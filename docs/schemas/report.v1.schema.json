@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xyte.dev/schemas/report.v1.schema.json",
+  "title": "Xyte Report V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generatedAtUtc",
+    "tenantId",
+    "format",
+    "outputPath",
+    "includeSensitive"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "xyte.report.v1"
+    },
+    "generatedAtUtc": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string"
+    },
+    "format": {
+      "type": "string",
+      "enum": [
+        "markdown",
+        "pdf"
+      ]
+    },
+    "outputPath": {
+      "type": "string"
+    },
+    "includeSensitive": {
+      "type": "boolean"
+    }
+  }
+}

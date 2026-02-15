@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xyte.dev/schemas/call-envelope.v1.schema.json",
+  "title": "Xyte Call Envelope V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "timestamp",
+    "requestId",
+    "endpointKey",
+    "method",
+    "guard",
+    "request"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "xyte.call.envelope.v1"
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "requestId": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string"
+    },
+    "endpointKey": {
+      "type": "string"
+    },
+    "method": {
+      "type": "string"
+    },
+    "guard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowWrite"
+      ],
+      "properties": {
+        "allowWrite": {
+          "type": "boolean"
+        },
+        "confirm": {
+          "type": "string"
+        }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "query"
+      ],
+      "properties": {
+        "path": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number"
+            ]
+          }
+        },
+        "query": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "body": {}
+      }
+    },
+    "response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "durationMs",
+        "retryCount",
+        "data"
+      ],
+      "properties": {
+        "status": {
+          "type": "integer"
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retryCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "data": {}
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "title",
+        "detail",
+        "xyteCode",
+        "retriable"
+      ],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "status": {
+          "type": "integer"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "xyteCode": {
+          "type": "string"
+        },
+        "retriable": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

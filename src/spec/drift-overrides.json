@@ -1,0 +1,42 @@
+{
+  "organization.commands.getCommands": {
+    "pathTemplate": "/core/v1/organization/devices/:device_id/commands",
+    "pathParams": ["device_id"],
+    "appendNotes": [
+      "Bruno doc path is stale; backend route is /core/v1/organization/devices/:device_id/commands."
+    ]
+  },
+  "organization.getOrganizationInfo": {
+    "bodyType": "none",
+    "hasBody": false,
+    "appendNotes": [
+      "Organization info endpoint is GET without request body."
+    ]
+  },
+  "organization.commands.cancelCommand": {
+    "bodyType": "none",
+    "hasBody": false,
+    "appendNotes": [
+      "Cancel command endpoint should not require a request body in SDK signatures."
+    ]
+  },
+  "device.device-info.setCloudSettings": {
+    "appendNotes": [
+      "Cloud settings payload should be normalized as { property, value } by SDK helper."
+    ]
+  },
+  "device.file-dumps.sendDump": {
+    "pathTemplate": "/v1/devices/:device_id/dumps/:mime_type/:filename",
+    "pathParams": ["device_id", "mime_type", "filename"],
+    "appendNotes": [
+      "Backend route accepts dynamic :mime_type/:filename segments."
+    ]
+  },
+  "device.file-dumps.appendDumpFile": {
+    "pathTemplate": "/v1/devices/:device_id/dumps/:id",
+    "pathParams": ["device_id", "id"],
+    "appendNotes": [
+      "Backend route uses dynamic dump id segment."
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+node_modules/
+video/node_modules/
+dist/
+coverage/
+.venv/
+*.log
+.DS_Store
+
+*.tgz

@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xyte.dev/schemas/inspect-deep-dive.v1.schema.json",
+  "title": "Xyte Deep Dive V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generatedAtUtc",
+    "tenantId",
+    "windowHours",
+    "summary",
+    "topOfflineSpaces",
+    "topIncidentDevices",
+    "activeIncidentAging",
+    "churn24h",
+    "ticketPosture",
+    "dataQuality"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "xyte.inspect.deep-dive.v1"
+    },
+    "generatedAtUtc": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string"
+    },
+    "windowHours": {
+      "type": "integer"
+    },
+    "summary": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "topOfflineSpaces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "space",
+          "offlineDevices",
+          "shareOfOfflinePct"
+        ],
+        "properties": {
+          "space": {
+            "type": "string"
+          },
+          "offlineDevices": {
+            "type": "integer"
+          },
+          "shareOfOfflinePct": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "topIncidentDevices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "device",
+          "incidentCount",
+          "activeIncidents"
+        ],
+        "properties": {
+          "device": {
+            "type": "string"
+          },
+          "incidentCount": {
+            "type": "integer"
+          },
+          "activeIncidents": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "activeIncidentAging": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "device",
+          "space",
+          "ageHours",
+          "createdAtUtc"
+        ],
+        "properties": {
+          "device": {
+            "type": "string"
+          },
+          "space": {
+            "type": "string"
+          },
+          "ageHours": {
+            "type": "integer"
+          },
+          "createdAtUtc": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "churn24h": {
+      "type": "object",
+      "required": [
+        "incidents",
+        "devices",
+        "spaces",
+        "bySpace",
+        "byDevice"
+      ],
+      "properties": {
+        "incidents": {
+          "type": "integer"
+        },
+        "devices": {
+          "type": "integer"
+        },
+        "spaces": {
+          "type": "integer"
+        },
+        "bySpace": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "space",
+              "incidents"
+            ],
+            "properties": {
+              "space": {
+                "type": "string"
+              },
+              "incidents": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "byDevice": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "device",
+              "incidents"
+            ],
+            "properties": {
+              "device": {
+                "type": "string"
+              },
+              "incidents": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      }
+    },
+    "ticketPosture": {
+      "type": "object",
+      "required": [
+        "openTickets",
+        "overlappingActiveIncidentDevices",
+        "oldestOpenTickets"
+      ],
+      "properties": {
+        "openTickets": {
+          "type": "integer"
+        },
+        "overlappingActiveIncidentDevices": {
+          "type": "integer"
+        },
+        "oldestOpenTickets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "ticketId",
+              "title",
+              "ageHours",
+              "deviceId",
+              "createdAtUtc"
+            ],
+            "properties": {
+              "ticketId": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "ageHours": {
+                "type": "integer"
+              },
+              "deviceId": {
+                "type": "string"
+              },
+              "createdAtUtc": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "dataQuality": {
+      "type": "object",
+      "required": [
+        "statusMismatches"
+      ],
+      "properties": {
+        "statusMismatches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "device",
+              "status",
+              "stateStatus",
+              "lastSeen",
+              "space"
+            ],
+            "properties": {
+              "device": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "stateStatus": {
+                "type": "string"
+              },
+              "lastSeen": {
+                "type": "string"
+              },
+              "space": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

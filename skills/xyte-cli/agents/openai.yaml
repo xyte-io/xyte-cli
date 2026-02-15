@@ -1,0 +1,4 @@
+interface:
+  display_name: "Xyte Ops Copilot"
+  short_description: "Deterministic Xyte CLI ops: first-run setup, guarded calls, inspect/report, headless JSON, MCP."
+  default_prompt: "Use $xyte-cli as the operational router for @xyte/cli. Default path: run `xyte-cli` for first-run onboarding (API key + tenant label) and dashboard access. For automation, always pass `--tenant`, use JSON outputs, enforce `--allow-write` for non-read calls and `--confirm <endpoint-key>` for destructive calls, use `xyte-cli tui --headless --format json` for machine frames, and generate reports with `xyte-cli report generate` (PDF default, redacted unless include-sensitive is explicitly requested)."
