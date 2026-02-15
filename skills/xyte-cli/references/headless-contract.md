@@ -93,4 +93,4 @@ By kind:
 
 ## JSON Schema
 
-- Canonical schema: `/Users/porton/Projects/xyte-cli/docs/schemas/headless-frame.v1.schema.json`
+- Schema file: `docs/schemas/headless-frame.v1.schema.json`

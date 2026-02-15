@@ -5,9 +5,18 @@ description: "Use for @xyte/cli operations: first-run setup, tenant/key auth, gu
 
 # XYTE Skill Router (One-Stop, Agent-Native)
 
-Last updated: 2026-02-08
+Last updated: 2026-02-15
 
-This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`. It is optimized for low-context agent routing: short policies, exact commands, and references/scripts for deeper procedures.
+This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
+
+## Invocation Rules
+
+- Use `xyte-cli` commands directly.
+- Do not use source/dev entrypoints (`npx`, `tsx`, `src/*`, `dist/*`, `bin/*`).
+- If `xyte-cli` is unavailable, ask the user to install `@xyte/cli` globally instead of improvising an entrypoint.
+- Command option correctness:
+  - `xyte-cli tenant list` has no `--format`.
+  - `xyte-cli setup status` supports `--format json|text`.
 
 ## Purpose and Trigger Conditions
 
@@ -61,7 +70,7 @@ Use when the request involves any of:
 
 ## Workflow Selector
 
-| Intent | Primary command/script |
+| Intent | Primary command |
 | --- | --- |
 | First-time onboarding (interactive) | `xyte-cli` |
 | Setup non-interactive | `xyte-cli setup run --non-interactive --tenant <tenant-id> --key <value>` |
@@ -76,8 +85,6 @@ Use when the request involves any of:
 | Headless snapshot (JSON NDJSON) | `xyte-cli tui --headless --screen <screen> --format json --once --tenant <tenant-id>` |
 | Continuous headless monitoring | `xyte-cli tui --headless --screen <screen> --format json --follow --interval-ms <ms> --tenant <tenant-id>` |
 | MCP tool bridge | `xyte-cli mcp serve` |
-| Contract smoke validation | `skills/xyte-cli/scripts/validate_agent_contracts.sh <tenant-id>` |
-| Headless contract validation | `skills/xyte-cli/scripts/check_headless.sh <tenant-id>` |
 
 ## Minimal Command Recipes
 
@@ -125,11 +132,11 @@ Schema/version IDs:
 - report metadata: `xyte.report.v1`
 
 Canonical schemas:
-- `/Users/porton/Projects/xyte-cli/docs/schemas/call-envelope.v1.schema.json`
-- `/Users/porton/Projects/xyte-cli/docs/schemas/headless-frame.v1.schema.json`
-- `/Users/porton/Projects/xyte-cli/docs/schemas/inspect-fleet.v1.schema.json`
-- `/Users/porton/Projects/xyte-cli/docs/schemas/inspect-deep-dive.v1.schema.json`
-- `/Users/porton/Projects/xyte-cli/docs/schemas/report.v1.schema.json`
+- `docs/schemas/call-envelope.v1.schema.json`
+- `docs/schemas/headless-frame.v1.schema.json`
+- `docs/schemas/inspect-fleet.v1.schema.json`
+- `docs/schemas/inspect-deep-dive.v1.schema.json`
+- `docs/schemas/report.v1.schema.json`
 
 ## MCP Tool Surface (Current)
 
@@ -145,23 +152,6 @@ Current tool names:
 Guard semantics in MCP mirror CLI:
 - write endpoints require `allow_write: true`
 - destructive endpoints require matching `confirm`
-
-## Validation Commands
-
-Run full contract checks:
-```bash
-skills/xyte-cli/scripts/validate_agent_contracts.sh <tenant-id>
-```
-
-Validate headless frames only:
-```bash
-skills/xyte-cli/scripts/check_headless.sh <tenant-id>
-```
-
-Validate any payload against schema:
-```bash
-node skills/xyte-cli/scripts/validate_with_schema.js <schema.json> <data.json>
-```
 
 ## Troubleshooting Entrypoints
 
@@ -179,21 +169,13 @@ XYTE_TUI_DEBUG=1 XYTE_TUI_DEBUG_LOG=/tmp/xyte-tui-debug.log xyte-cli tui --tenan
   - ensure `--headless --format json` (no text format in headless)
   - parse NDJSON and use the last runtime frame (`meta.startup != true`)
 
-## Utility Scripts
-
-- `/Users/porton/Projects/xyte-cli/skills/xyte-cli/scripts/run_xyte_cli.sh`
-- `/Users/porton/Projects/xyte-cli/skills/xyte-cli/scripts/check_headless.sh`
-- `/Users/porton/Projects/xyte-cli/skills/xyte-cli/scripts/validate_agent_contracts.sh`
-- `/Users/porton/Projects/xyte-cli/skills/xyte-cli/scripts/validate_with_schema.js`
-
 ## References (Load As Needed)
 
-- `/Users/porton/Projects/xyte-cli/skills/xyte-cli/references/endpoints.md`
-- `/Users/porton/Projects/xyte-cli/skills/xyte-cli/references/tui-flows.md`
-- `/Users/porton/Projects/xyte-cli/skills/xyte-cli/references/headless-contract.md`
+- `references/endpoints.md`
+- `references/tui-flows.md`
+- `references/headless-contract.md`
 
 ## Notes for Agents
 
 - Keep this file short in-context; use references for deep procedures.
-- Prefer scripts over ad hoc manual validation flows.
 - Keep tenant explicit in automation (`--tenant <tenant-id>`).

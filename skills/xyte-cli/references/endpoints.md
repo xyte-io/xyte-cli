@@ -34,7 +34,7 @@ xyte-cli call <endpoint-key> \
 
 ## Filters and Pagination Matrix (from spec)
 
-Source: `/Users/porton/Projects/xyte-cli/src/spec/public-endpoints.json`
+Derived from the bundled public endpoint spec.
 
 | Endpoint Key | Query Fields | Pagination Fields | Notes |
 | --- | --- | --- | --- |
@@ -100,10 +100,7 @@ Device:
   - `xyte-cli auth key list --tenant <tenant-id> --format json`
   - `xyte-cli auth key use --tenant <tenant-id> --provider <provider> --slot <id|name>`
 
-## Utility
+## Notes
 
-Generate a fresh query/filter report from spec:
-
-```bash
-skills/xyte-cli/scripts/endpoint_filters_report.sh
-```
+- Keep endpoint exploration and invocation on `xyte-cli` commands.
+- Do not rely on repo-local script paths for agent operation.
