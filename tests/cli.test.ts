@@ -506,9 +506,11 @@ describe('cli integration', () => {
     await program.parseAsync(['node', 'xyte-cli', 'install', '--skills', '--target', target, '--no-setup']);
 
     expect(existsSync(join(target, '.claude', 'skills', 'xyte-cli', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(target, '.github', 'skills', 'xyte-cli', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(target, '.agents', 'skills', 'xyte-cli', 'SKILL.md'))).toBe(true);
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
-    expect(output).toContain('Workspace initialized');
-    expect(output).toContain('Skills installed');
+    expect(output).toContain('Workspace target');
+    expect(output).toContain('Skill install summary');
   });
 
   it('runs install --skills with setup when XYTE_CLI_KEY is present', async () => {
@@ -542,8 +544,177 @@ describe('cli integration', () => {
     }
 
     expect(existsSync(join(target, '.claude', 'skills', 'xyte-cli', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(target, '.github', 'skills', 'xyte-cli', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(target, '.agents', 'skills', 'xyte-cli', 'SKILL.md'))).toBe(true);
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     expect(output).toContain('Setup complete');
+  });
+
+  it('installs only codex skill in user scope when requested', async () => {
+    const profileStore = new MemoryProfileStore();
+    const keychain = new MemoryKeychain();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, keychain, stdout, stderr });
+    const target = mkdtempSync(join(tmpdir(), 'xyte-cli-install-user-target-'));
+    const fakeHome = mkdtempSync(join(tmpdir(), 'xyte-cli-install-user-home-'));
+    const previousHome = process.env.HOME;
+    const previousUserProfile = process.env.USERPROFILE;
+    process.env.HOME = fakeHome;
+    process.env.USERPROFILE = fakeHome;
+
+    try {
+      await program.parseAsync([
+        'node',
+        'xyte-cli',
+        'install',
+        '--skills',
+        '--target',
+        target,
+        '--scope',
+        'user',
+        '--agents',
+        'codex',
+        '--no-setup'
+      ]);
+    } finally {
+      if (previousHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = previousHome;
+      }
+      if (previousUserProfile === undefined) {
+        delete process.env.USERPROFILE;
+      } else {
+        process.env.USERPROFILE = previousUserProfile;
+      }
+    }
+
+    expect(existsSync(join(fakeHome, '.agents', 'skills', 'xyte-cli', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(fakeHome, '.claude', 'skills', 'xyte-cli', 'SKILL.md'))).toBe(false);
+    expect(existsSync(join(target, '.claude', 'skills', 'xyte-cli', 'SKILL.md'))).toBe(false);
+  });
+
+  it('prompts for scope and agents in interactive mode when flags are omitted', async () => {
+    const profileStore = new MemoryProfileStore();
+    const keychain = new MemoryKeychain();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const promptValue = vi
+      .fn()
+      .mockResolvedValueOnce('project')
+      .mockResolvedValueOnce('claude,codex');
+    const program = createCli({
+      profileStore,
+      keychain,
+      stdout,
+      stderr,
+      isTTY: true,
+      promptValue
+    });
+    const target = mkdtempSync(join(tmpdir(), 'xyte-cli-install-interactive-'));
+
+    await program.parseAsync(['node', 'xyte-cli', 'install', '--skills', '--target', target, '--no-setup']);
+
+    expect(promptValue).toHaveBeenCalledTimes(2);
+    expect(existsSync(join(target, '.claude', 'skills', 'xyte-cli', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(target, '.agents', 'skills', 'xyte-cli', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(target, '.github', 'skills', 'xyte-cli', 'SKILL.md'))).toBe(false);
+  });
+
+  it('returns a clear error for invalid --agents value', async () => {
+    const profileStore = new MemoryProfileStore();
+    const keychain = new MemoryKeychain();
+    const program = createCli({ profileStore, keychain, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+
+    await expect(
+      program.parseAsync([
+        'node',
+        'xyte-cli',
+        'install',
+        '--skills',
+        '--scope',
+        'project',
+        '--agents',
+        'claude,unknown',
+        '--no-setup'
+      ])
+    ).rejects.toThrow('Invalid agents');
+  });
+
+  it('skips existing skill without --force and overwrites with --force', async () => {
+    const profileStore = new MemoryProfileStore();
+    const keychain = new MemoryKeychain();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, keychain, stdout, stderr });
+    const target = mkdtempSync(join(tmpdir(), 'xyte-cli-install-force-'));
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'install',
+      '--skills',
+      '--target',
+      target,
+      '--scope',
+      'project',
+      '--agents',
+      'claude',
+      '--no-setup'
+    ]);
+
+    stdout.write.mockClear();
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'install',
+      '--skills',
+      '--target',
+      target,
+      '--scope',
+      'project',
+      '--agents',
+      'claude',
+      '--no-setup'
+    ]);
+    const skippedOutput = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(skippedOutput).toContain('skipped');
+
+    stdout.write.mockClear();
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'install',
+      '--skills',
+      '--target',
+      target,
+      '--scope',
+      'project',
+      '--agents',
+      'claude',
+      '--force',
+      '--no-setup'
+    ]);
+    const overwrittenOutput = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(overwrittenOutput).toContain('overwritten');
+  });
+
+  it('fails install when any target destination fails', async () => {
+    const profileStore = new MemoryProfileStore();
+    const keychain = new MemoryKeychain();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, keychain, stdout, stderr });
+    const target = mkdtempSync(join(tmpdir(), 'xyte-cli-install-partial-fail-'));
+    writeFileSync(join(target, '.github'), 'not-a-directory', 'utf8');
+
+    await expect(program.parseAsync(['node', 'xyte-cli', 'install', '--skills', '--target', target, '--no-setup'])).rejects.toThrow(
+      'Skill installation failed'
+    );
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(output).toContain('project/copilot: failed');
   });
 
   it('does not register removed auth wrapper commands', async () => {

@@ -17,7 +17,12 @@ import { FileProfileStore, type ProfileStore } from '../secure/profile-store';
 import type { SecretProvider } from '../types/profile';
 import { parseJsonObject } from '../utils/json';
 import { writeJsonLine } from '../utils/json-output';
-import { installSkills } from '../utils/install-skills';
+import {
+  installSkills,
+  type SkillAgent,
+  type SkillInstallOutcome,
+  type SkillInstallScope
+} from '../utils/install-skills';
 import { runTuiApp } from '../tui/app';
 import type { TuiScreenId } from '../tui/types';
 import {
@@ -34,6 +39,7 @@ import { createMcpServer } from '../mcp/server';
 type OutputStream = Pick<typeof process.stdout, 'write'>;
 type ErrorStream = Pick<typeof process.stderr, 'write'>;
 type OutputFormat = 'json' | 'text';
+type PromptValueFn = (args: { question: string; initial?: string; stdout: OutputStream }) => Promise<string>;
 
 interface InstallDoctorResult {
   status: 'ok' | 'missing' | 'mismatch';
@@ -52,6 +58,8 @@ export interface CliRuntime {
   stdout?: OutputStream;
   stderr?: ErrorStream;
   runTui?: typeof runTuiApp;
+  promptValue?: PromptValueFn;
+  isTTY?: boolean;
 }
 
 interface SlotView {
@@ -68,6 +76,8 @@ interface SlotView {
 const SIMPLE_SETUP_PROVIDER: SecretProvider = 'xyte-org';
 const SIMPLE_SETUP_SLOT_NAME = 'primary';
 const SIMPLE_SETUP_DEFAULT_TENANT = 'default';
+const SKILL_AGENTS: SkillAgent[] = ['claude', 'copilot', 'codex'];
+const SKILL_SCOPES: SkillInstallScope[] = ['project', 'user', 'both'];
 
 function printJson(stream: OutputStream, value: unknown, options: { strictJson?: boolean } = {}) {
   writeJsonLine(stream, value, { strictJson: options.strictJson });
@@ -81,6 +91,58 @@ function parseProvider(value: string): SecretProvider {
   }
 
   return value as SecretProvider;
+}
+
+function parseSkillInstallScope(value: string | undefined): SkillInstallScope | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (!SKILL_SCOPES.includes(normalized as SkillInstallScope)) {
+    throw new Error(`Invalid scope: ${value}. Expected one of: ${SKILL_SCOPES.join(', ')}.`);
+  }
+  return normalized as SkillInstallScope;
+}
+
+function parseSkillAgents(value: string | undefined): SkillAgent[] | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const tokens = value
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (!tokens.length) {
+    throw new Error('Invalid agents: empty value.');
+  }
+
+  if (tokens.includes('all')) {
+    if (tokens.length > 1) {
+      throw new Error('Invalid agents: "all" cannot be combined with specific agents.');
+    }
+    return [...SKILL_AGENTS];
+  }
+
+  const unknown = tokens.filter((item) => !SKILL_AGENTS.includes(item as SkillAgent));
+  if (unknown.length > 0) {
+    throw new Error(`Invalid agents: ${unknown.join(', ')}. Expected "all" or ${SKILL_AGENTS.join(', ')}.`);
+  }
+
+  return SKILL_AGENTS.filter((agent) => tokens.includes(agent));
+}
+
+function formatInstallOutcome(outcome: SkillInstallOutcome): string {
+  const prefix = `${outcome.scope}/${outcome.agent}`;
+  if (outcome.status === 'failed') {
+    return `- ${prefix}: failed -> ${outcome.targetDir} (${outcome.error ?? 'unknown error'})`;
+  }
+  if (outcome.status === 'skipped') {
+    return `- ${prefix}: skipped -> ${outcome.targetDir} (already exists; use --force to overwrite)`;
+  }
+  return `- ${prefix}: ${outcome.status} -> ${outcome.targetDir}`;
 }
 
 function parsePathJson(value: string | undefined): Record<string, string | number> {
@@ -358,6 +420,8 @@ async function runSlotConnectivityTest(args: {
 export function createCli(runtime: CliRuntime = {}): Command {
   const stdout = runtime.stdout ?? process.stdout;
   const stderr = runtime.stderr ?? process.stderr;
+  const prompt = runtime.promptValue ?? promptValue;
+  const isInteractive = runtime.isTTY ?? Boolean(process.stdin.isTTY);
   const profileStore = runtime.profileStore ?? new FileProfileStore();
   const runTui = runtime.runTui ?? runTuiApp;
 
@@ -440,12 +504,16 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .description('Initialize workspace')
     .option('--skills', 'install local agent skills')
     .option('--target <path>', 'Workspace directory override')
+    .option('--scope <scope>', 'project|user|both')
+    .option('--agents <agents>', 'all|claude|copilot|codex[,..]')
     .option('--force', 'Overwrite existing skill install')
     .option('--no-setup', 'Skip guided setup after installing skills')
     .action(
       async (options: {
         skills?: boolean;
         target?: string;
+        scope?: string;
+        agents?: string;
         force?: boolean;
         setup?: boolean;
       }) => {
@@ -453,16 +521,54 @@ export function createCli(runtime: CliRuntime = {}): Command {
           throw new Error('Use "xyte-cli install --skills" to install agent skills.');
         }
 
+        let scope = parseSkillInstallScope(options.scope);
+        let agents = parseSkillAgents(options.agents);
+        if (isInteractive) {
+          if (!scope) {
+            scope = parseSkillInstallScope(
+              await prompt({
+                question: 'Install scope (project|user|both)',
+                initial: 'project',
+                stdout
+              })
+            );
+          }
+          if (!agents) {
+            agents = parseSkillAgents(
+              await prompt({
+                question: 'Agents (all|claude,copilot,codex)',
+                initial: 'all',
+                stdout
+              })
+            );
+          }
+        }
+        scope = scope ?? 'project';
+        agents = agents ?? [...SKILL_AGENTS];
+
         const skillSource = path.resolve(__dirname, '../../skills/xyte-cli');
         const result = await installSkills({
           skillName: 'xyte-cli',
           sourceDir: skillSource,
+          scope,
+          agents,
           targetWorkspace: options.target,
           force: options.force === true
         });
 
-        stdout.write(`✅ Workspace initialized at \`${result.workspaceRoot}\`.\n`);
-        stdout.write('✅ Skills installed to `.claude/skills/xyte-cli`.\n');
+        if (scope === 'project' || scope === 'both') {
+          stdout.write(`✅ Workspace target: \`${result.workspaceRoot}\`.\n`);
+        }
+        if (scope === 'user' || scope === 'both') {
+          stdout.write(`✅ User target: \`${result.homeRoot}\`.\n`);
+        }
+        stdout.write('Skill install summary:\n');
+        result.outcomes.forEach((outcome) => stdout.write(`${formatInstallOutcome(outcome)}\n`));
+
+        const failed = result.outcomes.filter((outcome) => outcome.status === 'failed');
+        if (failed.length > 0) {
+          throw new Error(`Skill installation failed for ${failed.length} target(s).`);
+        }
 
         if (options.setup === false) {
           return;
@@ -471,10 +577,10 @@ export function createCli(runtime: CliRuntime = {}): Command {
         let keyValue = process.env.XYTE_CLI_KEY?.trim();
         let tenantLabel = SIMPLE_SETUP_DEFAULT_TENANT;
 
-        if (process.stdin.isTTY) {
-          keyValue = keyValue || (await promptValue({ question: 'XYTE API key', stdout })).trim();
+        if (isInteractive) {
+          keyValue = keyValue || (await prompt({ question: 'XYTE API key', stdout })).trim();
           tenantLabel =
-            (await promptValue({
+            (await prompt({
               question: 'Tenant label (optional)',
               initial: tenantLabel,
               stdout
@@ -514,16 +620,16 @@ export function createCli(runtime: CliRuntime = {}): Command {
     });
 
     if (readiness.state !== 'ready') {
-      if (!process.stdin.isTTY) {
+      if (!isInteractive) {
         throw new Error('Setup required. Run: xyte-cli setup run --non-interactive --tenant default --key "$XYTE_CLI_KEY".');
       }
 
-      const apiKey = await promptValue({ question: 'XYTE API key', stdout });
+      const apiKey = await prompt({ question: 'XYTE API key', stdout });
       if (!apiKey.trim()) {
         throw new Error('API key is required to complete first-run setup.');
       }
 
-      const tenantLabelInput = await promptValue({
+      const tenantLabelInput = await prompt({
         question: 'Tenant label (optional)',
         initial: SIMPLE_SETUP_DEFAULT_TENANT,
         stdout
@@ -1110,7 +1216,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
         nonInteractive?: boolean;
         format?: OutputFormat;
       }) => {
-        if (!options.nonInteractive && !process.stdin.isTTY) {
+        if (!options.nonInteractive && !isInteractive) {
           throw new Error('Interactive setup requires a TTY. Use --non-interactive with explicit flags.');
         }
 
@@ -1120,9 +1226,9 @@ export function createCli(runtime: CliRuntime = {}): Command {
           let keyValue = options.key ?? process.env.XYTE_CLI_KEY;
 
           if (!options.nonInteractive) {
-            keyValue = keyValue || (await promptValue({ question: 'XYTE API key', stdout }));
+            keyValue = keyValue || (await prompt({ question: 'XYTE API key', stdout }));
             tenantLabel =
-              (await promptValue({
+              (await prompt({
                 question: 'Tenant label (optional)',
                 initial: tenantLabel,
                 stdout
@@ -1158,12 +1264,12 @@ export function createCli(runtime: CliRuntime = {}): Command {
         let keyValue = options.key ?? process.env.XYTE_CLI_KEY;
 
         if (!options.nonInteractive) {
-          tenantId = tenantId || (await promptValue({ question: 'Tenant id', stdout }));
-          tenantName = tenantName || (await promptValue({ question: 'Tenant display name', initial: tenantId, stdout }));
-          const providerAnswer = provider || parseProvider(await promptValue({ question: 'Provider', initial: 'xyte-org', stdout }));
+          tenantId = tenantId || (await prompt({ question: 'Tenant id', stdout }));
+          tenantName = tenantName || (await prompt({ question: 'Tenant display name', initial: tenantId, stdout }));
+          const providerAnswer = provider || parseProvider(await prompt({ question: 'Provider', initial: 'xyte-org', stdout }));
           provider = providerAnswer;
-          slotName = await promptValue({ question: 'Slot name', initial: slotName, stdout });
-          keyValue = keyValue || (await promptValue({ question: 'API key', stdout }));
+          slotName = await prompt({ question: 'Slot name', initial: slotName, stdout });
+          keyValue = keyValue || (await prompt({ question: 'API key', stdout }));
         }
 
         if (!tenantId) {

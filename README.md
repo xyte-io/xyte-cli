@@ -46,13 +46,33 @@ xyte-cli --help
 xyte-cli install --skills
 ```
 
-This installs the skill bundle into `.claude/skills/xyte-cli` and runs guided setup in the same flow.
+By default, this command prompts for:
+- install scope: `project`, `user`, or `both`
+- agents: `all` or a subset of `claude,copilot,codex`
+
+Then it installs the same skill bundle to the selected destinations and runs guided setup in the same flow.
+
+When no prompt is available (CI/non-interactive), default is:
+- scope: `project`
+- agents: `all` (`claude`, `copilot`, `codex`)
+
+Path mapping:
+- Project scope:
+  - Claude: `.claude/skills/xyte-cli`
+  - Copilot: `.github/skills/xyte-cli`
+  - Codex: `.agents/skills/xyte-cli`
+- User scope:
+  - Claude: `~/.claude/skills/xyte-cli`
+  - Copilot: `~/.copilot/skills/xyte-cli`
+  - Codex: `~/.agents/skills/xyte-cli`
 
 Options:
 
 ```bash
 xyte-cli install --skills --no-setup
 xyte-cli install --skills --target /path/to/workspace
+xyte-cli install --skills --scope project --agents claude,codex
+xyte-cli install --skills --scope both --agents all --force
 xyte-cli install --skills --force
 ```
 
@@ -85,7 +105,7 @@ Check xyte-cli --help first and keep outputs in JSON when possible.
 ### Core
 
 ```bash
-xyte-cli install --skills [--target <path>] [--force] [--no-setup]
+xyte-cli install --skills [--target <path>] [--scope <project|user|both>] [--agents <all|claude|copilot|codex[,..]>] [--force] [--no-setup]
 xyte-cli doctor install --format json
 xyte-cli setup status --tenant <tenant-id> --format json
 xyte-cli setup run [--non-interactive] [--tenant <tenant-id>] [--key <value>]
@@ -185,6 +205,13 @@ claude
 ```bash
 xyte-cli install --skills
 # in Codex prompts, ask to run xyte-cli commands directly
+```
+
+### GitHub Copilot
+
+```bash
+xyte-cli install --skills
+# in Copilot prompts, ask to run xyte-cli commands directly
 ```
 
 ## Development
