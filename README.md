@@ -231,6 +231,12 @@ npm i -g ./xyte-cli-*.tgz
 xyte-cli install --skills --no-setup
 ```
 
+## Release
+
+Manual npm release steps are documented in:
+
+- `docs/release.md`
+
 ## Skill Package Layout
 
 - `skills/xyte-cli/SKILL.md`

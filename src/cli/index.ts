@@ -17,6 +17,7 @@ import { FileProfileStore, type ProfileStore } from '../secure/profile-store';
 import type { SecretProvider } from '../types/profile';
 import { parseJsonObject } from '../utils/json';
 import { writeJsonLine } from '../utils/json-output';
+import { getCliVersion } from '../utils/version';
 import {
   installSkills,
   type SkillAgent,
@@ -261,7 +262,7 @@ function getRealPath(value: string): string {
 }
 
 function runInstallDoctor(): InstallDoctorResult {
-  const expectedPath = path.resolve(__dirname, '../../bin/xyte-cli');
+  const expectedPath = path.resolve(__dirname, '../../dist/bin/xyte-cli.js');
   const expectedRealPath = getRealPath(expectedPath);
   const commandPath = resolveCommandFromPath('xyte-cli');
   const commandOnPath = Boolean(commandPath);
@@ -496,7 +497,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
   };
 
   const program = new Command();
-  program.name('xyte-cli').description('Xyte CLI + TUI').version('0.1.0');
+  program.name('xyte-cli').description('Xyte CLI + TUI').version(getCliVersion());
   program.option('--error-format <format>', 'text|json', 'text');
 
   program

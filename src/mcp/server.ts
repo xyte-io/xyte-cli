@@ -9,6 +9,7 @@ import { toProblemDetails } from '../contracts/problem';
 import { evaluateReadiness } from '../config/readiness';
 import type { KeychainStore } from '../secure/keychain';
 import type { ProfileStore } from '../secure/profile-store';
+import { getCliVersion } from '../utils/version';
 import { buildFleetInspect, collectFleetSnapshot, generateFleetReport } from '../workflows/fleet-insights';
 
 interface JsonRpcRequest {
@@ -391,7 +392,7 @@ export function createMcpServer(options: McpServerOptions) {
         protocolVersion: '2025-06-18',
         serverInfo: {
           name: 'xyte-cli',
-          version: '0.1.0'
+          version: getCliVersion()
         },
         capabilities: {
           tools: {

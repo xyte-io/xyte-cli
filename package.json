@@ -4,18 +4,37 @@
   "description": "Xyte CLI, TUI, skills, and MCP bridge for zero-friction AI operations",
   "private": true,
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xyte-io/xyte-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xyte-io/xyte-cli/issues"
+  },
+  "homepage": "https://github.com/xyte-io/xyte-cli#readme",
+  "keywords": [
+    "xyte",
+    "cli",
+    "tui",
+    "mcp",
+    "agent",
+    "operations"
+  ],
   "type": "commonjs",
   "engines": {
     "node": ">=18"
   },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "bin": {
-    "xyte-cli": "bin/xyte-cli"
+    "xyte-cli": "dist/bin/xyte-cli.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist",
-    "bin",
     "skills",
     "docs/schemas"
   ],
@@ -23,6 +42,7 @@
     "clean": "rm -rf dist coverage",
     "build": "npm run clean && tsc -p tsconfig.build.json",
     "prepare": "npm run build",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build",
     "install:global": "npm run build && npm link",
     "uninstall:global": "npm unlink -g @xyte/cli || true",
     "reinstall:global": "npm run uninstall:global && npm run install:global",
