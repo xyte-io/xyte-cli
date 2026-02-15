@@ -48,6 +48,7 @@ Run a release:
 1. Ensure `package.json` version matches the release tag.
 2. Push a semver tag (`0.1.0` or `v0.1.0`) OR run workflow `Publish CLI` manually with `tag` input.
 3. The workflow validates tag/version match, runs install/build checks, and publishes to npm.
+4. The workflow pins publish runtime to Node `22` and npm `11.5.1`.
 
 ## Rollback / Recovery
 
