@@ -1,0 +1,84 @@
+name: Publish CLI
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+      - "*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish (e.g. 0.1.0 or v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve tag
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+
+          TAG="${TAG#refs/tags/}"
+          VERSION="${TAG#v}"
+
+          if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Tag '${TAG}' is not a valid semver tag."
+            exit 1
+          fi
+
+          echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+
+      - name: Checkout tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          git checkout --detach "refs/tags/${{ steps.meta.outputs.tag }}"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate package version matches tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          TAG_VERSION="${{ steps.meta.outputs.version }}"
+          if [[ "${PACKAGE_VERSION}" != "${TAG_VERSION}" ]]; then
+            echo "::error::package.json version (${PACKAGE_VERSION}) does not match tag (${TAG_VERSION})."
+            exit 1
+          fi
+
+      - name: Publish to npm
+        run: npm publish --access public
