@@ -1,0 +1,1271 @@
+<!doctype html>
+<html lang="en" id="top">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>xyte-cli — Deterministic Xyte Operations for Agents and Operators</title>
+    <meta
+      name="description"
+      content="xyte-cli provides deterministic endpoint calls, guarded write flows, a full TUI, headless NDJSON snapshots, schema contracts, and MCP server support."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@10..48,500;10..48,700;10..48,800&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0b1217;
+        --bg-elev: #111b22;
+        --bg-card: #17242d;
+        --bg-code: #0f1a22;
+        --line: rgba(176, 219, 238, 0.2);
+        --line-strong: rgba(176, 219, 238, 0.45);
+        --text: #eaf6fc;
+        --muted: #93b2c1;
+        --muted-strong: #b8d0db;
+        --aqua: #34d3d8;
+        --gold: #f9c46b;
+        --coral: #ff8e72;
+        --focus: #9ee0ff;
+        --radius-s: 10px;
+        --radius-m: 16px;
+        --radius-l: 24px;
+        --shadow-soft: 0 14px 45px rgba(0, 0, 0, 0.34);
+        --shadow-glow: 0 0 80px rgba(52, 211, 216, 0.14);
+        --font-display: "Bricolage Grotesque", "Segoe UI", sans-serif;
+        --font-body: "Manrope", "Segoe UI", sans-serif;
+        --font-mono: "IBM Plex Mono", Menlo, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        font-family: var(--font-body);
+        color: var(--text);
+        background:
+          radial-gradient(circle at 15% -8%, rgba(52, 211, 216, 0.26), transparent 40%),
+          radial-gradient(circle at 85% 8%, rgba(249, 196, 107, 0.22), transparent 34%),
+          linear-gradient(180deg, #081015 0%, #0b1217 22%, #091015 100%);
+        line-height: 1.58;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(167, 214, 232, 0.045) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(167, 214, 232, 0.045) 1px, transparent 1px);
+        background-size: 26px 26px;
+        mask-image: radial-gradient(circle at center, black 20%, transparent 95%);
+        z-index: -1;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .wrap {
+        width: min(1180px, 100% - 44px);
+        margin: 0 auto;
+      }
+
+      .section {
+        padding: 92px 0;
+      }
+
+      .section + .section {
+        border-top: 1px solid var(--line);
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--gold);
+        text-transform: uppercase;
+        letter-spacing: 0.13em;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        font-family: var(--font-display);
+        line-height: 1.05;
+      }
+
+      h2 {
+        font-size: clamp(32px, 4vw, 48px);
+        margin-bottom: 14px;
+      }
+
+      p {
+        margin: 0;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .skip-link {
+        position: absolute;
+        left: -999px;
+        top: 0;
+        padding: 10px 14px;
+        background: var(--aqua);
+        color: #00272c;
+        border-radius: 0 0 var(--radius-s) var(--radius-s);
+        font-weight: 700;
+      }
+
+      .skip-link:focus {
+        left: 16px;
+        z-index: 110;
+      }
+
+      .site-nav {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        backdrop-filter: blur(10px) saturate(170%);
+        background: rgba(8, 16, 21, 0.74);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .nav-row {
+        min-height: 64px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        padding: 10px 0;
+      }
+
+      .brand {
+        margin-right: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 11px;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .brand img {
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        background: #ffffff;
+        padding: 4px;
+      }
+
+      .brand-name {
+        font-family: var(--font-display);
+        font-size: 20px;
+        letter-spacing: 0.01em;
+      }
+
+      .nav-links {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+
+      .nav-links a {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--muted);
+        text-decoration: none;
+        padding: 7px 10px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+      }
+
+      .nav-links a:hover {
+        color: var(--text);
+        border-color: var(--line);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .nav-cta {
+        margin-left: 8px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, var(--gold), #f6d998);
+        color: #221605;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 13px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      .hero {
+        padding: 88px 0 68px;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+        gap: 34px;
+        align-items: end;
+      }
+
+      .hero h1 {
+        font-size: clamp(42px, 6vw, 76px);
+        margin-bottom: 22px;
+        max-width: 12ch;
+      }
+
+      .hero h1 em {
+        font-style: normal;
+        color: var(--aqua);
+      }
+
+      .hero-copy {
+        color: var(--muted-strong);
+        font-size: clamp(17px, 2vw, 21px);
+        max-width: 62ch;
+      }
+
+      .hero-actions {
+        margin-top: 32px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 700;
+        padding: 12px 18px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+      }
+
+      .btn-primary {
+        color: #02252c;
+        background: linear-gradient(135deg, var(--aqua), #7ce2e5);
+        box-shadow: var(--shadow-glow);
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-1px);
+      }
+
+      .btn-ghost {
+        color: var(--text);
+        border: 1px solid var(--line-strong);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .btn-ghost:hover {
+        border-color: var(--aqua);
+      }
+
+      .hero-badges {
+        margin-top: 28px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .hero-badges span {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--muted);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 6px 11px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .terminal-card {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-l);
+        overflow: hidden;
+        background: linear-gradient(165deg, rgba(16, 27, 36, 0.92), rgba(10, 17, 24, 0.94));
+        box-shadow: var(--shadow-soft);
+      }
+
+      .terminal-head {
+        border-bottom: 1px solid var(--line);
+        padding: 11px 14px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+      }
+
+      .dot-red {
+        background: var(--coral);
+      }
+
+      .dot-gold {
+        background: var(--gold);
+      }
+
+      .dot-aqua {
+        background: var(--aqua);
+      }
+
+      .terminal-title {
+        margin-left: 8px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .terminal-body {
+        font-family: var(--font-mono);
+        font-size: 13px;
+        line-height: 1.7;
+        margin: 0;
+        padding: 16px 18px;
+        background: var(--bg-code);
+        color: #d5e6ef;
+      }
+
+      .term-cmd {
+        color: var(--aqua);
+      }
+
+      .term-flg {
+        color: var(--gold);
+      }
+
+      .term-val {
+        color: #ffd6c8;
+      }
+
+      .term-cm {
+        color: #8ea9b6;
+      }
+
+      .lead {
+        max-width: 68ch;
+        color: var(--muted-strong);
+        font-size: 18px;
+      }
+
+      .split-cards {
+        margin-top: 26px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-m);
+        padding: 20px;
+        background: linear-gradient(180deg, rgba(23, 36, 45, 0.88), rgba(13, 23, 31, 0.88));
+      }
+
+      .card h3 {
+        font-size: 22px;
+        margin-bottom: 8px;
+      }
+
+      .chip-row {
+        margin-top: 14px;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .chip {
+        border-radius: 999px;
+        border: 1px solid var(--line-strong);
+        padding: 5px 10px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .features-grid {
+        margin-top: 26px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .feature-card {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-m);
+        padding: 18px 18px 20px;
+        background: linear-gradient(180deg, rgba(17, 27, 34, 0.84), rgba(9, 16, 21, 0.88));
+        transition: transform 0.2s ease, border-color 0.2s ease;
+      }
+
+      .feature-card:hover {
+        transform: translateY(-2px);
+        border-color: var(--line-strong);
+      }
+
+      .feature-card h3 {
+        font-size: 20px;
+        margin-bottom: 9px;
+      }
+
+      .feature-card p {
+        color: var(--muted);
+      }
+
+      .feature-card code {
+        display: block;
+        margin-top: 12px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: #d9edf7;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-s);
+        padding: 8px 9px;
+      }
+
+      .flow-grid {
+        margin-top: 26px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-m);
+        background: var(--bg-card);
+        overflow: hidden;
+      }
+
+      .panel h3 {
+        font-size: 20px;
+        padding: 16px 16px 0;
+      }
+
+      .panel p {
+        padding: 8px 16px 0;
+        color: var(--muted);
+      }
+
+      .panel pre {
+        margin: 16px;
+        padding: 14px;
+        border-radius: var(--radius-s);
+        border: 1px solid var(--line);
+        background: var(--bg-code);
+        overflow-x: auto;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        line-height: 1.68;
+        color: #d8e9f1;
+      }
+
+      .table-wrap {
+        margin-top: 24px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-m);
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 840px;
+        background: rgba(9, 16, 21, 0.9);
+      }
+
+      th,
+      td {
+        text-align: left;
+        border-bottom: 1px solid var(--line);
+        padding: 12px 14px;
+        vertical-align: top;
+      }
+
+      th {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+
+      td {
+        font-size: 14px;
+        color: #d7eaf3;
+      }
+
+      td code {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: #d3ebf6;
+      }
+
+      .warn-grid {
+        margin-top: 24px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .warn {
+        border: 1px solid rgba(255, 142, 114, 0.45);
+        border-radius: var(--radius-m);
+        background: linear-gradient(180deg, rgba(40, 20, 15, 0.78), rgba(25, 13, 10, 0.84));
+        padding: 18px;
+      }
+
+      .warn h3 {
+        font-size: 20px;
+        color: #ffc2b2;
+        margin-bottom: 9px;
+      }
+
+      .warn pre {
+        margin: 12px 0 0;
+        padding: 12px;
+        border: 1px solid rgba(255, 142, 114, 0.35);
+        border-radius: var(--radius-s);
+        background: rgba(0, 0, 0, 0.25);
+        overflow-x: auto;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        line-height: 1.7;
+      }
+
+      .schema-chips {
+        margin-top: 22px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .schema-chips a {
+        text-decoration: none;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 999px;
+        padding: 8px 12px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: #d0e7f2;
+      }
+
+      .schema-chips a:hover {
+        border-color: var(--aqua);
+      }
+
+      .shots-grid {
+        margin-top: 26px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .shot {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-m);
+        overflow: hidden;
+        background: var(--bg-card);
+      }
+
+      .shot img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .shot figcaption {
+        padding: 12px 14px 13px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .agent-quick {
+        margin-top: 30px;
+        display: grid;
+        grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
+        gap: 24px;
+        align-items: start;
+      }
+
+      .agent-install {
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-l);
+        padding: 24px;
+        background:
+          radial-gradient(circle at 88% 8%, rgba(52, 211, 216, 0.18), transparent 50%),
+          linear-gradient(160deg, rgba(17, 27, 34, 0.95), rgba(10, 17, 24, 0.95));
+        box-shadow: var(--shadow-soft);
+        display: flex;
+        flex-direction: column;
+        gap: 11px;
+      }
+
+      .agent-step {
+        display: inline-block;
+        margin-bottom: 2px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+        color: var(--gold);
+      }
+
+      .agent-install h3 {
+        font-size: 24px;
+        margin-bottom: 2px;
+      }
+
+      .agent-install p {
+        color: var(--muted);
+        margin: 0;
+        line-height: 1.44;
+      }
+
+      .agent-install pre {
+        margin: 2px 0 0;
+        padding: 14px 16px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: rgba(4, 18, 26, 0.9);
+        overflow-x: auto;
+        font-family: var(--font-mono);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .agent-note {
+        font-size: 13px;
+        margin-top: 2px;
+      }
+
+      .agent-prompt-single {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-l);
+        padding: 24px;
+        background:
+          radial-gradient(circle at 10% 0%, rgba(249, 196, 107, 0.12), transparent 48%),
+          linear-gradient(160deg, rgba(13, 23, 30, 0.95), rgba(8, 15, 21, 0.95));
+        box-shadow: var(--shadow-soft);
+        display: flex;
+        flex-direction: column;
+        gap: 11px;
+      }
+
+      .agent-prompt-single h3 {
+        font-size: 24px;
+        margin-bottom: 2px;
+      }
+
+      .agent-prompt-single p {
+        color: var(--muted-strong);
+        margin: 0;
+        line-height: 1.44;
+      }
+
+      .agent-prompt-single code {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--aqua);
+      }
+
+      .agent-example-label {
+        margin: 4px 0 0;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+        color: var(--gold);
+      }
+
+      .agent-prompt-single pre {
+        margin: 2px 0 0;
+        padding: 14px 16px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: rgba(4, 18, 26, 0.86);
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        line-height: 1.65;
+      }
+
+      #agents .lead {
+        margin-top: 10px;
+        max-width: 68ch;
+      }
+
+      .cta-shell {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-l);
+        padding: 34px;
+        background:
+          radial-gradient(circle at 80% 0%, rgba(249, 196, 107, 0.2), transparent 45%),
+          linear-gradient(180deg, rgba(14, 24, 31, 0.95), rgba(9, 16, 21, 0.95));
+      }
+
+      .cta-shell h2 {
+        margin-bottom: 12px;
+      }
+
+      .cta-actions {
+        margin-top: 22px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .footer {
+        border-top: 1px solid var(--line);
+        padding: 26px 0 40px;
+      }
+
+      .footer-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 16px;
+      }
+
+      .footer-left {
+        margin-right: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        color: var(--muted);
+      }
+
+      .footer-left img {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        background: #ffffff;
+        padding: 3px;
+      }
+
+      .footer-links {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .footer-links a {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--muted);
+        text-decoration: none;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 6px 10px;
+      }
+
+      .footer-links a:hover {
+        color: var(--text);
+        border-color: var(--line-strong);
+      }
+
+      .reveal {
+        opacity: 0;
+        transform: translateY(22px);
+        transition: opacity 0.55s ease, transform 0.55s ease;
+      }
+
+      .reveal.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .stagger > * {
+        opacity: 0;
+        transform: translateY(16px);
+        animation: rise 0.55s ease forwards;
+      }
+
+      .stagger > *:nth-child(1) {
+        animation-delay: 0.06s;
+      }
+
+      .stagger > *:nth-child(2) {
+        animation-delay: 0.12s;
+      }
+
+      .stagger > *:nth-child(3) {
+        animation-delay: 0.18s;
+      }
+
+      .stagger > *:nth-child(4) {
+        animation-delay: 0.24s;
+      }
+
+      @keyframes rise {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--focus);
+        outline-offset: 2px;
+      }
+
+      @media (max-width: 1060px) {
+        .hero-grid,
+        .split-cards,
+        .flow-grid,
+        .warn-grid,
+        .shots-grid,
+        .agent-quick {
+          grid-template-columns: 1fr;
+        }
+
+        .agent-quick {
+          gap: 16px;
+        }
+
+        .agent-install,
+        .agent-prompt-single {
+          padding: 22px;
+        }
+
+        .features-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 760px) {
+        .wrap {
+          width: min(1180px, 100% - 28px);
+        }
+
+        .section {
+          padding: 72px 0;
+        }
+
+        .hero {
+          padding: 64px 0 52px;
+        }
+
+        .features-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .agent-install,
+        .agent-prompt-single {
+          padding: 18px;
+          gap: 9px;
+        }
+
+        .agent-install h3,
+        .agent-prompt-single h3 {
+          font-size: 22px;
+        }
+
+        .nav-cta {
+          margin-left: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    <header class="site-nav" role="banner">
+      <div class="wrap nav-row">
+        <a href="#top" class="brand" aria-label="xyte-cli home">
+          <img src="./media/xyte-logo.jpg" alt="XYTE logo" />
+          <span class="brand-name">xyte-cli</span>
+        </a>
+        <nav class="nav-links" aria-label="Primary">
+          <a href="#compare">Compare</a>
+          <a href="#capabilities">Capabilities</a>
+          <a href="#commands">Commands</a>
+          <a href="#contracts">Contracts</a>
+          <a href="#agents">Agents</a>
+        </nav>
+        <a class="nav-cta" href="#start">Get Started</a>
+      </div>
+    </header>
+
+    <main id="content">
+      <section class="hero">
+        <div class="wrap hero-grid">
+          <div class="stagger">
+            <p class="eyebrow">CLI + TUI + headless + MCP</p>
+            <h1>Operate Xyte fleets with <em>predictable CLI flows</em>.</h1>
+            <p class="hero-copy">
+              <code>xyte-cli</code> gives coding agents and operators one deterministic runtime for endpoint calls, guarded writes,
+              full-screen TUI operations, headless NDJSON snapshots, and schema-validated output contracts.
+            </p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="#install">Install + setup</a>
+              <a class="btn btn-ghost" href="#commands">Command map</a>
+            </div>
+            <div class="hero-badges">
+              <span>Guarded mutations</span>
+              <span>Schema contracts</span>
+              <span>Agent-ready workflows</span>
+            </div>
+          </div>
+          <article class="terminal-card reveal" aria-label="Quick terminal preview">
+            <div class="terminal-head">
+              <span class="dot dot-red" aria-hidden="true"></span>
+              <span class="dot dot-gold" aria-hidden="true"></span>
+              <span class="dot dot-aqua" aria-hidden="true"></span>
+              <span class="terminal-title">xyte-cli quickstart</span>
+            </div>
+            <pre class="terminal-body"><span class="term-cm"># install + verify</span>
+<span class="term-cmd">npm install -g @xyte/cli@latest</span>
+<span class="term-cmd">xyte-cli --help</span>
+
+<span class="term-cm"># setup readiness</span>
+<span class="term-cmd">xyte-cli setup status</span> <span class="term-flg">--tenant</span> <span class="term-val">acme</span> <span class="term-flg">--format</span> <span class="term-val">json</span>
+
+<span class="term-cm"># headless frame for agents</span>
+<span class="term-cmd">xyte-cli tui</span> <span class="term-flg">--headless --screen</span> <span class="term-val">dashboard</span> <span class="term-flg">--once</span> <span class="term-flg">--format</span> <span class="term-val">json</span></pre>
+          </article>
+        </div>
+      </section>
+
+      <section class="section reveal" id="compare" aria-labelledby="compare-title">
+        <div class="wrap">
+          <p class="eyebrow">Model fit</p>
+          <h2 id="compare-title">`xyte-cli` vs `xyte-cli mcp serve`</h2>
+          <p class="lead">
+            Both expose the same operational surface. The choice is execution model: command-driven loops for coding agents, or
+            tool transport for orchestration platforms.
+          </p>
+          <div class="split-cards">
+            <article class="card">
+              <h3>CLI mode</h3>
+              <p>
+                Best for low-token, deterministic command workflows where the agent shells out and controls flow explicitly.
+              </p>
+              <div class="chip-row">
+                <span class="chip">Fast command loops</span>
+                <span class="chip">Predictable stdout</span>
+                <span class="chip">Easy CI integration</span>
+              </div>
+            </article>
+            <article class="card">
+              <h3>MCP mode</h3>
+              <p>
+                Best for tool-native runtimes that call `xyte-cli` capabilities over stdio through Model Context Protocol.
+              </p>
+              <div class="chip-row">
+                <span class="chip">Tool invocation</span>
+                <span class="chip">Orchestrator-friendly</span>
+                <span class="chip">Shared command contracts</span>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section reveal" id="capabilities" aria-labelledby="cap-title">
+        <div class="wrap">
+          <p class="eyebrow">Core capabilities</p>
+          <h2 id="cap-title">Built for production operations</h2>
+          <div class="features-grid">
+            <article class="feature-card">
+              <h3>Skill bootstrap</h3>
+              <p>Install bundled skill docs for Claude, Copilot, and Codex from one command.</p>
+              <code>xyte-cli install --skills</code>
+            </article>
+            <article class="feature-card">
+              <h3>Provider + slot auth</h3>
+              <p>Named key slots per provider with add/use/update/rename/test/remove lifecycle.</p>
+              <code>xyte-cli auth key list --tenant acme --format json</code>
+            </article>
+            <article class="feature-card">
+              <h3>Full TUI</h3>
+              <p>Operational screens for setup, config, dashboard, spaces, devices, incidents, and tickets.</p>
+              <code>xyte-cli tui</code>
+            </article>
+            <article class="feature-card">
+              <h3>Headless NDJSON</h3>
+              <p>Machine-only snapshots for agent loops with schema-stable IDs.</p>
+              <code>xyte-cli tui --headless --screen dashboard --once --format json</code>
+            </article>
+            <article class="feature-card">
+              <h3>Guarded writes</h3>
+              <p>Write and destructive endpoints require explicit confirmation flags.</p>
+              <code>xyte-cli call ... --allow-write --confirm ...</code>
+            </article>
+            <article class="feature-card">
+              <h3>Deterministic reports</h3>
+              <p>Fleet inspect/deep-dive/report pipeline with versioned contract outputs.</p>
+              <code>xyte-cli report generate --tenant acme --input /tmp/deep.json --out /tmp/report.pdf</code>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section reveal" id="install" aria-labelledby="install-title">
+        <div class="wrap">
+          <p class="eyebrow">Install + setup</p>
+          <h2 id="install-title">From zero to ready in one flow</h2>
+          <div class="flow-grid">
+            <article class="panel">
+              <h3>Global install</h3>
+              <p>Install package and verify command wiring.</p>
+              <pre><span class="term-cmd">npm install -g @xyte/cli@latest</span>
+<span class="term-cmd">xyte-cli --help</span>
+<span class="term-cmd">xyte-cli doctor install</span> <span class="term-flg">--format</span> <span class="term-val">json</span></pre>
+            </article>
+            <article class="panel">
+              <h3>Guided readiness</h3>
+              <p>Use guided setup or non-interactive setup in automation contexts.</p>
+              <pre><span class="term-cmd">xyte-cli setup run</span>
+
+<span class="term-cm"># CI/non-interactive</span>
+<span class="term-cmd">XYTE_CLI_KEY</span>=<span class="term-val">"&lt;your-key&gt;"</span> \
+<span class="term-cmd">xyte-cli setup run</span> <span class="term-flg">--non-interactive --tenant</span> <span class="term-val">acme</span></pre>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section reveal" id="skills" aria-labelledby="skills-title">
+        <div class="wrap">
+          <p class="eyebrow">Skill install flow</p>
+          <h2 id="skills-title">Install skills where your agents live</h2>
+          <p class="lead">
+            The installer supports project/user scopes, agent targeting, forced overwrite, and setup skip. Non-interactive fallback defaults
+            to project scope and all agents.
+          </p>
+          <div class="flow-grid">
+            <article class="panel">
+              <h3>Interactive or targeted install</h3>
+              <pre><span class="term-cmd">xyte-cli install --skills</span>
+<span class="term-cmd">xyte-cli install --skills --scope project --agents claude,codex</span>
+<span class="term-cmd">xyte-cli install --skills --scope both --agents all --force</span></pre>
+            </article>
+            <article class="panel">
+              <h3>No-setup path</h3>
+              <pre><span class="term-cmd">xyte-cli install --skills --no-setup</span>
+<span class="term-cmd">xyte-cli install --skills --target /path/to/workspace</span></pre>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section reveal" id="commands" aria-labelledby="commands-title">
+        <div class="wrap">
+          <p class="eyebrow">Command reference</p>
+          <h2 id="commands-title">High-signal command map</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Area</th>
+                  <th>Example</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Core diagnostics</td>
+                  <td><code>xyte-cli config doctor --tenant acme --format json</code></td>
+                  <td>Readiness + connectivity checks.</td>
+                </tr>
+                <tr>
+                  <td>Tenant profile</td>
+                  <td><code>xyte-cli tenant add acme --name "Acme"</code></td>
+                  <td>Use <code>tenant use</code> and <code>tenant list</code> for profile management.</td>
+                </tr>
+                <tr>
+                  <td>Auth slots</td>
+                  <td><code>xyte-cli auth key add --tenant acme --provider xyte-org --name primary --key "&lt;value&gt;" --set-active</code></td>
+                  <td>Named slots per provider, with test/rotate support.</td>
+                </tr>
+                <tr>
+                  <td>Endpoint calls</td>
+                  <td><code>xyte-cli call organization.devices.getDevices --tenant acme --output-mode envelope</code></td>
+                  <td>Deterministic endpoint and envelope surface.</td>
+                </tr>
+                <tr>
+                  <td>Insights</td>
+                  <td><code>xyte-cli inspect deep-dive --tenant acme --window 24 --format json</code></td>
+                  <td>Feeds report generation pipeline.</td>
+                </tr>
+                <tr>
+                  <td>TUI / headless</td>
+                  <td><code>xyte-cli tui --headless --screen spaces --format json --follow --interval-ms 2000 --tenant acme</code></td>
+                  <td>Interactive screen parity with machine output mode.</td>
+                </tr>
+                <tr>
+                  <td>MCP server</td>
+                  <td><code>xyte-cli mcp serve</code></td>
+                  <td>Tool transport for MCP-compatible clients.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="section reveal" id="guardrails" aria-labelledby="guardrails-title">
+        <div class="wrap">
+          <p class="eyebrow">Guarded writes</p>
+          <h2 id="guardrails-title">Mutations require explicit intent</h2>
+          <div class="warn-grid">
+            <article class="warn">
+              <h3>Write endpoint</h3>
+              <p class="muted">Non-read calls require <code>--allow-write</code>.</p>
+              <pre><span class="term-cmd">xyte-cli call organization.commands.sendCommand</span> \
+  <span class="term-flg">--tenant</span> <span class="term-val">acme</span> \
+  <span class="term-flg">--allow-write</span> \
+  <span class="term-flg">--path-json</span> <span class="term-val">'{"device_id":"DEVICE_ID"}'</span> \
+  <span class="term-flg">--body-json</span> <span class="term-val">'{"name":"reboot"}'</span></pre>
+            </article>
+            <article class="warn">
+              <h3>Destructive endpoint</h3>
+              <p class="muted">Delete-like behavior also requires endpoint confirmation token.</p>
+              <pre><span class="term-cmd">xyte-cli call organization.commands.cancelCommand</span> \
+  <span class="term-flg">--tenant</span> <span class="term-val">acme</span> \
+  <span class="term-flg">--allow-write</span> \
+  <span class="term-flg">--confirm</span> <span class="term-val">organization.commands.cancelCommand</span> \
+  <span class="term-flg">--path-json</span> <span class="term-val">'{"device_id":"DEVICE_ID","command_id":"COMMAND_ID"}'</span></pre>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section reveal" id="contracts" aria-labelledby="contracts-title">
+        <div class="wrap">
+          <p class="eyebrow">Machine contracts</p>
+          <h2 id="contracts-title">Schema IDs and source files</h2>
+          <p class="lead">
+            Headless and workflow outputs are versioned with stable contract IDs. Validate them in CI before production automation loops.
+          </p>
+          <div class="schema-chips">
+            <a href="./schemas/headless-frame.v1.schema.json">xyte.headless.frame.v1</a>
+            <a href="./schemas/call-envelope.v1.schema.json">xyte.call.envelope.v1</a>
+            <a href="./schemas/inspect-fleet.v1.schema.json">xyte.inspect.fleet.v1</a>
+            <a href="./schemas/inspect-deep-dive.v1.schema.json">xyte.inspect.deep-dive.v1</a>
+            <a href="./schemas/report.v1.schema.json">xyte.report.v1</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section reveal" id="visuals" aria-labelledby="visuals-title">
+        <div class="wrap">
+          <p class="eyebrow">Visual demo</p>
+          <h2 id="visuals-title">Interactive TUI and headless output</h2>
+          <div class="shots-grid">
+            <figure class="shot">
+              <img src="./media/tui-dashboard-synthetic.png" alt="xyte-cli TUI dashboard with KPIs, incidents table, and ticket list" />
+              <figcaption>TUI dashboard for human operators.</figcaption>
+            </figure>
+            <figure class="shot">
+              <img src="./media/headless-frame-synthetic.png" alt="xyte-cli headless JSON frame output with schema and metadata fields" />
+              <figcaption>Headless frame for coding-agent loops.</figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section class="section reveal" id="agents" aria-labelledby="agents-title">
+        <div class="wrap">
+          <p class="eyebrow">Agent quick start</p>
+          <h2 id="agents-title">Install once, then prompt away</h2>
+          <p class="lead">Two steps only: install once, then use any coding agent and prompt it to run <code>xyte-cli</code> directly.</p>
+          <div class="agent-quick">
+            <article class="agent-install">
+              <span class="agent-step">Step 1</span>
+              <h3>Install skills once</h3>
+              <p>Run this once in the workspace where your agent will operate.</p>
+              <pre><span class="term-cmd">xyte-cli install --skills</span></pre>
+              <p class="agent-note">Done. No repeats needed.</p>
+            </article>
+
+            <article class="agent-prompt-single" aria-label="Step 2 prompt guidance">
+              <span class="agent-step">Step 2</span>
+              <h3>Use any agent and prompt away</h3>
+              <p>Open Claude, Codex, or GitHub Copilot and give it a direct task prompt that explicitly says to run <code>xyte-cli</code> commands.</p>
+              <p class="agent-example-label">Prompt example</p>
+              <pre><span class="term-cm">Inspect tenant acme and generate a report.</span>
+<span class="term-cm">Use xyte-cli commands directly and keep outputs JSON-first.</span></pre>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section reveal" id="start" aria-labelledby="start-title">
+        <div class="wrap">
+          <div class="cta-shell">
+            <p class="eyebrow">Start now</p>
+            <h2 id="start-title">Deploy deterministic Xyte operations into your agent workflows.</h2>
+            <p class="lead">
+              Install the CLI, initialize skills, run setup once, and keep outputs JSON-first where possible for reliable automation.
+            </p>
+            <div class="cta-actions">
+              <a class="btn btn-primary" href="#install">Install now</a>
+              <a class="btn btn-ghost" href="#commands">Review command map</a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer" role="contentinfo">
+      <div class="wrap footer-row">
+        <div class="footer-left">
+          <img src="./media/xyte-logo.jpg" alt="" aria-hidden="true" />
+          <span>xyte-cli · deterministic fleet operations for humans and AI agents</span>
+        </div>
+        <div class="footer-links">
+          <a href="#top">Top</a>
+          <a href="./schemas/report.v1.schema.json">Schemas</a>
+          <a href="https://github.com/xyte-io/xyte-cli">GitHub</a>
+          <a href="https://www.npmjs.com/package/@xyte/cli">@xyte/cli</a>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      (() => {
+        const revealed = document.querySelectorAll(".reveal");
+        if (!("IntersectionObserver" in window)) {
+          revealed.forEach((el) => el.classList.add("is-visible"));
+          return;
+        }
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                entry.target.classList.add("is-visible");
+                observer.unobserve(entry.target);
+              }
+            });
+          },
+          { threshold: 0.12, rootMargin: "0px 0px -32px 0px" }
+        );
+        revealed.forEach((el) => observer.observe(el));
+      })();
+    </script>
+  </body>
+</html>
