@@ -18,9 +18,8 @@ This project is prepared for manual npm publishing of `@xyte/cli`.
    - `npm test`
 4. Validate package contents:
    - `npm pack --dry-run`
-5. Remove `"private": true` from `/Users/porton/Projects/xyte-cli/package.json`.
-6. Bump version in `/Users/porton/Projects/xyte-cli/package.json` (and lockfile if needed).
-7. Publish:
+5. Bump version in `/Users/porton/Projects/xyte-cli/package.json` (and lockfile if needed).
+6. Publish:
    - `npm publish`
 
 `publishConfig.access=public` is already configured, so first publish for the scoped package will be public.
