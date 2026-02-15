@@ -124,20 +124,17 @@ export function createDashboardScreen(): TuiScreen {
       }
 
       const tenantId = await context.getActiveTenantId();
-      const providerOverride = context.getProviderOverride();
       const loaded = await loadDashboardData(context.client, tenantId);
 
       const panels = sceneFromDashboardState({
         tenantId,
-        provider: providerOverride.provider,
-        model: providerOverride.model,
         devices: loaded.data.devices,
         incidents: loaded.data.incidents,
         tickets: loaded.data.tickets
       });
 
       const kpiPanel = panels.find((panel) => panel.id === 'dashboard-kpis');
-      const providerPanel = panels.find((panel) => panel.id === 'dashboard-provider');
+      const providerPanel = panels.find((panel) => panel.id === 'dashboard-status');
       const incidentPanel = panels.find((panel) => panel.id === 'dashboard-incidents');
       const ticketPanel = panels.find((panel) => panel.id === 'dashboard-tickets');
 

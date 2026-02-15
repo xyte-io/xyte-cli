@@ -56,7 +56,6 @@ export function createTicketsScreen(): TuiScreen {
   let root: blessed.Widgets.BoxElement | undefined;
   let list: blessed.Widgets.ListTableElement | undefined;
   let detail: blessed.Widgets.BoxElement | undefined;
-  let draft: blessed.Widgets.BoxElement | undefined;
   let context: TuiContext;
   let tickets: any[] = [];
   let filtered: any[] = [];
@@ -64,7 +63,6 @@ export function createTicketsScreen(): TuiScreen {
   let searchText = '';
   let selectedIndex = 0;
   let detailText = '';
-  let draftText = '';
   let lastResolveTapAt = 0;
   let detailRequestToken = 0;
   let selectionSync: SelectionSyncState = {
@@ -85,11 +83,7 @@ export function createTicketsScreen(): TuiScreen {
       list?.focus();
       return;
     }
-    if (activePane === 'detail-box') {
-      detail?.focus();
-      return;
-    }
-    draft?.focus();
+    detail?.focus();
   };
 
   const selectedTicket = () => filtered[selectedIndex];
@@ -119,27 +113,23 @@ export function createTicketsScreen(): TuiScreen {
           ])
         ], selectionSync);
         detail?.setContent('Render fallback mode enabled for ticket details.');
-        draft?.setContent('Draft panel preserved. Refresh (r) after narrowing payload/filter.');
       } else {
         const panels = sceneFromTicketsState({
           mode,
           searchText,
           selectedIndex,
           tickets: filtered,
-          detailText,
-          draftText
+          detailText
         });
 
         const tablePanel = panels.find((panel) => panel.id === 'tickets-table');
         const detailPanel = panels.find((panel) => panel.id === 'tickets-detail');
-        const draftPanel = panels.find((panel) => panel.id === 'tickets-draft');
 
         setListTableData(list, [
           (tablePanel?.table?.columns ?? ['ID', 'Status', 'Priority', 'Subject']) as [string, string, string, string],
           ...((tablePanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
         ], selectionSync);
         detail?.setContent((detailPanel?.text?.lines ?? ['No tickets.']).join('\n'));
-        draft?.setContent((draftPanel?.text?.lines ?? ['Press m to draft ticket response.']).join('\n'));
       }
       renderErrorMessage = '';
       renderErrorCount = 0;
@@ -180,7 +170,6 @@ export function createTicketsScreen(): TuiScreen {
         ])
       ], selectionSync);
       detail?.setContent(`Unable to render ticket detail safely.\nReason: ${message}`);
-      draft?.setContent('Press m to draft ticket response.');
     }
     syncListSelection(list, selectedIndex, selectionSync);
     focusPane();
@@ -275,7 +264,7 @@ export function createTicketsScreen(): TuiScreen {
         top: 0,
         left: '50%',
         width: '50%',
-        height: '55%',
+        height: '100%',
         border: 'line',
         label: ' Ticket Detail ',
         scrollable: true,
@@ -286,25 +275,9 @@ export function createTicketsScreen(): TuiScreen {
         content: 'Select a ticket.'
       });
 
-      draft = blessed.box({
-        parent: root,
-        top: '55%',
-        left: '50%',
-        width: '50%',
-        height: '45%',
-        border: 'line',
-        label: ' Draft Tool ',
-        tags: true,
-        scrollable: true,
-        alwaysScroll: true,
-        keys: false,
-        mouse: true,
-        vi: true,
-        content: 'Press m to draft ticket response.'
-      });
       context.debugLog?.('nav.list.nativeKeysDisabled', {
         screen: 'tickets',
-        widgets: ['tickets-table', 'detail-box', 'draft-box']
+        widgets: ['tickets-table', 'detail-box']
       });
 
       list.on('select item', (_item, index) => {
@@ -410,11 +383,10 @@ export function createTicketsScreen(): TuiScreen {
 
       if (activePane === 'detail-box') {
         scrollBox(detail, delta);
-      } else {
-        scrollBox(draft, delta);
+        context.screen.render();
+        return 'handled';
       }
-      context.screen.render();
-      return 'handled';
+      return 'unhandled';
     },
     async handleKey(ch, key) {
       const resolveSelectedTicket = async () => {
@@ -449,36 +421,6 @@ export function createTicketsScreen(): TuiScreen {
           renderRows();
           context.screen.render();
         }
-        return true;
-      }
-
-      if (ch === 'm') {
-        const ticket = selectedTicket();
-        if (!ticket) {
-          context.setStatus('No ticket selected.');
-          return true;
-        }
-
-        context.setStatus('Drafting ticket response...');
-        try {
-          const drafted = await context.runTicketDraft({ ticket, thread: ticket?.messages ?? ticket?.thread });
-          if (!isMounted) {
-            return true;
-          }
-          draftText = [
-            `Summary: ${drafted.summary}`,
-            'Unresolved asks:',
-            ...drafted.unresolvedAsks.map((item) => `- ${item}`),
-            '',
-            ...drafted.draftOptions.map((option) => `${option.tone}: ${option.draft}`)
-          ].join('\n');
-          renderRows();
-          context.setStatus('Ticket draft generated.');
-          context.screen.render();
-        } catch (error) {
-          context.showError(error);
-        }
-
         return true;
       }
 

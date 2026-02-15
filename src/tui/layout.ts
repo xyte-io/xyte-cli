@@ -80,7 +80,7 @@ export function createLayout(screen: blessed.Widgets.Screen, options: TuiLayoutO
     left: 0,
     width: '100%',
     height: 1,
-    content: ' u setup | g config | d/s/v/i/t/p screens | r refresh | / search | o provider | ? help | q quit ',
+    content: ' u setup | g config | d/s/v/i/t screens | r refresh | / search | ? help | q quit ',
     style: {
       fg: 'white',
       bg: 'black'

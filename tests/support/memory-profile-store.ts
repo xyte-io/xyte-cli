@@ -1,6 +1,5 @@
 import type {
   ApiKeySlotMeta,
-  LLMProfileUpdate,
   ProfileStoreData,
   SecretProvider,
   TenantKeyRegistry,
@@ -19,7 +18,6 @@ function emptyRegistry(): TenantKeyRegistry {
 export class MemoryProfileStore implements ProfileStore {
   private data: ProfileStoreData = {
     version: 2,
-    globalDefaultLLMProvider: 'openai',
     tenants: []
   };
 
@@ -40,7 +38,6 @@ export class MemoryProfileStore implements ProfileStore {
     name?: string;
     hubBaseUrl?: string;
     entryBaseUrl?: string;
-    openaiCompatibleBaseUrl?: string;
   }): Promise<TenantProfile> {
     const existing = this.data.tenants.find((tenant) => tenant.id === input.id);
     const now = new Date().toISOString();
@@ -49,7 +46,6 @@ export class MemoryProfileStore implements ProfileStore {
       existing.name = input.name ?? existing.name;
       existing.hubBaseUrl = input.hubBaseUrl ?? existing.hubBaseUrl;
       existing.entryBaseUrl = input.entryBaseUrl ?? existing.entryBaseUrl;
-      existing.openaiCompatibleBaseUrl = input.openaiCompatibleBaseUrl ?? existing.openaiCompatibleBaseUrl;
       existing.keyRegistry = existing.keyRegistry ?? emptyRegistry();
       existing.updatedAt = now;
       return structuredClone(existing);
@@ -60,7 +56,6 @@ export class MemoryProfileStore implements ProfileStore {
       name: input.name ?? input.id,
       hubBaseUrl: input.hubBaseUrl,
       entryBaseUrl: input.entryBaseUrl,
-      openaiCompatibleBaseUrl: input.openaiCompatibleBaseUrl,
       keyRegistry: emptyRegistry(),
       createdAt: now,
       updatedAt: now
@@ -90,32 +85,6 @@ export class MemoryProfileStore implements ProfileStore {
       return undefined;
     }
     return this.getTenant(this.data.activeTenantId);
-  }
-
-  async setGlobalLLM(update: LLMProfileUpdate): Promise<ProfileStoreData> {
-    if (update.provider) {
-      this.data.globalDefaultLLMProvider = update.provider;
-    }
-    if (update.model !== undefined) {
-      this.data.globalDefaultLLMModel = update.model;
-    }
-    return this.getData();
-  }
-
-  async setTenantLLM(tenantId: string, update: LLMProfileUpdate): Promise<TenantProfile> {
-    const tenant = this.data.tenants.find((item) => item.id === tenantId);
-    if (!tenant) {
-      throw new Error(`Unknown tenant: ${tenantId}`);
-    }
-
-    if (update.provider) {
-      tenant.defaultLLMProvider = update.provider;
-    }
-    if (update.model !== undefined) {
-      tenant.defaultLLMModel = update.model;
-    }
-    tenant.updatedAt = new Date().toISOString();
-    return structuredClone(tenant);
   }
 
   async listKeySlots(tenantId: string, provider?: SecretProvider): Promise<ApiKeySlotMeta[]> {

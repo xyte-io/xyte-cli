@@ -20,7 +20,6 @@ import {
 import {
   createHeadlessFrame,
   sceneFromConfigState,
-  sceneFromCopilotState,
   sceneFromDashboardState,
   sceneFromDevicesState,
   sceneFromIncidentsState,
@@ -49,7 +48,7 @@ export interface HeadlessRenderOptions {
 
 type SafeWrite = (text: string) => boolean;
 
-const PROVIDERS: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device', 'openai', 'anthropic', 'openai-compatible'];
+const PROVIDERS: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device'];
 
 function getRefreshState(args: { connectionState: ReadinessCheck['connectionState']; retried?: boolean }): 'idle' | 'retrying' | 'error' {
   if (args.connectionState === 'connected' || args.connectionState === 'not_checked') {
@@ -485,31 +484,6 @@ async function buildOperationalFrame(options: {
               connectionState: spaces.connectionState,
               retried: spaces.retry.retried
             })
-          })
-        }
-      });
-    }
-
-    case 'copilot': {
-      const panels = sceneFromCopilotState({
-        tenantId: options.tenantId,
-        logs: []
-      });
-      return createHeadlessFrame({
-        sessionId: options.sessionId,
-        sequence: options.sequence,
-        screen: 'copilot',
-        title: 'Copilot',
-        status: 'Copilot snapshot',
-        tenantId: options.tenantId,
-        motionEnabled: options.motionEnabled,
-        motionPhase: options.motionPhase,
-        logo: XYTE_LOGO_COMPACT,
-        panels,
-        meta: {
-          ...withNavigationMeta('copilot', {
-            renderSafety: inferRenderSafety(panels),
-            readiness: options.readiness.state
           })
         }
       });

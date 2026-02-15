@@ -5,9 +5,9 @@ import { movePaneWithBoundary } from '../../src/tui/navigation';
 
 describe('tab arrow navigation', () => {
   it('moves to next and previous tabs with wraparound', () => {
-    expect(nextTab('setup', 'left')).toBe('copilot');
+    expect(nextTab('setup', 'left')).toBe('tickets');
     expect(nextTab('setup', 'right')).toBe('config');
-    expect(nextTab('copilot', 'right')).toBe('setup');
+    expect(nextTab('tickets', 'right')).toBe('setup');
   });
 
   it('reports pane boundaries for tab-switch escalation', () => {
@@ -19,6 +19,6 @@ describe('tab arrow navigation', () => {
   });
 
   it('keeps tab order aligned with screen registry ordering', () => {
-    expect(TAB_ORDER).toEqual(['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets', 'copilot']);
+    expect(TAB_ORDER).toEqual(['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets']);
   });
 });

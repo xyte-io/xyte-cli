@@ -15,7 +15,7 @@ import type { SecretProvider } from '../../types/profile';
 import { sceneFromSetupState } from '../scene';
 import { runKeyCreateWizard } from '../key-wizard';
 
-const PROVIDERS: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device', 'openai', 'anthropic', 'openai-compatible'];
+const PROVIDERS: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device'];
 
 function parseProvider(value: string): SecretProvider {
   const normalized = value.trim() as SecretProvider;

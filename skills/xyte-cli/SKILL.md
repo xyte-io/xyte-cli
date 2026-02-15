@@ -32,7 +32,6 @@ Use when the request involves any of:
 - Non-read endpoint calls must include `--allow-write`.
 - Destructive endpoint calls must include `--confirm <endpoint-key>`.
 - In automation, always pass `--tenant <tenant-id>`.
-- Treat copilot output as advisory only.
 
 ## Deterministic Execution Order
 

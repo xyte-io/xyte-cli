@@ -9,7 +9,7 @@ import { SCREEN_PANE_CONFIG } from '../../src/tui/panes';
 describe('pane-focus arrow navigation', () => {
   it('defines pane configuration for every screen', () => {
     const screens = Object.keys(SCREEN_PANE_CONFIG);
-    expect(screens.sort()).toEqual(['config', 'copilot', 'dashboard', 'devices', 'incidents', 'setup', 'spaces', 'tickets'].sort());
+    expect(screens.sort()).toEqual(['config', 'dashboard', 'devices', 'incidents', 'setup', 'spaces', 'tickets'].sort());
 
     for (const [screenId, config] of Object.entries(SCREEN_PANE_CONFIG)) {
       expect(config.panes.length).toBeGreaterThan(0);
@@ -63,10 +63,6 @@ describe('pane-focus arrow navigation', () => {
       const source = readFileSync(join(root, 'src', 'tui', 'screens', `${name}.ts`), 'utf8');
       expect(source).not.toMatch(/keys:\s*true/);
     }
-
-    const copilotSource = readFileSync(join(root, 'src', 'tui', 'screens', 'copilot.ts'), 'utf8');
-    const matches = copilotSource.match(/keys:\s*true/g) ?? [];
-    expect(matches.length).toBe(1);
   });
 
   it('does not throw when scrolling non-scrollable box widgets', () => {

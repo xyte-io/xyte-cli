@@ -28,7 +28,7 @@ if [[ ! -f "$REPO_ROOT/dist/bin/xyte-cli.js" ]]; then
   exit 1
 fi
 
-SCREENS=(setup config dashboard spaces devices incidents tickets copilot)
+SCREENS=(setup config dashboard spaces devices incidents tickets)
 META_KEYS=(inputState queueDepth droppedEvents transitionState refreshState navigationMode activePane availablePanes tabId tabOrder tabNavBoundary renderSafety tableFormat contract)
 TMP_CFG="$(mktemp -d)"
 trap 'rm -rf "$TMP_CFG"' EXIT

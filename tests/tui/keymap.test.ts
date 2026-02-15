@@ -15,14 +15,12 @@ describe('tui keymaps', () => {
     expect(keys).toContain('v');
     expect(keys).toContain('i');
     expect(keys).toContain('t');
-    expect(keys).toContain('p');
     expect(keys).toContain('q');
   });
 
   it('defines workflow action shortcuts', () => {
     const actions = SCREEN_ACTION_KEYMAP.map((item) => item.keys);
-    expect(actions).toContain('Incidents: x');
+    expect(actions).toContain('Incidents: /');
     expect(actions).toContain('Tickets: R or rr');
-    expect(actions).toContain('Copilot: s');
   });
 });

@@ -16,7 +16,7 @@ import { runKeyCreateWizard, runKeyUpdateWizard } from '../key-wizard';
 import type { SecretProvider } from '../../types/profile';
 import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
 
-const PROVIDERS: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device', 'openai', 'anthropic', 'openai-compatible'];
+const PROVIDERS: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device'];
 
 function providerAt(index: number): SecretProvider {
   return PROVIDERS[clampIndex(index, PROVIDERS.length)];

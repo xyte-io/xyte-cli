@@ -34,7 +34,6 @@ export interface ReadinessOptions {
 }
 
 const XYTE_PROVIDERS: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device'];
-const ALL_PROVIDERS: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device', 'openai', 'anthropic', 'openai-compatible'];
 
 function defaultConnectivity(): ConnectivityResult {
   return {
@@ -89,7 +88,7 @@ export async function evaluateReadiness(options: ReadinessOptions): Promise<Read
     };
   }
 
-  for (const provider of ALL_PROVIDERS) {
+  for (const provider of XYTE_PROVIDERS) {
     const [slots, active] = await Promise.all([
       options.profileStore.listKeySlots(tenant.id, provider),
       options.profileStore.getActiveKeySlot(tenant.id, provider)

@@ -1,12 +1,4 @@
-export type SecretProvider =
-  | 'xyte-org'
-  | 'xyte-partner'
-  | 'xyte-device'
-  | 'openai'
-  | 'anthropic'
-  | 'openai-compatible';
-
-export type LLMProviderProfile = 'openai' | 'anthropic' | 'openai-compatible';
+export type SecretProvider = 'xyte-org' | 'xyte-partner' | 'xyte-device';
 
 export interface ApiKeySlotMeta {
   slotId: string;
@@ -28,9 +20,6 @@ export interface TenantProfile {
   name: string;
   hubBaseUrl?: string;
   entryBaseUrl?: string;
-  openaiCompatibleBaseUrl?: string;
-  defaultLLMProvider?: LLMProviderProfile;
-  defaultLLMModel?: string;
   keyRegistry: TenantKeyRegistry;
   createdAt: string;
   updatedAt: string;
@@ -39,12 +28,5 @@ export interface TenantProfile {
 export interface ProfileStoreData {
   version: 2;
   activeTenantId?: string;
-  globalDefaultLLMProvider: LLMProviderProfile;
-  globalDefaultLLMModel?: string;
   tenants: TenantProfile[];
-}
-
-export interface LLMProfileUpdate {
-  provider?: LLMProviderProfile;
-  model?: string;
 }

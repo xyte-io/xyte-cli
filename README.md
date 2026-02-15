@@ -11,12 +11,12 @@ Xyte CLI with SKILLS, built for coding agents and operators.
 
 ### Key Features
 
-- Playwright-style install flow: `xyte-cli install --skills`
+- One-command skill install flow: `xyte-cli install --skills`
 - Guided setup embedded into install flow (unless `--no-setup`)
 - Provider/slot key lifecycle (`add`, `use`, `update`, `rename`, `test`, `remove`)
 - Guarded endpoint writes (`--allow-write`) and deletes (`--confirm <endpoint-key>`)
 - Full TUI screens:
-  - `setup`, `config`, `dashboard`, `spaces`, `devices`, `incidents`, `tickets`, `copilot`
+  - `setup`, `config`, `dashboard`, `spaces`, `devices`, `incidents`, `tickets`
 - Provider-first Config screen with hotkeys:
   - `a`, `e`, `u`, `t`, `x`, `n`, `c`, `r`
 - Headless JSON frames with stable contracts
@@ -75,8 +75,6 @@ Check xyte-cli --help first and keep outputs in JSON when possible.
 ```
 
 ## Visual Demo
-
-![Xyte logo](docs/media/xyte-logo.png)
 
 ![XYTE TUI dashboard](docs/media/tui-dashboard-synthetic.png)
 
@@ -180,13 +178,6 @@ Schemas:
 ```bash
 xyte-cli install --skills
 claude
-```
-
-### GitHub Copilot
-
-```bash
-xyte-cli install --skills
-# then run Copilot in your workspace and prompt it to use xyte-cli
 ```
 
 ### Codex

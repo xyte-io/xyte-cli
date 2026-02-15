@@ -27,15 +27,11 @@ export const SCREEN_PANE_CONFIG: Record<TuiScreenId, ScreenPaneConfig> = {
     defaultPane: 'devices-table'
   },
   incidents: {
-    panes: ['incidents-table', 'detail-box', 'triage-box'],
+    panes: ['incidents-table', 'detail-box'],
     defaultPane: 'incidents-table'
   },
   tickets: {
-    panes: ['tickets-table', 'detail-box', 'draft-box'],
+    panes: ['tickets-table', 'detail-box'],
     defaultPane: 'tickets-table'
-  },
-  copilot: {
-    panes: ['prompt-input', 'provider-box', 'output-box'],
-    defaultPane: 'prompt-input'
   }
 };

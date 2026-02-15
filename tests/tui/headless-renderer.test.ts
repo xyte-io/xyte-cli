@@ -85,7 +85,7 @@ describe('headless renderer', () => {
     expect((runtimeFrame?.meta as any)?.navigationMode).toBe('pane-focus');
     expect((runtimeFrame?.meta as any)?.refreshState).toBeDefined();
     expect((runtimeFrame?.meta as any)?.tabId).toBe('spaces');
-    expect((runtimeFrame?.meta as any)?.tabOrder).toEqual(['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets', 'copilot']);
+    expect((runtimeFrame?.meta as any)?.tabOrder).toEqual(['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets']);
     expect((runtimeFrame?.meta as any)?.tabNavBoundary).toBeNull();
     expect((runtimeFrame?.meta as any)?.renderSafety).toBeDefined();
     expect((runtimeFrame?.meta as any)?.tableFormat).toBe('compact-v1');
@@ -155,7 +155,7 @@ describe('headless renderer', () => {
         client,
         profileStore,
         keychain,
-        screen: 'copilot',
+        screen: 'tickets',
         format: 'json',
         motionEnabled: false,
         follow: false,
@@ -212,7 +212,7 @@ describe('headless renderer', () => {
 
   it('emits pane metadata for every screen in one-shot mode', async () => {
     const { profileStore, keychain } = await makeReadyProfile();
-    const screens: TuiScreenId[] = ['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets', 'copilot'];
+    const screens: TuiScreenId[] = ['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets'];
 
     const client: any = {
       organization: {
@@ -257,7 +257,7 @@ describe('headless renderer', () => {
       expect((runtimeFrame?.meta as any)?.activePane).toBe(SCREEN_PANE_CONFIG[screen].defaultPane);
       expect((runtimeFrame?.meta as any)?.availablePanes).toEqual(SCREEN_PANE_CONFIG[screen].panes);
       expect((runtimeFrame?.meta as any)?.tabId).toBe(screen);
-      expect((runtimeFrame?.meta as any)?.tabOrder).toEqual(['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets', 'copilot']);
+      expect((runtimeFrame?.meta as any)?.tabOrder).toEqual(['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets']);
       expect((runtimeFrame?.meta as any)?.renderSafety).toBeDefined();
       expect((runtimeFrame?.meta as any)?.tableFormat).toBe('compact-v1');
     }

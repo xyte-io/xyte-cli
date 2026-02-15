@@ -3,7 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { createLayout } from './layout';
 import { GLOBAL_KEYMAP, SCREEN_ACTION_KEYMAP } from './keymap';
-import type { TuiContext, TuiProviderOverride, TuiScreen, TuiScreenId } from './types';
+import type { TuiContext, TuiScreen, TuiScreenId } from './types';
 import { createSetupScreen } from './screens/setup';
 import { createConfigScreen } from './screens/config';
 import { createDashboardScreen } from './screens/dashboard';
@@ -11,16 +11,10 @@ import { createSpacesScreen } from './screens/spaces';
 import { createDevicesScreen } from './screens/devices';
 import { createIncidentsScreen } from './screens/incidents';
 import { createTicketsScreen } from './screens/tickets';
-import { createCopilotScreen } from './screens/copilot';
 import type { XyteClient } from '../types/client';
-import type { LLMService } from '../llm/provider';
 import type { ProfileStore } from '../secure/profile-store';
 import { FileProfileStore } from '../secure/profile-store';
 import { createKeychainStore, type KeychainStore } from '../secure/keychain';
-import { runIncidentTriage } from '../workflows/incident-triage';
-import { runTicketDraft } from '../workflows/ticket-draft';
-import { runHealthSummary } from '../workflows/health-summary';
-import { runCommandSuggestions } from '../workflows/command-suggestions';
 import { dispatchKeypress } from './dispatch';
 import { isMotionEnabled, startupFrames } from './animation';
 import { runHeadlessRenderer } from './headless-renderer';
@@ -33,7 +27,6 @@ import { nextTab } from './tabs';
 
 export interface TuiAppOptions {
   client: XyteClient;
-  llm: LLMService;
   profileStore?: ProfileStore;
   keychain?: KeychainStore;
   initialScreen?: TuiScreenId;
@@ -163,7 +156,6 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
     });
 
     const layout = createLayout(screen, { motionEnabled });
-    let providerOverride: TuiProviderOverride = {};
     let activeScreenId: TuiScreenId = options.initialScreen ?? 'dashboard';
     let pulsePhase = 0;
     let readinessState: ReadinessCheck | undefined;
@@ -381,7 +373,6 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
     const context: TuiContext = {
       screen,
       client: options.client,
-      llm: options.llm,
       profileStore,
       keychain,
       async getActiveTenantId() {
@@ -392,12 +383,6 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
       },
       async refreshReadiness(checkConnectivity = false) {
         return refreshReadiness(checkConnectivity);
-      },
-      getProviderOverride() {
-        return providerOverride;
-      },
-      setProviderOverride(value) {
-        providerOverride = value;
       },
       setStatus(text) {
         renderFooter(text);
@@ -417,42 +402,6 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
       async confirmWrite(actionLabel, token) {
         const value = await context.prompt(`Type "${token}" to confirm: ${actionLabel}`, '');
         return value === token;
-      },
-      async runIncidentTriage(input) {
-        return runIncidentTriage({
-          llm: options.llm,
-          tenantId: await context.getActiveTenantId(),
-          provider: providerOverride.provider,
-          model: providerOverride.model,
-          ...input
-        });
-      },
-      async runTicketDraft(input) {
-        return runTicketDraft({
-          llm: options.llm,
-          tenantId: await context.getActiveTenantId(),
-          provider: providerOverride.provider,
-          model: providerOverride.model,
-          ...input
-        });
-      },
-      async runHealthSummary(input) {
-        return runHealthSummary({
-          llm: options.llm,
-          tenantId: await context.getActiveTenantId(),
-          provider: providerOverride.provider,
-          model: providerOverride.model,
-          ...input
-        });
-      },
-      async runCommandSuggestions(input) {
-        return runCommandSuggestions({
-          llm: options.llm,
-          tenantId: await context.getActiveTenantId(),
-          provider: providerOverride.provider,
-          model: providerOverride.model,
-          ...input
-        });
       }
     };
 
@@ -463,8 +412,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
       spaces: createSpacesScreen(),
       devices: createDevicesScreen(),
       incidents: createIncidentsScreen(),
-      tickets: createTicketsScreen(),
-      copilot: createCopilotScreen()
+      tickets: createTicketsScreen()
     };
 
     let mounted: TuiScreen | undefined;
@@ -589,36 +537,6 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
       });
     };
 
-    const setProviderOverride = async () => {
-      const providerInput = await context.prompt(
-        'Provider override (openai|anthropic|openai-compatible|clear):',
-        providerOverride.provider ?? ''
-      );
-      if (providerInput === undefined) {
-        return;
-      }
-
-      const trimmedProvider = providerInput.trim();
-      if (!trimmedProvider || trimmedProvider === 'clear') {
-        providerOverride = {};
-        context.setStatus('Provider override cleared.');
-        return;
-      }
-
-      if (!['openai', 'anthropic', 'openai-compatible'].includes(trimmedProvider)) {
-        context.setStatus('Invalid provider override value.');
-        return;
-      }
-
-      const modelInput = await context.prompt('Model override (optional):', providerOverride.model ?? '');
-      providerOverride = {
-        provider: trimmedProvider as TuiProviderOverride['provider'],
-        model: modelInput?.trim() ? modelInput.trim() : undefined
-      };
-      context.setStatus(`Provider override set to ${providerOverride.provider}${providerOverride.model ? ` (${providerOverride.model})` : ''}.`);
-      screen.render();
-    };
-
     const handleGlobalKey = async (ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg) => {
       logger.log('input.global', {
         key: key.name ?? key.full,
@@ -658,10 +576,6 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
         await mountScreen('tickets');
         return;
       }
-      if (ch === 'p') {
-        await mountScreen('copilot');
-        return;
-      }
       if (ch === 'r') {
         logger.log('screen.refresh.request', {
           id: activeScreenId,
@@ -689,11 +603,6 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
 
       if (ch === '?') {
         showHelp();
-        return;
-      }
-
-      if (ch === 'o') {
-        await setProviderOverride();
         return;
       }
 
@@ -742,13 +651,6 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
         const dispatchResult = await dispatchKeypress({
           ch: event.ch,
           key: event.key,
-          shouldBypassHorizontalGlobal: () =>
-            mounted?.id === 'copilot' &&
-            mounted?.getActivePane?.() === 'prompt-input' &&
-            (event.key.name === 'left' || event.key.name === 'right') &&
-            !event.key.ctrl &&
-            !event.key.meta &&
-            !event.key.shift,
           isModalActive: modalActive,
           handleArrow: activeMounted?.handleArrow
             ? async (key) => {

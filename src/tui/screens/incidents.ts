@@ -25,37 +25,15 @@ export function normalizeIncidents(items: unknown): any[] {
     .map((incident) => (typeof incident === 'object' ? incident : { value: incident }));
 }
 
-export function formatIncidentTriageText(triage: {
-  rootCauseHypothesis?: string;
-  confidence?: number;
-  recommendedNextActions?: unknown[];
-  escalationHint?: string;
-}): string {
-  const actions = Array.isArray(triage.recommendedNextActions)
-    ? triage.recommendedNextActions.map((item) => String(item))
-    : [];
-  const confidence = typeof triage.confidence === 'number' && Number.isFinite(triage.confidence) ? triage.confidence : 0;
-
-  return [
-    `Root cause: ${triage.rootCauseHypothesis ?? 'unknown'}`,
-    `Confidence: ${confidence.toFixed(2)}`,
-    'Next actions:',
-    ...(actions.length ? actions.map((item) => `- ${item}`) : ['- none']),
-    `Escalation: ${triage.escalationHint ?? 'none'}`
-  ].join('\n');
-}
-
 export function createIncidentsScreen(): TuiScreen {
   let root: blessed.Widgets.BoxElement | undefined;
   let list: blessed.Widgets.ListTableElement | undefined;
-  let triageBox: blessed.Widgets.BoxElement | undefined;
   let detailBox: blessed.Widgets.BoxElement | undefined;
   let context: TuiContext;
   let incidents: any[] = [];
   let filtered: any[] = [];
   let severityFilter = '';
   let selectedIndex = 0;
-  let triageText = '';
   let selectionSync: SelectionSyncState = {
     syncing: false,
     name: 'incidents-table'
@@ -73,11 +51,7 @@ export function createIncidentsScreen(): TuiScreen {
       list?.focus();
       return;
     }
-    if (activePane === 'detail-box') {
-      detailBox?.focus();
-      return;
-    }
-    triageBox?.focus();
+    detailBox?.focus();
   };
 
   const renderRows = () => {
@@ -105,25 +79,21 @@ export function createIncidentsScreen(): TuiScreen {
           ])
         ], selectionSync);
         detailBox?.setContent('Render fallback mode enabled for incident details.');
-        triageBox?.setContent('Triage view suspended due to repeated render failures. Press r to retry.');
       } else {
         const panels = sceneFromIncidentsState({
           severityFilter,
           selectedIndex,
-          incidents: filtered,
-          triageText
+          incidents: filtered
         });
 
         const tablePanel = panels.find((panel) => panel.id === 'incidents-table');
         const detailPanel = panels.find((panel) => panel.id === 'incidents-detail');
-        const triagePanel = panels.find((panel) => panel.id === 'incidents-triage');
 
         setListTableData(list, [
           (tablePanel?.table?.columns ?? ['ID', 'Severity', 'State', 'Device']) as [string, string, string, string],
           ...((tablePanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
         ], selectionSync);
         detailBox?.setContent((detailPanel?.text?.lines ?? ['No incidents.']).join('\n'));
-        triageBox?.setContent((triagePanel?.text?.lines ?? ['Run triage with key x.']).join('\n'));
       }
       renderErrorMessage = '';
       renderErrorCount = 0;
@@ -164,7 +134,6 @@ export function createIncidentsScreen(): TuiScreen {
         ])
       ], selectionSync);
       detailBox?.setContent(`Unable to render incident detail safely.\nReason: ${message}`);
-      triageBox?.setContent('Run triage with key x.');
     }
     syncListSelection(list, selectedIndex, selectionSync);
     focusPane();
@@ -208,7 +177,7 @@ export function createIncidentsScreen(): TuiScreen {
         parent: root,
         top: 0,
         left: '45%',
-        width: '25%',
+        width: '55%',
         height: '100%',
         border: 'line',
         label: ' Incident Detail ',
@@ -219,25 +188,9 @@ export function createIncidentsScreen(): TuiScreen {
         vi: true
       });
 
-      triageBox = blessed.box({
-        parent: root,
-        top: 0,
-        left: '70%',
-        width: '30%',
-        height: '100%',
-        border: 'line',
-        label: ' Triage ',
-        tags: true,
-        scrollable: true,
-        alwaysScroll: true,
-        vi: true,
-        keys: false,
-        mouse: true,
-        content: 'Select an incident and press x to run triage.'
-      });
       context.debugLog?.('nav.list.nativeKeysDisabled', {
         screen: 'incidents',
-        widgets: ['incidents-table', 'detail-box', 'triage-box']
+        widgets: ['incidents-table', 'detail-box']
       });
 
       list.on('select item', (_item, index) => {
@@ -339,10 +292,7 @@ export function createIncidentsScreen(): TuiScreen {
         context.screen.render();
         return 'handled';
       }
-
-      scrollBox(triageBox, delta);
-      context.screen.render();
-      return 'handled';
+      return 'unhandled';
     },
     async handleKey(ch, key) {
       if (key.name === 'slash' || ch === '/') {
@@ -356,30 +306,6 @@ export function createIncidentsScreen(): TuiScreen {
           renderRows();
           context.screen.render();
         }
-        return true;
-      }
-
-      if (ch === 'x') {
-        const selected = filtered[selectedIndex];
-        if (!selected) {
-          context.setStatus('No incident selected.');
-          return true;
-        }
-
-        context.setStatus('Running incident triage...');
-        try {
-          const triage = await context.runIncidentTriage({ incident: selected });
-          if (!isMounted) {
-            return true;
-          }
-          triageText = formatIncidentTriageText(triage);
-          renderRows();
-          context.setStatus('Incident triage complete.');
-          context.screen.render();
-        } catch (error) {
-          context.showError(error);
-        }
-
         return true;
       }
 

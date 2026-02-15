@@ -19,7 +19,6 @@ import { parseJsonObject } from '../utils/json';
 import { writeJsonLine } from '../utils/json-output';
 import { installSkills } from '../utils/install-skills';
 import { runTuiApp } from '../tui/app';
-import { LLMService } from '../llm/provider';
 import type { TuiScreenId } from '../tui/types';
 import {
   buildDeepDive,
@@ -75,14 +74,7 @@ function printJson(stream: OutputStream, value: unknown, options: { strictJson?:
 }
 
 function parseProvider(value: string): SecretProvider {
-  const allowed: SecretProvider[] = [
-    'openai',
-    'anthropic',
-    'openai-compatible',
-    'xyte-org',
-    'xyte-partner',
-    'xyte-device'
-  ];
+  const allowed: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device'];
 
   if (!allowed.includes(value as SecretProvider)) {
     throw new Error(`Invalid provider: ${value}`);
@@ -446,7 +438,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
   program
     .command('install')
     .description('Initialize workspace')
-    .option('--skills', 'install skills for claude / github copilot')
+    .option('--skills', 'install local agent skills')
     .option('--target <path>', 'Workspace directory override')
     .option('--force', 'Overwrite existing skill install')
     .option('--no-setup', 'Skip guided setup after installing skills')
@@ -560,11 +552,9 @@ export function createCli(runtime: CliRuntime = {}): Command {
       keychain: keychainReady,
       tenantId: activeTenantId
     });
-    const llmService = new LLMService({ profileStore, keychain: keychainReady });
 
     await runTui({
       client,
-      llm: llmService,
       profileStore,
       keychain: keychainReady,
       initialScreen: 'dashboard',
@@ -844,14 +834,12 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .option('--name <name>', 'Display name')
     .option('--hub-url <url>', 'Hub API base URL')
     .option('--entry-url <url>', 'Entry API base URL')
-    .option('--openai-compatible-url <url>', 'OpenAI-compatible base URL')
     .action(async (tenantId: string, options: Record<string, string | undefined>) => {
       const tenantProfile = await profileStore.upsertTenant({
         id: tenantId,
         name: options.name,
         hubBaseUrl: options.hubUrl,
-        entryBaseUrl: options.entryUrl,
-        openaiCompatibleBaseUrl: options.openaiCompatibleUrl
+        entryBaseUrl: options.entryUrl
       });
       printJson(stdout, tenantProfile);
     });
@@ -896,45 +884,13 @@ export function createCli(runtime: CliRuntime = {}): Command {
       stdout.write(`Default tenant set to ${options.tenant}\n`);
     });
 
-  const llm = profile.command('llm').description('Manage LLM profile settings');
-
-  llm
-    .command('set-provider')
-    .requiredOption('--provider <provider>', 'openai|anthropic|openai-compatible')
-    .option('--tenant <tenantId>', 'Optional tenant-scoped override')
-    .action(async (options: { provider: 'openai' | 'anthropic' | 'openai-compatible'; tenant?: string }) => {
-      if (options.tenant) {
-        await profileStore.setTenantLLM(options.tenant, { provider: options.provider });
-        stdout.write(`Tenant ${options.tenant} provider set to ${options.provider}\n`);
-        return;
-      }
-
-      await profileStore.setGlobalLLM({ provider: options.provider });
-      stdout.write(`Global provider set to ${options.provider}\n`);
-    });
-
-  llm
-    .command('set-model')
-    .requiredOption('--model <model>', 'Model name')
-    .option('--tenant <tenantId>', 'Optional tenant-scoped override')
-    .action(async (options: { model: string; tenant?: string }) => {
-      if (options.tenant) {
-        await profileStore.setTenantLLM(options.tenant, { model: options.model });
-        stdout.write(`Tenant ${options.tenant} model set to ${options.model}\n`);
-        return;
-      }
-
-      await profileStore.setGlobalLLM({ model: options.model });
-      stdout.write(`Global model set to ${options.model}\n`);
-    });
-
   const auth = program.command('auth').description('Manage API keys in OS keychain');
   const authKey = auth.command('key').description('Manage named key slots');
 
   authKey
     .command('add')
     .requiredOption('--tenant <tenantId>', 'Tenant id')
-    .requiredOption('--provider <provider>', 'openai|anthropic|openai-compatible|xyte-org|xyte-partner|xyte-device')
+    .requiredOption('--provider <provider>', 'xyte-org|xyte-partner|xyte-device')
     .requiredOption('--name <name>', 'Slot display name')
     .option('--slot-id <slotId>', 'Optional explicit slot id')
     .option('--key <value>', 'API key value')
@@ -1315,7 +1271,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .command('tui')
     .description('Launch the full-screen TUI')
     .option('--headless', 'Run headless visual mode for agents')
-    .option('--screen <screen>', 'setup|config|dashboard|spaces|devices|incidents|tickets|copilot', 'dashboard')
+    .option('--screen <screen>', 'setup|config|dashboard|spaces|devices|incidents|tickets', 'dashboard')
     .option('--format <format>', 'json|text (headless is json-only)', 'json')
     .option('--once', 'Render one frame and exit (default behavior)')
     .option('--follow', 'Continuously stream frames')
@@ -1338,9 +1294,8 @@ export function createCli(runtime: CliRuntime = {}): Command {
     }) => {
       const keychain = await getKeychain();
       const client = createXyteClient({ profileStore, keychain });
-      const llmService = new LLMService({ profileStore, keychain });
 
-      const allowedScreens: TuiScreenId[] = ['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets', 'copilot'];
+      const allowedScreens: TuiScreenId[] = ['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets'];
       const screen = (options.screen ?? 'dashboard') as TuiScreenId;
       if (!allowedScreens.includes(screen)) {
         throw new Error(`Invalid screen: ${options.screen}`);
@@ -1361,7 +1316,6 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
       await runTui({
         client,
-        llm: llmService,
         profileStore,
         keychain,
         initialScreen: screen,

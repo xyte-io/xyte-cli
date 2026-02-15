@@ -3,7 +3,6 @@ import path from 'node:path';
 
 import type {
   ApiKeySlotMeta,
-  LLMProfileUpdate,
   ProfileStoreData,
   SecretProvider,
   TenantKeyRegistry,
@@ -14,7 +13,6 @@ import { buildSlotId, ensureSlotName, matchesSlotRef } from './key-slots';
 
 const DEFAULT_DATA: ProfileStoreData = {
   version: 2,
-  globalDefaultLLMProvider: 'openai',
   tenants: []
 };
 
@@ -27,13 +25,10 @@ export interface ProfileStore {
     name?: string;
     hubBaseUrl?: string;
     entryBaseUrl?: string;
-    openaiCompatibleBaseUrl?: string;
   }): Promise<TenantProfile>;
   removeTenant(tenantId: string): Promise<void>;
   setActiveTenant(tenantId: string): Promise<void>;
   getActiveTenant(): Promise<TenantProfile | undefined>;
-  setGlobalLLM(update: LLMProfileUpdate): Promise<ProfileStoreData>;
-  setTenantLLM(tenantId: string, update: LLMProfileUpdate): Promise<TenantProfile>;
   listKeySlots(tenantId: string, provider?: SecretProvider): Promise<ApiKeySlotMeta[]>;
   addKeySlot(tenantId: string, input: { provider: SecretProvider; name: string; slotId?: string; fingerprint: string }): Promise<ApiKeySlotMeta>;
   updateKeySlot(
@@ -94,9 +89,6 @@ function normalizeTenant(raw: TenantProfile): TenantProfile {
     name: raw.name ?? raw.id,
     hubBaseUrl: raw.hubBaseUrl,
     entryBaseUrl: raw.entryBaseUrl,
-    openaiCompatibleBaseUrl: raw.openaiCompatibleBaseUrl,
-    defaultLLMProvider: raw.defaultLLMProvider,
-    defaultLLMModel: raw.defaultLLMModel,
     keyRegistry: {
       slots: normalizedSlots,
       activeSlotByProvider
@@ -139,7 +131,6 @@ export class FileProfileStore implements ProfileStore {
     name?: string;
     hubBaseUrl?: string;
     entryBaseUrl?: string;
-    openaiCompatibleBaseUrl?: string;
   }): Promise<TenantProfile> {
     const data = await this.getData();
     const now = new Date().toISOString();
@@ -151,7 +142,6 @@ export class FileProfileStore implements ProfileStore {
         name: input.name ?? input.id,
         hubBaseUrl: input.hubBaseUrl,
         entryBaseUrl: input.entryBaseUrl,
-        openaiCompatibleBaseUrl: input.openaiCompatibleBaseUrl,
         keyRegistry: createEmptyRegistry(),
         createdAt: now,
         updatedAt: now
@@ -170,7 +160,6 @@ export class FileProfileStore implements ProfileStore {
       name: input.name ?? current.name,
       hubBaseUrl: input.hubBaseUrl ?? current.hubBaseUrl,
       entryBaseUrl: input.entryBaseUrl ?? current.entryBaseUrl,
-      openaiCompatibleBaseUrl: input.openaiCompatibleBaseUrl ?? current.openaiCompatibleBaseUrl,
       keyRegistry: cloneRegistry(current.keyRegistry),
       updatedAt: now
     };
@@ -208,39 +197,6 @@ export class FileProfileStore implements ProfileStore {
       return undefined;
     }
     return data.tenants.find((tenant) => tenant.id === data.activeTenantId);
-  }
-
-  async setGlobalLLM(update: LLMProfileUpdate): Promise<ProfileStoreData> {
-    const data = await this.getData();
-    if (update.provider) {
-      data.globalDefaultLLMProvider = update.provider;
-    }
-    if (update.model !== undefined) {
-      data.globalDefaultLLMModel = update.model;
-    }
-    await this.writeData(data);
-    return data;
-  }
-
-  async setTenantLLM(tenantId: string, update: LLMProfileUpdate): Promise<TenantProfile> {
-    const data = await this.getData();
-    const index = data.tenants.findIndex((tenant) => tenant.id === tenantId);
-    if (index === -1) {
-      throw new Error(`Unknown tenant: ${tenantId}`);
-    }
-
-    const tenant = data.tenants[index];
-    const updated: TenantProfile = {
-      ...tenant,
-      defaultLLMProvider: update.provider ?? tenant.defaultLLMProvider,
-      defaultLLMModel: update.model !== undefined ? update.model : tenant.defaultLLMModel,
-      keyRegistry: cloneRegistry(tenant.keyRegistry),
-      updatedAt: new Date().toISOString()
-    };
-
-    data.tenants[index] = updated;
-    await this.writeData(data);
-    return updated;
   }
 
   async listKeySlots(tenantId: string, provider?: SecretProvider): Promise<ApiKeySlotMeta[]> {
@@ -400,8 +356,6 @@ export class FileProfileStore implements ProfileStore {
 
     return {
       version: 2,
-      globalDefaultLLMProvider: input.globalDefaultLLMProvider ?? 'openai',
-      globalDefaultLLMModel: input.globalDefaultLLMModel,
       activeTenantId: input.activeTenantId,
       tenants
     };

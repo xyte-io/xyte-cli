@@ -72,8 +72,6 @@ export interface HeadlessFrame {
 
 export interface DashboardSceneState {
   tenantId?: string;
-  provider?: string;
-  model?: string;
   devices: any[];
   incidents: any[];
   tickets: any[];
@@ -91,7 +89,6 @@ export interface IncidentsSceneState {
   severityFilter: string;
   selectedIndex: number;
   incidents: any[];
-  triageText?: string;
 }
 
 export interface TicketsSceneState {
@@ -101,7 +98,6 @@ export interface TicketsSceneState {
   selectedIndex: number;
   tickets: any[];
   detailText?: string;
-  draftText?: string;
 }
 
 export interface SpacesSceneState {
@@ -113,13 +109,6 @@ export interface SpacesSceneState {
   spaces: any[];
   spaceDetail?: unknown;
   devicesInSpace: any[];
-}
-
-export interface CopilotSceneState {
-  tenantId?: string;
-  provider?: string;
-  model?: string;
-  logs: string[];
 }
 
 export interface SetupSceneState {
@@ -188,14 +177,13 @@ export function sceneFromDashboardState(state: DashboardSceneState): ScenePanel[
       ]
     },
     {
-      id: 'dashboard-provider',
-      title: 'Provider Status',
+      id: 'dashboard-status',
+      title: 'Status',
       kind: 'text',
       text: {
         lines: [
-          `Provider override: ${state.provider ?? 'none'}`,
-          `Model override: ${state.model ?? 'none'}`,
-          'Copilot outputs are advisory only.'
+          'Use setup/config to manage tenant readiness and key slots.',
+          'Headless mode provides machine-readable snapshots for agents.'
         ]
       }
     },
@@ -311,14 +299,6 @@ export function sceneFromIncidentsState(state: IncidentsSceneState): ScenePanel[
         lines: detailLines
       }
     },
-    {
-      id: 'incidents-triage',
-      title: 'Triage',
-      kind: 'text',
-      text: {
-        lines: state.triageText ? state.triageText.split('\n') : ['Run triage from interactive mode with key x.']
-      }
-    }
   ];
 }
 
@@ -363,14 +343,6 @@ export function sceneFromTicketsState(state: TicketsSceneState): ScenePanel[] {
       kind: 'text',
       text: {
         lines: detailLines
-      }
-    },
-    {
-      id: 'tickets-draft',
-      title: 'Draft Tool',
-      kind: 'text',
-      text: {
-        lines: state.draftText ? state.draftText.split('\n') : ['Run draft from interactive mode with key m.']
       }
     }
   ];
@@ -434,33 +406,6 @@ export function sceneFromSpacesState(state: SpacesSceneState): ScenePanel[] {
   ];
 }
 
-export function sceneFromCopilotState(state: CopilotSceneState): ScenePanel[] {
-  return [
-    {
-      id: 'copilot-status',
-      title: 'Provider',
-      kind: 'text',
-      text: {
-        lines: [
-          `Provider override: ${state.provider ?? 'none'}`,
-          `Model override: ${state.model ?? 'none'}`,
-          `Tenant: ${state.tenantId ?? 'none'}`
-        ]
-      }
-    },
-    {
-      id: 'copilot-log',
-      title: 'Output',
-      kind: 'text',
-      text: {
-        lines: state.logs.length
-          ? state.logs
-          : ['Use interactive mode to run prompts. In headless mode, this view is a snapshot of current copilot log state.']
-      }
-    }
-  ];
-}
-
 export function sceneFromSetupState(state: SetupSceneState): ScenePanel[] {
   return [
     {
@@ -506,7 +451,7 @@ export function sceneFromSetupState(state: SetupSceneState): ScenePanel[] {
           '- p set active slot',
           '- c test connectivity',
           '- r refresh',
-          'Global keys: u/g/d/s/v/i/t/p, r refresh, ? help, q quit'
+          'Global keys: u/g/d/s/v/i/t, r refresh, ? help, q quit'
         ]
       }
     }
@@ -575,7 +520,7 @@ export function sceneFromConfigState(state: ConfigSceneState): ScenePanel[] {
           '- x remove slot',
           '- c doctor',
           '- r refresh',
-          'Global keys: u/g/d/s/v/i/t/p, r refresh, ? help, q quit'
+          'Global keys: u/g/d/s/v/i/t, r refresh, ? help, q quit'
         ]
       }
     }

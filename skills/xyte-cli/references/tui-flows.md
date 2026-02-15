@@ -16,7 +16,6 @@ Supported screens:
 - `devices`
 - `incidents`
 - `tickets`
-- `copilot`
 
 ## Deterministic Branching (Required)
 
@@ -78,11 +77,6 @@ xyte-cli tui --headless --screen incidents --format json --once --tenant <tenant
 Tickets:
 ```bash
 xyte-cli tui --headless --screen tickets --format json --once --tenant <tenant-id>
-```
-
-Copilot snapshot:
-```bash
-xyte-cli tui --headless --screen copilot --format json --once --tenant <tenant-id>
 ```
 
 ## Follow Mode (Streaming)

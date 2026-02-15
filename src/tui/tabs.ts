@@ -1,6 +1,6 @@
 import type { TuiScreenId } from './types';
 
-export const TAB_ORDER: TuiScreenId[] = ['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets', 'copilot'];
+export const TAB_ORDER: TuiScreenId[] = ['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets'];
 
 export function nextTab(current: TuiScreenId, direction: 'left' | 'right'): TuiScreenId {
   const currentIndex = TAB_ORDER.indexOf(current);
