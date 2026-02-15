@@ -48,7 +48,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "tui": "tsx src/bin/xyte-cli.ts tui"
+    "tui": "tsx src/bin/xyte-cli.ts tui",
+    "release:publish": "bash scripts/publish.sh all",
+    "release:publish:cli": "bash scripts/publish.sh cli",
+    "release:publish:pages": "bash scripts/publish.sh pages"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.26.0",

@@ -24,6 +24,14 @@ This project is prepared for manual npm publishing of `@xyte/cli`.
 
 `publishConfig.access=public` is already configured, so first publish for the scoped package will be public.
 
+## Helper Script
+
+Use the repo script when delegating deploy actions:
+
+- `npm run release:publish:cli` - publish only `@xyte/cli`
+- `npm run release:publish:pages` - trigger GitHub Pages workflow only
+- `npm run release:publish` - publish npm package, then trigger GitHub Pages workflow
+
 ## Rollback / Recovery
 
 - If a bad version is published, prefer a fast patch release with a bumped patch version.
