@@ -1,6 +1,6 @@
 {
   "name": "@xyteai/cli",
-  "version": "0.1.1",
+  "version": "0.1.0",
   "description": "Xyte CLI, TUI, skills, and MCP bridge for zero-friction AI operations",
   "license": "Apache-2.0",
   "repository": {
@@ -43,7 +43,7 @@
     "prepare": "npm run build",
     "prepublishOnly": "npm run typecheck && npm test && npm run build",
     "install:global": "npm run build && npm link",
-    "uninstall:global": "npm unlink -g @xyte/cli || true",
+    "uninstall:global": "npm unlink -g @xyteai/cli || true",
     "reinstall:global": "npm run uninstall:global && npm run install:global",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
