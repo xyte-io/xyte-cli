@@ -1042,7 +1042,14 @@
 
 <span class="term-cm"># CI/non-interactive</span>
 <span class="term-cmd">XYTE_CLI_KEY</span>=<span class="term-val">"&lt;your-key&gt;"</span> \
-<span class="term-cmd">xyte-cli setup run</span> <span class="term-flg">--non-interactive --tenant</span> <span class="term-val">acme</span></pre>
+<span class="term-cmd">xyte-cli setup run</span> <span class="term-flg">--non-interactive --tenant</span> <span class="term-val">acme</span> <span class="term-flg">--key</span> <span class="term-val">&lt;value&gt;</span></pre>
+            </article>
+            <article class="panel">
+              <h3>Commit gate (fresh user)</h3>
+              <p>Run this sequence before merging: isolated install + skills + setup + persisted key reuse + live call.</p>
+              <pre><span class="term-cmd">XYTE_CLI_KEY</span>=<span class="term-val">"&lt;real-key&gt;"</span> \
+<span class="term-cmd">XYTE_E2E_TENANT</span>=<span class="term-val">"&lt;tenant-id-or-default&gt;"</span> \
+<span class="term-cmd">npm run test:commit</span></pre>
             </article>
           </div>
         </div>
