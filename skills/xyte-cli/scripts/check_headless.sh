@@ -43,7 +43,7 @@ for screen in "${SCREENS[@]}"; do
   if [[ -n "$TENANT_ID" ]]; then
     output="$("${cmd[@]}")"
   else
-    output="$(XYTE_CLI_CONFIG_DIR="$TMP_CFG" XYTE_CLI_KEYCHAIN_BACKEND=memory "${cmd[@]}")"
+    output="$(XYTE_CLI_CONFIG_DIR="$TMP_CFG" "${cmd[@]}")"
   fi
 
   runtime_frame="$(printf '%s\n' "$output" | jq -c 'select((.meta.startup // false) | not)' | tail -n1)"

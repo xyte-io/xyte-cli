@@ -9,7 +9,7 @@ import reportSchema from '../docs/schemas/report.v1.schema.json';
 import { buildCallEnvelope } from '../src/contracts/call-envelope';
 import { buildDeepDive, buildFleetInspect, generateFleetReport } from '../src/workflows/fleet-insights';
 import { runHeadlessRenderer } from '../src/tui/headless-renderer';
-import { MemoryKeychain } from '../src/secure/keychain';
+import { MemorySecretStore } from '../src/secure/secret-store';
 import { MemoryProfileStore } from './support/memory-profile-store';
 
 const ajv = new Ajv2020({ strict: false });
@@ -71,7 +71,7 @@ describe('schema contracts', () => {
 
   it('validates headless runtime frame payload', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
     const slot = await profileStore.addKeySlot('acme', {
@@ -79,7 +79,7 @@ describe('schema contracts', () => {
       name: 'primary',
       fingerprint: 'sha256:test'
     });
-    await keychain.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key');
+    await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key');
 
     const chunks: string[] = [];
     const output = {
@@ -106,7 +106,7 @@ describe('schema contracts', () => {
     await runHeadlessRenderer({
       client,
       profileStore,
-      keychain,
+      secretStore,
       screen: 'spaces',
       format: 'json',
       motionEnabled: false,

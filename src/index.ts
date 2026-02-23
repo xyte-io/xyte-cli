@@ -15,6 +15,7 @@ export {
 } from './workflows/fleet-insights';
 
 export { FileProfileStore } from './secure/profile-store';
-export { createKeychainStore, MemoryKeychain } from './secure/keychain';
+export { createSecretStore, MemorySecretStore, FileSecretStore } from './secure/secret-store';
+export type { SecretStore } from './secure/secret-store';
 export type { ProfileStore } from './secure/profile-store';
 export type { SecretProvider, TenantProfile, ProfileStoreData, ApiKeySlotMeta, TenantKeyRegistry } from './types/profile';

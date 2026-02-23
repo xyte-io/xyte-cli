@@ -14,7 +14,7 @@ import { createTicketsScreen } from './screens/tickets';
 import type { XyteClient } from '../types/client';
 import type { ProfileStore } from '../secure/profile-store';
 import { FileProfileStore } from '../secure/profile-store';
-import { createKeychainStore, type KeychainStore } from '../secure/keychain';
+import { createSecretStore, type SecretStore } from '../secure/secret-store';
 import { dispatchKeypress } from './dispatch';
 import { isMotionEnabled, startupFrames } from './animation';
 import { runHeadlessRenderer } from './headless-renderer';
@@ -28,7 +28,7 @@ import { nextTab } from './tabs';
 export interface TuiAppOptions {
   client: XyteClient;
   profileStore?: ProfileStore;
-  keychain?: KeychainStore;
+  secretStore?: SecretStore;
   initialScreen?: TuiScreenId;
   headless?: boolean;
   format?: 'json' | 'text';
@@ -105,7 +105,7 @@ export function updateErrorStormState(
 
 export async function runTuiApp(options: TuiAppOptions): Promise<void> {
   const profileStore = options.profileStore ?? new FileProfileStore();
-  const keychain = options.keychain ?? (await createKeychainStore());
+  const secretStore = options.secretStore ?? (await createSecretStore());
   const motionEnabled = isMotionEnabled({ headless: options.headless, explicitMotion: options.motionEnabled });
   const debugEnabled = Boolean(
     options.debug || options.debugLogPath || process.env.XYTE_TUI_DEBUG === '1' || process.env.XYTE_TUI_DEBUG_LOG
@@ -131,7 +131,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
       await runHeadlessRenderer({
         client: options.client,
         profileStore,
-        keychain,
+        secretStore,
         screen: options.initialScreen ?? 'dashboard',
         format: 'json',
         motionEnabled,
@@ -283,7 +283,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
       logger.log('readiness.refresh.start', { checkConnectivity });
       readinessState = await evaluateReadiness({
         profileStore,
-        keychain,
+        secretStore,
         tenantId: options.tenantId,
         client: options.client,
         checkConnectivity
@@ -374,7 +374,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
       screen,
       client: options.client,
       profileStore,
-      keychain,
+      secretStore,
       async getActiveTenantId() {
         return options.tenantId ?? (await profileStore.getData()).activeTenantId;
       },

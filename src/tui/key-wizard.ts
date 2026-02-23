@@ -5,7 +5,7 @@ import type { TuiContext } from './types';
 const PROVIDERS: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device'];
 
 interface WizardContext
-  extends Pick<TuiContext, 'prompt' | 'promptSecret' | 'confirmWrite' | 'setStatus' | 'profileStore' | 'keychain'> {}
+  extends Pick<TuiContext, 'prompt' | 'promptSecret' | 'confirmWrite' | 'setStatus' | 'profileStore' | 'secretStore'> {}
 
 export interface KeyWizardResult {
   canceled: boolean;
@@ -158,7 +158,7 @@ export async function runKeyCreateWizard(args: RunKeyCreateWizardArgs): Promise<
     name: slotName,
     fingerprint
   });
-  await context.keychain.setSlotSecret(tenantId, provider, slot.slotId, keyValue);
+  await context.secretStore.setSlotSecret(tenantId, provider, slot.slotId, keyValue);
   if (setActive) {
     await context.profileStore.setActiveKeySlot(tenantId, provider, slot.slotId);
   }
@@ -213,7 +213,7 @@ export async function runKeyUpdateWizard(args: RunKeyUpdateWizardArgs): Promise<
     return canceledResult();
   }
 
-  await context.keychain.setSlotSecret(tenantId, provider, slot.slotId, keyValue);
+  await context.secretStore.setSlotSecret(tenantId, provider, slot.slotId, keyValue);
   const updated = await context.profileStore.updateKeySlot(tenantId, provider, slot.slotId, {
     name: slotName,
     fingerprint

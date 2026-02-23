@@ -10,7 +10,7 @@ usage() {
   cat <<'EOF'
 Usage: scripts/publish.sh [cli|pages|all]
 
-  cli    Publish @xyte/cli to npm
+  cli    Publish @xyteai/cli to npm
   pages  Trigger GitHub Pages deployment workflow
   all    Publish npm package, then trigger Pages deployment (default)
 EOF
@@ -20,7 +20,7 @@ publish_cli() {
   echo "Checking npm auth..."
   npm whoami >/dev/null
 
-  echo "Publishing @xyte/cli..."
+  echo "Publishing @xyteai/cli..."
   npm publish
 }
 

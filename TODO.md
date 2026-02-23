@@ -1,7 +1,7 @@
 # TODO - xyte-cli continuation
 
 ## A. Lock product surface
-- [x] Keep package identity: `@xyte/cli`
+- [x] Keep package identity: `@xyteai/cli`
 - [x] Keep single executable: `xyte-cli`
 - [x] Remove any compatibility/alias behavior not part of current feature set
 

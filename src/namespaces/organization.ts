@@ -1,6 +1,7 @@
 import type { NamespaceCall, XyteCallArgs } from '../types/client';
 
 export interface OrganizationNamespace {
+  closeIncident: NamespaceCall;
   cancelCommand: NamespaceCall;
   getCommands: NamespaceCall;
   sendCommand: NamespaceCall;
@@ -27,6 +28,7 @@ export interface OrganizationNamespace {
 
 export function createOrganizationNamespace(call: (endpointKey: string, args?: XyteCallArgs) => Promise<unknown>): OrganizationNamespace {
   return {
+    closeIncident: (args) => call('organization.incidents.closeIncident', args),
     cancelCommand: (args) => call('organization.commands.cancelCommand', args),
     getCommands: (args) => call('organization.commands.getCommands', args),
     sendCommand: (args) => call('organization.commands.sendCommand', args),

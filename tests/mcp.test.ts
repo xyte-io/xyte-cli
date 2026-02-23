@@ -3,7 +3,7 @@ import { PassThrough } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 
 import { createMcpServer } from '../src/mcp/server';
-import { MemoryKeychain } from '../src/secure/keychain';
+import { MemorySecretStore } from '../src/secure/secret-store';
 import { MemoryProfileStore } from './support/memory-profile-store';
 
 function waitForLine(stream: PassThrough): Promise<any> {
@@ -25,10 +25,10 @@ function waitForLine(stream: PassThrough): Promise<any> {
 describe('mcp server', () => {
   it('responds to initialize and tools/list', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     const input = new PassThrough();
     const output = new PassThrough();
-    const server = createMcpServer({ profileStore, keychain, input, output });
+    const server = createMcpServer({ profileStore, secretStore, input, output });
     const running = server.start();
 
     input.write(`${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} })}\n`);
