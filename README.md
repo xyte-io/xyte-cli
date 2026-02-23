@@ -21,6 +21,7 @@ Xyte CLI with SKILLS, built for coding agents and operators.
   - `a`, `e`, `u`, `t`, `x`, `n`, `c`, `r`
 - Headless JSON frames with stable contracts
 - Inspect/report pipelines with schema-versioned output
+- A4 PDF reports with humanized time labels, continuation-safe pagination, and readability-first table layout
 
 ## Requirements
 

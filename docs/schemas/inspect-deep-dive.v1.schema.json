@@ -27,6 +27,9 @@
     "tenantId": {
       "type": "string"
     },
+    "tenantName": {
+      "type": "string"
+    },
     "windowHours": {
       "type": "integer"
     },
