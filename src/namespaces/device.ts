@@ -8,6 +8,7 @@ export interface DeviceNamespace {
   setConfig: NamespaceCall;
   getDeviceInfo: NamespaceCall;
   getSpaceInfo: NamespaceCall;
+  spaceMove: NamespaceCall;
   setCloudSettings: (args: XyteCallArgs & { body: { property: string; value: unknown } | Record<string, unknown> }) => Promise<unknown>;
   updateDevice: NamespaceCall;
   addEvent: NamespaceCall;
@@ -40,6 +41,7 @@ export function createDeviceNamespace(call: (endpointKey: string, args?: XyteCal
     setConfig: (args) => call('device.configuration.setConfig', args),
     getDeviceInfo: (args) => call('device.device-info.getDeviceInfo', args),
     getSpaceInfo: (args) => call('device.device-info.getSpaceInfo', args),
+    spaceMove: (args) => call('device.device-info.spaceMove', args),
     setCloudSettings: (args) => call('device.device-info.setCloudSettings', args),
     updateDevice: (args) => call('device.device-info.updateDevice', args),
     addEvent: (args) => call('device.events.addEvent', args),

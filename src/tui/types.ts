@@ -2,7 +2,7 @@ import type blessed from 'blessed';
 
 import type { XyteClient } from '../types/client';
 import type { ProfileStore } from '../secure/profile-store';
-import type { KeychainStore } from '../secure/keychain';
+import type { SecretStore } from '../secure/secret-store';
 import type { ReadinessCheck } from '../config/readiness';
 
 export type TuiScreenId = 'setup' | 'config' | 'dashboard' | 'spaces' | 'devices' | 'incidents' | 'tickets';
@@ -14,7 +14,7 @@ export interface TuiContext {
   screen: blessed.Widgets.Screen;
   client: XyteClient;
   profileStore: ProfileStore;
-  keychain: KeychainStore;
+  secretStore: SecretStore;
   getActiveTenantId(): Promise<string | undefined>;
   getReadiness(): ReadinessCheck | undefined;
   refreshReadiness(checkConnectivity?: boolean): Promise<ReadinessCheck>;

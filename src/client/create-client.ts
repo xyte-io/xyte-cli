@@ -4,7 +4,7 @@ import { XyteAuthError, XyteValidationError } from '../http/errors';
 import { createDeviceNamespace } from '../namespaces/device';
 import { createOrganizationNamespace } from '../namespaces/organization';
 import { createPartnerNamespace } from '../namespaces/partner';
-import { createKeychainStore, type KeychainStore } from '../secure/keychain';
+import { createSecretStore, type SecretStore } from '../secure/secret-store';
 import { FileProfileStore, type ProfileStore } from '../secure/profile-store';
 import type { PublicEndpointSpec } from '../types/endpoints';
 import type { SecretProvider } from '../types/profile';
@@ -98,16 +98,16 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
       retryBackoffMs: options.retryBackoffMs
     });
 
-  let keychainPromise: Promise<KeychainStore> | undefined;
+  let secretStorePromise: Promise<SecretStore> | undefined;
 
-  const getKeychain = async (): Promise<KeychainStore> => {
-    if (options.keychain) {
-      return options.keychain;
+  const getSecretStore = async (): Promise<SecretStore> => {
+    if (options.secretStore) {
+      return options.secretStore;
     }
-    if (!keychainPromise) {
-      keychainPromise = createKeychainStore();
+    if (!secretStorePromise) {
+      secretStorePromise = createSecretStore();
     }
-    return keychainPromise;
+    return secretStorePromise;
   };
 
   const resolveTenant = async (requestedTenantId?: string) => {
@@ -144,8 +144,8 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
 
     const activeSlot = await profileStore.getActiveKeySlot(tenantId, provider);
     const slotId = activeSlot?.slotId ?? 'default';
-    const keychain = await getKeychain();
-    const value = await keychain.getSlotSecret(tenantId, provider, slotId);
+    const secretStore = await getSecretStore();
+    const value = await secretStore.getSlotSecret(tenantId, provider, slotId);
     if (!value) {
       throw new XyteAuthError(
         `Missing API key for provider ${provider} in tenant ${tenantId} (slot ${slotId}). Use "xyte-cli auth key add/use" or "xyte-cli setup run".`
@@ -234,7 +234,7 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
     describeEndpoint: (key) => getEndpoint(key),
     listEndpoints: () => listEndpoints(),
     listTenantEndpoints: async (tenantId: string) => {
-      const keychain = await getKeychain();
+      const secretStore = await getSecretStore();
       const [orgSlot, partnerSlot, deviceSlot] = await Promise.all([
         profileStore.getActiveKeySlot(tenantId, 'xyte-org'),
         profileStore.getActiveKeySlot(tenantId, 'xyte-partner'),
@@ -242,9 +242,9 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
       ]);
 
       const [org, partner, device] = await Promise.all([
-        keychain.getSlotSecret(tenantId, 'xyte-org', orgSlot?.slotId ?? 'default'),
-        keychain.getSlotSecret(tenantId, 'xyte-partner', partnerSlot?.slotId ?? 'default'),
-        keychain.getSlotSecret(tenantId, 'xyte-device', deviceSlot?.slotId ?? 'default')
+        secretStore.getSlotSecret(tenantId, 'xyte-org', orgSlot?.slotId ?? 'default'),
+        secretStore.getSlotSecret(tenantId, 'xyte-partner', partnerSlot?.slotId ?? 'default'),
+        secretStore.getSlotSecret(tenantId, 'xyte-device', deviceSlot?.slotId ?? 'default')
       ]);
 
       return listEndpoints().filter((endpoint) => {

@@ -1,6 +1,6 @@
 import type { PublicEndpointSpec } from './endpoints';
 import type { HttpTransport } from '../http/transport';
-import type { KeychainStore } from '../secure/keychain';
+import type { SecretStore } from '../secure/secret-store';
 import type { ProfileStore } from '../secure/profile-store';
 import type { DeviceNamespace } from '../namespaces/device';
 import type { OrganizationNamespace } from '../namespaces/organization';
@@ -43,7 +43,7 @@ export interface XyteClientOptions {
     device?: string;
   };
   profileStore?: ProfileStore;
-  keychain?: KeychainStore;
+  secretStore?: SecretStore;
   transport?: HttpTransport;
 }
 

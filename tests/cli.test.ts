@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { createCli } from '../src/cli/index';
-import { MemoryKeychain } from '../src/secure/keychain';
+import { MemorySecretStore } from '../src/secure/secret-store';
 import { MemoryProfileStore } from './support/memory-profile-store';
 import { buildDeepDive } from '../src/workflows/fleet-insights';
 
@@ -14,13 +14,13 @@ describe('cli integration', () => {
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
 
-    const keychain = new MemoryKeychain();
-    await keychain.setSecret('acme', 'xyte-device', 'device-key');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-device', 'device-key');
 
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
 
-    const program = createCli({ profileStore, keychain, stdout, stderr });
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
 
     vi.stubGlobal(
       'fetch',
@@ -48,20 +48,31 @@ describe('cli integration', () => {
 
   it('blocks write calls without --allow-write', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
 
-    const program = createCli({ profileStore, keychain, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
 
     await expect(
       program.parseAsync(['node', 'xyte-cli', 'call', 'organization.commands.sendCommand'])
     ).rejects.toThrow('--allow-write');
   });
 
+  it('blocks device spaceMove call without --allow-write', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+
+    await expect(
+      program.parseAsync(['node', 'xyte-cli', 'call', 'device.device-info.spaceMove'])
+    ).rejects.toThrow('--allow-write');
+  });
+
   it('shows one-line remediation when running bare xyte-cli without setup in non-interactive mode', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
 
-    const program = createCli({ profileStore, keychain, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
 
     await expect(program.parseAsync(['node', 'xyte-cli'])).rejects.toThrow(
       'Setup required. Run: xyte-cli setup run --non-interactive --tenant default --key "$XYTE_CLI_KEY".'
@@ -72,13 +83,13 @@ describe('cli integration', () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme', name: 'Acme' });
     await profileStore.setActiveTenant('acme');
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     const slot = await profileStore.addKeySlot('acme', {
       provider: 'xyte-org',
       name: 'primary',
       fingerprint: 'sha256:test'
     });
-    await keychain.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key');
+    await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key');
     await profileStore.setActiveKeySlot('acme', 'xyte-org', slot.slotId);
     const runTui = vi.fn().mockResolvedValue(undefined);
 
@@ -94,7 +105,7 @@ describe('cli integration', () => {
 
     const program = createCli({
       profileStore,
-      keychain,
+      secretStore,
       runTui,
       stdout: { write: vi.fn() },
       stderr: { write: vi.fn() }
@@ -109,23 +120,34 @@ describe('cli integration', () => {
 
   it('requires --confirm for destructive calls', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
 
-    const program = createCli({ profileStore, keychain, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
 
     await expect(
       program.parseAsync(['node', 'xyte-cli', 'call', 'organization.commands.cancelCommand', '--allow-write'])
     ).rejects.toThrow('--confirm organization.commands.cancelCommand');
   });
 
+  it('requires --confirm for organization close incident call', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+
+    await expect(
+      program.parseAsync(['node', 'xyte-cli', 'call', 'organization.incidents.closeIncident', '--allow-write'])
+    ).rejects.toThrow('--confirm organization.incidents.closeIncident');
+  });
+
   it('passes headless tui options through cli command', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     const runTui = vi.fn().mockResolvedValue(undefined);
 
     const program = createCli({
       profileStore,
-      keychain,
+      secretStore,
       runTui,
       stdout: { write: vi.fn() },
       stderr: { write: vi.fn() }
@@ -163,11 +185,11 @@ describe('cli integration', () => {
 
   it('rejects non-json format in headless mode', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     const runTui = vi.fn().mockResolvedValue(undefined);
     const program = createCli({
       profileStore,
-      keychain,
+      secretStore,
       runTui,
       stdout: { write: vi.fn() },
       stderr: { write: vi.fn() }
@@ -181,12 +203,12 @@ describe('cli integration', () => {
 
   it('does not force motion setting when --no-motion is omitted', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     const runTui = vi.fn().mockResolvedValue(undefined);
 
     const program = createCli({
       profileStore,
-      keychain,
+      secretStore,
       runTui,
       stdout: { write: vi.fn() },
       stderr: { write: vi.fn() }
@@ -212,11 +234,11 @@ describe('cli integration', () => {
 
   it('prints setup status in json format', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
 
-    const program = createCli({ profileStore, keychain, stdout, stderr });
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
     await program.parseAsync(['node', 'xyte-cli', 'setup', 'status', '--format', 'json']);
 
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
@@ -228,11 +250,11 @@ describe('cli integration', () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
 
-    const program = createCli({ profileStore, keychain, stdout, stderr });
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
     await program.parseAsync([
       'node',
       'xyte-cli',
@@ -272,10 +294,10 @@ describe('cli integration', () => {
 
   it('reports install diagnostics', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const program = createCli({ profileStore, keychain, stdout, stderr });
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
 
     await program.parseAsync(['node', 'xyte-cli', 'doctor', 'install', '--format', 'json']);
 
@@ -289,11 +311,11 @@ describe('cli integration', () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
-    const keychain = new MemoryKeychain();
-    await keychain.setSecret('acme', 'xyte-device', 'device-key');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-device', 'device-key');
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const program = createCli({ profileStore, keychain, stdout, stderr });
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
 
     vi.stubGlobal(
       'fetch',
@@ -329,11 +351,11 @@ describe('cli integration', () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
-    const keychain = new MemoryKeychain();
-    await keychain.setSecret('acme', 'xyte-org', 'org-key');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const program = createCli({ profileStore, keychain, stdout, stderr });
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
 
     vi.stubGlobal(
       'fetch',
@@ -378,10 +400,10 @@ describe('cli integration', () => {
 
   it('generates markdown report from deep-dive input', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const program = createCli({ profileStore, keychain, stdout, stderr });
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
     const tmpRoot = mkdtempSync(join(tmpdir(), 'xyte-report-test-'));
     const inputPath = join(tmpRoot, 'deep-dive.json');
     const outPath = join(tmpRoot, 'report.md');
@@ -418,10 +440,10 @@ describe('cli integration', () => {
 
   it('defaults report generation to branded pdf output', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const program = createCli({ profileStore, keychain, stdout, stderr });
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
     const tmpRoot = mkdtempSync(join(tmpdir(), 'xyte-report-pdf-test-'));
     const inputPath = join(tmpRoot, 'deep-dive.json');
     const outPath = join(tmpRoot, 'report.pdf');
@@ -461,10 +483,10 @@ describe('cli integration', () => {
 
   it('runs simplified setup in non-interactive mode with only tenant+key', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const program = createCli({ profileStore, keychain, stdout, stderr });
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
 
     vi.stubGlobal(
       'fetch',
@@ -497,10 +519,10 @@ describe('cli integration', () => {
 
   it('installs skill to target workspace with --no-setup', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const program = createCli({ profileStore, keychain, stdout, stderr });
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
     const target = mkdtempSync(join(tmpdir(), 'xyte-cli-skill-install-'));
 
     await program.parseAsync(['node', 'xyte-cli', 'install', '--skills', '--target', target, '--no-setup']);
@@ -515,10 +537,10 @@ describe('cli integration', () => {
 
   it('runs install --skills with setup when XYTE_CLI_KEY is present', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const program = createCli({ profileStore, keychain, stdout, stderr });
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
     const target = mkdtempSync(join(tmpdir(), 'xyte-cli-install-setup-'));
     const previousEnv = process.env.XYTE_CLI_KEY;
     process.env.XYTE_CLI_KEY = 'org-key';
@@ -552,10 +574,10 @@ describe('cli integration', () => {
 
   it('installs only codex skill in user scope when requested', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const program = createCli({ profileStore, keychain, stdout, stderr });
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
     const target = mkdtempSync(join(tmpdir(), 'xyte-cli-install-user-target-'));
     const fakeHome = mkdtempSync(join(tmpdir(), 'xyte-cli-install-user-home-'));
     const previousHome = process.env.HOME;
@@ -597,7 +619,7 @@ describe('cli integration', () => {
 
   it('prompts for scope and agents in interactive mode when flags are omitted', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
     const promptValue = vi
@@ -606,7 +628,7 @@ describe('cli integration', () => {
       .mockResolvedValueOnce('claude,codex');
     const program = createCli({
       profileStore,
-      keychain,
+      secretStore,
       stdout,
       stderr,
       isTTY: true,
@@ -624,8 +646,8 @@ describe('cli integration', () => {
 
   it('returns a clear error for invalid --agents value', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
-    const program = createCli({ profileStore, keychain, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+    const secretStore = new MemorySecretStore();
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
 
     await expect(
       program.parseAsync([
@@ -644,10 +666,10 @@ describe('cli integration', () => {
 
   it('skips existing skill without --force and overwrites with --force', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const program = createCli({ profileStore, keychain, stdout, stderr });
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
     const target = mkdtempSync(join(tmpdir(), 'xyte-cli-install-force-'));
 
     await program.parseAsync([
@@ -702,10 +724,10 @@ describe('cli integration', () => {
 
   it('fails install when any target destination fails', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const program = createCli({ profileStore, keychain, stdout, stderr });
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
     const target = mkdtempSync(join(tmpdir(), 'xyte-cli-install-partial-fail-'));
     writeFileSync(join(target, '.github'), 'not-a-directory', 'utf8');
 
@@ -719,8 +741,8 @@ describe('cli integration', () => {
 
   it('does not register removed auth wrapper commands', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
-    const program = createCli({ profileStore, keychain, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+    const secretStore = new MemorySecretStore();
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
 
     const authCommand = program.commands.find((command) => command.name() === 'auth');
     expect(authCommand).toBeDefined();

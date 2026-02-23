@@ -11,7 +11,7 @@ import { getEndpoint, listEndpoints } from '../client/catalog';
 import { buildCallEnvelope } from '../contracts/call-envelope';
 import { toProblemDetails } from '../contracts/problem';
 import { evaluateReadiness, type ReadinessCheck } from '../config/readiness';
-import { createKeychainStore, type KeychainStore } from '../secure/keychain';
+import { createSecretStore, type SecretStore } from '../secure/secret-store';
 import { makeKeyFingerprint, matchesSlotRef } from '../secure/key-slots';
 import { FileProfileStore, type ProfileStore } from '../secure/profile-store';
 import type { SecretProvider } from '../types/profile';
@@ -55,7 +55,7 @@ interface InstallDoctorResult {
 
 export interface CliRuntime {
   profileStore?: ProfileStore;
-  keychain?: KeychainStore;
+  secretStore?: SecretStore;
   stdout?: OutputStream;
   stderr?: ErrorStream;
   runTui?: typeof runTuiApp;
@@ -334,7 +334,7 @@ async function resolveSlotByRef(
 
 async function collectSlotViews(args: {
   profileStore: ProfileStore;
-  keychain: KeychainStore;
+  secretStore: SecretStore;
   tenantId: string;
   provider?: SecretProvider;
 }): Promise<SlotView[]> {
@@ -348,7 +348,7 @@ async function collectSlotViews(args: {
 
   const views: SlotView[] = [];
   for (const slot of slots) {
-    const hasSecret = Boolean(await args.keychain.getSlotSecret(args.tenantId, slot.provider, slot.slotId));
+    const hasSecret = Boolean(await args.secretStore.getSlotSecret(args.tenantId, slot.provider, slot.slotId));
     views.push({
       tenantId: args.tenantId,
       provider: slot.provider,
@@ -426,22 +426,22 @@ export function createCli(runtime: CliRuntime = {}): Command {
   const profileStore = runtime.profileStore ?? new FileProfileStore();
   const runTui = runtime.runTui ?? runTuiApp;
 
-  let keychainPromise: Promise<KeychainStore> | undefined;
-  const getKeychain = async () => {
-    if (runtime.keychain) {
-      return runtime.keychain;
+  let secretStorePromise: Promise<SecretStore> | undefined;
+  const getSecretStore = async () => {
+    if (runtime.secretStore) {
+      return runtime.secretStore;
     }
-    if (!keychainPromise) {
-      keychainPromise = createKeychainStore();
+    if (!secretStorePromise) {
+      secretStorePromise = createSecretStore();
     }
-    return keychainPromise;
+    return secretStorePromise;
   };
 
   const withClient = async (tenantId?: string, retry?: { attempts?: number; backoffMs?: number }) => {
-    const keychain = await getKeychain();
+    const secretStore = await getSecretStore();
     return createXyteClient({
       profileStore,
-      keychain,
+      secretStore,
       tenantId,
       retryAttempts: retry?.attempts,
       retryBackoffMs: retry?.backoffMs
@@ -460,7 +460,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     });
     await profileStore.setActiveTenant(args.tenantId);
 
-    const keychain = await getKeychain();
+    const secretStore = await getSecretStore();
     const slots = await profileStore.listKeySlots(args.tenantId, SIMPLE_SETUP_PROVIDER);
     const existing = slots.find((slot) => slot.name.toLowerCase() === SIMPLE_SETUP_SLOT_NAME);
 
@@ -474,7 +474,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
           fingerprint: makeKeyFingerprint(args.keyValue)
         });
 
-    await keychain.setSlotSecret(args.tenantId, SIMPLE_SETUP_PROVIDER, slot.slotId, args.keyValue);
+    await secretStore.setSlotSecret(args.tenantId, SIMPLE_SETUP_PROVIDER, slot.slotId, args.keyValue);
     if (args.setActive !== false) {
       await profileStore.setActiveKeySlot(args.tenantId, SIMPLE_SETUP_PROVIDER, slot.slotId);
     }
@@ -482,7 +482,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     const client = await withClient(args.tenantId);
     const readiness = await evaluateReadiness({
       profileStore,
-      keychain,
+      secretStore,
       tenantId: args.tenantId,
       client,
       checkConnectivity: true
@@ -611,11 +611,11 @@ export function createCli(runtime: CliRuntime = {}): Command {
     );
 
   program.action(async () => {
-    const keychain = await getKeychain();
+    const secretStore = await getSecretStore();
     const readinessClient = await withClient(undefined);
     const readiness = await evaluateReadiness({
       profileStore,
-      keychain,
+      secretStore,
       client: readinessClient,
       checkConnectivity: true
     });
@@ -653,17 +653,17 @@ export function createCli(runtime: CliRuntime = {}): Command {
     }
 
     const activeTenantId = readiness.tenantId ?? (await profileStore.getData()).activeTenantId;
-    const keychainReady = await getKeychain();
+    const secretStoreReady = await getSecretStore();
     const client = createXyteClient({
       profileStore,
-      keychain: keychainReady,
+      secretStore: secretStoreReady,
       tenantId: activeTenantId
     });
 
     await runTui({
       client,
       profileStore,
-      keychain: keychainReady,
+      secretStore: secretStoreReady,
       initialScreen: 'dashboard',
       headless: false,
       tenantId: activeTenantId
@@ -832,7 +832,8 @@ export function createCli(runtime: CliRuntime = {}): Command {
         throw new Error(`Invalid format: ${format}. Use json|ascii.`);
       }
       const client = await withClient(options.tenant);
-      const snapshot = await collectFleetSnapshot(client, options.tenant);
+      const tenantProfile = await profileStore.getTenant(options.tenant);
+      const snapshot = await collectFleetSnapshot(client, options.tenant, tenantProfile?.name);
       const result = buildFleetInspect(snapshot);
 
       if (format === 'ascii') {
@@ -857,7 +858,8 @@ export function createCli(runtime: CliRuntime = {}): Command {
       }
       const windowHours = Number.parseInt(options.window ?? '24', 10);
       const client = await withClient(options.tenant);
-      const snapshot = await collectFleetSnapshot(client, options.tenant);
+      const tenantProfile = await profileStore.getTenant(options.tenant);
+      const snapshot = await collectFleetSnapshot(client, options.tenant, tenantProfile?.name);
       const result = buildDeepDive(snapshot, Number.isFinite(windowHours) ? windowHours : 24);
 
       if (format === 'ascii') {
@@ -909,6 +911,13 @@ export function createCli(runtime: CliRuntime = {}): Command {
           throw new Error(`Input tenant mismatch. Expected ${options.tenant}, got ${raw.tenantId}.`);
         }
 
+        if (!('tenantName' in raw) || typeof (raw as { tenantName?: unknown }).tenantName !== 'string') {
+          const tenantProfile = await profileStore.getTenant(options.tenant);
+          if (tenantProfile?.name) {
+            (raw as { tenantName?: string }).tenantName = tenantProfile.name;
+          }
+        }
+
         const generated = await generateFleetReport({
           deepDive: raw as any,
           format: format as 'markdown' | 'pdf',
@@ -924,10 +933,10 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .command('serve')
     .description('Run MCP server over stdio')
     .action(async () => {
-      const keychain = await getKeychain();
+      const secretStore = await getSecretStore();
       const server = createMcpServer({
         profileStore,
-        keychain
+        secretStore
       });
       await server.start();
     });
@@ -991,7 +1000,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       stdout.write(`Default tenant set to ${options.tenant}\n`);
     });
 
-  const auth = program.command('auth').description('Manage API keys in OS keychain');
+  const auth = program.command('auth').description('Manage API keys in persistent secret store');
   const authKey = auth.command('key').description('Manage named key slots');
 
   authKey
@@ -1006,7 +1015,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       const provider = parseProvider(options.provider);
       const value = requireKeyValue(options.key);
       await profileStore.upsertTenant({ id: options.tenant });
-      const keychain = await getKeychain();
+      const secretStore = await getSecretStore();
 
       const slot = await profileStore.addKeySlot(options.tenant, {
         provider,
@@ -1015,7 +1024,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
         fingerprint: makeKeyFingerprint(value)
       });
 
-      await keychain.setSlotSecret(options.tenant, provider, slot.slotId, value);
+      await secretStore.setSlotSecret(options.tenant, provider, slot.slotId, value);
       if (options.setActive) {
         await profileStore.setActiveKeySlot(options.tenant, provider, slot.slotId);
       }
@@ -1033,11 +1042,11 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .option('--provider <provider>', 'Optional provider filter')
     .option('--format <format>', 'json|text', 'json')
     .action(async (options: { tenant: string; provider?: string; format?: OutputFormat }) => {
-      const keychain = await getKeychain();
+      const secretStore = await getSecretStore();
       const provider = options.provider ? parseProvider(options.provider) : undefined;
       const slots = await collectSlotViews({
         profileStore,
-        keychain,
+        secretStore,
         tenantId: options.tenant,
         provider
       });
@@ -1096,9 +1105,9 @@ export function createCli(runtime: CliRuntime = {}): Command {
       const provider = parseProvider(options.provider);
       const slot = await resolveSlotByRef(profileStore, options.tenant, provider, options.slot);
       const value = requireKeyValue(options.key);
-      const keychain = await getKeychain();
+      const secretStore = await getSecretStore();
 
-      await keychain.setSlotSecret(options.tenant, provider, slot.slotId, value);
+      await secretStore.setSlotSecret(options.tenant, provider, slot.slotId, value);
       const updated = await profileStore.updateKeySlot(options.tenant, provider, slot.slotId, {
         fingerprint: makeKeyFingerprint(value)
       });
@@ -1122,9 +1131,9 @@ export function createCli(runtime: CliRuntime = {}): Command {
       }
       const provider = parseProvider(options.provider);
       const slot = await resolveSlotByRef(profileStore, options.tenant, provider, options.slot);
-      const keychain = await getKeychain();
+      const secretStore = await getSecretStore();
 
-      await keychain.clearSlotSecret(options.tenant, provider, slot.slotId);
+      await secretStore.clearSlotSecret(options.tenant, provider, slot.slotId);
       await profileStore.removeKeySlot(options.tenant, provider, slot.slotId);
       printJson(stdout, {
         tenantId: options.tenant,
@@ -1141,8 +1150,8 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .action(async (options: { tenant: string; provider: string; slot: string }) => {
       const provider = parseProvider(options.provider);
       const slot = await resolveSlotByRef(profileStore, options.tenant, provider, options.slot);
-      const keychain = await getKeychain();
-      const secret = await keychain.getSlotSecret(options.tenant, provider, slot.slotId);
+      const secretStore = await getSecretStore();
+      const secret = await secretStore.getSlotSecret(options.tenant, provider, slot.slotId);
 
       if (!secret) {
         throw new Error(`No secret found for slot "${slot.slotId}" (${provider}) in tenant ${options.tenant}.`);
@@ -1176,11 +1185,11 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .option('--tenant <tenantId>', 'Tenant id override')
     .option('--format <format>', 'json|text', 'json')
     .action(async (options: { tenant?: string; format?: OutputFormat }) => {
-      const keychain = await getKeychain();
+      const secretStore = await getSecretStore();
       const client = await withClient(options.tenant);
       const readiness = await evaluateReadiness({
         profileStore,
-        keychain,
+        secretStore,
         tenantId: options.tenant,
         client,
         checkConnectivity: true
@@ -1288,7 +1297,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
           name: tenantName
         });
         await profileStore.setActiveTenant(tenantId);
-        const keychain = await getKeychain();
+        const secretStore = await getSecretStore();
 
         let slot;
         try {
@@ -1307,7 +1316,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
             fingerprint: makeKeyFingerprint(keyValue)
           });
         }
-        await keychain.setSlotSecret(tenantId, provider, slot.slotId, keyValue);
+        await secretStore.setSlotSecret(tenantId, provider, slot.slotId, keyValue);
 
         if (options.setActive !== false) {
           await profileStore.setActiveKeySlot(tenantId, provider, slot.slotId);
@@ -1316,7 +1325,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
         const client = await withClient(tenantId);
         const readiness = await evaluateReadiness({
           profileStore,
-          keychain,
+          secretStore,
           tenantId,
           client,
           checkConnectivity: true
@@ -1348,7 +1357,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .action(async (options: { tenant?: string; retryAttempts?: string; retryBackoffMs?: string; format?: OutputFormat }) => {
       const retryAttempts = Number.parseInt(options.retryAttempts ?? '2', 10);
       const retryBackoffMs = Number.parseInt(options.retryBackoffMs ?? '250', 10);
-      const keychain = await getKeychain();
+      const secretStore = await getSecretStore();
       const client = await withClient(options.tenant, {
         attempts: Number.isFinite(retryAttempts) ? retryAttempts : 2,
         backoffMs: Number.isFinite(retryBackoffMs) ? retryBackoffMs : 250
@@ -1356,7 +1365,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
       const readiness = await evaluateReadiness({
         profileStore,
-        keychain,
+        secretStore,
         tenantId: options.tenant,
         client,
         checkConnectivity: true
@@ -1399,8 +1408,8 @@ export function createCli(runtime: CliRuntime = {}): Command {
       debug?: boolean;
       debugLog?: string;
     }) => {
-      const keychain = await getKeychain();
-      const client = createXyteClient({ profileStore, keychain });
+      const secretStore = await getSecretStore();
+      const client = createXyteClient({ profileStore, secretStore });
 
       const allowedScreens: TuiScreenId[] = ['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets'];
       const screen = (options.screen ?? 'dashboard') as TuiScreenId;
@@ -1424,7 +1433,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       await runTui({
         client,
         profileStore,
-        keychain,
+        secretStore,
         initialScreen: screen,
         headless: Boolean(options.headless),
         format: (options.headless ? 'json' : format) as OutputFormat,

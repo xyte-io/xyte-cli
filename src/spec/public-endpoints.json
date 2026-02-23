@@ -128,6 +128,25 @@
     "sourceFile": "Device API/Device Info/Get Space Info.bru"
   },
   {
+    "key": "device.device-info.spaceMove",
+    "namespace": "device",
+    "group": "device-info",
+    "action": "spaceMove",
+    "title": "Space Move",
+    "method": "PUT",
+    "base": "hub",
+    "pathTemplate": "/v1/devices/:device_id/space/:space_id",
+    "pathParams": [
+      "device_id",
+      "space_id"
+    ],
+    "queryParams": [],
+    "authScope": "device",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "Device API/Device Info/Space Move.bru"
+  },
+  {
     "key": "device.device-info.setCloudSettings",
     "namespace": "device",
     "group": "device-info",
@@ -720,6 +739,24 @@
     "notes": [
       "Organization info endpoint is GET without request body."
     ]
+  },
+  {
+    "key": "organization.incidents.closeIncident",
+    "namespace": "organization",
+    "group": "incidents",
+    "action": "closeIncident",
+    "title": "Close Incident",
+    "method": "DELETE",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/incidents/:incident_id",
+    "pathParams": [
+      "incident_id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "Organization API/Incidents/Close Incident.bru"
   },
   {
     "key": "organization.incidents.getIncidents",

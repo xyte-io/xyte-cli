@@ -1,12 +1,13 @@
-import { createWriteStream, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-
-import PDFDocument from 'pdfkit';
 
 import { extractArray } from '../tui/data-loaders';
 import type { XyteClient } from '../types/client';
 import { INSPECT_DEEP_DIVE_SCHEMA_VERSION, INSPECT_FLEET_SCHEMA_VERSION, REPORT_SCHEMA_VERSION } from '../contracts/versions';
 import { withSpan } from '../observability/tracing';
+import { renderBrandedPdfReport } from './report/pdf-render';
+import { formatUtcForReport as formatUtcForReportFromLayout } from './report/time-format';
+import { getWindowFocus as getWindowFocusFromTheme } from './report/theme';
 
 interface StatusCounts {
   [key: string]: number;
@@ -15,6 +16,7 @@ interface StatusCounts {
 export interface FleetSnapshot {
   generatedAtUtc: string;
   tenantId: string;
+  tenantName?: string;
   devices: any[];
   spaces: any[];
   incidents: any[];
@@ -50,6 +52,7 @@ export interface DeepDiveResult {
   schemaVersion: typeof INSPECT_DEEP_DIVE_SCHEMA_VERSION;
   generatedAtUtc: string;
   tenantId: string;
+  tenantName?: string;
   windowHours: number;
   summary: string[];
   topOfflineSpaces: Array<{ space: string; offlineDevices: number; shareOfOfflinePct: number }>;
@@ -257,7 +260,7 @@ async function loadAllSpaces(client: XyteClient, tenantId: string): Promise<any[
   return extractArray(single, ['spaces', 'data', 'items']);
 }
 
-export async function collectFleetSnapshot(client: XyteClient, tenantId: string): Promise<FleetSnapshot> {
+export async function collectFleetSnapshot(client: XyteClient, tenantId: string, tenantName?: string): Promise<FleetSnapshot> {
   return withSpan('xyte.inspect.collect_snapshot', { 'xyte.tenant.id': tenantId }, async () => {
     const [devices, spaces, incidentsRaw, orgTicketsRaw, partnerTicketsRaw] = await Promise.all([
       loadAllDevices(client, tenantId),
@@ -277,6 +280,7 @@ export async function collectFleetSnapshot(client: XyteClient, tenantId: string)
     return {
       generatedAtUtc: new Date().toISOString(),
       tenantId,
+      tenantName,
       devices: stableSort(devices),
       spaces: stableSort(spaces),
       incidents: stableSort(incidents),
@@ -431,6 +435,7 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
     schemaVersion: INSPECT_DEEP_DIVE_SCHEMA_VERSION,
     generatedAtUtc: snapshot.generatedAtUtc,
     tenantId: snapshot.tenantId,
+    tenantName: snapshot.tenantName,
     windowHours,
     summary,
     topOfflineSpaces,
@@ -551,574 +556,9 @@ function ensureDir(filePath: string): void {
   mkdirSync(dirname(resolve(filePath)), { recursive: true });
 }
 
-const PAGE_MARGIN_X = 46;
-const PAGE_MARGIN_Y = 42;
-const HEADER_TOP = 18;
-const HEADER_HEIGHT = 68;
-const FOOTER_HEIGHT = 22;
-const CONTENT_TOP = HEADER_TOP + HEADER_HEIGHT + 16;
-const SPACE_SM = 8;
-const SPACE_MD = 12;
-const SPACE_LG = 18;
-const SPACE_XL = 24;
-const FONT_H1 = 18;
-const FONT_H2 = 13;
-const FONT_BODY = 10;
-const FONT_CAPTION = 9;
-const TABLE_ROW_MIN = 22;
-const TABLE_ROW_MAX = 220;
-const TABLE_CELL_PAD_X = 6;
-const TABLE_CELL_PAD_Y = 5;
+export const formatUtcForReport = formatUtcForReportFromLayout;
+export const getWindowFocus = getWindowFocusFromTheme;
 
-interface WindowFocus {
-  label: string;
-  detail: string;
-  accent: string;
-}
-
-interface PdfRenderContext {
-  tenantId: string;
-  generatedAtUtc: string;
-  windowHours: number;
-  windowFocus: WindowFocus;
-  logoPath?: string;
-}
-
-interface TableColumn {
-  header: string;
-  width: number;
-  align?: 'left' | 'center' | 'right';
-  wrap?: boolean;
-}
-
-function resolveLogoPath(): string | undefined {
-  const candidates = [
-    resolve(process.cwd(), 'assets/xyte-logo.png'),
-    resolve(__dirname, '../../assets/xyte-logo.png'),
-    resolve(__dirname, '../../../assets/xyte-logo.png')
-  ];
-  return candidates.find((candidate) => existsSync(candidate));
-}
-
-function formatTwoDigits(value: number): string {
-  return String(value).padStart(2, '0');
-}
-
-export function formatUtcForReport(value: unknown): string {
-  const parsed = parseTimestamp(value);
-  if (!parsed) {
-    return identifier(value);
-  }
-  const y = parsed.getUTCFullYear();
-  const m = formatTwoDigits(parsed.getUTCMonth() + 1);
-  const d = formatTwoDigits(parsed.getUTCDate());
-  const hh = formatTwoDigits(parsed.getUTCHours());
-  const mm = formatTwoDigits(parsed.getUTCMinutes());
-  return `${y}-${m}-${d} ${hh}:${mm} UTC`;
-}
-
-export function getWindowFocus(windowHours: number): WindowFocus {
-  if (windowHours <= 24) {
-    return {
-      label: 'Immediate churn',
-      detail: 'Prioritize active incident containment and hot spaces in the last day.',
-      accent: '#B45309'
-    };
-  }
-  if (windowHours <= 72) {
-    return {
-      label: 'Short-term Trend',
-      detail: 'Track repeat offenders and stabilize recurring high-churn spaces.',
-      accent: '#1D4ED8'
-    };
-  }
-  return {
-    label: 'Weekly concentration',
-    detail: 'Focus on sustained incident concentration and structural remediation.',
-    accent: '#166534'
-  };
-}
-
-function resetCursor(doc: PDFKit.PDFDocument): void {
-  doc.x = doc.page.margins.left;
-  doc.y = Math.max(doc.y, CONTENT_TOP);
-}
-
-function drawPdfHeader(doc: PDFKit.PDFDocument, ctx: PdfRenderContext): void {
-  const left = doc.page.margins.left;
-  const right = doc.page.width - doc.page.margins.right;
-  const bandTop = HEADER_TOP;
-  const bandHeight = HEADER_HEIGHT;
-
-  doc.save();
-  doc.roundedRect(left, bandTop, right - left, bandHeight, 8).fillAndStroke('#E8F0FC', '#C2D5F3');
-  doc.restore();
-
-  if (ctx.logoPath) {
-    try {
-      doc.image(ctx.logoPath, left + 12, bandTop + 16, { fit: [110, 34] });
-    } catch {
-      doc.font('Helvetica-Bold').fontSize(36).fillColor('#1459A6').text('XYTE', left + 12, bandTop + 12);
-    }
-  } else {
-    doc.font('Helvetica-Bold').fontSize(36).fillColor('#1459A6').text('XYTE', left + 12, bandTop + 12);
-  }
-
-  doc
-    .font('Helvetica-Bold')
-    .fontSize(FONT_H1)
-    .fillColor('#1A2332')
-    .text('Fleet Findings Report', left + 146, bandTop + 14, { width: right - left - 250, align: 'left' });
-  doc
-    .font('Helvetica')
-    .fontSize(FONT_BODY)
-    .fillColor('#415067')
-    .text(`Tenant: ${ctx.tenantId}`, left + 146, bandTop + 37, { width: right - left - 250, align: 'left' })
-    .text(`Generated: ${formatUtcForReport(ctx.generatedAtUtc)}`, left + 146, bandTop + 51, { width: right - left - 250, align: 'left' });
-
-  const badgeWidth = 165;
-  const badgeHeight = 28;
-  const badgeX = right - badgeWidth - 12;
-  const badgeY = bandTop + 20;
-  doc.save();
-  doc.roundedRect(badgeX, badgeY, badgeWidth, badgeHeight, 14).fill(ctx.windowFocus.accent);
-  doc.restore();
-  doc.font('Helvetica-Bold').fontSize(FONT_CAPTION).fillColor('#FFFFFF').text(
-    `${ctx.windowHours}h • ${ctx.windowFocus.label}`,
-    badgeX + 12,
-    badgeY + 9,
-    { width: badgeWidth - 24, align: 'center' }
-  );
-}
-
-function drawPdfFooter(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, pageNumber: number, pageCount: number): void {
-  const y = doc.page.height - doc.page.margins.bottom - FOOTER_HEIGHT + 10;
-  const left = doc.page.margins.left;
-  const right = doc.page.width - doc.page.margins.right;
-  doc.save();
-  doc.moveTo(left, y - 6).lineTo(right, y - 6).lineWidth(0.6).strokeColor('#D5DEE9').stroke();
-  doc.restore();
-  doc.font('Helvetica').fontSize(FONT_CAPTION).fillColor('#5B687B').text('Xyte Fleet Findings Report', left, y, { width: 220, align: 'left' });
-  doc.text(`${ctx.windowHours}h window`, left + 220, y, { width: 120, align: 'center' });
-  doc.text(`Page ${pageNumber} of ${pageCount}`, right - 120, y, { width: 120, align: 'right' });
-}
-
-function startReportPage(doc: PDFKit.PDFDocument, ctx: PdfRenderContext): void {
-  doc.addPage();
-  drawPdfHeader(doc, ctx);
-  resetCursor(doc);
-}
-
-function ensurePageSpace(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, minHeight: number): void {
-  resetCursor(doc);
-  const bottom = doc.page.height - doc.page.margins.bottom - FOOTER_HEIGHT - SPACE_SM;
-  if (doc.y + minHeight <= bottom) {
-    return;
-  }
-  startReportPage(doc, ctx);
-}
-
-function drawSectionTitle(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, title: string): void {
-  ensurePageSpace(doc, ctx, 30);
-  resetCursor(doc);
-  doc.moveDown(0.2);
-  doc.font('Helvetica-Bold').fontSize(FONT_H2).fillColor('#182433').text(title, {
-    width: doc.page.width - doc.page.margins.left - doc.page.margins.right
-  });
-  const y = doc.y + 2;
-  doc.save();
-  doc.moveTo(doc.page.margins.left, y).lineTo(doc.page.width - doc.page.margins.right, y).lineWidth(0.8).strokeColor('#D4DEE8').stroke();
-  doc.restore();
-  doc.moveDown(0.2);
-}
-
-function drawWindowFocusStrip(doc: PDFKit.PDFDocument, ctx: PdfRenderContext): void {
-  ensurePageSpace(doc, ctx, 56);
-  resetCursor(doc);
-  const x = doc.page.margins.left;
-  const y = doc.y;
-  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-  const height = 48;
-  doc.save();
-  doc.roundedRect(x, y, width, height, 7).fillAndStroke('#F3F7FC', '#D7E3F2');
-  doc.restore();
-  doc.font('Helvetica-Bold').fontSize(FONT_BODY).fillColor(ctx.windowFocus.accent).text('Window Focus', x + 12, y + 10);
-  doc.font('Helvetica').fontSize(FONT_BODY).fillColor('#243447').text(ctx.windowFocus.detail, x + 110, y + 10, {
-    width: width - 122
-  });
-  doc.y = y + height + SPACE_MD;
-}
-
-function drawKpiGrid(
-  doc: PDFKit.PDFDocument,
-  ctx: PdfRenderContext,
-  cards: Array<{ label: string; value: string; tone?: 'normal' | 'warn' | 'bad' }>
-): void {
-  ensurePageSpace(doc, ctx, 106);
-  resetCursor(doc);
-  const startX = doc.page.margins.left;
-  const topY = doc.y;
-  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-  const gap = SPACE_SM;
-  const cardWidth = Math.floor((width - gap * 3) / 4);
-  const cardHeight = 84;
-
-  cards.slice(0, 4).forEach((card, index) => {
-    const x = startX + index * (cardWidth + gap);
-    const tone =
-      card.tone === 'bad'
-        ? { bg: '#FDEBEC', border: '#F7C4C7', value: '#A2282F' }
-        : card.tone === 'warn'
-          ? { bg: '#FFF6E8', border: '#F7D9A6', value: '#9C5F08' }
-          : { bg: '#EEF6FF', border: '#C6E0FF', value: '#1459A6' };
-
-    doc.save();
-    doc.roundedRect(x, topY, cardWidth, cardHeight, 8).fillAndStroke(tone.bg, tone.border);
-    doc.restore();
-    doc.font('Helvetica').fontSize(FONT_BODY).fillColor('#4B5563').text(card.label, x + 10, topY + 13, {
-      width: cardWidth - 20
-    });
-    doc.font('Helvetica-Bold').fontSize(26).fillColor(tone.value).text(card.value, x + 10, topY + 37, {
-      width: cardWidth - 20
-    });
-  });
-
-  doc.y = topY + cardHeight + SPACE_LG;
-}
-
-function drawKeyFindings(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, lines: string[]): void {
-  const findings = lines.slice(0, 4);
-  if (!findings.length) {
-    return;
-  }
-
-  ensurePageSpace(doc, ctx, 72);
-  resetCursor(doc);
-  const x = doc.page.margins.left;
-  const y = doc.y;
-  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-  doc.save();
-  doc.roundedRect(x, y, width, 56 + findings.length * 10, 8).fillAndStroke('#F8FAFD', '#DCE6F2');
-  doc.restore();
-  doc.font('Helvetica-Bold').fontSize(FONT_BODY).fillColor('#223245').text('Key Findings', x + 12, y + 10);
-  let cursorY = y + 26;
-  findings.forEach((line) => {
-    doc.font('Helvetica').fontSize(FONT_BODY).fillColor('#1F2A38').text(`- ${line}`, x + 12, cursorY, {
-      width: width - 24
-    });
-    cursorY += 14;
-  });
-  doc.y = y + 56 + findings.length * 10 + SPACE_LG;
-}
-
-function drawBullets(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, lines: string[]): void {
-  lines.forEach((line) => {
-    ensurePageSpace(doc, ctx, 20);
-    resetCursor(doc);
-    doc.font('Helvetica').fontSize(FONT_BODY).fillColor('#1F2937').text(`- ${line}`, {
-      width: doc.page.width - doc.page.margins.left - doc.page.margins.right
-    });
-    doc.moveDown(0.05);
-  });
-}
-
-function drawSpaceBars(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, rows: Array<{ space: string; incidents: number }>): void {
-  if (!rows.length) {
-    return;
-  }
-  drawSectionTitle(doc, ctx, `${ctx.windowHours}h Churn Concentration (Top Spaces)`);
-  const chartRows = rows.slice(0, 5);
-  const maxValue = Math.max(...chartRows.map((row) => row.incidents), 1);
-  const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-  const labelWidth = 285;
-  const valueWidth = 50;
-  const barWidth = pageWidth - labelWidth - valueWidth - 20;
-  chartRows.forEach((row) => {
-    ensurePageSpace(doc, ctx, 24);
-    resetCursor(doc);
-    const y = doc.y;
-    const x = doc.page.margins.left;
-    const ratio = row.incidents / maxValue;
-    doc.font('Helvetica').fontSize(FONT_BODY).fillColor('#1F2937').text(row.space, x, y + 5, {
-      width: labelWidth - 8,
-      ellipsis: true
-    });
-    doc.save();
-    doc.roundedRect(x + labelWidth, y + 8, barWidth, 9, 3).fill('#E6ECF5');
-    doc.roundedRect(x + labelWidth, y + 8, Math.max(8, barWidth * ratio), 9, 3).fill('#3B82F6');
-    doc.restore();
-    doc.font('Helvetica-Bold').fontSize(FONT_BODY).fillColor('#1F2937').text(String(row.incidents), x + labelWidth + barWidth + 8, y + 5, {
-      width: valueWidth,
-      align: 'right'
-    });
-    doc.y = y + 22;
-  });
-  doc.moveDown(0.35);
-}
-
-function normalizeColumns(columns: TableColumn[], availableWidth: number): TableColumn[] {
-  const total = columns.reduce((sum, column) => sum + column.width, 0);
-  if (Math.abs(total - availableWidth) <= 1) {
-    return columns;
-  }
-  if (total > availableWidth) {
-    const ratio = availableWidth / total;
-    const scaled = columns.map((column) => ({ ...column, width: Math.floor(column.width * ratio) }));
-    const scaledTotal = scaled.reduce((sum, column) => sum + column.width, 0);
-    scaled[0].width += availableWidth - scaledTotal;
-    return scaled;
-  }
-  const grown = columns.map((column) => ({ ...column }));
-  const flexIndex = grown.findIndex((column) => column.wrap !== false);
-  const target = flexIndex === -1 ? 0 : flexIndex;
-  grown[target].width += availableWidth - total;
-  return grown;
-}
-
-function measureTableRowHeight(doc: PDFKit.PDFDocument, columns: TableColumn[], row: string[]): number {
-  doc.font('Helvetica').fontSize(FONT_BODY);
-  const lineHeight = doc.currentLineHeight();
-  let maxHeight = lineHeight;
-  row.forEach((cell, index) => {
-    const column = columns[index];
-    const innerWidth = Math.max(20, column.width - TABLE_CELL_PAD_X * 2);
-    if (column.wrap === false) {
-      maxHeight = Math.max(maxHeight, lineHeight);
-      return;
-    }
-    const measured = doc.heightOfString(cell, {
-      width: innerWidth,
-      align: column.align ?? 'left'
-    });
-    maxHeight = Math.max(maxHeight, measured);
-  });
-  const rowHeight = maxHeight + TABLE_CELL_PAD_Y * 2;
-  return Math.min(TABLE_ROW_MAX, Math.max(TABLE_ROW_MIN, rowHeight));
-}
-
-function drawTable(
-  doc: PDFKit.PDFDocument,
-  ctx: PdfRenderContext,
-  args: {
-    title: string;
-    columns: TableColumn[];
-    rows: string[][];
-    emptyMessage?: string;
-  }
-): void {
-  const tableLeft = doc.page.margins.left;
-  const availableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-  const columns = normalizeColumns(args.columns, availableWidth);
-  const headerHeight = 24;
-  const continuationTitle = `${args.title} (cont.)`;
-
-  const drawHeader = () => {
-    ensurePageSpace(doc, ctx, headerHeight + 6);
-    resetCursor(doc);
-    const y = doc.y;
-    let x = tableLeft;
-    columns.forEach((column) => {
-      doc.save();
-      doc.rect(x, y, column.width, headerHeight).fillAndStroke('#E8EEF6', '#CAD7E8');
-      doc.restore();
-      doc.font('Helvetica-Bold').fontSize(FONT_BODY).fillColor('#1F2937').text(column.header, x + TABLE_CELL_PAD_X, y + 6, {
-        width: column.width - TABLE_CELL_PAD_X * 2,
-        align: column.align ?? 'left',
-        ellipsis: true
-      });
-      x += column.width;
-    });
-    doc.y = y + headerHeight;
-  };
-
-  if (!args.rows.length) {
-    ensurePageSpace(doc, ctx, 32 + headerHeight);
-    drawSectionTitle(doc, ctx, args.title);
-    ensurePageSpace(doc, ctx, 24);
-    resetCursor(doc);
-    doc.font('Helvetica').fontSize(FONT_BODY).fillColor('#475569').text(args.emptyMessage ?? 'No data available.', {
-      width: availableWidth
-    });
-    doc.moveDown(0.5);
-    return;
-  }
-
-  const firstRowHeight = measureTableRowHeight(doc, columns, args.rows[0]);
-  ensurePageSpace(doc, ctx, 34 + headerHeight + firstRowHeight);
-  drawSectionTitle(doc, ctx, args.title);
-  drawHeader();
-  args.rows.forEach((row) => {
-    const rowHeight = measureTableRowHeight(doc, columns, row);
-    const bottom = doc.page.height - doc.page.margins.bottom - FOOTER_HEIGHT - SPACE_SM;
-    if (doc.y + rowHeight > bottom) {
-      startReportPage(doc, ctx);
-      ensurePageSpace(doc, ctx, 34 + headerHeight + Math.min(rowHeight, 60));
-      drawSectionTitle(doc, ctx, continuationTitle);
-      drawHeader();
-    }
-
-    const y = doc.y;
-    let x = tableLeft;
-    row.forEach((cell, index) => {
-      const column = columns[index];
-      doc.save();
-      doc.rect(x, y, column.width, rowHeight).fillAndStroke('#FFFFFF', '#E3EAF3');
-      doc.restore();
-      doc.font('Helvetica').fontSize(FONT_BODY).fillColor('#0F172A').text(cell, x + TABLE_CELL_PAD_X, y + TABLE_CELL_PAD_Y, {
-        width: column.width - TABLE_CELL_PAD_X * 2,
-        height: rowHeight - TABLE_CELL_PAD_Y * 2,
-        align: column.align ?? 'left',
-        lineBreak: column.wrap !== false,
-        ellipsis: column.wrap === false
-      });
-      x += column.width;
-    });
-    doc.y = y + rowHeight;
-  });
-  doc.moveDown(0.45);
-}
-
-function renderBrandedPdfReport(deepDive: DeepDiveResult, outputPath: string, includeSensitive: boolean): Promise<void> {
-  return new Promise((resolvePromise, rejectPromise) => {
-    ensureDir(outputPath);
-    const ctx: PdfRenderContext = {
-      tenantId: deepDive.tenantId,
-      generatedAtUtc: deepDive.generatedAtUtc,
-      windowHours: deepDive.windowHours,
-      windowFocus: getWindowFocus(deepDive.windowHours),
-      logoPath: resolveLogoPath()
-    };
-
-    const doc = new PDFDocument({
-      size: 'LETTER',
-      margins: {
-        left: PAGE_MARGIN_X,
-        right: PAGE_MARGIN_X,
-        top: PAGE_MARGIN_Y,
-        bottom: PAGE_MARGIN_Y
-      },
-      bufferPages: true
-    });
-    const stream = doc.pipe(createWriteStream(outputPath));
-
-    stream.on('finish', () => resolvePromise());
-    stream.on('error', (error) => rejectPromise(error));
-
-    drawPdfHeader(doc, ctx);
-    resetCursor(doc);
-
-    drawKpiGrid(doc, ctx, [
-      { label: 'Active incidents', value: String(deepDive.activeIncidentAging.length), tone: deepDive.activeIncidentAging.length > 0 ? 'warn' : 'normal' },
-      { label: `${deepDive.windowHours}h churn`, value: String(deepDive.churn24h.incidents), tone: deepDive.churn24h.incidents > 0 ? 'warn' : 'normal' },
-      { label: 'Open tickets', value: String(deepDive.ticketPosture.openTickets), tone: deepDive.ticketPosture.openTickets > 0 ? 'warn' : 'normal' },
-      {
-        label: 'Data mismatches',
-        value: String(deepDive.dataQuality.statusMismatches.length),
-        tone: deepDive.dataQuality.statusMismatches.length > 0 ? 'bad' : 'normal'
-      }
-    ]);
-
-    drawWindowFocusStrip(doc, ctx);
-    drawKeyFindings(doc, ctx, deepDive.summary);
-
-    drawSectionTitle(doc, ctx, 'Executive Summary');
-    drawBullets(doc, ctx, deepDive.summary);
-    doc.moveDown(0.35);
-
-    drawSpaceBars(doc, ctx, deepDive.churn24h.bySpace);
-
-    drawTable(doc, ctx, {
-      title: 'Top Spaces by Offline Devices',
-      columns: [
-        { header: 'Space', width: 370, wrap: true },
-        { header: 'Offline', width: 90, align: 'right', wrap: false },
-        { header: 'Share', width: 90, align: 'right', wrap: false }
-      ],
-      rows: deepDive.topOfflineSpaces.map((row) => [row.space, String(row.offlineDevices), `${row.shareOfOfflinePct}%`]),
-      emptyMessage: 'No offline spaces found.'
-    });
-
-    drawTable(doc, ctx, {
-      title: 'Top Devices by Incident Volume',
-      columns: [
-        { header: 'Device', width: 370, wrap: true },
-        { header: 'Incidents', width: 90, align: 'right', wrap: false },
-        { header: 'Active', width: 90, align: 'right', wrap: false }
-      ],
-      rows: deepDive.topIncidentDevices.map((row) => [row.device, String(row.incidentCount), String(row.activeIncidents)]),
-      emptyMessage: 'No incident device concentration detected.'
-    });
-
-    drawTable(doc, ctx, {
-      title: 'Active Incident Aging',
-      columns: [
-        { header: 'Device', width: 120, wrap: true },
-        { header: 'Space', width: 230, wrap: true },
-        { header: 'Age (h)', width: 70, align: 'right', wrap: false },
-        { header: 'Created At', width: 130, wrap: false }
-      ],
-      rows: deepDive.activeIncidentAging.slice(0, 16).map((row) => [row.device, row.space, String(row.ageHours), formatUtcForReport(row.createdAtUtc)]),
-      emptyMessage: 'No active incidents.'
-    });
-
-    drawTable(doc, ctx, {
-      title: `${deepDive.windowHours}-Hour Churn by Space`,
-      columns: [
-        { header: 'Space', width: 450, wrap: true },
-        { header: 'Incidents', width: 100, align: 'right', wrap: false }
-      ],
-      rows: deepDive.churn24h.bySpace.map((row) => [row.space, String(row.incidents)]),
-      emptyMessage: 'No churn events in this window.'
-    });
-
-    drawTable(doc, ctx, {
-      title: 'Oldest Open Tickets',
-      columns: [
-        { header: 'Ticket', width: 88, wrap: false },
-        { header: 'Title', width: 182, wrap: true },
-        { header: 'Age (h)', width: 62, align: 'right', wrap: false },
-        { header: 'Device', width: 88, wrap: false },
-        { header: 'Created At', width: 130, wrap: false }
-      ],
-      rows: deepDive.ticketPosture.oldestOpenTickets.slice(0, 12).map((row) => [
-        redactSensitive(row.ticketId, includeSensitive),
-        row.title,
-        String(row.ageHours),
-        redactSensitive(row.deviceId, includeSensitive),
-        formatUtcForReport(row.createdAtUtc)
-      ]),
-      emptyMessage: 'No open tickets.'
-    });
-
-    if (deepDive.dataQuality.statusMismatches.length) {
-      drawTable(doc, ctx, {
-        title: 'Data Quality: Status Mismatches',
-        columns: [
-          { header: 'Device', width: 120, wrap: true },
-          { header: 'status', width: 70, wrap: false },
-          { header: 'state.status', width: 90, wrap: false },
-          { header: 'Last Seen', width: 130, wrap: false },
-          { header: 'Space', width: 160, wrap: true }
-        ],
-        rows: deepDive.dataQuality.statusMismatches.map((row) => [
-          row.device,
-          row.status,
-          row.stateStatus,
-          formatUtcForReport(row.lastSeen),
-          row.space
-        ])
-      });
-    }
-
-    const pages = doc.bufferedPageRange();
-    for (let index = pages.start; index < pages.start + pages.count; index += 1) {
-      doc.switchToPage(index);
-      drawPdfFooter(doc, ctx, index - pages.start + 1, pages.count);
-    }
-
-    doc.end();
-  });
-}
 export async function generateFleetReport(args: {
   deepDive: DeepDiveResult;
   format: 'markdown' | 'pdf';

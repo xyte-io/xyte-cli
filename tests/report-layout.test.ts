@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildDeepDive, formatDeepDiveMarkdown, formatUtcForReport, getWindowFocus } from '../src/workflows/fleet-insights';
+import { formatWindowLabel } from '../src/workflows/report/time-format';
 
 describe('report layout helpers', () => {
   it('formats UTC timestamps into compact readable form', () => {
-    expect(formatUtcForReport('2026-02-07T03:37:12Z')).toBe('2026-02-07 03:37 UTC');
-    expect(formatUtcForReport('2026-02-07T03:37:12')).toBe('2026-02-07 03:37 UTC');
-    expect(formatUtcForReport('2026-02-07T03:37:12+02:00')).toBe('2026-02-07 01:37 UTC');
-    expect(formatUtcForReport('2026-02-08T07:28:31.761652+00:00')).toBe('2026-02-08 07:28 UTC');
-    expect(formatUtcForReport('2026-02-08 07:28:31.761652+0000')).toBe('2026-02-08 07:28 UTC');
-    expect(formatUtcForReport('2026-02-07')).toBe('2026-02-07 00:00 UTC');
+    expect(formatUtcForReport('2026-02-07T03:37:12Z')).toBe('Feb 07, 2026 03:37 UTC');
+    expect(formatUtcForReport('2026-02-07T03:37:12')).toBe('Feb 07, 2026 03:37 UTC');
+    expect(formatUtcForReport('2026-02-07T03:37:12+02:00')).toBe('Feb 07, 2026 01:37 UTC');
+    expect(formatUtcForReport('2026-02-08T07:28:31.761652+00:00')).toBe('Feb 08, 2026 07:28 UTC');
+    expect(formatUtcForReport('2026-02-08 07:28:31.761652+0000')).toBe('Feb 08, 2026 07:28 UTC');
+    expect(formatUtcForReport('2026-02-07')).toBe('Feb 07, 2026 00:00 UTC');
   });
 
   it('keeps invalid timestamps as-is for safety', () => {
@@ -20,6 +21,8 @@ describe('report layout helpers', () => {
     expect(getWindowFocus(24).label).toContain('Immediate');
     expect(getWindowFocus(72).label).toContain('Short-term');
     expect(getWindowFocus(168).label).toContain('Weekly');
+    expect(formatWindowLabel(24)).toBe('Last 24 hours');
+    expect(formatWindowLabel(1)).toBe('Last hour');
   });
 
   it('uses the requested window in deep-dive summary and markdown heading', () => {

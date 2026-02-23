@@ -7,7 +7,7 @@ import { getEndpoint, listEndpoints } from '../client/catalog';
 import { buildCallEnvelope } from '../contracts/call-envelope';
 import { toProblemDetails } from '../contracts/problem';
 import { evaluateReadiness } from '../config/readiness';
-import type { KeychainStore } from '../secure/keychain';
+import type { SecretStore } from '../secure/secret-store';
 import type { ProfileStore } from '../secure/profile-store';
 import { getCliVersion } from '../utils/version';
 import { buildFleetInspect, collectFleetSnapshot, generateFleetReport } from '../workflows/fleet-insights';
@@ -38,7 +38,7 @@ interface McpTool {
 
 export interface McpServerOptions {
   profileStore: ProfileStore;
-  keychain: KeychainStore;
+  secretStore: SecretStore;
   input?: NodeJS.ReadableStream;
   output?: Pick<typeof process.stdout, 'write'>;
 }
@@ -225,7 +225,7 @@ export function createMcpServer(options: McpServerOptions) {
   const withClient = (tenantId?: string, retry?: { attempts?: number; backoffMs?: number }) =>
     createXyteClient({
       profileStore: options.profileStore,
-      keychain: options.keychain,
+      secretStore: options.secretStore,
       tenantId,
       retryAttempts: retry?.attempts,
       retryBackoffMs: retry?.backoffMs
@@ -237,7 +237,7 @@ export function createMcpServer(options: McpServerOptions) {
       const client = withClient(tenant);
       const readiness = await evaluateReadiness({
         profileStore: options.profileStore,
-        keychain: options.keychain,
+        secretStore: options.secretStore,
         tenantId: tenant,
         client,
         checkConnectivity: true
@@ -255,7 +255,7 @@ export function createMcpServer(options: McpServerOptions) {
       });
       const readiness = await evaluateReadiness({
         profileStore: options.profileStore,
-        keychain: options.keychain,
+        secretStore: options.secretStore,
         tenantId: tenant,
         client,
         checkConnectivity: true

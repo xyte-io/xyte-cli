@@ -7,7 +7,7 @@ describe('public endpoint catalog', () => {
     const keys = endpoints.map((endpoint) => endpoint.key);
     const unique = new Set(keys);
     expect(unique.size).toBe(keys.length);
-    expect(keys.length).toBeGreaterThan(50);
+    expect(keys.length).toBeGreaterThan(60);
   });
 
   it('contains route drift overrides', () => {
@@ -23,5 +23,27 @@ describe('public endpoint catalog', () => {
 
     const cloudSettings = endpoints.find((endpoint) => endpoint.key === 'device.device-info.setCloudSettings');
     expect(cloudSettings?.notes?.join(' ')).toContain('{ property, value }');
+  });
+
+  it('includes device space move endpoint metadata', () => {
+    const endpoint = endpoints.find((item) => item.key === 'device.device-info.spaceMove');
+    expect(endpoint).toBeDefined();
+    expect(endpoint?.method).toBe('PUT');
+    expect(endpoint?.pathTemplate).toBe('/v1/devices/:device_id/space/:space_id');
+    expect(endpoint?.authScope).toBe('device');
+    expect(endpoint?.bodyType).toBe('none');
+    expect(endpoint?.hasBody).toBe(false);
+    expect(endpoint?.pathParams).toEqual(['device_id', 'space_id']);
+  });
+
+  it('includes organization close incident endpoint metadata', () => {
+    const endpoint = endpoints.find((item) => item.key === 'organization.incidents.closeIncident');
+    expect(endpoint).toBeDefined();
+    expect(endpoint?.method).toBe('DELETE');
+    expect(endpoint?.pathTemplate).toBe('/core/v1/organization/incidents/:incident_id');
+    expect(endpoint?.authScope).toBe('organization');
+    expect(endpoint?.bodyType).toBe('none');
+    expect(endpoint?.hasBody).toBe(false);
+    expect(endpoint?.pathParams).toEqual(['incident_id']);
   });
 });

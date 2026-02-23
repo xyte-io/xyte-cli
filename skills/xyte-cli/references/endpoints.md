@@ -72,11 +72,33 @@ xyte-cli call organization.devices.getHistories \
   }'
 ```
 
+## Concrete Write/Delete Examples
+
+### `device.device-info.spaceMove` (write, guarded)
+
+```bash
+xyte-cli call device.device-info.spaceMove \
+  --tenant <tenant-id> \
+  --allow-write \
+  --path-json '{"device_id":"<device-id>","space_id":"<space-id>"}'
+```
+
+### `organization.incidents.closeIncident` (destructive, guarded)
+
+```bash
+xyte-cli call organization.incidents.closeIncident \
+  --tenant <tenant-id> \
+  --allow-write \
+  --confirm organization.incidents.closeIncident \
+  --path-json '{"incident_id":"<incident-id>"}'
+```
+
 ## Common Endpoint Keys
 
 Organization:
 - `organization.devices.getDevices`
 - `organization.devices.getDevice`
+- `organization.incidents.closeIncident`
 - `organization.incidents.getIncidents`
 - `organization.tickets.getTickets`
 - `organization.commands.sendCommand`
@@ -88,6 +110,7 @@ Partner:
 
 Device:
 - `device.device-info.getDeviceInfo`
+- `device.device-info.spaceMove`
 - `device.telemetries.sendTelemetry`
 - `device.device-info.setCloudSettings`
 

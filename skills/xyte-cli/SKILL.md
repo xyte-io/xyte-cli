@@ -1,6 +1,6 @@
 ---
 name: xyte-cli
-description: "Use for @xyte/cli operations: first-run setup, tenant/key auth, guarded endpoint calls, inspect/report generation, JSON-only headless TUI snapshots, and MCP tool serving with schema-validated outputs."
+description: "Use for @xyteai/cli operations: first-run setup, tenant/key auth, guarded endpoint calls, inspect/report generation, JSON-only headless TUI snapshots, and MCP tool serving with schema-validated outputs."
 ---
 
 # XYTE Skill Router (One-Stop, Agent-Native)
@@ -13,10 +13,14 @@ This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
 
 - Use `xyte-cli` commands directly.
 - Do not use source/dev entrypoints (`npx`, `tsx`, `src/*`, `dist/*`, `bin/*`).
-- If `xyte-cli` is unavailable, ask the user to install `@xyte/cli` globally instead of improvising an entrypoint.
+- If `xyte-cli` is unavailable, ask the user to install `@xyteai/cli` globally instead of improvising an entrypoint.
 - Command option correctness:
   - `xyte-cli tenant list` has no `--format`.
   - `xyte-cli setup status` supports `--format json|text`.
+- For fresh users in a new environment, verify readiness with:
+  - `xyte-cli doctor install --format json`
+  - `xyte-cli install --skills --scope both --agents all --force` (or the agent-specific install target)
+  - `xyte-cli setup run --non-interactive --tenant <tenant-id> --key <value>`
 
 ## Purpose and Trigger Conditions
 
@@ -46,6 +50,7 @@ Use when the request involves any of:
 
 1. Setup/readiness:
 - `xyte-cli doctor install --format json`
+- `xyte-cli install --skills --scope both --agents all --force --no-setup`
 - `xyte-cli setup status --tenant <tenant-id> --format json`
 - `xyte-cli config doctor --tenant <tenant-id> --format json`
 

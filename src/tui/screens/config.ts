@@ -29,7 +29,7 @@ async function runSlotConnectivityProbe(args: {
   slotId: string;
 }): Promise<string> {
   const { context, tenantId, provider, slotId } = args;
-  const secret = await context.keychain.getSlotSecret(tenantId, provider, slotId);
+  const secret = await context.secretStore.getSlotSecret(tenantId, provider, slotId);
   if (!secret) {
     throw new Error(`No secret found for slot ${slotId} (${provider}).`);
   }
@@ -37,7 +37,7 @@ async function runSlotConnectivityProbe(args: {
   if (provider === 'xyte-org') {
     const client = createXyteClient({
       profileStore: context.profileStore,
-      keychain: context.keychain,
+      secretStore: context.secretStore,
       tenantId,
       auth: { organization: secret }
     });
@@ -48,7 +48,7 @@ async function runSlotConnectivityProbe(args: {
   if (provider === 'xyte-partner') {
     const client = createXyteClient({
       profileStore: context.profileStore,
-      keychain: context.keychain,
+      secretStore: context.secretStore,
       tenantId,
       auth: { partner: secret }
     });
@@ -125,7 +125,7 @@ export function createConfigScreen(): TuiScreen {
       const activeSlot = activeTenantId ? await context.profileStore.getActiveKeySlot(activeTenantId, provider) : undefined;
       const hasActiveSecret =
         activeTenantId && activeSlot
-          ? Boolean(await context.keychain.getSlotSecret(activeTenantId, provider, activeSlot.slotId))
+          ? Boolean(await context.secretStore.getSlotSecret(activeTenantId, provider, activeSlot.slotId))
           : false;
 
       providerRowsState.push({
@@ -153,7 +153,7 @@ export function createConfigScreen(): TuiScreen {
         name: slot.name,
         active: activeForProvider?.slotId === slot.slotId ? 'yes' : 'no',
         hasSecret:
-          activeTenantId && (await context.keychain.getSlotSecret(activeTenantId, slot.provider, slot.slotId)) ? 'yes' : 'no',
+          activeTenantId && (await context.secretStore.getSlotSecret(activeTenantId, slot.provider, slot.slotId)) ? 'yes' : 'no',
         fingerprint: slot.fingerprint
       }))
     );
@@ -470,7 +470,7 @@ export function createConfigScreen(): TuiScreen {
             context.setStatus('Remove action canceled.');
             return true;
           }
-          await context.keychain.clearSlotSecret(tenantId, selectedProvider, selectedSlot.slotId);
+          await context.secretStore.clearSlotSecret(tenantId, selectedProvider, selectedSlot.slotId);
           await context.profileStore.removeKeySlot(tenantId, selectedProvider, selectedSlot.slotId);
           await this.refresh();
           context.setStatus(`Removed slot ${selectedSlot.slotId}.`);

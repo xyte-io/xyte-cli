@@ -2,7 +2,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { randomUUID } from 'node:crypto';
 
 import { evaluateReadiness, type ReadinessCheck } from '../config/readiness';
-import type { KeychainStore } from '../secure/keychain';
+import type { SecretStore } from '../secure/secret-store';
 import type { ProfileStore } from '../secure/profile-store';
 import type { SecretProvider } from '../types/profile';
 import type { XyteClient } from '../types/client';
@@ -36,7 +36,7 @@ import { TAB_ORDER } from './tabs';
 export interface HeadlessRenderOptions {
   client: XyteClient;
   profileStore: ProfileStore;
-  keychain: KeychainStore;
+  secretStore: SecretStore;
   screen: TuiScreenId;
   format: 'json';
   motionEnabled: boolean;
@@ -189,7 +189,7 @@ async function buildConfigFrame(args: {
   sessionId: string;
   sequence: number;
   profileStore: ProfileStore;
-  keychain: KeychainStore;
+  secretStore: SecretStore;
   readiness: ReadinessCheck;
   motionEnabled: boolean;
   motionPhase: number;
@@ -203,7 +203,7 @@ async function buildConfigFrame(args: {
       const providerSlots = allSlots.filter((slot) => slot.provider === provider);
       const activeSlot = tenantId ? await args.profileStore.getActiveKeySlot(tenantId, provider) : undefined;
       const hasActiveSecret =
-        tenantId && activeSlot ? Boolean(await args.keychain.getSlotSecret(tenantId, provider, activeSlot.slotId)) : false;
+        tenantId && activeSlot ? Boolean(await args.secretStore.getSlotSecret(tenantId, provider, activeSlot.slotId)) : false;
       return {
         provider,
         slotCount: providerSlots.length,
@@ -220,7 +220,7 @@ async function buildConfigFrame(args: {
       .filter((slot) => slot.provider === selectedProvider)
       .map(async (slot) => {
         const active = tenantId ? await args.profileStore.getActiveKeySlot(tenantId, slot.provider) : undefined;
-        const hasSecret = tenantId ? Boolean(await args.keychain.getSlotSecret(tenantId, slot.provider, slot.slotId)) : false;
+        const hasSecret = tenantId ? Boolean(await args.secretStore.getSlotSecret(tenantId, slot.provider, slot.slotId)) : false;
         return {
           provider: slot.provider,
           slotId: slot.slotId,
@@ -602,7 +602,7 @@ export async function runHeadlessRenderer(options: HeadlessRenderOptions): Promi
       const tenantId = await resolveTenantId(options.profileStore, options.tenantId);
       const readiness = await evaluateReadiness({
         profileStore: options.profileStore,
-        keychain: options.keychain,
+        secretStore: options.secretStore,
         tenantId,
         client: options.client,
         checkConnectivity: true
@@ -627,7 +627,7 @@ export async function runHeadlessRenderer(options: HeadlessRenderOptions): Promi
           sessionId,
           sequence: nextSequence(),
           profileStore: options.profileStore,
-          keychain: options.keychain,
+          secretStore: options.secretStore,
           readiness,
           motionEnabled: options.motionEnabled,
           motionPhase: phase,

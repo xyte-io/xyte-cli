@@ -21,22 +21,20 @@ Xyte CLI with SKILLS, built for coding agents and operators.
   - `a`, `e`, `u`, `t`, `x`, `n`, `c`, `r`
 - Headless JSON frames with stable contracts
 - Inspect/report pipelines with schema-versioned output
+- A4 PDF reports with humanized time labels, continuation-safe pagination, and readability-first table layout
 
 ## Requirements
 
 - Node.js 18+
 - A valid XYTE API key
-- Supported keychain backend:
-  - macOS Keychain
-  - Linux `secret-tool`
-  - test/runtime override: `XYTE_CLI_KEYCHAIN_BACKEND=memory`
+- Writable local config directory (defaults to platform config path; override with `XYTE_CLI_CONFIG_DIR`)
 
 ## Getting Started
 
 ## Installation
 
 ```bash
-npm install -g @xyte/cli@latest
+npm install -g @xyteai/cli@latest
 xyte-cli --help
 ```
 
@@ -230,6 +228,30 @@ Local package smoke:
 npm i -g ./xyte-cli-*.tgz
 xyte-cli install --skills --no-setup
 ```
+
+External user live smoke (required before commit):
+
+```bash
+XYTE_CLI_KEY="<real-key>" \
+XYTE_E2E_TENANT="<tenant-id-or-default>" \
+npm run test:commit
+```
+
+This gate is enforced before commit:
+`npm run test:commit` runs `npm run typecheck`, `npm test`, `npm run check:endpoint-parity`, then `npm run smoke:external-live`.
+
+`smoke:external-live` runs exactly like a new external user install:
+1. `npm pack`
+2. isolated HOME/config/prefix/workspace
+3. global install from tarball
+4. `xyte-cli doctor install --format json`
+5. `xyte-cli install --skills --scope both --agents all --force --no-setup` (plus skill manifest/actionability assertion)
+6. one-time `xyte-cli setup run --non-interactive --tenant <tenant> --key <real-key>`
+7. `xyte-cli setup status --tenant <tenant> --format json` must be `ready`
+8. real read endpoint call: `xyte-cli call organization.devices.getDevices --tenant <tenant> --output-mode envelope --strict-json`
+
+If `XYTE_E2E_TENANT` is omitted, `default` is used.
+If `XYTE_CLI_KEY` is missing, the smoke step fails before any install call executes.
 
 ## Release
 

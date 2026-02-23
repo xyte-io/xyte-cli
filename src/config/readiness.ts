@@ -1,4 +1,4 @@
-import type { KeychainStore } from '../secure/keychain';
+import type { SecretStore } from '../secure/secret-store';
 import type { ProfileStore } from '../secure/profile-store';
 import type { SecretProvider, TenantProfile } from '../types/profile';
 import type { XyteClient } from '../types/client';
@@ -27,7 +27,7 @@ export interface ReadinessCheck {
 
 export interface ReadinessOptions {
   profileStore: ProfileStore;
-  keychain: KeychainStore;
+  secretStore: SecretStore;
   tenantId?: string;
   client?: XyteClient;
   checkConnectivity?: boolean;
@@ -94,7 +94,7 @@ export async function evaluateReadiness(options: ReadinessOptions): Promise<Read
       options.profileStore.getActiveKeySlot(tenant.id, provider)
     ]);
 
-    const hasActiveSecret = active ? Boolean(await options.keychain.getSlotSecret(tenant.id, provider, active.slotId)) : false;
+    const hasActiveSecret = active ? Boolean(await options.secretStore.getSlotSecret(tenant.id, provider, active.slotId)) : false;
 
     providers.push({
       provider,
