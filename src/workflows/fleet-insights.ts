@@ -5,8 +5,8 @@ import { extractArray } from '../tui/data-loaders';
 import type { XyteClient } from '../types/client';
 import { INSPECT_DEEP_DIVE_SCHEMA_VERSION, INSPECT_FLEET_SCHEMA_VERSION, REPORT_SCHEMA_VERSION } from '../contracts/versions';
 import { withSpan } from '../observability/tracing';
-import { formatUtcForReport as formatUtcForReportFromLayout } from './report/pdf-layout';
 import { renderBrandedPdfReport } from './report/pdf-render';
+import { formatUtcForReport as formatUtcForReportFromLayout } from './report/time-format';
 import { getWindowFocus as getWindowFocusFromTheme } from './report/theme';
 
 interface StatusCounts {
@@ -16,6 +16,7 @@ interface StatusCounts {
 export interface FleetSnapshot {
   generatedAtUtc: string;
   tenantId: string;
+  tenantName?: string;
   devices: any[];
   spaces: any[];
   incidents: any[];
@@ -51,6 +52,7 @@ export interface DeepDiveResult {
   schemaVersion: typeof INSPECT_DEEP_DIVE_SCHEMA_VERSION;
   generatedAtUtc: string;
   tenantId: string;
+  tenantName?: string;
   windowHours: number;
   summary: string[];
   topOfflineSpaces: Array<{ space: string; offlineDevices: number; shareOfOfflinePct: number }>;
@@ -258,7 +260,7 @@ async function loadAllSpaces(client: XyteClient, tenantId: string): Promise<any[
   return extractArray(single, ['spaces', 'data', 'items']);
 }
 
-export async function collectFleetSnapshot(client: XyteClient, tenantId: string): Promise<FleetSnapshot> {
+export async function collectFleetSnapshot(client: XyteClient, tenantId: string, tenantName?: string): Promise<FleetSnapshot> {
   return withSpan('xyte.inspect.collect_snapshot', { 'xyte.tenant.id': tenantId }, async () => {
     const [devices, spaces, incidentsRaw, orgTicketsRaw, partnerTicketsRaw] = await Promise.all([
       loadAllDevices(client, tenantId),
@@ -278,6 +280,7 @@ export async function collectFleetSnapshot(client: XyteClient, tenantId: string)
     return {
       generatedAtUtc: new Date().toISOString(),
       tenantId,
+      tenantName,
       devices: stableSort(devices),
       spaces: stableSort(spaces),
       incidents: stableSort(incidents),
@@ -432,6 +435,7 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
     schemaVersion: INSPECT_DEEP_DIVE_SCHEMA_VERSION,
     generatedAtUtc: snapshot.generatedAtUtc,
     tenantId: snapshot.tenantId,
+    tenantName: snapshot.tenantName,
     windowHours,
     summary,
     topOfflineSpaces,

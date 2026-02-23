@@ -7,44 +7,41 @@ export interface WindowFocus {
 }
 
 export const XYTE_PALETTE = {
-  // Primary palette
-  black: '#000000',
-  white: '#FFFFFF',
-  purplePrimary: '#7B1FA2',
-  amberPrimary: '#FFC107',
-  // Secondary palette
-  blueDeep: '#283593',
-  purpleDeep: '#6B0079',
-  violet: '#7C4DFF',
-  blueBright: '#2979FF',
-  pink: '#FF4081',
-  teal: '#00BFA5',
-  // Derived utility tokens (tints/shades from the palette above)
-  navy950: '#000000',
-  navy900: '#283593',
-  navy800: '#6B0079',
-  navy700: '#7B1FA2',
-  ink950: '#000000',
-  ink900: '#0E0E12',
-  ink700: '#2A2A33',
-  slate700: '#414162',
-  slate500: '#676782',
-  slate400: '#8A8AA8',
-  paper: '#FFFFFF',
-  paperBlue: '#F4F3FF',
-  mist: '#F6F1FB',
-  borderSoft: '#DAD6EE',
-  borderStrong: '#B8B0DE',
-  borderInk: '#8B80C6',
-  aqua: '#00BFA5',
-  aquaBright: '#7C4DFF',
-  aquaSoft: '#E7F9F6',
-  gold: '#FFC107',
-  goldSoft: '#FFF5D6',
-  coral: '#FF4081',
-  coralSoft: '#FFE4EF',
-  blue: '#2979FF',
-  blueSoft: '#E8F0FF'
+  brandPrimary: '#3B82F6',
+  brandPrimaryLight: '#EFF6FF',
+  textPrimary: '#111827',
+  textSecondary: '#6B7280',
+  textTertiary: '#9CA3AF',
+  bgPage: '#FFFFFF',
+  bgSubtle: '#F9FAFB',
+  border: '#E5E7EB',
+  statusGreen: '#059669',
+  statusRed: '#DC2626',
+  statusAmber: '#D97706'
+} as const;
+
+export const REPORT_THEME = {
+  text: {
+    primary: XYTE_PALETTE.textPrimary,
+    secondary: XYTE_PALETTE.textSecondary,
+    tertiary: XYTE_PALETTE.textTertiary
+  },
+  surface: {
+    page: XYTE_PALETTE.bgPage,
+    subtle: XYTE_PALETTE.bgSubtle,
+    badge: XYTE_PALETTE.brandPrimaryLight
+  },
+  border: {
+    default: XYTE_PALETTE.border
+  },
+  accent: {
+    primary: XYTE_PALETTE.brandPrimary
+  },
+  status: {
+    online: XYTE_PALETTE.statusGreen,
+    offline: XYTE_PALETTE.statusRed,
+    warning: XYTE_PALETTE.statusAmber
+  }
 } as const;
 
 export interface MetricTone {
@@ -57,25 +54,25 @@ export interface MetricTone {
 
 const METRIC_TONES: Record<'normal' | 'warn' | 'bad', MetricTone> = {
   normal: {
-    panel: '#E8F9F6',
-    border: '#8ADFD2',
-    label: '#006B5C',
-    value: '#007D6D',
-    accent: XYTE_PALETTE.teal
+    panel: REPORT_THEME.surface.subtle,
+    border: REPORT_THEME.border.default,
+    label: REPORT_THEME.text.secondary,
+    value: REPORT_THEME.text.primary,
+    accent: REPORT_THEME.accent.primary
   },
   warn: {
-    panel: XYTE_PALETTE.goldSoft,
-    border: '#E7CC83',
-    label: '#7A5200',
-    value: '#946200',
-    accent: XYTE_PALETTE.amberPrimary
+    panel: REPORT_THEME.surface.subtle,
+    border: REPORT_THEME.border.default,
+    label: REPORT_THEME.text.secondary,
+    value: REPORT_THEME.text.primary,
+    accent: REPORT_THEME.accent.primary
   },
   bad: {
-    panel: XYTE_PALETTE.coralSoft,
-    border: '#F2AFC6',
-    label: '#8F1D49',
-    value: '#B11157',
-    accent: XYTE_PALETTE.pink
+    panel: REPORT_THEME.surface.subtle,
+    border: REPORT_THEME.border.default,
+    label: REPORT_THEME.text.secondary,
+    value: REPORT_THEME.text.primary,
+    accent: REPORT_THEME.accent.primary
   }
 };
 
@@ -88,9 +85,9 @@ export function getWindowFocus(windowHours: number): WindowFocus {
     return {
       label: 'Immediate churn',
       detail: 'Contain active incidents and stabilize high-volatility spaces from the last day.',
-      accent: XYTE_PALETTE.pink,
-      surface: XYTE_PALETTE.coralSoft,
-      panel: '#FFEAF2'
+      accent: REPORT_THEME.accent.primary,
+      surface: REPORT_THEME.surface.badge,
+      panel: REPORT_THEME.surface.badge
     };
   }
 
@@ -98,17 +95,17 @@ export function getWindowFocus(windowHours: number): WindowFocus {
     return {
       label: 'Short-term trend',
       detail: 'Track repeat offenders and reduce recurring churn patterns before they harden.',
-      accent: XYTE_PALETTE.blueBright,
-      surface: XYTE_PALETTE.blueSoft,
-      panel: '#EEF3FF'
+      accent: REPORT_THEME.accent.primary,
+      surface: REPORT_THEME.surface.badge,
+      panel: REPORT_THEME.surface.badge
     };
   }
 
   return {
     label: 'Weekly concentration',
     detail: 'Prioritize structural remediation where incident concentration persists week over week.',
-    accent: XYTE_PALETTE.purplePrimary,
-    surface: XYTE_PALETTE.aquaSoft,
-    panel: '#F1EBFF'
+    accent: REPORT_THEME.accent.primary,
+    surface: REPORT_THEME.surface.badge,
+    panel: REPORT_THEME.surface.badge
   };
 }

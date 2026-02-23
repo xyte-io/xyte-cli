@@ -832,7 +832,8 @@ export function createCli(runtime: CliRuntime = {}): Command {
         throw new Error(`Invalid format: ${format}. Use json|ascii.`);
       }
       const client = await withClient(options.tenant);
-      const snapshot = await collectFleetSnapshot(client, options.tenant);
+      const tenantProfile = await profileStore.getTenant(options.tenant);
+      const snapshot = await collectFleetSnapshot(client, options.tenant, tenantProfile?.name);
       const result = buildFleetInspect(snapshot);
 
       if (format === 'ascii') {
@@ -857,7 +858,8 @@ export function createCli(runtime: CliRuntime = {}): Command {
       }
       const windowHours = Number.parseInt(options.window ?? '24', 10);
       const client = await withClient(options.tenant);
-      const snapshot = await collectFleetSnapshot(client, options.tenant);
+      const tenantProfile = await profileStore.getTenant(options.tenant);
+      const snapshot = await collectFleetSnapshot(client, options.tenant, tenantProfile?.name);
       const result = buildDeepDive(snapshot, Number.isFinite(windowHours) ? windowHours : 24);
 
       if (format === 'ascii') {
@@ -907,6 +909,13 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
         if (raw.tenantId && raw.tenantId !== options.tenant) {
           throw new Error(`Input tenant mismatch. Expected ${options.tenant}, got ${raw.tenantId}.`);
+        }
+
+        if (!('tenantName' in raw) || typeof (raw as { tenantName?: unknown }).tenantName !== 'string') {
+          const tenantProfile = await profileStore.getTenant(options.tenant);
+          if (tenantProfile?.name) {
+            (raw as { tenantName?: string }).tenantName = tenantProfile.name;
+          }
         }
 
         const generated = await generateFleetReport({

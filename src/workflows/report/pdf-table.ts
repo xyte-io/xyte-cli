@@ -1,7 +1,7 @@
 import type PDFKit from 'pdfkit';
 
 import { PDF_LAYOUT, drawSectionTitle, ensurePageSpace, startReportPage, type PdfRenderContext } from './pdf-layout';
-import { XYTE_PALETTE } from './theme';
+import { REPORT_THEME } from './theme';
 
 export interface TableColumn {
   header: string;
@@ -10,44 +10,219 @@ export interface TableColumn {
   wrap?: boolean;
 }
 
+export interface ShouldBreakBeforeTableRowArgs {
+  availableHeight: number;
+  currentRowHeight: number;
+  nextRowHeight: number;
+  remainingRows: number;
+  rowsOnPage: number;
+}
+
+export function shouldBreakBeforeTableRow(args: ShouldBreakBeforeTableRowArgs): boolean {
+  if (args.rowsOnPage < 1) {
+    return false;
+  }
+  if (args.remainingRows !== 2) {
+    return false;
+  }
+  if (args.currentRowHeight > args.availableHeight) {
+    return false;
+  }
+  return args.currentRowHeight + args.nextRowHeight > args.availableHeight;
+}
+
+export interface PaginateTableRowsByHeightArgs {
+  rowHeights: number[];
+  firstPageHeight: number;
+  continuationPageHeight: number;
+}
+
+export function paginateTableRowsByHeight(args: PaginateTableRowsByHeightArgs): number[][] {
+  const pages: number[][] = [];
+  if (!args.rowHeights.length) {
+    return pages;
+  }
+
+  let rowIndex = 0;
+  let pageIndex = 0;
+  while (rowIndex < args.rowHeights.length) {
+    const pageCapacity = Math.max(1, pageIndex === 0 ? args.firstPageHeight : args.continuationPageHeight);
+    let consumed = 0;
+    const pageRows: number[] = [];
+
+    while (rowIndex < args.rowHeights.length) {
+      const currentHeight = args.rowHeights[rowIndex];
+      const remainingRows = args.rowHeights.length - rowIndex;
+      const nextHeight = remainingRows > 1 ? args.rowHeights[rowIndex + 1] : 0;
+      const available = pageCapacity - consumed;
+
+      if (
+        shouldBreakBeforeTableRow({
+          availableHeight: available,
+          currentRowHeight: currentHeight,
+          nextRowHeight: nextHeight,
+          remainingRows,
+          rowsOnPage: pageRows.length
+        })
+      ) {
+        break;
+      }
+
+      const fits = currentHeight <= available;
+      if (!fits && pageRows.length > 0) {
+        break;
+      }
+
+      pageRows.push(rowIndex);
+      consumed += currentHeight;
+      rowIndex += 1;
+
+      if (!fits) {
+        break;
+      }
+    }
+
+    if (!pageRows.length) {
+      pageRows.push(rowIndex);
+      rowIndex += 1;
+    }
+
+    pages.push(pageRows);
+    pageIndex += 1;
+  }
+
+  return pages;
+}
+
 function normalizeColumns(columns: TableColumn[], availableWidth: number): TableColumn[] {
   const total = columns.reduce((sum, column) => sum + column.width, 0);
   if (Math.abs(total - availableWidth) <= 1) {
-    return columns;
+    return columns.map((column) => ({ ...column }));
   }
+
   if (total > availableWidth) {
     const ratio = availableWidth / total;
-    const scaled = columns.map((column) => ({ ...column, width: Math.floor(column.width * ratio) }));
-    const scaledTotal = scaled.reduce((sum, column) => sum + column.width, 0);
-    scaled[0].width += availableWidth - scaledTotal;
-    return scaled;
+    const resized = columns.map((column) => ({ ...column, width: Math.max(44, Math.floor(column.width * ratio)) }));
+    const resizedTotal = resized.reduce((sum, column) => sum + column.width, 0);
+    resized[0].width += availableWidth - resizedTotal;
+    return resized;
   }
-  const grown = columns.map((column) => ({ ...column }));
-  const flexIndex = grown.findIndex((column) => column.wrap !== false);
-  const target = flexIndex === -1 ? 0 : flexIndex;
-  grown[target].width += availableWidth - total;
-  return grown;
+
+  const expanded = columns.map((column) => ({ ...column }));
+  const flexIndex = expanded.findIndex((column) => column.wrap !== false);
+  const target = flexIndex >= 0 ? flexIndex : 0;
+  expanded[target].width += availableWidth - total;
+  return expanded;
 }
 
-function measureTableRowHeight(doc: PDFKit.PDFDocument, columns: TableColumn[], row: string[]): number {
-  doc.font('Helvetica').fontSize(PDF_LAYOUT.fontBody);
+function tableWidth(columns: TableColumn[]): number {
+  return columns.reduce((sum, column) => sum + column.width, 0);
+}
+
+function measureTableRowHeight(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, columns: TableColumn[], row: string[]): number {
+  doc.font(ctx.fonts.regular).fontSize(9.5);
   const lineHeight = doc.currentLineHeight();
-  let maxHeight = lineHeight;
-  row.forEach((cell, index) => {
-    const column = columns[index];
-    const innerWidth = Math.max(20, column.width - PDF_LAYOUT.tableCellPadX * 2);
+  let maxTextHeight = lineHeight;
+
+  row.forEach((cell, columnIndex) => {
+    const column = columns[columnIndex];
+    const innerWidth = Math.max(24, column.width - PDF_LAYOUT.tableCellPadLeft - PDF_LAYOUT.tableCellPadRight);
     if (column.wrap === false) {
-      maxHeight = Math.max(maxHeight, lineHeight);
+      maxTextHeight = Math.max(maxTextHeight, lineHeight);
       return;
     }
     const measured = doc.heightOfString(cell, {
       width: innerWidth,
-      align: column.align ?? 'left'
+      align: column.align ?? 'left',
+      lineGap: 0
     });
-    maxHeight = Math.max(maxHeight, measured);
+    maxTextHeight = Math.max(maxTextHeight, measured);
   });
-  const rowHeight = maxHeight + PDF_LAYOUT.tableCellPadY * 2;
+
+  const rowHeight = maxTextHeight + PDF_LAYOUT.tableCellPadTop + PDF_LAYOUT.tableCellPadBottom;
   return Math.min(PDF_LAYOUT.tableRowMax, Math.max(PDF_LAYOUT.tableRowMin, rowHeight));
+}
+
+function drawHorizontalRule(doc: PDFKit.PDFDocument, x: number, y: number, width: number, thickness: number): void {
+  doc.save();
+  doc.moveTo(x, y).lineTo(x + width, y).lineWidth(thickness).strokeColor(REPORT_THEME.border.default).stroke();
+  doc.restore();
+}
+
+function fitHeaderCellFontSize(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, text: string, innerWidth: number): number {
+  for (let size = 9; size >= 7; size -= 0.5) {
+    doc.font(ctx.fonts.medium).fontSize(size);
+    if (doc.widthOfString(text, { characterSpacing: 0.3 }) <= innerWidth) {
+      return size;
+    }
+  }
+  return 7;
+}
+
+function drawTableHeader(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, columns: TableColumn[]): void {
+  const x = doc.page.margins.left;
+  const y = doc.y;
+  const width = tableWidth(columns);
+
+  doc.save();
+  doc.rect(x, y, width, PDF_LAYOUT.tableHeaderHeight).fill(REPORT_THEME.surface.subtle);
+  doc.restore();
+  drawHorizontalRule(doc, x, y + PDF_LAYOUT.tableHeaderHeight, width, 2);
+
+  let cursorX = x;
+  columns.forEach((column) => {
+    const header = column.header.toUpperCase();
+    const innerWidth = column.width - PDF_LAYOUT.tableCellPadLeft - PDF_LAYOUT.tableCellPadRight;
+    const fontSize = fitHeaderCellFontSize(doc, ctx, header, innerWidth);
+    doc.font(ctx.fonts.medium).fontSize(fontSize).fillColor(REPORT_THEME.text.secondary).text(header, cursorX + PDF_LAYOUT.tableCellPadLeft, y + PDF_LAYOUT.tableCellPadTop, {
+      width: innerWidth,
+      align: column.align ?? 'left',
+      lineBreak: false,
+      ellipsis: false,
+      characterSpacing: 0.3
+    });
+    cursorX += column.width;
+  });
+
+  doc.y = y + PDF_LAYOUT.tableHeaderHeight;
+}
+
+function drawTableRow(
+  doc: PDFKit.PDFDocument,
+  ctx: PdfRenderContext,
+  columns: TableColumn[],
+  row: string[],
+  rowHeight: number,
+  rowIndex: number,
+  getCellTextColor?: (args: { rowIndex: number; columnIndex: number; value: string }) => string | undefined
+): void {
+  const x = doc.page.margins.left;
+  const y = doc.y;
+  const width = tableWidth(columns);
+  const fill = rowIndex % 2 === 0 ? REPORT_THEME.surface.page : REPORT_THEME.surface.subtle;
+
+  doc.save();
+  doc.rect(x, y, width, rowHeight).fill(fill);
+  doc.restore();
+  drawHorizontalRule(doc, x, y + rowHeight, width, 1);
+
+  let cursorX = x;
+  columns.forEach((column, columnIndex) => {
+    const value = row[columnIndex] ?? '';
+    const customColor = getCellTextColor?.({ rowIndex, columnIndex, value });
+    const wraps = column.wrap !== false;
+    doc.font(ctx.fonts.regular).fontSize(9.5).fillColor(customColor ?? REPORT_THEME.text.primary).text(value, cursorX + PDF_LAYOUT.tableCellPadLeft, y + PDF_LAYOUT.tableCellPadTop, {
+      width: column.width - PDF_LAYOUT.tableCellPadLeft - PDF_LAYOUT.tableCellPadRight,
+      height: rowHeight - PDF_LAYOUT.tableCellPadTop - PDF_LAYOUT.tableCellPadBottom,
+      align: column.align ?? 'left',
+      lineBreak: wraps,
+      ellipsis: false,
+      lineGap: 0
+    });
+    cursorX += column.width;
+  });
+
+  doc.y = y + rowHeight;
 }
 
 export function drawTable(
@@ -58,78 +233,54 @@ export function drawTable(
     columns: TableColumn[];
     rows: string[][];
     emptyMessage?: string;
+    getCellTextColor?: (args: { rowIndex: number; columnIndex: number; value: string }) => string | undefined;
   }
 ): void {
-  const tableLeft = doc.page.margins.left;
   const availableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const columns = normalizeColumns(args.columns, availableWidth);
-  const headerHeight = 24;
-  const continuationTitle = `${args.title} (cont.)`;
-
-  const drawHeader = () => {
-    ensurePageSpace(doc, ctx, headerHeight + 6);
-    const y = doc.y;
-    let x = tableLeft;
-    columns.forEach((column) => {
-      doc.save();
-      doc.rect(x, y, column.width, headerHeight).fillAndStroke(XYTE_PALETTE.mist, XYTE_PALETTE.borderStrong);
-      doc.rect(x, y, column.width, 4).fill(ctx.windowFocus.accent);
-      doc.restore();
-      doc.font('Helvetica-Bold').fontSize(PDF_LAYOUT.fontBody).fillColor(XYTE_PALETTE.ink700).text(column.header, x + PDF_LAYOUT.tableCellPadX, y + 6, {
-        width: column.width - PDF_LAYOUT.tableCellPadX * 2,
-        align: column.align ?? 'left',
-        ellipsis: true
-      });
-      x += column.width;
-    });
-    doc.y = y + headerHeight;
-  };
 
   if (!args.rows.length) {
-    ensurePageSpace(doc, ctx, 32 + headerHeight);
     drawSectionTitle(doc, ctx, args.title);
-    ensurePageSpace(doc, ctx, 24);
-    doc.font('Helvetica').fontSize(PDF_LAYOUT.fontBody).fillColor(XYTE_PALETTE.slate500).text(args.emptyMessage ?? 'No data available.', {
+    ensurePageSpace(doc, ctx, 30);
+    doc.font(ctx.fonts.regular).fontSize(10).fillColor(REPORT_THEME.text.secondary).text(args.emptyMessage ?? 'No data available.', {
       width: availableWidth
     });
-    doc.moveDown(0.5);
+    doc.y += PDF_LAYOUT.sectionGap;
     return;
   }
 
-  const firstRowHeight = measureTableRowHeight(doc, columns, args.rows[0]);
-  ensurePageSpace(doc, ctx, 34 + headerHeight + firstRowHeight);
+  const rowHeights = args.rows.map((row) => measureTableRowHeight(doc, ctx, columns, row));
+  const firstRowHeight = rowHeights[0];
   drawSectionTitle(doc, ctx, args.title);
-  drawHeader();
+  ensurePageSpace(doc, ctx, PDF_LAYOUT.tableHeaderHeight + firstRowHeight);
+  drawTableHeader(doc, ctx, columns);
 
-  args.rows.forEach((row, rowIndex) => {
-    const rowHeight = measureTableRowHeight(doc, columns, row);
-    const bottom = doc.page.height - doc.page.margins.bottom - PDF_LAYOUT.footerHeight - PDF_LAYOUT.spaceSm;
-    if (doc.y + rowHeight > bottom) {
-      startReportPage(doc, ctx);
-      ensurePageSpace(doc, ctx, 34 + headerHeight + Math.min(rowHeight, 60));
-      drawSectionTitle(doc, ctx, continuationTitle);
-      drawHeader();
-    }
-
-    const y = doc.y;
-    let x = tableLeft;
-    const rowFill = rowIndex % 2 === 0 ? XYTE_PALETTE.paper : '#F9FCFF';
-    row.forEach((cell, index) => {
-      const column = columns[index];
-      doc.save();
-      doc.rect(x, y, column.width, rowHeight).fillAndStroke(rowFill, '#E1EAF4');
-      doc.restore();
-      doc.font('Helvetica').fontSize(PDF_LAYOUT.fontBody).fillColor(XYTE_PALETTE.ink900).text(cell, x + PDF_LAYOUT.tableCellPadX, y + PDF_LAYOUT.tableCellPadY, {
-        width: column.width - PDF_LAYOUT.tableCellPadX * 2,
-        height: rowHeight - PDF_LAYOUT.tableCellPadY * 2,
-        align: column.align ?? 'left',
-        lineBreak: column.wrap !== false,
-        ellipsis: column.wrap === false
-      });
-      x += column.width;
-    });
-    doc.y = y + rowHeight;
+  const bottom = doc.page.height - doc.page.margins.bottom - PDF_LAYOUT.footerHeight;
+  const firstPageHeight = Math.max(1, Math.floor(bottom - doc.y));
+  const headingBlockHeight =
+    PDF_LAYOUT.sectionHeadingLineHeight +
+    PDF_LAYOUT.sectionUnderlineGap +
+    PDF_LAYOUT.sectionUnderlineThickness +
+    PDF_LAYOUT.sectionContentGap;
+  const continuationStartY = PDF_LAYOUT.contentTopContinuation + headingBlockHeight + PDF_LAYOUT.tableHeaderHeight;
+  const continuationPageHeight = Math.max(1, Math.floor(bottom - continuationStartY));
+  const pages = paginateTableRowsByHeight({
+    rowHeights,
+    firstPageHeight,
+    continuationPageHeight
   });
 
-  doc.moveDown(0.45);
+  pages.forEach((pageRows, pageIndex) => {
+    if (pageIndex > 0) {
+      startReportPage(doc, ctx);
+      drawSectionTitle(doc, ctx, args.title, { continued: true });
+      drawTableHeader(doc, ctx, columns);
+    }
+
+    pageRows.forEach((rowIndex) => {
+      drawTableRow(doc, ctx, columns, args.rows[rowIndex], rowHeights[rowIndex], rowIndex, args.getCellTextColor);
+    });
+  });
+
+  doc.y += PDF_LAYOUT.sectionGap;
 }

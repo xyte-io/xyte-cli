@@ -70,11 +70,10 @@ describe('pdf report rendering', () => {
     const raw = readFileSync(outPath, 'latin1');
     const pageCount = (raw.match(/\/Type \/Page\b/g) ?? []).length;
 
-    expect(pageCount).toBeGreaterThan(1);
-    // PDFKit emits glyph payloads as hex TJ segments with split runs, so match stable fragments.
-    expect(raw).toContain('466c6565742046696e64696e6773205265706f72'); // Fleet Findings Repor...
-    expect(raw).toContain('6f70205370616365732062'); // ...Top Spaces b...
-    expect(raw).toContain('44617461205175616c6974793a'); // Data Quality:
-    expect(raw).toContain('28636f6e742e29'); // (cont.)
+    expect(pageCount).toBeGreaterThan(2);
+    // Inter embedding changes text encoding, so assert stable structural fragments instead.
+    expect(raw).toContain('/MediaBox [0 0 595.28 841.89]'); // A4
+    expect(raw).toContain('/Type /Page');
+    expect(raw).toContain('/I1'); // embedded logo image object
   });
 });

@@ -9,18 +9,17 @@ import { drawTable } from './pdf-table';
 import {
   PDF_LAYOUT,
   drawBullets,
-  drawKeyFindings,
+  drawEndOfReportDivider,
   drawKpiGrid,
   drawPdfFooter,
   drawPdfHeader,
   drawSectionTitle,
   drawSpaceBars,
-  drawWindowFocusStrip,
-  formatUtcForReport,
-  resolveLogoPath,
   type PdfRenderContext
 } from './pdf-layout';
-import { getWindowFocus } from './theme';
+import { registerReportFonts } from './font-asset';
+import { formatRelativeAgeFromHours, formatUtcForReport, formatWindowLabel } from './time-format';
+import { REPORT_THEME, getWindowFocus } from './theme';
 
 function ensureDir(filePath: string): void {
   mkdirSync(dirname(resolve(filePath)), { recursive: true });
@@ -36,114 +35,181 @@ function redactSensitive(value: string, includeSensitive: boolean): string {
   return `${value.slice(0, 4)}...${value.slice(-4)}`;
 }
 
+function compactIdentifier(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === 'n/a' || trimmed === '***') {
+    return trimmed || 'n/a';
+  }
+
+  if (trimmed.includes('...') && trimmed.length > 10) {
+    return `${trimmed.slice(0, 4)}...${trimmed.slice(-3)}`;
+  }
+
+  const looksLikeUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
+  const looksLikeLongHex = /^[0-9a-f]{20,}$/i.test(trimmed);
+  if (looksLikeUuid || looksLikeLongHex || trimmed.length > 28) {
+    return `${trimmed.slice(0, 4)}...${trimmed.slice(-3)}`;
+  }
+
+  return trimmed;
+}
+
+function formatSpaceHierarchy(spacePath: string): string {
+  const value = spacePath.trim();
+  if (!value) {
+    return 'n/a';
+  }
+
+  const parts = value.split('/').filter(Boolean);
+  if (parts.length <= 2) {
+    return value;
+  }
+
+  const leaf = parts.at(-1) ?? value;
+  const context = parts.slice(Math.max(0, parts.length - 3), parts.length - 1);
+  if (!context.length) {
+    return leaf;
+  }
+  return `${leaf} (${context.join(' / ')})`;
+}
+
 export function renderBrandedPdfReport(deepDive: DeepDiveResult, outputPath: string, includeSensitive: boolean): Promise<void> {
   return new Promise((resolvePromise, rejectPromise) => {
     ensureDir(outputPath);
-    const ctx: PdfRenderContext = {
-      tenantId: deepDive.tenantId,
-      generatedAtUtc: deepDive.generatedAtUtc,
-      windowHours: deepDive.windowHours,
-      windowFocus: getWindowFocus(deepDive.windowHours),
-      logoPath: resolveLogoPath()
-    };
+    const windowLabel = formatWindowLabel(deepDive.windowHours);
+    const summaryLines = Array.from(
+      new Set(
+        deepDive.summary
+          .map((line) => line.replace(/^(\d+)h churn:/i, `${windowLabel} churn:`).trim())
+          .filter(Boolean)
+      )
+    );
 
     const doc = new PDFDocument({
-      size: 'LETTER',
+      size: 'A4',
       margins: {
         left: PDF_LAYOUT.pageMarginX,
         right: PDF_LAYOUT.pageMarginX,
-        top: PDF_LAYOUT.pageMarginY,
-        bottom: PDF_LAYOUT.pageMarginY
+        top: PDF_LAYOUT.pageMarginTop,
+        bottom: PDF_LAYOUT.pageMarginBottom
       },
       bufferPages: true,
       compress: false
     });
+    const fonts = registerReportFonts(doc);
+
+    const ctx: PdfRenderContext = {
+      tenantId: deepDive.tenantId,
+      tenantName: typeof deepDive.tenantName === 'string' ? deepDive.tenantName : undefined,
+      generatedAtUtc: deepDive.generatedAtUtc,
+      windowHours: deepDive.windowHours,
+      windowLabel,
+      windowFocus: getWindowFocus(deepDive.windowHours),
+      fonts
+    };
     const stream = doc.pipe(createWriteStream(outputPath));
 
     stream.on('finish', () => resolvePromise());
     stream.on('error', (error) => rejectPromise(error));
 
-    drawPdfHeader(doc, ctx);
-    doc.y = Math.max(doc.y, PDF_LAYOUT.contentTop);
+    drawPdfHeader(doc, ctx, 'full');
+    doc.x = doc.page.margins.left;
+    doc.y = PDF_LAYOUT.contentTopFirstPage;
 
     drawKpiGrid(doc, ctx, [
-      { label: 'Active incidents', value: String(deepDive.activeIncidentAging.length), tone: deepDive.activeIncidentAging.length > 0 ? 'warn' : 'normal' },
-      { label: `${deepDive.windowHours}h churn`, value: String(deepDive.churn24h.incidents), tone: deepDive.churn24h.incidents > 0 ? 'warn' : 'normal' },
-      { label: 'Open tickets', value: String(deepDive.ticketPosture.openTickets), tone: deepDive.ticketPosture.openTickets > 0 ? 'warn' : 'normal' },
+      { label: 'Active incidents', value: String(deepDive.activeIncidentAging.length) },
+      { label: windowLabel, value: String(deepDive.churn24h.incidents) },
+      { label: 'Open tickets', value: String(deepDive.ticketPosture.openTickets) },
       {
         label: 'Data mismatches',
-        value: String(deepDive.dataQuality.statusMismatches.length),
-        tone: deepDive.dataQuality.statusMismatches.length > 0 ? 'bad' : 'normal'
+        value: String(deepDive.dataQuality.statusMismatches.length)
       }
     ]);
 
-    drawWindowFocusStrip(doc, ctx);
-    drawKeyFindings(doc, ctx, deepDive.summary);
-
     drawSectionTitle(doc, ctx, 'Executive Summary');
-    drawBullets(doc, ctx, deepDive.summary);
-    doc.moveDown(0.35);
+    drawBullets(doc, ctx, summaryLines);
+    doc.y += PDF_LAYOUT.sectionGap;
 
-    drawSpaceBars(doc, ctx, deepDive.churn24h.bySpace);
+    drawSpaceBars(
+      doc,
+      ctx,
+      deepDive.churn24h.bySpace.map((row) => ({
+        space: formatSpaceHierarchy(row.space),
+        incidents: row.incidents
+      }))
+    );
 
     drawTable(doc, ctx, {
       title: 'Top Spaces by Offline Devices',
       columns: [
-        { header: 'Space', width: 370, wrap: true },
-        { header: 'Offline', width: 90, align: 'right', wrap: false },
-        { header: 'Share', width: 90, align: 'right', wrap: false }
+        { header: 'Space', width: 293, wrap: true },
+        { header: 'Offline', width: 80, align: 'right', wrap: false },
+        { header: 'Share', width: 80, align: 'right', wrap: false }
       ],
-      rows: deepDive.topOfflineSpaces.map((row) => [row.space, String(row.offlineDevices), `${row.shareOfOfflinePct}%`]),
+      rows: deepDive.topOfflineSpaces.map((row) => [
+        formatSpaceHierarchy(row.space),
+        String(row.offlineDevices),
+        `${row.shareOfOfflinePct}%`
+      ]),
       emptyMessage: 'No offline spaces found.'
     });
 
     drawTable(doc, ctx, {
       title: 'Top Devices by Incident Volume',
       columns: [
-        { header: 'Device', width: 370, wrap: true },
-        { header: 'Incidents', width: 90, align: 'right', wrap: false },
-        { header: 'Active', width: 90, align: 'right', wrap: false }
+        { header: 'Device', width: 293, wrap: true },
+        { header: 'Incidents', width: 80, align: 'right', wrap: false },
+        { header: 'Active', width: 80, align: 'right', wrap: false }
       ],
-      rows: deepDive.topIncidentDevices.map((row) => [row.device, String(row.incidentCount), String(row.activeIncidents)]),
+      rows: deepDive.topIncidentDevices.map((row) => [
+        compactIdentifier(row.device),
+        String(row.incidentCount),
+        String(row.activeIncidents)
+      ]),
       emptyMessage: 'No incident device concentration detected.'
     });
 
     drawTable(doc, ctx, {
       title: 'Active Incident Aging',
       columns: [
-        { header: 'Device', width: 120, wrap: true },
-        { header: 'Space', width: 230, wrap: true },
-        { header: 'Age (h)', width: 70, align: 'right', wrap: false },
-        { header: 'Created At', width: 130, wrap: false }
+        { header: 'Device', width: 94, wrap: true },
+        { header: 'Space', width: 159, wrap: true },
+        { header: 'Age', width: 82, align: 'right', wrap: false },
+        { header: 'Created At (UTC)', width: 118, wrap: true }
       ],
-      rows: deepDive.activeIncidentAging.slice(0, 16).map((row) => [row.device, row.space, String(row.ageHours), formatUtcForReport(row.createdAtUtc)]),
+      rows: deepDive.activeIncidentAging.map((row) => [
+        compactIdentifier(row.device),
+        formatSpaceHierarchy(row.space),
+        formatRelativeAgeFromHours(row.ageHours),
+        formatUtcForReport(row.createdAtUtc)
+      ]),
       emptyMessage: 'No active incidents.'
     });
 
     drawTable(doc, ctx, {
-      title: `${deepDive.windowHours}-Hour Churn by Space`,
+      title: `${windowLabel} by Space`,
       columns: [
-        { header: 'Space', width: 450, wrap: true },
-        { header: 'Incidents', width: 100, align: 'right', wrap: false }
+        { header: 'Space', width: 333, wrap: true },
+        { header: 'Incidents', width: 120, align: 'right', wrap: false }
       ],
-      rows: deepDive.churn24h.bySpace.map((row) => [row.space, String(row.incidents)]),
+      rows: deepDive.churn24h.bySpace.map((row) => [formatSpaceHierarchy(row.space), String(row.incidents)]),
       emptyMessage: 'No churn events in this window.'
     });
 
     drawTable(doc, ctx, {
       title: 'Oldest Open Tickets',
       columns: [
-        { header: 'Ticket', width: 88, wrap: false },
-        { header: 'Title', width: 182, wrap: true },
-        { header: 'Age (h)', width: 62, align: 'right', wrap: false },
-        { header: 'Device', width: 88, wrap: false },
-        { header: 'Created At', width: 130, wrap: false }
+        { header: 'Ticket', width: 78, wrap: false },
+        { header: 'Title', width: 108, wrap: true },
+        { header: 'Age', width: 82, align: 'right', wrap: false },
+        { header: 'Device', width: 84, wrap: false },
+        { header: 'Created At (UTC)', width: 101, wrap: true }
       ],
-      rows: deepDive.ticketPosture.oldestOpenTickets.slice(0, 12).map((row) => [
-        redactSensitive(row.ticketId, includeSensitive),
+      rows: deepDive.ticketPosture.oldestOpenTickets.map((row) => [
+        compactIdentifier(redactSensitive(row.ticketId, includeSensitive)),
         row.title,
-        String(row.ageHours),
-        redactSensitive(row.deviceId, includeSensitive),
+        formatRelativeAgeFromHours(row.ageHours),
+        compactIdentifier(redactSensitive(row.deviceId, includeSensitive)),
         formatUtcForReport(row.createdAtUtc)
       ]),
       emptyMessage: 'No open tickets.'
@@ -153,21 +219,36 @@ export function renderBrandedPdfReport(deepDive: DeepDiveResult, outputPath: str
       drawTable(doc, ctx, {
         title: 'Data Quality: Status Mismatches',
         columns: [
-          { header: 'Device', width: 120, wrap: true },
-          { header: 'status', width: 70, wrap: false },
-          { header: 'state.status', width: 90, wrap: false },
-          { header: 'Last Seen', width: 130, wrap: false },
-          { header: 'Space', width: 160, wrap: true }
+          { header: 'Device', width: 74, wrap: true },
+          { header: 'Status', width: 70, wrap: false },
+          { header: 'State', width: 86, wrap: false },
+          { header: 'Last Seen (UTC)', width: 108, wrap: true },
+          { header: 'Space', width: 115, wrap: true }
         ],
         rows: deepDive.dataQuality.statusMismatches.map((row) => [
-          row.device,
+          compactIdentifier(row.device),
           row.status,
           row.stateStatus,
           formatUtcForReport(row.lastSeen),
-          row.space
-        ])
+          formatSpaceHierarchy(row.space)
+        ]),
+        getCellTextColor: ({ columnIndex, value }) => {
+          if (columnIndex !== 1 && columnIndex !== 2) {
+            return undefined;
+          }
+          const normalized = value.toLowerCase();
+          if (normalized === 'online') {
+            return REPORT_THEME.status.online;
+          }
+          if (normalized === 'offline') {
+            return REPORT_THEME.status.offline;
+          }
+          return undefined;
+        }
       });
     }
+
+    drawEndOfReportDivider(doc);
 
     const pages = doc.bufferedPageRange();
     for (let index = pages.start; index < pages.start + pages.count; index += 1) {
