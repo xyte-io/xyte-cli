@@ -1,40 +1,42 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://xyte.dev/schemas/utility-ai-context.v1.schema.json",
-  "title": "Xyte Utility AI Context V1",
+  "$id": "https://xyte.dev/schemas/utility-prepare.v1.schema.json",
+  "title": "Xyte Utility Prepare V1",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
     "generatedAtUtc",
+    "actionKey",
     "entity",
-    "mappedAction",
+    "mode",
     "input",
+    "canonical",
     "decodeRules",
     "artifacts",
     "promptTemplatePath",
     "skillNodePath",
-    "suggestedCommands"
+    "suggestedCommands",
+    "executionSupport"
   ],
   "properties": {
     "schemaVersion": {
-      "const": "xyte.utility.ai-context.v1"
+      "const": "xyte.utility.prepare.v1"
     },
     "generatedAtUtc": {
       "type": "string"
     },
-    "entity": {
-      "type": "string",
-      "enum": [
-        "devices",
-        "spaces"
-      ]
+    "actionKey": {
+      "type": "string"
     },
-    "mappedAction": {
+    "entity": {
+      "type": "string"
+    },
+    "mode": {
       "type": "string",
       "enum": [
-        "device.bulk-rename",
-        "space.import-tree"
+        "friendly",
+        "generic"
       ]
     },
     "input": {
@@ -65,6 +67,33 @@
         "sizeBytes": {
           "type": "integer",
           "minimum": 0
+        }
+      }
+    },
+    "canonical": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primaryFormat",
+        "headers",
+        "jsonShape"
+      ],
+      "properties": {
+        "primaryFormat": {
+          "type": "string",
+          "enum": [
+            "csv",
+            "jsonl"
+          ]
+        },
+        "headers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "jsonShape": {
+          "type": "object"
         }
       }
     },
@@ -105,12 +134,12 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "dryRun",
+        "next",
         "apply",
         "verify"
       ],
       "properties": {
-        "dryRun": {
+        "next": {
           "type": "string"
         },
         "apply": {
@@ -120,6 +149,13 @@
           "type": "string"
         }
       }
+    },
+    "executionSupport": {
+      "type": "string",
+      "enum": [
+        "space.import-tree",
+        "call-loop-only"
+      ]
     }
   }
 }

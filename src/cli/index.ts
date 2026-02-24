@@ -36,8 +36,9 @@ import {
   formatFleetInspectAscii,
   generateFleetReport
 } from '../workflows/fleet-insights';
-import { buildUtilityAiContext, type UtilityAiContextEntity } from '../workflows/utility-ai-context';
-import { runDeviceBulkRename, runSpaceImportTree } from '../workflows/utility-commands';
+import { buildUtilityPrepare, listUtilityPrepareActions } from '../workflows/utility-prepare';
+import type { UtilityPreparePrimaryFormat } from '../workflows/utility-action-profiles';
+import { runSpaceImportTree } from '../workflows/utility-commands';
 import { createMcpServer } from '../mcp/server';
 
 type OutputStream = Pick<typeof process.stdout, 'write'>;
@@ -184,12 +185,15 @@ function parseUtilityInputFormat(value: string | undefined): UtilityInputFormat 
   return normalized as UtilityInputFormat;
 }
 
-function parseUtilityAiContextEntity(value: string | undefined): UtilityAiContextEntity {
-  const normalized = (value ?? '').trim().toLowerCase();
-  if (normalized !== 'devices' && normalized !== 'spaces') {
-    throw new Error(`Invalid entity: ${value}. Use devices|spaces.`);
+function parseUtilityPreparePrimaryFormat(value: string | undefined): UtilityPreparePrimaryFormat | undefined {
+  if (!value || !value.trim()) {
+    return undefined;
   }
-  return normalized as UtilityAiContextEntity;
+  const normalized = value.trim().toLowerCase();
+  if (normalized !== 'csv' && normalized !== 'jsonl') {
+    throw new Error(`Invalid primary format: ${value}. Use csv|jsonl.`);
+  }
+  return normalized as UtilityPreparePrimaryFormat;
 }
 
 function requiresWriteGuard(method: string): boolean {
@@ -838,114 +842,81 @@ export function createCli(runtime: CliRuntime = {}): Command {
       }
     });
 
-  const utility = program.command('utility').description('Utility AI context and preprocessing helpers');
+  const utility = program.command('utility').description('Utility preprocessing helpers');
 
   utility
-    .command('ai-context')
-    .description('Build AI decoding contract and scaffold canonical utility files')
+    .command('prepare')
+    .description('Build utility preprocessing contract and scaffold canonical files for one action')
     .requiredOption('--input <path>', 'Input source path')
-    .option('--entity <entity>', 'devices|spaces')
+    .requiredOption('--action <actionKey>', 'Action key (endpoint key or space.import-tree)')
     .option('--tenant <tenantId>', 'Tenant id used in suggested command strings')
     .option('--output-dir <path>', 'Directory for scaffolded files')
-    .option('--interactive', 'Prompt for missing entity/output-dir values')
+    .option('--primary-format <format>', 'csv|jsonl')
     .option('--force', 'Overwrite scaffold files if they already exist')
     .option('--strict-json', 'Fail on non-serializable output')
     .action(
       async (options: {
         input: string;
-        entity?: string;
+        action: string;
         tenant?: string;
         outputDir?: string;
-        interactive?: boolean;
+        primaryFormat?: string;
         force?: boolean;
         strictJson?: boolean;
       }) => {
-        let entityValue = options.entity;
-        if (!entityValue && options.interactive === true) {
-          entityValue = await prompt({
-            question: 'Entity (devices|spaces)',
-            initial: 'devices',
-            stdout
-          });
-        }
-        if (!entityValue) {
-          throw new Error('Missing entity. Use --entity devices|spaces, or pass --interactive.');
-        }
-
-        let outputDir = options.outputDir;
-        if (!outputDir && options.interactive === true) {
-          outputDir = await prompt({
-            question: 'Output directory for scaffold files',
-            initial: './tmp',
-            stdout
-          });
-        }
-        const resolvedOutputDir = outputDir && outputDir.trim() ? outputDir.trim() : './tmp';
-
-        const result = buildUtilityAiContext({
+        const result = buildUtilityPrepare({
           inputPath: options.input,
-          entity: parseUtilityAiContextEntity(entityValue),
-          outputDir: resolvedOutputDir,
+          actionKey: options.action,
+          outputDir: options.outputDir,
           tenantId: options.tenant,
+          primaryFormat: parseUtilityPreparePrimaryFormat(options.primaryFormat),
           force: options.force === true
         });
         printJson(stdout, result, { strictJson: options.strictJson });
       }
     );
 
-  const device = program.command('device').description('Device utility operations');
-
-  device
-    .command('bulk-rename')
-    .description('Rename devices in bulk from input rows')
-    .requiredOption('--tenant <tenantId>', 'Tenant id')
-    .requiredOption('--input <path>', 'Input path (CSV/JSON/JSONL)')
-    .option('--input-format <format>', 'auto|csv|json|jsonl', 'auto')
-    .option('--device-id-field <name>', 'Input column/field for device id', 'device_id')
-    .option('--new-name-field <name>', 'Input column/field for new device name', 'new_name')
-    .option('--rename-body-field <name>', 'Body field used for rename payload', 'name')
-    .option('--apply', 'Apply changes (default is dry-run)')
-    .option('--continue-on-error', 'Continue processing rows after failures')
-    .option('--report <path>', 'Write NDJSON row report file')
+  utility
+    .command('list-actions')
+    .description('List utility prepare action keys')
+    .option('--format <format>', 'text|json', 'text')
+    .option('--entity <entity>', 'Filter by entity (devices|spaces|tickets|commands|...)')
+    .option('--include-generic', 'Include generic profiles', true)
+    .option('--no-include-generic', 'Exclude generic profiles')
     .option('--strict-json', 'Fail on non-serializable output')
-    .action(
-      async (options: {
-        tenant: string;
-        input: string;
-        inputFormat?: string;
-        deviceIdField?: string;
-        newNameField?: string;
-        renameBodyField?: string;
-        apply?: boolean;
-        continueOnError?: boolean;
-        report?: string;
-        strictJson?: boolean;
-      }) => {
-        const client = await withClient(options.tenant);
-        const result = await runDeviceBulkRename({
-          client,
-          tenantId: options.tenant,
-          inputPath: options.input,
-          inputFormat: parseUtilityInputFormat(options.inputFormat),
-          apply: options.apply === true,
-          continueOnError: options.continueOnError === true,
-          reportPath: options.report,
-          deviceIdField: options.deviceIdField,
-          newNameField: options.newNameField,
-          renameBodyField: options.renameBodyField
-        });
-        printJson(stdout, result, { strictJson: options.strictJson });
-        if (result.totals.failed > 0) {
-          process.exitCode = 1;
-        }
+    .action(async (options: { format?: string; entity?: string; includeGeneric?: boolean; strictJson?: boolean }) => {
+      const format = (options.format ?? 'text').trim().toLowerCase();
+      if (format !== 'text' && format !== 'json') {
+        throw new Error(`Invalid format: ${options.format}. Use text|json.`);
       }
-    );
+
+      const actions = listUtilityPrepareActions({
+        entity: options.entity,
+        includeGeneric: options.includeGeneric !== false
+      });
+
+      if (format === 'json') {
+        printJson(stdout, actions, { strictJson: options.strictJson });
+        return;
+      }
+
+      if (!actions.length) {
+        stdout.write('No utility actions found.\n');
+        return;
+      }
+
+      for (const action of actions) {
+        stdout.write(
+          `${action.actionKey} | entity=${action.entity} | mode=${action.mode} | execution=${action.executionSupport}\n`
+        );
+      }
+    });
 
   const space = program.command('space').description('Space utility operations');
 
   space
     .command('import-tree')
-    .description('Create or find spaces from file-defined paths')
+    .description('Create or find spaces from file-defined paths (prepare-first: run `xyte-cli utility prepare --action space.import-tree`)')
     .requiredOption('--tenant <tenantId>', 'Tenant id')
     .requiredOption('--input <path>', 'Input path (CSV/JSON/JSONL)')
     .option('--input-format <format>', 'auto|csv|json|jsonl', 'auto')

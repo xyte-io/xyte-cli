@@ -672,7 +672,10 @@
     "base": "hub",
     "pathTemplate": "/core/v1/organization/devices",
     "pathParams": [],
-    "queryParams": [],
+    "queryParams": [
+      "space_id",
+      "page"
+    ],
     "authScope": "organization",
     "bodyType": "none",
     "hasBody": false,

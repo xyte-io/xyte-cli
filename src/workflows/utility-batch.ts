@@ -3,7 +3,7 @@ import { writeFileSync, appendFileSync } from 'node:fs';
 import { UTILITY_BATCH_SCHEMA_VERSION } from '../contracts/versions';
 import type { XyteClient, XyteCallResult } from '../types/client';
 
-export type UtilityBatchCommand = 'device.bulk-rename' | 'space.import-tree';
+export type UtilityBatchCommand = 'space.import-tree';
 
 export interface UtilityBatchOperation {
   rowIndex: number;
