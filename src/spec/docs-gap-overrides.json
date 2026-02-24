@@ -1,0 +1,31 @@
+{
+  "device.registration.registerDevice": {
+    "authScope": "none",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/register-device",
+      "Global security object is inherited at schema level and does not provide operation-specific auth intent; keep legacy unauthenticated registration semantics until docs provide explicit per-operation auth scope."
+    ]
+  },
+  "device.registration.bulkRegisterDevice": {
+    "authScope": "none",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/bulk-register-devices",
+      "Global security object is inherited at schema level and does not provide operation-specific auth intent; keep legacy unauthenticated bulk registration semantics until docs provide explicit per-operation auth scope."
+    ]
+  },
+  "organization.commands.sendCommand": {
+    "bodyType": "json",
+    "hasBody": true,
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/send-command",
+      "Docs 422 example explicitly requires a valid command or friendly_name, which implies a request payload even when requestBody schema is absent in SSR data."
+    ]
+  },
+  "organization.spaces.findOrCreateSpace": {
+    "pathTemplate": "/core/v1/organization/spaces/find_or_create",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/find-or-create-space",
+      "Docs SSR API path currently resolves to '/core/v1/organization/spaces-1', which does not map to a callable route; override keeps documented Find-or-Create behavior callable."
+    ]
+  }
+}

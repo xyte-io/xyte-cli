@@ -15,7 +15,13 @@
     "authScope": "device",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Device API/Command/Get Command.bru"
+    "sourceFile": "https://dev.xyte.io/reference/get-command",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/get-command",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/commands-1",
+      "Docs raw path params: deviceId"
+    ]
   },
   {
     "key": "device.command.getCommandsWithChildren",
@@ -33,7 +39,13 @@
     "authScope": "device",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Device API/Command/Get Commands with Children.bru"
+    "sourceFile": "https://dev.xyte.io/reference/get-commands-with-children",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/get-commands-with-children",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/commands-1",
+      "Docs raw path params: deviceId"
+    ]
   },
   {
     "key": "device.command.updateCommand",
@@ -51,8 +63,14 @@
     "authScope": "device",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Device API/Command/Update Command.bru",
-    "bodyExample": "{\n      \"status\": \"done\",\n      \"message\": \"great success!\",\n      \"id\": \"Command ID returned in Get Command API\""
+    "sourceFile": "https://dev.xyte.io/reference/update-command",
+    "bodyExample": "{\n  \"status\": \"done\",\n  \"message\": \"great success!\",\n  \"id\": \"xxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx\"\n}",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/update-command",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/commands-1",
+      "Docs raw path params: deviceId"
+    ]
   },
   {
     "key": "device.configuration.getConfig",
@@ -70,7 +88,13 @@
     "authScope": "device",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Device API/Configuration/Get Config.bru"
+    "sourceFile": "https://dev.xyte.io/reference/get-config",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/get-config",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/configuration-2",
+      "Docs raw path params: deviceId"
+    ]
   },
   {
     "key": "device.configuration.setConfig",
@@ -88,8 +112,13 @@
     "authScope": "device",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Device API/Configuration/Set Config.bru",
-    "bodyExample": "{\n      \"input\": \"htmi\""
+    "sourceFile": "https://dev.xyte.io/reference/set-config",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/set-config",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/configuration-2",
+      "Docs raw path params: deviceId"
+    ]
   },
   {
     "key": "device.device-info.getDeviceInfo",
@@ -107,7 +136,13 @@
     "authScope": "device",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Device API/Device Info/Get Device Info.bru"
+    "sourceFile": "https://dev.xyte.io/reference/get-device-info",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/get-device-info",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/device-info",
+      "Docs raw path params: deviceId"
+    ]
   },
   {
     "key": "device.device-info.getSpaceInfo",
@@ -125,26 +160,13 @@
     "authScope": "device",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Device API/Device Info/Get Space Info.bru"
-  },
-  {
-    "key": "device.device-info.spaceMove",
-    "namespace": "device",
-    "group": "device-info",
-    "action": "spaceMove",
-    "title": "Space Move",
-    "method": "PUT",
-    "base": "hub",
-    "pathTemplate": "/v1/devices/:device_id/space/:space_id",
-    "pathParams": [
-      "device_id",
-      "space_id"
-    ],
-    "queryParams": [],
-    "authScope": "device",
-    "bodyType": "none",
-    "hasBody": false,
-    "sourceFile": "Device API/Device Info/Space Move.bru"
+    "sourceFile": "https://dev.xyte.io/reference/get-space-info",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/get-space-info",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/api-space",
+      "Docs raw path params: deviceId"
+    ]
   },
   {
     "key": "device.device-info.setCloudSettings",
@@ -162,10 +184,36 @@
     "authScope": "device",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Device API/Device Info/Set Cloud Settings.bru",
-    "bodyExample": "{\n    \"incidents.suspend_creation\": true",
+    "sourceFile": "https://dev.xyte.io/reference/set-cloud-settings",
     "notes": [
-      "Cloud settings payload should be normalized as { property, value } by SDK helper."
+      "Docs page: https://dev.xyte.io/reference/set-cloud-settings",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/device-info",
+      "Docs raw path params: deviceId"
+    ]
+  },
+  {
+    "key": "device.device-info.spaceMove",
+    "namespace": "device",
+    "group": "device-info",
+    "action": "spaceMove",
+    "title": "Space Move",
+    "method": "PUT",
+    "base": "hub",
+    "pathTemplate": "/v1/devices/:device_id/space/move",
+    "pathParams": [
+      "device_id"
+    ],
+    "queryParams": [],
+    "authScope": "device",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://dev.xyte.io/reference/space-move-api",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/space-move-api",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/api-space",
+      "Docs raw path params: deviceId"
     ]
   },
   {
@@ -184,8 +232,13 @@
     "authScope": "device",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Device API/Device Info/Update Device.bru",
-    "bodyExample": "{\n      \"name\": \"My device's name\",\n      \"details\": {\n          \"color\": \"red\""
+    "sourceFile": "https://dev.xyte.io/reference/update-device",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/update-device",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/device-info",
+      "Docs raw path params: deviceId"
+    ]
   },
   {
     "key": "device.events.addEvent",
@@ -194,7 +247,7 @@
     "action": "addEvent",
     "title": "Add Event",
     "method": "POST",
-    "base": "hub",
+    "base": "entry",
     "pathTemplate": "/v1/devices/:device_id/events",
     "pathParams": [
       "device_id"
@@ -203,30 +256,38 @@
     "authScope": "device",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Device API/Events/Add Event.bru",
-    "bodyExample": "{\n     \"name\": \"power surge\",\n     \"category\": \"electric\",\n     \"int_key_1\": 120,\n     \"int_key_2\": null,\n     \"string_key_1\": null,\n     \"string_key_2\": null"
+    "sourceFile": "https://dev.xyte.io/reference/add-event",
+    "bodyExample": "{\n  \"issue\": \"cover_open\",\n  \"priority\": 1,\n  \"title\": \"Device cover is open\",\n  \"description\": \"The top guard cover is open and will prevent any device operation until closed.\"\n}",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/add-event",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/events",
+      "Docs raw path params: deviceId"
+    ]
   },
   {
     "key": "device.file-dumps.appendDumpFile",
     "namespace": "device",
     "group": "file-dumps",
     "action": "appendDumpFile",
-    "title": "Append dump file",
+    "title": "Append Dump File",
     "method": "PUT",
     "base": "hub",
-    "pathTemplate": "/v1/devices/:device_id/dumps/:id",
+    "pathTemplate": "/v1/devices/:device_id/dumps/:dump_id",
     "pathParams": [
       "device_id",
-      "id"
+      "dump_id"
     ],
     "queryParams": [],
     "authScope": "device",
-    "bodyType": "multipart-form",
+    "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Device API/File Dumps/Append dump file.bru",
-    "bodyExample": "data: @file(VatimpRrj/test.txt)",
+    "sourceFile": "https://dev.xyte.io/reference/append-dump-file",
     "notes": [
-      "Backend route uses dynamic dump id segment."
+      "Docs page: https://dev.xyte.io/reference/append-dump-file",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/file-dumps",
+      "Docs raw path params: deviceId, dumpId"
     ]
   },
   {
@@ -245,12 +306,14 @@
     ],
     "queryParams": [],
     "authScope": "device",
-    "bodyType": "multipart-form",
+    "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Device API/File Dumps/Send Dump.bru",
-    "bodyExample": "data: @file(9ezL49PXj/test.txt)",
+    "sourceFile": "https://dev.xyte.io/reference/send-dump",
     "notes": [
-      "Backend route accepts dynamic :mime_type/:filename segments."
+      "Docs page: https://dev.xyte.io/reference/send-dump",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/file-dumps",
+      "Docs raw path params: deviceId, mime-type, filename"
     ]
   },
   {
@@ -263,14 +326,20 @@
     "base": "hub",
     "pathTemplate": "/v1/devices/:device_id/incidents/:incident_id",
     "pathParams": [
-      "incident_id",
-      "device_id"
+      "device_id",
+      "incident_id"
     ],
     "queryParams": [],
     "authScope": "device",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Device API/Incidents/Close Incident.bru"
+    "sourceFile": "https://dev.xyte.io/reference/close-incident",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/close-incident",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/incidents",
+      "Docs raw path params: deviceId, incidentId"
+    ]
   },
   {
     "key": "device.incidents.closeIncidents",
@@ -288,7 +357,13 @@
     "authScope": "device",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Device API/Incidents/Close Incidents.bru"
+    "sourceFile": "https://dev.xyte.io/reference/close-incidents",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/close-incidents",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/incidents",
+      "Docs raw path params: deviceId"
+    ]
   },
   {
     "key": "device.incidents.getIncidents",
@@ -306,7 +381,13 @@
     "authScope": "device",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Device API/Incidents/Get Incidents.bru"
+    "sourceFile": "https://dev.xyte.io/reference/get-incident",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/get-incident",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/incidents",
+      "Docs raw path params: deviceId"
+    ]
   },
   {
     "key": "device.incidents.openIncident",
@@ -324,8 +405,14 @@
     "authScope": "device",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Device API/Incidents/Open Incident.bru",
-    "bodyExample": "{\n      \"title\" : \"Open a new incident for testing\",\n      \"issue\" : \"incident-Z01\",\n      \"priority\": 2,\n      \"description\": \"Long text\""
+    "sourceFile": "https://dev.xyte.io/reference/create-incident",
+    "bodyExample": "{\n  \"issue\": \"cover_open\",\n  \"priority\": 1,\n  \"title\": \"Device cover is open\",\n  \"description\": \"The top guard cover is open and will prevent any device operation until closed.\"\n}",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/create-incident",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/incidents",
+      "Docs raw path params: deviceId"
+    ]
   },
   {
     "key": "device.license.getLicense",
@@ -343,7 +430,13 @@
     "authScope": "device",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Device API/License/Get License.bru"
+    "sourceFile": "https://dev.xyte.io/reference/get-license",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/get-license",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/licenses-2",
+      "Docs raw path params: deviceId"
+    ]
   },
   {
     "key": "device.license.updateLicense",
@@ -361,15 +454,20 @@
     "authScope": "device",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Device API/License/Update License.bru",
-    "bodyExample": "{\n      \"state\": \"inuse\",\n      \"id\": \"License ID from Get License\""
+    "sourceFile": "https://dev.xyte.io/reference/update-license",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/update-license",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/licenses-2",
+      "Docs raw path params: deviceId"
+    ]
   },
   {
     "key": "device.registration.bulkRegisterDevice",
     "namespace": "device",
     "group": "registration",
     "action": "bulkRegisterDevice",
-    "title": "Bulk Register Device",
+    "title": "Bulk Register Devices",
     "method": "POST",
     "base": "entry",
     "pathTemplate": "/v1/devices/bulk_create",
@@ -378,7 +476,15 @@
     "authScope": "none",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Device API/Registration/Bulk Register Device.bru"
+    "sourceFile": "https://dev.xyte.io/reference/bulk-register-devices",
+    "bodyExample": "{\n  \"hardware_key\": \"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxxx\",\n  \"cloud_id\": \"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxxx\",\n  \"mac\": \"11:22:33:44:55:66\",\n  \"sn\": \"112\",\n  \"firmware_version\": \"1.0.1\",\n  \"name\": \"test device\"\n}",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/bulk-register-devices",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/registration-1",
+      "Docs page: https://dev.xyte.io/reference/bulk-register-devices",
+      "Global security object is inherited at schema level and does not provide operation-specific auth intent; keep legacy unauthenticated bulk registration semantics until docs provide explicit per-operation auth scope."
+    ]
   },
   {
     "key": "device.registration.deleteDevice",
@@ -396,7 +502,13 @@
     "authScope": "device",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Device API/Registration/Delete Device.bru"
+    "sourceFile": "https://dev.xyte.io/reference/delete-device",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/delete-device",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/registration-1",
+      "Docs raw path params: deviceId"
+    ]
   },
   {
     "key": "device.registration.getChildDevices",
@@ -406,15 +518,21 @@
     "title": "Get Child Devices",
     "method": "GET",
     "base": "hub",
-    "pathTemplate": "/v1/devices/:device_id/children",
+    "pathTemplate": "/v1/devices/:parent_id/children",
     "pathParams": [
-      "device_id"
+      "parent_id"
     ],
     "queryParams": [],
     "authScope": "device",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Device API/Registration/Get Child Devices.bru"
+    "sourceFile": "https://dev.xyte.io/reference/get-child-devices",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/get-child-devices",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/registration-1",
+      "Docs raw path params: parent_id"
+    ]
   },
   {
     "key": "device.registration.registerChildDevice",
@@ -424,16 +542,21 @@
     "title": "Register Child Device",
     "method": "POST",
     "base": "entry",
-    "pathTemplate": "/v1/devices/:device_id/children",
+    "pathTemplate": "/v1/devices/:parent_id/children",
     "pathParams": [
-      "device_id"
+      "parent_id"
     ],
     "queryParams": [],
     "authScope": "device",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Device API/Registration/Register Child Device.bru",
-    "bodyExample": "{\n      \"sn\": \"112\",\n      \"model_id\": \"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxxx\",\n      \"firmware_version\": \"1.0.1\",\n      \"name\": \"Friendly name\",\n      \"details\": {\n          \"key\": 100"
+    "sourceFile": "https://dev.xyte.io/reference/register-child-device",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/register-child-device",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/registration-1",
+      "Docs raw path params: parent_id"
+    ]
   },
   {
     "key": "device.registration.registerDevice",
@@ -449,8 +572,15 @@
     "authScope": "none",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Device API/Registration/Register Device.bru",
-    "bodyExample": "{\n    \"mac\": \"00:11:22:33:44:55\",\n    \"cloud_id\": \"xxyyzz\",\n    \"sn\": \"112233\",\n    \"hardware_key\": \"\",\n    \"firmware_version\": \"0.0.1\",\n    \"name\": \"Friendly device name\",\n    \"details\": {\n      \"network\": {\n        \"ip\": \"1.2.3.4\""
+    "sourceFile": "https://dev.xyte.io/reference/register-device",
+    "bodyExample": "{\n  \"hardware_key\": \"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxxx\",\n  \"cloud_id\": \"xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxxx\",\n  \"mac\": \"11:22:33:44:55:66\",\n  \"sn\": \"112\",\n  \"firmware_version\": \"1.0.1\",\n  \"name\": \"test device\",\n  \"host_address\": \"192.168.0.1\"\n}",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/register-device",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/registration-1",
+      "Docs page: https://dev.xyte.io/reference/register-device",
+      "Global security object is inherited at schema level and does not provide operation-specific auth intent; keep legacy unauthenticated registration semantics until docs provide explicit per-operation auth scope."
+    ]
   },
   {
     "key": "device.remote-files.getFile",
@@ -460,16 +590,22 @@
     "title": "Get File",
     "method": "GET",
     "base": "hub",
-    "pathTemplate": "/v1/devices/:device_id/files/:file_id",
+    "pathTemplate": "/v1/devices/:device_id/files/:file_uuid",
     "pathParams": [
-      "file_id",
-      "device_id"
+      "device_id",
+      "file_uuid"
     ],
     "queryParams": [],
     "authScope": "device",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Device API/Remote Files/Get File.bru"
+    "sourceFile": "https://dev.xyte.io/reference/get-file",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/get-file",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/remote-files",
+      "Docs raw path params: deviceId, fileUuid"
+    ]
   },
   {
     "key": "device.remote-files.getFiles",
@@ -487,14 +623,20 @@
     "authScope": "device",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Device API/Remote Files/Get Files.bru"
+    "sourceFile": "https://dev.xyte.io/reference/get-files",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/get-files",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/remote-files",
+      "Docs raw path params: deviceId"
+    ]
   },
   {
     "key": "device.telemetries.sendChildTelemetry",
     "namespace": "device",
     "group": "telemetries",
     "action": "sendChildTelemetry",
-    "title": "Send Child Telemetry",
+    "title": "Send Child Telemetries",
     "method": "POST",
     "base": "hub",
     "pathTemplate": "/v1/devices/:device_id/children/telemetries",
@@ -505,8 +647,14 @@
     "authScope": "device",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Device API/Telemetries/Send Child Telemetry.bru",
-    "bodyExample": "{\n    \"b04c3c...9994b0\": {\n      \"status\": \"online\",\n      \"timestamp\": \"2024-01-01T01:00:00\",\n      \"override\": false,\n      \"telemetries\": {\n        \"fan_speed\": 5.5,\n        \"eco_mode\": true,\n        \"temp\": 100,\n        \"input\": \"hdmi\",\n        \"power\": true"
+    "sourceFile": "https://dev.xyte.io/reference/send-child-telemetries",
+    "bodyExample": "{\n  \"11303e81-5d56-4910-a472-68676375d995\": {\n    \"status\": \"online\",\n    \"telemetries\": {\n      \"speed\": 10,\n      \"fuel\": 99\n    }\n  },\n  \"b4adc748-4462-4933-8173-9d40e0a17d22\": {\n    \"status\": \"offline\"\n  }\n}",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/send-child-telemetries",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/telemetries",
+      "Docs raw path params: deviceId"
+    ]
   },
   {
     "key": "device.telemetries.sendMassTelemetry",
@@ -516,16 +664,18 @@
     "title": "Send Mass Telemetry",
     "method": "POST",
     "base": "hub",
-    "pathTemplate": "/v1/devices/:device_id/children/telemetries",
-    "pathParams": [
-      "device_id"
-    ],
+    "pathTemplate": "/v1/devices/telemetries",
+    "pathParams": [],
     "queryParams": [],
     "authScope": "device",
-    "bodyType": "json",
-    "hasBody": true,
-    "sourceFile": "Device API/Telemetries/Send Mass Telemetry.bru",
-    "bodyExample": "{\n    \"b04c3c...9994b0\": {\n      \"status\": \"online\",\n      \"timestamp\": \"2024-01-01T01:00:00\",\n      \"override\": false,\n      \"telemetries\": {\n        \"fan_speed\": 5.5,\n        \"eco_mode\": true,\n        \"temp\": 100,\n        \"input\": \"hdmi\",\n        \"power\": true"
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://dev.xyte.io/reference/send-mass-telemetry",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/send-mass-telemetry",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/telemetries"
+    ]
   },
   {
     "key": "device.telemetries.sendTelemetry",
@@ -543,8 +693,14 @@
     "authScope": "device",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Device API/Telemetries/Send Telemetry.bru",
-    "bodyExample": "{\n      \"status\": \"online\",\n      \"timestamp\": \"2024-01-01T01:00:00\",\n      \"override\": false,\n      \"telemetries\": {\n          \"fan_speed\": 5.5,\n          \"eco_mode\" : true,\n          \"temp\": 50,\n          \"input\": \"hdmi\",\n          \"power\" : true"
+    "sourceFile": "https://dev.xyte.io/reference/send-telemetry",
+    "bodyExample": "{\n  \"status\": \"online\",\n  \"timestamp\": \"2022-08-04T11:40:22.836Z\",\n  \"telemetries\": {\n    \"fan_speed\": 100.1,\n    \"connection\": \"4g\",\n    \"usbc\": true\n  }\n}",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/send-telemetry",
+      "Docs category: /branches/1/categories/reference/Device API",
+      "Docs parent: /branches/1/reference/telemetries",
+      "Docs raw path params: deviceId"
+    ]
   },
   {
     "key": "organization.commands.cancelCommand",
@@ -556,17 +712,19 @@
     "base": "hub",
     "pathTemplate": "/core/v1/organization/devices/:device_id/commands/:command_id",
     "pathParams": [
-      "command_id",
-      "device_id"
+      "device_id",
+      "command_id"
     ],
     "queryParams": [],
     "authScope": "organization",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Organization API/Commands/Cancel Command.bru",
-    "bodyExample": "{\n    \"name\": \"reboot\",\n    \"friendly_name\": \"Reboot\",\n    \"file_id\": \"optional\",\n    \"extra_params\": {}",
+    "sourceFile": "https://docs.xyte.io/reference/cancel-command",
     "notes": [
-      "Cancel command endpoint should not require a request body in SDK signatures."
+      "Docs page: https://docs.xyte.io/reference/cancel-command",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/commands",
+      "Docs raw path params: device_id, command_id"
     ]
   },
   {
@@ -581,13 +739,20 @@
     "pathParams": [
       "device_id"
     ],
-    "queryParams": [],
+    "queryParams": [
+      "status",
+      "page",
+      "per_page"
+    ],
     "authScope": "organization",
-    "bodyType": "none",
-    "hasBody": false,
-    "sourceFile": "Organization API/Commands/Get Commands.bru",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/get-commands",
     "notes": [
-      "Bruno doc path is stale; backend route is /core/v1/organization/devices/:device_id/commands."
+      "Docs page: https://docs.xyte.io/reference/get-commands",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/commands",
+      "Docs raw path params: device_id"
     ]
   },
   {
@@ -606,8 +771,15 @@
     "authScope": "organization",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Organization API/Commands/Send Command.bru",
-    "bodyExample": "{\n    \"name\": \"reboot\",\n    \"friendly_name\": \"Reboot\",\n    \"file_id\": \"optional\",\n    \"extra_params\": {}"
+    "sourceFile": "https://docs.xyte.io/reference/send-command",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/send-command",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/commands",
+      "Docs raw path params: device_id",
+      "Docs page: https://docs.xyte.io/reference/send-command",
+      "Docs 422 example explicitly requires a valid command or friendly_name, which implies a request payload even when requestBody schema is absent in SSR data."
+    ]
   },
   {
     "key": "organization.devices.claimDevice",
@@ -623,8 +795,12 @@
     "authScope": "organization",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Organization API/Devices/Claim Device.bru",
-    "bodyExample": "{\n      \"name\": \"Friendly device name\",\n      \"space_id\": 13244,\n      \"mac\": null,\n      \"sn\": null,\n      \"cloud_id\": \"\""
+    "sourceFile": "https://docs.xyte.io/reference/claim-device",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/claim-device",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/devices-2"
+    ]
   },
   {
     "key": "organization.devices.deleteDevice",
@@ -642,7 +818,13 @@
     "authScope": "organization",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Organization API/Devices/Delete Device.bru"
+    "sourceFile": "https://docs.xyte.io/reference/delete-device",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/delete-device",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/devices-2",
+      "Docs raw path params: device_id"
+    ]
   },
   {
     "key": "organization.devices.getDevice",
@@ -660,7 +842,13 @@
     "authScope": "organization",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Organization API/Devices/Get Device.bru"
+    "sourceFile": "https://docs.xyte.io/reference/get-device",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-device",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/devices-2",
+      "Docs raw path params: device_id"
+    ]
   },
   {
     "key": "organization.devices.getDevices",
@@ -673,13 +861,17 @@
     "pathTemplate": "/core/v1/organization/devices",
     "pathParams": [],
     "queryParams": [
-      "space_id",
-      "page"
+      "space_id"
     ],
     "authScope": "organization",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Organization API/Devices/Get Devices.bru"
+    "sourceFile": "https://docs.xyte.io/reference/get-devices",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-devices",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/devices-2"
+    ]
   },
   {
     "key": "organization.devices.getHistories",
@@ -702,7 +894,12 @@
     "authScope": "organization",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Organization API/Devices/Get Histories.bru"
+    "sourceFile": "https://docs.xyte.io/reference/get-histories",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-histories",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/devices-2"
+    ]
   },
   {
     "key": "organization.devices.updateDevice",
@@ -712,7 +909,7 @@
     "title": "Update Device",
     "method": "PATCH",
     "base": "hub",
-    "pathTemplate": "/core/v1/organization/devices/:device_id",
+    "pathTemplate": "/core/v1/organization/:device_id",
     "pathParams": [
       "device_id"
     ],
@@ -720,8 +917,13 @@
     "authScope": "organization",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Organization API/Devices/Update Device.bru",
-    "bodyExample": "{\n      \"configuration\": {\n          \"a\": 1"
+    "sourceFile": "https://docs.xyte.io/reference/update-device",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/update-device",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/devices-2",
+      "Docs raw path params: device_id"
+    ]
   },
   {
     "key": "organization.getOrganizationInfo",
@@ -737,10 +939,11 @@
     "authScope": "organization",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Organization API/Get Organization Info.bru",
-    "bodyExample": "{\n     \"device_id\": \"xxxxx\"",
+    "sourceFile": "https://docs.xyte.io/reference/get-organizations-info",
     "notes": [
-      "Organization info endpoint is GET without request body."
+      "Docs page: https://docs.xyte.io/reference/get-organizations-info",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/organisation-api"
     ]
   },
   {
@@ -759,7 +962,13 @@
     "authScope": "organization",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Organization API/Incidents/Close Incident.bru"
+    "sourceFile": "https://docs.xyte.io/reference/close-incident",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/close-incident",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/incidents-1",
+      "Docs raw path params: incident_id"
+    ]
   },
   {
     "key": "organization.incidents.getIncidents",
@@ -771,11 +980,28 @@
     "base": "hub",
     "pathTemplate": "/core/v1/organization/incidents",
     "pathParams": [],
-    "queryParams": [],
+    "queryParams": [
+      "from",
+      "to",
+      "status",
+      "priority",
+      "title",
+      "description",
+      "issue",
+      "device_model",
+      "partner_name",
+      "sub_model",
+      "space_id"
+    ],
     "authScope": "organization",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Organization API/Incidents/Get Incidents.bru"
+    "sourceFile": "https://docs.xyte.io/reference/get-incidents",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-incidents",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/incidents-1"
+    ]
   },
   {
     "key": "organization.spaces.createSpace",
@@ -791,8 +1017,13 @@
     "authScope": "organization",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Organization API/Spaces/Create Space.bru",
-    "bodyExample": "{\n    \"name\": \"Space name\",\n    \"parent_id\": 100,\n    \"config\": {}"
+    "sourceFile": "https://docs.xyte.io/reference/create-space",
+    "bodyExample": "{\n  \"name\": \"Another\",\n  \"parent_id\": 95,\n  \"config\": {\n    \"priority_factor\": \"1\",\n    \"inherit_location\": false,\n    \"temperature_units\": \"fahrenheit\",\n    \"inherit_priority_factor\": false,\n    \"inherit_temperature_units\": true,\n    \"img\": \"https://placecats.com/neo_banana/300/200\"\n  }\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/create-space",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/spaces-1"
+    ]
   },
   {
     "key": "organization.spaces.deleteSpace",
@@ -810,7 +1041,13 @@
     "authScope": "organization",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Organization API/Spaces/Delete Space.bru"
+    "sourceFile": "https://docs.xyte.io/reference/delete-space",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/delete-space",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/spaces-1",
+      "Docs raw path params: space_id"
+    ]
   },
   {
     "key": "organization.spaces.findOrCreateSpace",
@@ -826,26 +1063,44 @@
     "authScope": "organization",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Organization API/Spaces/Find or Create Space.bru",
-    "bodyExample": "{\n    \"name\": \"Building/Floor/Room\",\n    \"parent_id\": 100,\n    \"config\": {}"
+    "sourceFile": "https://docs.xyte.io/reference/find-or-create-space",
+    "bodyExample": "{\n  \"name\": \"Another\",\n  \"parent_id\": 95,\n  \"config\": {\n    \"priority_factor\": \"1\",\n    \"inherit_location\": false,\n    \"temperature_units\": \"fahrenheit\",\n    \"inherit_priority_factor\": false,\n    \"inherit_temperature_units\": true,\n    \"img\": \"https://placecats.com/neo_banana/300/200\"\n  }\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/find-or-create-space",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/spaces-1",
+      "Docs page: https://docs.xyte.io/reference/find-or-create-space",
+      "Docs SSR API path currently resolves to '/core/v1/organization/spaces-1', which does not map to a callable route; override keeps documented Find-or-Create behavior callable."
+    ]
   },
   {
     "key": "organization.spaces.getSpace",
     "namespace": "organization",
     "group": "spaces",
     "action": "getSpace",
-    "title": "Get Space",
+    "title": "Get Spaces",
     "method": "GET",
     "base": "hub",
-    "pathTemplate": "/core/v1/organization/spaces/:space_id",
-    "pathParams": [
-      "space_id"
+    "pathTemplate": "/core/v1/organization/spaces",
+    "pathParams": [],
+    "queryParams": [
+      "id",
+      "name",
+      "parent_id",
+      "space_type",
+      "created_before",
+      "created_after",
+      "path_includes"
     ],
-    "queryParams": [],
     "authScope": "organization",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Organization API/Spaces/Get Space.bru"
+    "sourceFile": "https://docs.xyte.io/reference/get-spaces",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-spaces",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/spaces-1"
+    ]
   },
   {
     "key": "organization.spaces.getSpaces",
@@ -858,20 +1113,23 @@
     "pathTemplate": "/core/v1/organization/spaces",
     "pathParams": [],
     "queryParams": [
-      "page",
-      "per_page",
       "id",
-      "parent_id",
       "name",
-      "path_includes",
+      "parent_id",
       "space_type",
       "created_before",
-      "created_after"
+      "created_after",
+      "path_includes"
     ],
     "authScope": "organization",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Organization API/Spaces/Get Spaces.bru"
+    "sourceFile": "https://docs.xyte.io/reference/get-spaces",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-spaces",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/spaces-1"
+    ]
   },
   {
     "key": "organization.spaces.updateSpace",
@@ -889,8 +1147,14 @@
     "authScope": "organization",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Organization API/Spaces/Update Space.bru",
-    "bodyExample": "{"
+    "sourceFile": "https://docs.xyte.io/reference/update-space",
+    "bodyExample": "{\n  \"name\": \"Another\",\n  \"parent_id\": 95,\n  \"config\": {\n    \"priority_factor\": \"1\",\n    \"inherit_location\": true,\n    \"temperature_units\": \"fahrenheit\",\n    \"inherit_priority_factor\": true,\n    \"inherit_temperature_units\": true,\n    \"img\": \"https://placecats.com/neo_banana/300/200\"\n  }\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/update-space",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/spaces-1",
+      "Docs raw path params: space_id"
+    ]
   },
   {
     "key": "organization.tickets.getTicket",
@@ -906,16 +1170,23 @@
     ],
     "queryParams": [],
     "authScope": "organization",
-    "bodyType": "none",
-    "hasBody": false,
-    "sourceFile": "Organization API/Tickets/Get Ticket.bru"
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/get-ticket",
+    "bodyExample": "{\n  \"id\": \"022a67f7-00e2-41b....\",\n  \"title\": \"Temperature won't go down\",\n  \"description\": \"Overheating, Help!\",\n  \"status\": \"resolved\",\n  \"created_at\": \"2024-07-21T11:15:02Z\",\n  \"device_id\": \"47560fbb-d998-4e2f-.....\",\n  \"user_name\": \"S. James\",\n  \"user_email\": \"james@abcde.io\",\n  \"comments\": [\n    {\n      \"id\": \"11111\",\n      \"text\": \"Hi - my device is overheating and it won't cool off. Help!\",\n      \"created_at\": \"2024-07-21T11:15:26.830Z\",\n      \"system\": false,\n      \"user\": \"S. James\",\n      \"owner\": \"Green Energy Corp\",\n      \"owner_type\": \"organization\"\n    }\n  ]\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-ticket",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/tickets-2",
+      "Docs raw path params: ticket_id"
+    ]
   },
   {
     "key": "organization.tickets.getTickets",
     "namespace": "organization",
     "group": "tickets",
     "action": "getTickets",
-    "title": "Get Tickets",
+    "title": "Get Open Tickets",
     "method": "GET",
     "base": "hub",
     "pathTemplate": "/core/v1/organization/tickets",
@@ -924,7 +1195,12 @@
     "authScope": "organization",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Organization API/Tickets/Get Tickets.bru"
+    "sourceFile": "https://docs.xyte.io/reference/get-open-tickets",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-open-tickets",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/tickets-2"
+    ]
   },
   {
     "key": "organization.tickets.markResolved",
@@ -942,7 +1218,13 @@
     "authScope": "organization",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Organization API/Tickets/Mark Resolved.bru"
+    "sourceFile": "https://docs.xyte.io/reference/mark-resolved",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/mark-resolved",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/tickets-2",
+      "Docs raw path params: ticket_id"
+    ]
   },
   {
     "key": "organization.tickets.sendMessage",
@@ -956,12 +1238,19 @@
     "pathParams": [
       "ticket_id"
     ],
-    "queryParams": [],
+    "queryParams": [
+      "message"
+    ],
     "authScope": "organization",
-    "bodyType": "json",
-    "hasBody": true,
-    "sourceFile": "Organization API/Tickets/Send Message.bru",
-    "bodyExample": "{\n      \"message\": \"Hello!\""
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/send-message",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/send-message",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/tickets-2",
+      "Docs raw path params: ticket_id"
+    ]
   },
   {
     "key": "organization.tickets.updateTicket",
@@ -979,8 +1268,13 @@
     "authScope": "organization",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Organization API/Tickets/Update Ticket.bru",
-    "bodyExample": "{\n      \"title\": \"New title\",\n      \"description\": \"New description\""
+    "sourceFile": "https://docs.xyte.io/reference/update-ticket",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/update-ticket",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/tickets-2",
+      "Docs raw path params: ticket_id"
+    ]
   },
   {
     "key": "partner.devices.deleteDevice",
@@ -998,7 +1292,13 @@
     "authScope": "partner",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Partner API/Devices/Delete Device.bru"
+    "sourceFile": "https://dev.xyte.io/reference/partner-delete-device",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/partner-delete-device",
+      "Docs category: /branches/1/categories/reference/Partner Core API",
+      "Docs parent: /branches/1/reference/device",
+      "Docs raw path params: device_id"
+    ]
   },
   {
     "key": "partner.devices.getCommands",
@@ -1012,11 +1312,19 @@
     "pathParams": [
       "device_id"
     ],
-    "queryParams": [],
+    "queryParams": [
+      "status"
+    ],
     "authScope": "partner",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Partner API/Devices/Get Commands.bru"
+    "sourceFile": "https://dev.xyte.io/reference/partner-get-device-commands",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/partner-get-device-commands",
+      "Docs category: /branches/1/categories/reference/Partner Core API",
+      "Docs parent: /branches/1/reference/device",
+      "Docs raw path params: device_id"
+    ]
   },
   {
     "key": "partner.devices.getConfiguration",
@@ -1034,7 +1342,13 @@
     "authScope": "partner",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Partner API/Devices/Get Configuration.bru"
+    "sourceFile": "https://dev.xyte.io/reference/partner-get-device-configuration",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/partner-get-device-configuration",
+      "Docs category: /branches/1/categories/reference/Partner Core API",
+      "Docs parent: /branches/1/reference/device",
+      "Docs raw path params: device_id"
+    ]
   },
   {
     "key": "partner.devices.getDeviceInfo",
@@ -1052,7 +1366,13 @@
     "authScope": "partner",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Partner API/Devices/Get Device Info.bru"
+    "sourceFile": "https://dev.xyte.io/reference/partner-get-device-info",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/partner-get-device-info",
+      "Docs category: /branches/1/categories/reference/Partner Core API",
+      "Docs parent: /branches/1/reference/device",
+      "Docs raw path params: device_id"
+    ]
   },
   {
     "key": "partner.devices.getDevices",
@@ -1064,11 +1384,21 @@
     "base": "hub",
     "pathTemplate": "/core/v1/partner/devices",
     "pathParams": [],
-    "queryParams": [],
+    "queryParams": [
+      "model_id",
+      "sn",
+      "mac",
+      "page"
+    ],
     "authScope": "partner",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Partner API/Devices/Get Devices.bru"
+    "sourceFile": "https://dev.xyte.io/reference/partner-list-devices",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/partner-list-devices",
+      "Docs category: /branches/1/categories/reference/Partner Core API",
+      "Docs parent: /branches/1/reference/device"
+    ]
   },
   {
     "key": "partner.devices.getStateHistory",
@@ -1082,11 +1412,22 @@
     "pathParams": [
       "device_id"
     ],
-    "queryParams": [],
+    "queryParams": [
+      "status",
+      "from",
+      "to",
+      "page"
+    ],
     "authScope": "partner",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Partner API/Devices/Get State History.bru"
+    "sourceFile": "https://dev.xyte.io/reference/partner-get-device-state-history",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/partner-get-device-state-history",
+      "Docs category: /branches/1/categories/reference/Partner Core API",
+      "Docs parent: /branches/1/reference/device",
+      "Docs raw path params: device_id"
+    ]
   },
   {
     "key": "partner.devices.getStateHistoryMultiDevices",
@@ -1098,11 +1439,21 @@
     "base": "hub",
     "pathTemplate": "/core/v1/partner/devices/histories",
     "pathParams": [],
-    "queryParams": [],
+    "queryParams": [
+      "status",
+      "from",
+      "to",
+      "page"
+    ],
     "authScope": "partner",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Partner API/Devices/Get State History (multi-devices).bru"
+    "sourceFile": "https://dev.xyte.io/reference/partner-get-all-device-state-histories",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/partner-get-all-device-state-histories",
+      "Docs category: /branches/1/categories/reference/Partner Core API",
+      "Docs parent: /branches/1/reference/device"
+    ]
   },
   {
     "key": "partner.devices.getTelemetries",
@@ -1120,7 +1471,13 @@
     "authScope": "partner",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Partner API/Devices/Get Telemetries.bru"
+    "sourceFile": "https://dev.xyte.io/reference/partner-get-device-telemetries",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/partner-get-device-telemetries",
+      "Docs category: /branches/1/categories/reference/Partner Core API",
+      "Docs parent: /branches/1/reference/device",
+      "Docs raw path params: device_id"
+    ]
   },
   {
     "key": "partner.tickets.addComment",
@@ -1138,8 +1495,13 @@
     "authScope": "partner",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Partner API/Tickets/Add Comment.bru",
-    "bodyExample": "{\n      \"message\": \"New chat message\""
+    "sourceFile": "https://dev.xyte.io/reference/partner-tickets-add-comment",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/partner-tickets-add-comment",
+      "Docs category: /branches/1/categories/reference/Partner Core API",
+      "Docs parent: /branches/1/reference/ticket",
+      "Docs raw path params: ticket_id"
+    ]
   },
   {
     "key": "partner.tickets.closeTicket",
@@ -1157,7 +1519,13 @@
     "authScope": "partner",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Partner API/Tickets/Close Ticket.bru"
+    "sourceFile": "https://dev.xyte.io/reference/partner-tickets-close",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/partner-tickets-close",
+      "Docs category: /branches/1/categories/reference/Partner Core API",
+      "Docs parent: /branches/1/reference/ticket",
+      "Docs raw path params: ticket_id"
+    ]
   },
   {
     "key": "partner.tickets.getTicket",
@@ -1167,7 +1535,7 @@
     "title": "Get Ticket",
     "method": "GET",
     "base": "hub",
-    "pathTemplate": "/core/v1/partner/tickets/:ticket_id",
+    "pathTemplate": "/core/v1/partner/tickets/:ticket_id (COPY)",
     "pathParams": [
       "ticket_id"
     ],
@@ -1175,7 +1543,13 @@
     "authScope": "partner",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Partner API/Tickets/Get Ticket.bru"
+    "sourceFile": "https://dev.xyte.io/reference/partner-tickets-get",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/partner-tickets-get",
+      "Docs category: /branches/1/categories/reference/Partner Core API",
+      "Docs parent: /branches/1/reference/ticket",
+      "Docs raw path params: ticket_id"
+    ]
   },
   {
     "key": "partner.tickets.getTickets",
@@ -1191,7 +1565,12 @@
     "authScope": "partner",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "Partner API/Tickets/Get Tickets.bru"
+    "sourceFile": "https://dev.xyte.io/reference/partner-tickets-list",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/partner-tickets-list",
+      "Docs category: /branches/1/categories/reference/Partner Core API",
+      "Docs parent: /branches/1/reference/ticket"
+    ]
   },
   {
     "key": "partner.tickets.updateTicket",
@@ -1209,7 +1588,12 @@
     "authScope": "partner",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "Partner API/Tickets/Update Ticket.bru",
-    "bodyExample": "{\n      \"title\": \"New Title\",\n      \"description\": \"New Description\""
+    "sourceFile": "https://dev.xyte.io/reference/partner-tickets-update",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/partner-tickets-update",
+      "Docs category: /branches/1/categories/reference/Partner Core API",
+      "Docs parent: /branches/1/reference/ticket",
+      "Docs raw path params: ticket_id"
+    ]
   }
 ]
