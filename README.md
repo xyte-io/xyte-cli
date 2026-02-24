@@ -17,6 +17,10 @@ Xyte CLI with SKILLS, built for coding agents and operators.
 - Guarded endpoint writes (`--allow-write`) and deletes (`--confirm <endpoint-key>`)
 - Full TUI screens:
   - `setup`, `config`, `dashboard`, `spaces`, `devices`, `incidents`, `tickets`
+- TUI ops action palette (`a`) on `spaces|devices|incidents|tickets`:
+  - claim device, close incident, resolve/send ticket message, send command, create child space, rename space
+- TUI structured endpoint filters (`f`) and list controls (`[` `]` `p`) where supported
+- TUI write policy: organization-only actions in interactive mode
 - Provider-first Config screen with hotkeys:
   - `a`, `e`, `u`, `t`, `x`, `n`, `c`, `r`
 - Headless JSON frames with stable contracts
@@ -134,8 +138,11 @@ xyte-cli list-endpoints
 xyte-cli describe-endpoint organization.devices.getDevices
 xyte-cli call organization.devices.getDevices --tenant <tenant-id>
 xyte-cli call organization.devices.getDevices --tenant <tenant-id> --output-mode envelope
-xyte-cli call organization.incidents.getIncidents --tenant <tenant-id> --query-json '{"status":"active","from":0,"to":1771934060,"page":1,"per_page":100}'
+NOW=$(date +%s)
+xyte-cli call organization.incidents.getIncidents --tenant <tenant-id> --query-json "{\"status\":\"active\",\"from\":0,\"to\":$NOW,\"page\":1,\"per_page\":100}"
 ```
+
+For reliable incident reads across environments, pass both `from` and `to` as integer Unix timestamps. In some deployments, omitting them (or sending `null`) can return empty results even when active incidents exist.
 
 ### Guarded Writes
 
@@ -234,6 +241,15 @@ xyte-cli tui
 xyte-cli tui --headless --screen dashboard --format json --once --tenant <tenant-id>
 xyte-cli tui --headless --screen spaces --format json --follow --interval-ms 2000 --tenant <tenant-id>
 ```
+
+Interactive TUI operations:
+- `a` opens action palette on `spaces`, `devices`, `incidents`, `tickets`
+- `f` opens structured filter editor on ops screens
+- `[` and `]` paginate where endpoint/screen supports paging
+- `p` sets per-page size where paging is supported
+
+Headless guardrail:
+- `--headless` is read-only snapshot mode; write actions are interactive-only.
 
 ### MCP
 

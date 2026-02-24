@@ -1001,7 +1001,7 @@
             </article>
             <article class="feature-card">
               <h3>Full TUI</h3>
-              <p>Operational screens for setup, config, dashboard, spaces, devices, incidents, and tickets.</p>
+              <p>Operational screens plus action palette (`a`), structured filters (`f`), and paging controls (`[` `]` `p`) for ops workflows.</p>
               <code>xyte-cli tui</code>
             </article>
             <article class="feature-card">
@@ -1144,6 +1144,11 @@
                   <td>Deterministic endpoint and envelope surface.</td>
                 </tr>
                 <tr>
+                  <td>Incident fetch (reliable)</td>
+                  <td><code>NOW=$(date +%s); xyte-cli call organization.incidents.getIncidents --tenant acme --query-json "{\"status\":\"active\",\"from\":0,\"to\":$NOW,\"page\":1,\"per_page\":100}"</code></td>
+                  <td>Use explicit integer time bounds for active incident queries.</td>
+                </tr>
+                <tr>
                   <td>Insights</td>
                   <td><code>xyte-cli inspect deep-dive --tenant acme --window 24 --format json</code></td>
                   <td>Feeds report generation pipeline.</td>
@@ -1166,7 +1171,7 @@
                 <tr>
                   <td>TUI / headless</td>
                   <td><code>xyte-cli tui --headless --screen spaces --format json --follow --interval-ms 2000 --tenant acme</code></td>
-                  <td>Interactive screen parity with machine output mode.</td>
+                  <td>Interactive TUI has org-only write actions; headless remains read-only snapshots.</td>
                 </tr>
                 <tr>
                   <td>MCP server</td>
@@ -1203,7 +1208,7 @@
   <span class="term-flg">--path-json</span> <span class="term-val">'{"device_id":"DEVICE_ID","command_id":"COMMAND_ID"}'</span></pre>
             </article>
           </div>
-          <p class="muted">Utility prepare commands are read-only scaffolds. Import-tree execution remains dry-run by default and requires <code>--apply</code> for writes.</p>
+          <p class="muted">Utility prepare commands are read-only scaffolds. TUI headless mode is read-only. Import-tree execution remains dry-run by default and requires <code>--apply</code> for writes.</p>
         </div>
       </section>
 

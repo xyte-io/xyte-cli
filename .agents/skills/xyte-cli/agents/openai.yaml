@@ -1,0 +1,4 @@
+interface:
+  display_name: "Xyte Ops Agent"
+  short_description: "Deterministic Xyte CLI ops: first-run setup, guarded calls, inspect/report, headless JSON, MCP."
+  default_prompt: "Use $xyte-cli as the operational router for @xyteai/cli. Invoke commands directly with `xyte-cli` (do not use source/dev entrypoints like npx/tsx/src/dist/bin paths). For fresh installs use `xyte-cli install --skills`, then `xyte-cli setup run --non-interactive --tenant <tenant-id> --key <value>`; automation must pass `--tenant`, prefer JSON outputs, enforce `--allow-write` for non-read calls and `--confirm <endpoint-key>` for destructive calls, use `xyte-cli tui --headless --format json` for machine frames, and generate reports with `xyte-cli report generate` (PDF default, redacted unless include-sensitive is explicitly requested)."

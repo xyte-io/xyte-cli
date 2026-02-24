@@ -68,6 +68,8 @@ function withNavigationMeta(screen: TuiScreenId, meta: Record<string, unknown> =
     tabOrder: TAB_ORDER,
     tabNavBoundary: null,
     renderSafety: 'ok' as const,
+    headlessWrite: false,
+    writePolicy: 'organization-only',
     activePane: paneConfig.defaultPane,
     availablePanes: paneConfig.panes,
     navigationMode: 'pane-focus' as const,
@@ -321,7 +323,9 @@ async function buildOperationalFrame(options: {
         tenantId: options.tenantId,
         searchText: '',
         selectedIndex: 0,
-        devices: devices.data
+        devices: devices.data,
+        spaceFilter: '',
+        actionsHint: 'interactive-only: a send-command, f space_id filter'
       });
       return createHeadlessFrame({
         sessionId: options.sessionId,
@@ -342,6 +346,9 @@ async function buildOperationalFrame(options: {
               state: devices.connectionState,
               error: devices.error?.message
             },
+            actionsHint: 'interactive-only writes (organization-only)',
+            writePolicy: 'organization-only',
+            headlessWrite: false,
             retry: devices.retry,
             refreshState: getRefreshState({
               connectionState: devices.connectionState,
@@ -358,7 +365,11 @@ async function buildOperationalFrame(options: {
         tenantId: options.tenantId,
         incidents: incidents.data,
         selectedIndex: 0,
-        severityFilter: ''
+        severityFilter: '',
+        statusFilter: 'active',
+        page: 1,
+        perPage: 100,
+        actionsHint: 'interactive-only: a close-incident, f filters, [ ] pages, p per-page'
       });
       return createHeadlessFrame({
         sessionId: options.sessionId,
@@ -379,6 +390,9 @@ async function buildOperationalFrame(options: {
               state: incidents.connectionState,
               error: incidents.error?.message
             },
+            actionsHint: 'interactive-only writes (organization-only)',
+            writePolicy: 'organization-only',
+            headlessWrite: false,
             retry: incidents.retry,
             refreshState: getRefreshState({
               connectionState: incidents.connectionState,
@@ -396,7 +410,13 @@ async function buildOperationalFrame(options: {
         mode: tickets.data.mode,
         searchText: '',
         selectedIndex: 0,
-        tickets: tickets.data.tickets
+        tickets: tickets.data.tickets,
+        page: 1,
+        perPage: 25,
+        totalFiltered: tickets.data.tickets.length,
+        actionsHint: tickets.data.mode === 'organization'
+          ? 'interactive-only: a resolve/message, f local filters, [ ] pages, p per-page'
+          : 'interactive-only: ticket writes disabled in partner mode'
       });
       return createHeadlessFrame({
         sessionId: options.sessionId,
@@ -417,6 +437,9 @@ async function buildOperationalFrame(options: {
               state: tickets.connectionState,
               error: tickets.error?.message
             },
+            actionsHint: 'interactive-only writes (organization-only)',
+            writePolicy: 'organization-only',
+            headlessWrite: false,
             retry: tickets.retry,
             refreshState: getRefreshState({
               connectionState: tickets.connectionState,
@@ -454,7 +477,9 @@ async function buildOperationalFrame(options: {
         paneStatus,
         spaces: spaces.data,
         spaceDetail: detail,
-        devicesInSpace
+        devicesInSpace,
+        endpointFilterSummary: '',
+        actionsHint: 'interactive-only: a claim/create/rename, f endpoint filters'
       });
       return createHeadlessFrame({
         sessionId: options.sessionId,
@@ -476,6 +501,9 @@ async function buildOperationalFrame(options: {
               error: spaces.error?.message,
               drilldownError
             },
+            actionsHint: 'interactive-only writes (organization-only)',
+            writePolicy: 'organization-only',
+            headlessWrite: false,
             retry: {
               spaces: spaces.retry,
               drilldown: drilldownRetry

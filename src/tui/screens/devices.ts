@@ -12,9 +12,57 @@ import {
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
 import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
-import { loadDevicesData } from '../data-loaders';
+import type { CommandTemplate } from '../data-loaders';
+import { loadCommandTemplates, loadDevicesData } from '../data-loaders';
 import { sceneFromDevicesState } from '../scene';
 import { payloadSummary, safeSearchText } from '../serialize';
+import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, promptChoice } from '../actions';
+
+function deviceIdOf(device: any): string {
+  return String(device?.id ?? device?._id ?? device?.device_id ?? '');
+}
+
+export interface SendCommandWithGuardArgs {
+  device: any;
+  template: CommandTemplate;
+  params: Record<string, unknown> | undefined;
+  context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;
+}
+
+export async function sendCommandWithGuard(args: SendCommandWithGuardArgs): Promise<boolean> {
+  const deviceId = deviceIdOf(args.device);
+  if (!deviceId) {
+    args.context.setStatus('Selected device has no id.');
+    return false;
+  }
+
+  const ok = await confirmWriteWithToken(args.context, 'Send command', 'command', 'Send command canceled.');
+  if (!ok) {
+    return false;
+  }
+
+  const body: Record<string, unknown> = args.template.mode === 'command'
+    ? { command: args.template.value }
+    : { friendly_name: args.template.value };
+  if (args.params && Object.keys(args.params).length > 0) {
+    body.params = args.params;
+  }
+
+  args.context.setStatus('Sending command...');
+  try {
+    const tenantId = await args.context.getActiveTenantId();
+    await args.context.client.organization.sendCommand({
+      tenantId,
+      path: { device_id: deviceId },
+      body
+    });
+    args.context.setStatus(`Command sent to device ${deviceId}.`);
+    return true;
+  } catch (error) {
+    args.context.showError(error);
+    return false;
+  }
+}
 
 export function createDevicesScreen(): TuiScreen {
   let root: blessed.Widgets.BoxElement | undefined;
@@ -36,6 +84,7 @@ export function createDevicesScreen(): TuiScreen {
   let renderErrorCount = 0;
   let renderErrorWindowStart = 0;
   let renderFrozen = false;
+  let spaceFilter = '';
 
   const focusPane = () => {
     if (activePane === 'devices-table') {
@@ -45,7 +94,9 @@ export function createDevicesScreen(): TuiScreen {
     detail?.focus();
   };
 
-  const applyFilter = () => {
+  const selectedDevice = () => filtered[selectedIndex];
+
+  const applyFilter = (restoreDeviceId?: string) => {
     if (!isMounted) {
       return;
     }
@@ -58,7 +109,14 @@ export function createDevicesScreen(): TuiScreen {
       const needle = searchText.toLowerCase();
       filtered = devices.filter((device) => safeSearchText(device).includes(needle));
     }
-    selectedIndex = clampIndex(selectedIndex, filtered.length);
+    if (restoreDeviceId) {
+      const restoreIndex = filtered.findIndex((device) => deviceIdOf(device) === restoreDeviceId);
+      selectedIndex = restoreIndex >= 0 ? restoreIndex : clampIndex(selectedIndex, filtered.length);
+    } else {
+      selectedIndex = clampIndex(selectedIndex, filtered.length);
+    }
+
+    const actionsHint = 'actions: a send-command, f endpoint filter';
 
     try {
       if (renderFrozen) {
@@ -81,7 +139,9 @@ export function createDevicesScreen(): TuiScreen {
         const panels = sceneFromDevicesState({
           searchText,
           selectedIndex,
-          devices: filtered
+          devices: filtered,
+          spaceFilter,
+          actionsHint
         });
 
         const tablePanel = panels.find((panel) => panel.id === 'devices-table');
@@ -140,6 +200,46 @@ export function createDevicesScreen(): TuiScreen {
     syncListSelection(table, selectedIndex, selectionSync);
     focusPane();
     context.screen.render();
+  };
+
+  const refreshDevices = async (restoreDeviceId?: string) => {
+    if (!context || !isMounted) {
+      return;
+    }
+
+    const tenantId = await context.getActiveTenantId();
+    context.debugLog?.('screen.data.fetch.start', {
+      screen: 'devices',
+      tenantId,
+      spaceFilter
+    });
+    const loaded = await loadDevicesData(context.client, tenantId, {
+      query: {
+        space_id: spaceFilter || undefined
+      }
+    });
+    if (!isMounted) {
+      return;
+    }
+    devices = loaded.data;
+    context.debugLog?.('screen.data.fetch.complete', {
+      screen: 'devices',
+      tenantId,
+      count: devices.length,
+      connectionState: loaded.connectionState,
+      retry: loaded.retry,
+      payload: payloadSummary(devices),
+      spaceFilter
+    });
+    if (loaded.error) {
+      context.setStatus(`Devices ${loaded.connectionState}: ${loaded.error.message}`);
+      context.debugLog?.('screen.data.fetch.error', {
+        screen: 'devices',
+        message: loaded.error.message,
+        state: loaded.connectionState
+      });
+    }
+    applyFilter(restoreDeviceId);
   };
 
   return {
@@ -212,37 +312,7 @@ export function createDevicesScreen(): TuiScreen {
       root = undefined;
     },
     async refresh() {
-      if (!context || !isMounted) {
-        return;
-      }
-
-      const tenantId = await context.getActiveTenantId();
-      context.debugLog?.('screen.data.fetch.start', {
-        screen: 'devices',
-        tenantId
-      });
-      const loaded = await loadDevicesData(context.client, tenantId);
-      if (!isMounted) {
-        return;
-      }
-      devices = loaded.data;
-      context.debugLog?.('screen.data.fetch.complete', {
-        screen: 'devices',
-        tenantId,
-        count: devices.length,
-        connectionState: loaded.connectionState,
-        retry: loaded.retry,
-        payload: payloadSummary(devices)
-      });
-      if (loaded.error) {
-        context.setStatus(`Devices ${loaded.connectionState}: ${loaded.error.message}`);
-        context.debugLog?.('screen.data.fetch.error', {
-          screen: 'devices',
-          message: loaded.error.message,
-          state: loaded.connectionState
-        });
-      }
-      applyFilter();
+      await refreshDevices(deviceIdOf(selectedDevice()));
     },
     focus() {
       focusPane();
@@ -306,6 +376,94 @@ export function createDevicesScreen(): TuiScreen {
           applyFilter();
         }
         return true;
+      }
+
+      if (ch === 'f') {
+        const value = await context.prompt('Space ID filter (empty clears):', spaceFilter);
+        if (value === undefined || !isMounted) {
+          return true;
+        }
+        spaceFilter = value.trim();
+        selectedIndex = 0;
+        await refreshDevices();
+        return true;
+      }
+
+      if (ch === 'a') {
+        return openActionPalette({
+          context,
+          title: 'Device actions',
+          actions: [
+            {
+              label: 'Send command',
+              run: async () => {
+                const device = selectedDevice();
+                if (!device) {
+                  context.setStatus('No device selected.');
+                  return;
+                }
+                const deviceId = deviceIdOf(device);
+                if (!deviceId) {
+                  context.setStatus('Selected device has no id.');
+                  return;
+                }
+                const tenantId = await context.getActiveTenantId();
+                const templatesOutcome = await loadCommandTemplates(context.client, tenantId, deviceId);
+                if (templatesOutcome.error) {
+                  context.setStatus(`Command templates unavailable: ${templatesOutcome.error.message}`);
+                  return;
+                }
+                if (!templatesOutcome.data.length) {
+                  context.setStatus('No command templates available for selected device.');
+                  return;
+                }
+
+                const choice = await promptChoice(context, {
+                  title: `Command templates for ${deviceId}`,
+                  choices: templatesOutcome.data.map((template) => ({
+                    label: template.label,
+                    value: `${template.mode}:${template.value}`
+                  }))
+                });
+                if (!choice || !isMounted) {
+                  return;
+                }
+                const selectedTemplate = templatesOutcome.data.find(
+                  (template) => `${template.mode}:${template.value}` === choice.value
+                );
+                if (!selectedTemplate) {
+                  context.setStatus('Template selection is invalid.');
+                  return;
+                }
+
+                const paramsInput = await context.prompt('Optional params JSON object (empty skips):', '');
+                if (paramsInput === undefined || !isMounted) {
+                  context.setStatus('Send command canceled.');
+                  return;
+                }
+                let params: Record<string, unknown> | undefined;
+                if (paramsInput.trim()) {
+                  const parsed = parseJsonObjectInput(paramsInput);
+                  if (!parsed.ok) {
+                    context.setStatus(`Invalid params JSON: ${parsed.error}`);
+                    return;
+                  }
+                  params = parsed.value;
+                }
+
+                const sent = await sendCommandWithGuard({
+                  device,
+                  template: selectedTemplate,
+                  params,
+                  context
+                });
+                if (sent && isMounted) {
+                  await refreshDevices(deviceId);
+                }
+              }
+            }
+          ]
+        });
       }
 
       if (key.name === 'enter') {

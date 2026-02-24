@@ -15,6 +15,43 @@ import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
 import { loadIncidentsData } from '../data-loaders';
 import { sceneFromIncidentsState } from '../scene';
 import { payloadSummary } from '../serialize';
+import { confirmWriteWithToken, openActionPalette } from '../actions';
+
+function incidentIdOf(incident: any): string {
+  return String(incident?.id ?? incident?._id ?? incident?.uuid ?? '');
+}
+
+export interface CloseIncidentWithGuardArgs {
+  incident: any;
+  context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;
+}
+
+export async function closeIncidentWithGuard(args: CloseIncidentWithGuardArgs): Promise<boolean> {
+  const incidentId = incidentIdOf(args.incident);
+  if (!incidentId) {
+    args.context.setStatus('Selected incident has no id.');
+    return false;
+  }
+
+  const ok = await confirmWriteWithToken(args.context, 'Close incident', 'close', 'Close incident canceled.');
+  if (!ok) {
+    return false;
+  }
+
+  args.context.setStatus('Closing incident...');
+  try {
+    const tenantId = await args.context.getActiveTenantId();
+    await args.context.client.organization.closeIncident({
+      tenantId,
+      path: { incident_id: incidentId }
+    });
+    args.context.setStatus(`Incident ${incidentId} closed.`);
+    return true;
+  } catch (error) {
+    args.context.showError(error);
+    return false;
+  }
+}
 
 export function normalizeIncidents(items: unknown): any[] {
   if (!Array.isArray(items)) {
@@ -34,6 +71,13 @@ export function createIncidentsScreen(): TuiScreen {
   let filtered: any[] = [];
   let severityFilter = '';
   let selectedIndex = 0;
+  let statusFilter = 'active';
+  let priorityFilter = '';
+  let spaceIdFilter = '';
+  let titleFilter = '';
+  let issueFilter = '';
+  let page = 1;
+  let perPage = 100;
   let selectionSync: SelectionSyncState = {
     syncing: false,
     name: 'incidents-table'
@@ -54,7 +98,9 @@ export function createIncidentsScreen(): TuiScreen {
     detailBox?.focus();
   };
 
-  const renderRows = () => {
+  const selectedIncident = () => filtered[selectedIndex];
+
+  const renderRows = (restoreIncidentId?: string) => {
     if (!isMounted) {
       return;
     }
@@ -65,7 +111,15 @@ export function createIncidentsScreen(): TuiScreen {
     filtered = severityFilter
       ? incidents.filter((incident) => String(incident?.severity ?? incident?.priority ?? '').toLowerCase().includes(severityFilter))
       : incidents;
-    selectedIndex = clampIndex(selectedIndex, filtered.length);
+
+    if (restoreIncidentId) {
+      const restoreIndex = filtered.findIndex((incident) => incidentIdOf(incident) === restoreIncidentId);
+      selectedIndex = restoreIndex >= 0 ? restoreIndex : clampIndex(selectedIndex, filtered.length);
+    } else {
+      selectedIndex = clampIndex(selectedIndex, filtered.length);
+    }
+
+    const actionsHint = 'actions: a close-incident, f filters, [ ] pages, p per-page';
 
     try {
       if (renderFrozen) {
@@ -83,7 +137,12 @@ export function createIncidentsScreen(): TuiScreen {
         const panels = sceneFromIncidentsState({
           severityFilter,
           selectedIndex,
-          incidents: filtered
+          incidents: filtered,
+          statusFilter,
+          priorityFilter,
+          page,
+          perPage,
+          actionsHint
         });
 
         const tablePanel = panels.find((panel) => panel.id === 'incidents-table');
@@ -137,6 +196,55 @@ export function createIncidentsScreen(): TuiScreen {
     }
     syncListSelection(list, selectedIndex, selectionSync);
     focusPane();
+  };
+
+  const refreshRows = async (restoreIncidentId?: string) => {
+    if (!isMounted) {
+      return;
+    }
+    const tenantId = await context.getActiveTenantId();
+    context.debugLog?.('screen.data.fetch.start', {
+      screen: 'incidents',
+      tenantId
+    });
+    const loaded = await loadIncidentsData(context.client, tenantId, {
+      paginateAll: false,
+      query: {
+        status: statusFilter || undefined,
+        priority: priorityFilter || undefined,
+        space_id: spaceIdFilter || undefined,
+        title: titleFilter || undefined,
+        issue: issueFilter || undefined,
+        from: 0,
+        to: Math.floor(Date.now() / 1000),
+        page,
+        per_page: perPage
+      }
+    });
+    if (!isMounted) {
+      return;
+    }
+    incidents = normalizeIncidents(loaded.data);
+    context.debugLog?.('screen.data.fetch.complete', {
+      screen: 'incidents',
+      tenantId,
+      count: incidents.length,
+      connectionState: loaded.connectionState,
+      retry: loaded.retry,
+      payload: payloadSummary(incidents),
+      page,
+      perPage
+    });
+    if (loaded.error) {
+      context.setStatus(`Incidents ${loaded.connectionState}: ${loaded.error.message}`);
+      context.debugLog?.('screen.data.fetch.error', {
+        screen: 'incidents',
+        message: loaded.error.message,
+        state: loaded.connectionState
+      });
+    }
+    renderRows(restoreIncidentId);
+    context.screen.render();
   };
 
   return {
@@ -208,37 +316,7 @@ export function createIncidentsScreen(): TuiScreen {
       root = undefined;
     },
     async refresh() {
-      if (!isMounted) {
-        return;
-      }
-      const tenantId = await context.getActiveTenantId();
-      context.debugLog?.('screen.data.fetch.start', {
-        screen: 'incidents',
-        tenantId
-      });
-      const loaded = await loadIncidentsData(context.client, tenantId);
-      if (!isMounted) {
-        return;
-      }
-      incidents = normalizeIncidents(loaded.data);
-      context.debugLog?.('screen.data.fetch.complete', {
-        screen: 'incidents',
-        tenantId,
-        count: incidents.length,
-        connectionState: loaded.connectionState,
-        retry: loaded.retry,
-        payload: payloadSummary(incidents)
-      });
-      if (loaded.error) {
-        context.setStatus(`Incidents ${loaded.connectionState}: ${loaded.error.message}`);
-        context.debugLog?.('screen.data.fetch.error', {
-          screen: 'incidents',
-          message: loaded.error.message,
-          state: loaded.connectionState
-        });
-      }
-      renderRows();
-      context.screen.render();
+      await refreshRows(incidentIdOf(selectedIncident()));
     },
     focus() {
       focusPane();
@@ -296,7 +374,7 @@ export function createIncidentsScreen(): TuiScreen {
     },
     async handleKey(ch, key) {
       if (key.name === 'slash' || ch === '/') {
-        const value = await context.prompt('Severity filter (e.g. high/critical):', severityFilter);
+        const value = await context.prompt('Severity filter (local; empty clears):', severityFilter);
         if (!isMounted) {
           return true;
         }
@@ -307,6 +385,96 @@ export function createIncidentsScreen(): TuiScreen {
           context.screen.render();
         }
         return true;
+      }
+
+      if (ch === 'f') {
+        const nextStatus = await context.prompt('Status filter (empty clears):', statusFilter);
+        if (nextStatus === undefined || !isMounted) {
+          return true;
+        }
+        const nextPriority = await context.prompt('Priority filter (empty clears):', priorityFilter);
+        if (nextPriority === undefined || !isMounted) {
+          return true;
+        }
+        const nextSpaceId = await context.prompt('Space ID filter (empty clears):', spaceIdFilter);
+        if (nextSpaceId === undefined || !isMounted) {
+          return true;
+        }
+        const nextTitle = await context.prompt('Title filter (empty clears):', titleFilter);
+        if (nextTitle === undefined || !isMounted) {
+          return true;
+        }
+        const nextIssue = await context.prompt('Issue filter (empty clears):', issueFilter);
+        if (nextIssue === undefined || !isMounted) {
+          return true;
+        }
+
+        statusFilter = nextStatus.trim().toLowerCase();
+        priorityFilter = nextPriority.trim().toLowerCase();
+        spaceIdFilter = nextSpaceId.trim();
+        titleFilter = nextTitle.trim();
+        issueFilter = nextIssue.trim();
+        page = 1;
+        selectedIndex = 0;
+        await refreshRows();
+        return true;
+      }
+
+      if (ch === '[') {
+        page = Math.max(1, page - 1);
+        selectedIndex = 0;
+        await refreshRows();
+        return true;
+      }
+
+      if (ch === ']') {
+        page += 1;
+        selectedIndex = 0;
+        await refreshRows();
+        return true;
+      }
+
+      if (ch === 'p') {
+        const value = await context.prompt('Incidents per page (10|25|50|100):', String(perPage));
+        if (value === undefined || !isMounted) {
+          return true;
+        }
+        const parsed = Number.parseInt(value.trim(), 10);
+        if (![10, 25, 50, 100].includes(parsed)) {
+          context.setStatus('Invalid per-page value. Use 10, 25, 50, or 100.');
+          return true;
+        }
+        perPage = parsed;
+        page = 1;
+        selectedIndex = 0;
+        await refreshRows();
+        return true;
+      }
+
+      if (ch === 'a') {
+        return openActionPalette({
+          context,
+          title: 'Incident actions',
+          actions: [
+            {
+              label: 'Close incident',
+              run: async () => {
+                const incident = selectedIncident();
+                if (!incident) {
+                  context.setStatus('No incident selected.');
+                  return;
+                }
+                const closed = await closeIncidentWithGuard({
+                  incident,
+                  context
+                });
+                if (closed && isMounted) {
+                  await refreshRows();
+                }
+              }
+            }
+          ]
+        });
       }
 
       if (key.name === 'enter' && activePane === 'incidents-table') {

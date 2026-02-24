@@ -90,6 +90,9 @@ describe('headless renderer', () => {
     expect((runtimeFrame?.meta as any)?.renderSafety).toBeDefined();
     expect((runtimeFrame?.meta as any)?.tableFormat).toBe('compact-v1');
     expect((runtimeFrame?.meta as any)?.contract?.frameVersion).toBe(HEADLESS_FRAME_SCHEMA_VERSION);
+    expect((runtimeFrame?.meta as any)?.actionsHint).toContain('interactive-only');
+    expect((runtimeFrame?.meta as any)?.headlessWrite).toBe(false);
+    expect((runtimeFrame?.meta as any)?.writePolicy).toBe('organization-only');
   });
 
   it('renders text frames with logo and panel sections', () => {
@@ -260,6 +263,7 @@ describe('headless renderer', () => {
       expect((runtimeFrame?.meta as any)?.tabOrder).toEqual(['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets']);
       expect((runtimeFrame?.meta as any)?.renderSafety).toBeDefined();
       expect((runtimeFrame?.meta as any)?.tableFormat).toBe('compact-v1');
+      expect((runtimeFrame?.meta as any)?.headlessWrite).toBe(false);
     }
   });
 });

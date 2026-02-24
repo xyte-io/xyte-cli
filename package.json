@@ -28,7 +28,7 @@
     "provenance": true
   },
   "bin": {
-    "xyte-cli": "dist/bin/xyte-cli.js"
+    "xyte-cli": "bin/xyte-cli"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

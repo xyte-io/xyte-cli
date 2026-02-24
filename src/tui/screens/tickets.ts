@@ -15,6 +15,19 @@ import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
 import { loadTicketsData } from '../data-loaders';
 import { sceneFromTicketsState } from '../scene';
 import { payloadSummary, safePreviewLines, safeSearchText } from '../serialize';
+import { confirmWriteWithToken, openActionPalette } from '../actions';
+
+function ticketIdOf(ticket: any): string {
+  return String(ticket?.id ?? ticket?._id ?? '');
+}
+
+function ticketStatusOf(ticket: any): string {
+  return String(ticket?.status ?? ticket?.state ?? '').trim().toLowerCase();
+}
+
+function ticketPriorityOf(ticket: any): string {
+  return String(ticket?.priority ?? '').trim().toLowerCase();
+}
 
 export interface ResolveTicketWithGuardArgs {
   ticket: any;
@@ -24,27 +37,74 @@ export interface ResolveTicketWithGuardArgs {
 
 export async function resolveTicketWithGuard(args: ResolveTicketWithGuardArgs): Promise<boolean> {
   const { ticket, mode, context } = args;
-  const ok = await context.confirmWrite('Resolve ticket', 'resolve');
-  if (!ok) {
-    context.setStatus('Resolve action canceled.');
+  if (mode !== 'organization') {
+    context.setStatus('Ticket write actions are disabled in partner mode (organization-only policy).');
     return false;
   }
 
-  const ticketId = String(ticket?.id ?? ticket?._id ?? '');
+  const ticketId = ticketIdOf(ticket);
   if (!ticketId) {
     context.setStatus('Selected ticket has no id.');
+    return false;
+  }
+
+  const ok = await confirmWriteWithToken(context, 'Resolve ticket', 'resolve', 'Resolve action canceled.');
+  if (!ok) {
     return false;
   }
 
   context.setStatus('Resolving ticket...');
   try {
     const tenantId = await context.getActiveTenantId();
-    if (mode === 'organization') {
-      await context.client.organization.markResolved({ tenantId, path: { ticket_id: ticketId } });
-    } else {
-      await context.client.partner.closeTicket({ tenantId, path: { ticket_id: ticketId } });
-    }
+    await context.client.organization.markResolved({ tenantId, path: { ticket_id: ticketId } });
     context.setStatus(`Ticket ${ticketId} resolved.`);
+    return true;
+  } catch (error) {
+    context.showError(error);
+    return false;
+  }
+}
+
+export interface SendTicketMessageWithGuardArgs {
+  ticket: any;
+  mode: 'organization' | 'partner';
+  context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;
+  message: string;
+}
+
+export async function sendTicketMessageWithGuard(args: SendTicketMessageWithGuardArgs): Promise<boolean> {
+  const { ticket, mode, context } = args;
+  if (mode !== 'organization') {
+    context.setStatus('Ticket write actions are disabled in partner mode (organization-only policy).');
+    return false;
+  }
+
+  const ticketId = ticketIdOf(ticket);
+  if (!ticketId) {
+    context.setStatus('Selected ticket has no id.');
+    return false;
+  }
+
+  const message = args.message.trim();
+  if (!message) {
+    context.setStatus('Message is required.');
+    return false;
+  }
+
+  const ok = await confirmWriteWithToken(context, 'Send ticket message', 'message', 'Send message canceled.');
+  if (!ok) {
+    return false;
+  }
+
+  context.setStatus('Sending ticket message...');
+  try {
+    const tenantId = await context.getActiveTenantId();
+    await context.client.organization.sendMessage({
+      tenantId,
+      path: { ticket_id: ticketId },
+      query: { message }
+    });
+    context.setStatus(`Message sent for ticket ${ticketId}.`);
     return true;
   } catch (error) {
     context.showError(error);
@@ -58,9 +118,14 @@ export function createTicketsScreen(): TuiScreen {
   let detail: blessed.Widgets.BoxElement | undefined;
   let context: TuiContext;
   let tickets: any[] = [];
+  let filteredAll: any[] = [];
   let filtered: any[] = [];
   let mode: 'organization' | 'partner' = 'organization';
   let searchText = '';
+  let statusFilter = '';
+  let priorityFilter = '';
+  let page = 1;
+  let perPage = 25;
   let selectedIndex = 0;
   let detailText = '';
   let lastResolveTapAt = 0;
@@ -87,8 +152,46 @@ export function createTicketsScreen(): TuiScreen {
   };
 
   const selectedTicket = () => filtered[selectedIndex];
+  const ticketWritesEnabled = () => mode === 'organization';
 
-  const renderRows = () => {
+  const rebuildFiltered = (restoreTicketId?: string) => {
+    let next = tickets;
+    if (searchText) {
+      const needle = searchText.toLowerCase();
+      next = next.filter((ticket) => safeSearchText(ticket).includes(needle));
+    }
+    if (statusFilter) {
+      next = next.filter((ticket) => ticketStatusOf(ticket).includes(statusFilter));
+    }
+    if (priorityFilter) {
+      next = next.filter((ticket) => ticketPriorityOf(ticket).includes(priorityFilter));
+    }
+    filteredAll = next;
+
+    const totalPages = Math.max(1, Math.ceil(Math.max(filteredAll.length, 1) / Math.max(1, perPage)));
+    if (restoreTicketId) {
+      const globalIndex = filteredAll.findIndex((ticket) => ticketIdOf(ticket) === restoreTicketId);
+      if (globalIndex >= 0) {
+        page = Math.floor(globalIndex / Math.max(1, perPage)) + 1;
+      }
+    }
+    page = Math.max(1, Math.min(page, totalPages));
+    const start = (page - 1) * Math.max(1, perPage);
+    filtered = filteredAll.slice(start, start + Math.max(1, perPage));
+
+    if (restoreTicketId) {
+      const pageIndex = filtered.findIndex((ticket) => ticketIdOf(ticket) === restoreTicketId);
+      if (pageIndex >= 0) {
+        selectedIndex = pageIndex;
+      } else {
+        selectedIndex = clampIndex(selectedIndex, filtered.length);
+      }
+    } else {
+      selectedIndex = clampIndex(selectedIndex, filtered.length);
+    }
+  };
+
+  const renderRows = (restoreTicketId?: string) => {
     if (!isMounted) {
       return;
     }
@@ -96,10 +199,11 @@ export function createTicketsScreen(): TuiScreen {
       screen: 'tickets',
       frozen: renderFrozen
     });
-    filtered = searchText
-      ? tickets.filter((ticket) => safeSearchText(ticket).includes(searchText.toLowerCase()))
-      : tickets;
-    selectedIndex = clampIndex(selectedIndex, filtered.length);
+    rebuildFiltered(restoreTicketId);
+
+    const actionsHint = ticketWritesEnabled()
+      ? 'actions: a open action palette'
+      : 'actions: writes disabled in partner mode';
 
     try {
       if (renderFrozen) {
@@ -119,7 +223,13 @@ export function createTicketsScreen(): TuiScreen {
           searchText,
           selectedIndex,
           tickets: filtered,
-          detailText
+          detailText,
+          statusFilter,
+          priorityFilter,
+          page,
+          perPage,
+          totalFiltered: filteredAll.length,
+          actionsHint
         });
 
         const tablePanel = panels.find((panel) => panel.id === 'tickets-table');
@@ -188,7 +298,7 @@ export function createTicketsScreen(): TuiScreen {
       return;
     }
 
-    const ticketId = String(ticket?.id ?? ticket?._id ?? '');
+    const ticketId = ticketIdOf(ticket);
     const fallbackPreview = safePreviewLines(ticket).lines.join('\n');
     detailText = ticketId && detailCacheByTicket.has(ticketId) ? detailCacheByTicket.get(ticketId)! : fallbackPreview;
     renderRows();
@@ -209,7 +319,7 @@ export function createTicketsScreen(): TuiScreen {
         }
         detailText = safePreviewLines(full).lines.join('\n');
         detailCacheByTicket.set(ticketId, detailText);
-        renderRows();
+        renderRows(ticketId);
         context.screen.render();
       } catch {
         if (!isMounted || requestToken !== detailRequestToken || selectedIndex !== index) {
@@ -219,7 +329,7 @@ export function createTicketsScreen(): TuiScreen {
         detailText = cached
           ? `${cached}\n\n[warning] Unable to refresh full ticket details; showing last successful preview.`
           : `${fallbackPreview}\n\n[warning] Unable to refresh full ticket details.`;
-        renderRows();
+        renderRows(ticketId);
         context.screen.render();
       }
     })();
@@ -297,6 +407,7 @@ export function createTicketsScreen(): TuiScreen {
         return;
       }
       const tenantId = await context.getActiveTenantId();
+      const restoreTicketId = ticketIdOf(selectedTicket());
       context.debugLog?.('screen.data.fetch.start', {
         screen: 'tickets',
         tenantId
@@ -308,10 +419,9 @@ export function createTicketsScreen(): TuiScreen {
 
       mode = loaded.data.mode;
       tickets = loaded.data.tickets;
-      selectedIndex = 0;
-      detailText = '';
       detailRequestToken += 1;
       detailCacheByTicket.clear();
+      detailText = '';
       context.debugLog?.('screen.data.fetch.complete', {
         screen: 'tickets',
         tenantId,
@@ -329,9 +439,9 @@ export function createTicketsScreen(): TuiScreen {
           state: loaded.connectionState
         });
       }
-      renderRows();
+      renderRows(restoreTicketId);
       if (filtered.length) {
-        queueTicketDetailFetch(0);
+        queueTicketDetailFetch(selectedIndex);
       }
       context.screen.render();
     },
@@ -389,22 +499,40 @@ export function createTicketsScreen(): TuiScreen {
       return 'unhandled';
     },
     async handleKey(ch, key) {
-      const resolveSelectedTicket = async () => {
+      const resolveSelected = async () => {
         const ticket = selectedTicket();
         if (!ticket) {
           context.setStatus('No ticket selected.');
           return true;
         }
-
-        const resolved = await resolveTicketWithGuard({
-          ticket,
-          mode,
-          context
-        });
+        const resolved = await resolveTicketWithGuard({ ticket, mode, context });
         if (!isMounted) {
           return true;
         }
         if (resolved) {
+          await this.refresh();
+        }
+        return true;
+      };
+
+      const sendMessage = async () => {
+        const ticket = selectedTicket();
+        if (!ticket) {
+          context.setStatus('No ticket selected.');
+          return true;
+        }
+        const message = await context.prompt('Ticket message:', '');
+        if (message === undefined) {
+          context.setStatus('Send message canceled.');
+          return true;
+        }
+        const sent = await sendTicketMessageWithGuard({
+          ticket,
+          mode,
+          context,
+          message
+        });
+        if (sent && isMounted) {
           await this.refresh();
         }
         return true;
@@ -417,15 +545,109 @@ export function createTicketsScreen(): TuiScreen {
         }
         if (value !== undefined) {
           searchText = value.trim();
+          page = 1;
           selectedIndex = 0;
           renderRows();
+          if (filtered.length) {
+            queueTicketDetailFetch(selectedIndex);
+          } else {
+            context.screen.render();
+          }
+        }
+        return true;
+      }
+
+      if (ch === 'f') {
+        const status = await context.prompt('Status filter (empty clears):', statusFilter);
+        if (status === undefined || !isMounted) {
+          return true;
+        }
+        const priority = await context.prompt('Priority filter (empty clears):', priorityFilter);
+        if (priority === undefined || !isMounted) {
+          return true;
+        }
+        statusFilter = status.trim().toLowerCase();
+        priorityFilter = priority.trim().toLowerCase();
+        page = 1;
+        selectedIndex = 0;
+        renderRows();
+        if (filtered.length) {
+          queueTicketDetailFetch(selectedIndex);
+        } else {
           context.screen.render();
         }
         return true;
       }
 
+      if (ch === '[') {
+        page = Math.max(1, page - 1);
+        selectedIndex = 0;
+        renderRows();
+        if (filtered.length) {
+          queueTicketDetailFetch(0);
+        } else {
+          context.screen.render();
+        }
+        return true;
+      }
+
+      if (ch === ']') {
+        page += 1;
+        selectedIndex = 0;
+        renderRows();
+        if (filtered.length) {
+          queueTicketDetailFetch(0);
+        } else {
+          context.screen.render();
+        }
+        return true;
+      }
+
+      if (ch === 'p') {
+        const value = await context.prompt('Tickets per page (10|25|50|100):', String(perPage));
+        if (value === undefined || !isMounted) {
+          return true;
+        }
+        const parsed = Number.parseInt(value.trim(), 10);
+        if (![10, 25, 50, 100].includes(parsed)) {
+          context.setStatus('Invalid per-page value. Use 10, 25, 50, or 100.');
+          return true;
+        }
+        perPage = parsed;
+        page = 1;
+        selectedIndex = 0;
+        renderRows();
+        if (filtered.length) {
+          queueTicketDetailFetch(0);
+        } else {
+          context.screen.render();
+        }
+        return true;
+      }
+
+      if (ch === 'a') {
+        return openActionPalette({
+          context,
+          title: `Ticket actions (${mode} mode)`,
+          actions: [
+            {
+              label: 'Resolve ticket',
+              enabled: ticketWritesEnabled(),
+              disabledReason: 'Ticket writes are disabled in partner mode.',
+              run: async () => resolveSelected()
+            },
+            {
+              label: 'Send message',
+              enabled: ticketWritesEnabled(),
+              disabledReason: 'Ticket writes are disabled in partner mode.',
+              run: async () => sendMessage()
+            }
+          ]
+        });
+      }
+
       if (ch === 'R') {
-        return resolveSelectedTicket();
+        return resolveSelected();
       }
 
       if (ch === 'r') {
@@ -433,7 +655,7 @@ export function createTicketsScreen(): TuiScreen {
         const tappedTwiceQuickly = now - lastResolveTapAt <= 650;
         lastResolveTapAt = now;
         if (tappedTwiceQuickly) {
-          return resolveSelectedTicket();
+          return resolveSelected();
         }
         return false;
       }

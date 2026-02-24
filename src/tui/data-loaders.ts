@@ -69,6 +69,9 @@ export interface LoadOutcome<T> {
   retry: RetryState;
 }
 
+type QueryValue = string | number | boolean | null | undefined;
+type QueryShape = Record<string, QueryValue>;
+
 interface LoadWithOutcomeOptions {
   retry?: RetryPolicyOptions;
 }
@@ -166,6 +169,23 @@ function mergeRetry(outcomes: Array<LoadOutcome<unknown>>): RetryState {
   );
 }
 
+function compactQuery(query: QueryShape | undefined): Record<string, string | number | boolean> | undefined {
+  if (!query) {
+    return undefined;
+  }
+
+  const entries = Object.entries(query)
+    .filter(([, value]) => value !== undefined && value !== null)
+    .map(([key, value]) => [key, typeof value === 'string' ? value.trim() : value] as const)
+    .filter(([, value]) => value !== '');
+
+  if (!entries.length) {
+    return undefined;
+  }
+
+  return Object.fromEntries(entries) as Record<string, string | number | boolean>;
+}
+
 export interface DashboardLoadResult {
   devices: any[];
   incidents: any[];
@@ -192,36 +212,115 @@ export async function loadDashboardData(client: XyteClient, tenantId?: string): 
   };
 }
 
-export async function loadDevicesData(client: XyteClient, tenantId?: string): Promise<LoadOutcome<any[]>> {
+export interface DevicesQuery {
+  space_id?: string;
+}
+
+export interface DevicesLoadOptions {
+  query?: DevicesQuery;
+}
+
+export async function loadDevicesData(
+  client: XyteClient,
+  tenantId?: string,
+  options: DevicesLoadOptions = {}
+): Promise<LoadOutcome<any[]>> {
   const result = await loadWithOutcome(
     async () => {
+      const query = compactQuery(options.query as QueryShape | undefined);
       const raw = await client.organization
-        .getDevices({ tenantId })
+        .getDevices({ tenantId, ...(query ? { query } : {}) })
         .catch(() => client.partner.getDevices({ tenantId }));
-      return extractArray(raw, ['devices', 'data', 'items']);
+      const devices = extractArray(raw, ['devices', 'data', 'items']);
+      const spaceId = String(options.query?.space_id ?? '').trim();
+      if (!spaceId) {
+        return devices;
+      }
+      return devices.filter((device) => matchesSpace(device, spaceId));
     },
     []
   );
   return result;
 }
 
-export async function loadIncidentsData(client: XyteClient, tenantId?: string): Promise<LoadOutcome<any[]>> {
+export interface IncidentsQuery {
+  from?: number;
+  to?: number;
+  status?: string;
+  priority?: string;
+  title?: string;
+  issue?: string;
+  space_id?: string;
+  page?: number;
+  per_page?: number;
+}
+
+export interface IncidentsLoadOptions {
+  query?: IncidentsQuery;
+  paginateAll?: boolean;
+}
+
+function normalizeIncidentItem(incident: unknown): any {
+  return incident && typeof incident === 'object' ? incident : { value: incident };
+}
+
+export async function loadIncidentsData(
+  client: XyteClient,
+  tenantId?: string,
+  options: IncidentsLoadOptions = {}
+): Promise<LoadOutcome<any[]>> {
   return loadWithOutcome(
     async () => {
-      const perPage = 100;
-      const to = Math.floor(Date.now() / 1000);
-      const all: any[] = [];
+      const nowUnix = Math.floor(Date.now() / 1000);
+      const merged: IncidentsQuery = {
+        status: 'active',
+        from: 0,
+        to: nowUnix,
+        page: 1,
+        per_page: 100,
+        ...(options.query ?? {})
+      };
 
-      for (let page = 1; page <= 50; page += 1) {
+      const paginateAll = options.paginateAll !== false;
+      const perPage = Math.max(1, Number(merged.per_page ?? 100));
+      const initialPage = Math.max(1, Number(merged.page ?? 1));
+
+      if (!paginateAll) {
+        const query = compactQuery({
+          from: merged.from,
+          to: merged.to,
+          status: merged.status,
+          priority: merged.priority,
+          title: merged.title,
+          issue: merged.issue,
+          space_id: merged.space_id,
+          page: initialPage,
+          per_page: perPage
+        });
         const raw = await client.organization.getIncidents({
           tenantId,
-          query: {
-            status: 'active',
-            from: 0,
-            to,
-            page,
-            per_page: perPage
-          }
+          ...(query ? { query } : {})
+        });
+        return extractIncidentsArray(raw).map(normalizeIncidentItem);
+      }
+
+      const all: any[] = [];
+
+      for (let page = initialPage; page <= 50; page += 1) {
+        const query = compactQuery({
+          from: merged.from,
+          to: merged.to,
+          status: merged.status,
+          priority: merged.priority,
+          title: merged.title,
+          issue: merged.issue,
+          space_id: merged.space_id,
+          page,
+          per_page: perPage
+        });
+        const raw = await client.organization.getIncidents({
+          tenantId,
+          ...(query ? { query } : {})
         });
         const pageItems = extractIncidentsArray(raw);
         if (!pageItems.length) {
@@ -236,10 +335,10 @@ export async function loadIncidentsData(client: XyteClient, tenantId?: string): 
 
       if (!all.length) {
         const raw = await client.organization.getIncidents({ tenantId });
-        return extractIncidentsArray(raw).map((incident) => (incident && typeof incident === 'object' ? incident : { value: incident }));
+        return extractIncidentsArray(raw).map(normalizeIncidentItem);
       }
 
-      return all.map((incident) => (incident && typeof incident === 'object' ? incident : { value: incident }));
+      return all.map(normalizeIncidentItem);
     },
     []
   );
@@ -291,11 +390,90 @@ export async function loadTicketsData(client: XyteClient, tenantId?: string): Pr
   };
 }
 
-export async function loadSpacesData(client: XyteClient, tenantId?: string): Promise<LoadOutcome<any[]>> {
+export interface SpacesQuery {
+  id?: string;
+  name?: string;
+  parent_id?: string | number;
+  space_type?: string;
+  created_before?: string;
+  created_after?: string;
+  path_includes?: string;
+}
+
+export interface SpacesLoadOptions {
+  query?: SpacesQuery;
+}
+
+export async function loadSpacesData(
+  client: XyteClient,
+  tenantId?: string,
+  options: SpacesLoadOptions = {}
+): Promise<LoadOutcome<any[]>> {
   return loadWithOutcome(
     async () => {
-      const raw = await client.organization.getSpaces({ tenantId });
+      const query = compactQuery(options.query as QueryShape | undefined);
+      const raw = await client.organization.getSpaces({ tenantId, ...(query ? { query } : {}) });
       return extractArray(raw, ['spaces', 'data', 'items']);
+    },
+    []
+  );
+}
+
+export interface CommandTemplate {
+  mode: 'command' | 'friendly_name';
+  value: string;
+  label: string;
+}
+
+function normalizeCommandTemplates(items: any[]): CommandTemplate[] {
+  const dedupe = new Set<string>();
+  const templates: CommandTemplate[] = [];
+
+  for (const item of items) {
+    const command = String(item?.command ?? '').trim();
+    const friendlyName = String(item?.friendly_name ?? '').trim();
+
+    if (command) {
+      const key = `command:${command}`;
+      if (!dedupe.has(key)) {
+        dedupe.add(key);
+        templates.push({
+          mode: 'command',
+          value: command,
+          label: `command: ${command}`
+        });
+      }
+    }
+
+    if (friendlyName) {
+      const key = `friendly_name:${friendlyName}`;
+      if (!dedupe.has(key)) {
+        dedupe.add(key);
+        templates.push({
+          mode: 'friendly_name',
+          value: friendlyName,
+          label: `friendly_name: ${friendlyName}`
+        });
+      }
+    }
+  }
+
+  return templates;
+}
+
+export async function loadCommandTemplates(
+  client: XyteClient,
+  tenantId: string | undefined,
+  deviceId: string
+): Promise<LoadOutcome<CommandTemplate[]>> {
+  return loadWithOutcome(
+    async () => {
+      const raw = await client.organization.getCommands({
+        tenantId,
+        path: { device_id: deviceId }
+      });
+      const commands = extractArray(raw, ['commands', 'data', 'items']);
+      return normalizeCommandTemplates(commands);
     },
     []
   );

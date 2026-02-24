@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { resolveTicketWithGuard } from '../../src/tui/screens/tickets';
+import { resolveTicketWithGuard, sendTicketMessageWithGuard } from '../../src/tui/screens/tickets';
 import { sceneFromTicketsState } from '../../src/tui/scene';
 
 describe('tickets screen write guard', () => {
@@ -10,9 +10,6 @@ describe('tickets screen write guard', () => {
       client: {
         organization: {
           markResolved
-        },
-        partner: {
-          closeTicket: vi.fn()
         }
       },
       getActiveTenantId: vi.fn().mockResolvedValue('acme'),
@@ -37,8 +34,7 @@ describe('tickets screen write guard', () => {
     const markResolved = vi.fn().mockResolvedValue({ ok: true });
     const context: any = {
       client: {
-        organization: { markResolved },
-        partner: { closeTicket: vi.fn() }
+        organization: { markResolved }
       },
       getActiveTenantId: vi.fn().mockResolvedValue('acme'),
       confirmWrite: vi.fn().mockResolvedValue(true),
@@ -61,38 +57,33 @@ describe('tickets screen write guard', () => {
     expect(context.setStatus).toHaveBeenCalledWith('Ticket t-1 resolved.');
   });
 
-  it('resolves partner ticket after confirmation', async () => {
-    const closeTicket = vi.fn().mockResolvedValue({ ok: true });
+  it('blocks resolve in partner mode by policy', async () => {
     const context: any = {
       client: {
-        organization: { markResolved: vi.fn() },
-        partner: { closeTicket }
+        organization: { markResolved: vi.fn() }
       },
-      getActiveTenantId: vi.fn().mockResolvedValue('partner-tenant'),
+      getActiveTenantId: vi.fn().mockResolvedValue('acme'),
       confirmWrite: vi.fn().mockResolvedValue(true),
       setStatus: vi.fn(),
       showError: vi.fn()
     };
 
     const result = await resolveTicketWithGuard({
-      ticket: { _id: 'p-55' },
+      ticket: { id: 't-1' },
       mode: 'partner',
       context
     });
 
-    expect(result).toBe(true);
-    expect(closeTicket).toHaveBeenCalledWith({
-      tenantId: 'partner-tenant',
-      path: { ticket_id: 'p-55' }
-    });
+    expect(result).toBe(false);
+    expect(context.client.organization.markResolved).not.toHaveBeenCalled();
+    expect(context.setStatus).toHaveBeenCalledWith('Ticket write actions are disabled in partner mode (organization-only policy).');
   });
 
   it('does not attempt resolve when ticket id is missing', async () => {
     const markResolved = vi.fn().mockResolvedValue({ ok: true });
     const context: any = {
       client: {
-        organization: { markResolved },
-        partner: { closeTicket: vi.fn() }
+        organization: { markResolved }
       },
       getActiveTenantId: vi.fn().mockResolvedValue('acme'),
       confirmWrite: vi.fn().mockResolvedValue(true),
@@ -109,6 +100,56 @@ describe('tickets screen write guard', () => {
     expect(result).toBe(false);
     expect(markResolved).not.toHaveBeenCalled();
     expect(context.setStatus).toHaveBeenCalledWith('Selected ticket has no id.');
+  });
+
+  it('sends ticket message after confirmation', async () => {
+    const sendMessage = vi.fn().mockResolvedValue({ ok: true });
+    const context: any = {
+      client: {
+        organization: { sendMessage }
+      },
+      getActiveTenantId: vi.fn().mockResolvedValue('acme'),
+      confirmWrite: vi.fn().mockResolvedValue(true),
+      setStatus: vi.fn(),
+      showError: vi.fn()
+    };
+
+    const result = await sendTicketMessageWithGuard({
+      ticket: { id: 't-1' },
+      mode: 'organization',
+      message: 'hello',
+      context
+    });
+
+    expect(result).toBe(true);
+    expect(sendMessage).toHaveBeenCalledWith({
+      tenantId: 'acme',
+      path: { ticket_id: 't-1' },
+      query: { message: 'hello' }
+    });
+  });
+
+  it('requires non-empty message', async () => {
+    const context: any = {
+      client: {
+        organization: { sendMessage: vi.fn() }
+      },
+      getActiveTenantId: vi.fn().mockResolvedValue('acme'),
+      confirmWrite: vi.fn().mockResolvedValue(true),
+      setStatus: vi.fn(),
+      showError: vi.fn()
+    };
+
+    const result = await sendTicketMessageWithGuard({
+      ticket: { id: 't-1' },
+      mode: 'organization',
+      message: '   ',
+      context
+    });
+
+    expect(result).toBe(false);
+    expect(context.client.organization.sendMessage).not.toHaveBeenCalled();
+    expect(context.setStatus).toHaveBeenCalledWith('Message is required.');
   });
 
   it('renders ticket detail safely for cyclic payloads', () => {

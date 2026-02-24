@@ -82,6 +82,8 @@ export interface DevicesSceneState {
   searchText: string;
   selectedIndex: number;
   devices: any[];
+  spaceFilter?: string;
+  actionsHint?: string;
 }
 
 export interface IncidentsSceneState {
@@ -89,6 +91,11 @@ export interface IncidentsSceneState {
   severityFilter: string;
   selectedIndex: number;
   incidents: any[];
+  statusFilter?: string;
+  priorityFilter?: string;
+  page?: number;
+  perPage?: number;
+  actionsHint?: string;
 }
 
 export interface TicketsSceneState {
@@ -98,6 +105,12 @@ export interface TicketsSceneState {
   selectedIndex: number;
   tickets: any[];
   detailText?: string;
+  statusFilter?: string;
+  priorityFilter?: string;
+  page?: number;
+  perPage?: number;
+  totalFiltered?: number;
+  actionsHint?: string;
 }
 
 export interface SpacesSceneState {
@@ -109,6 +122,8 @@ export interface SpacesSceneState {
   spaces: any[];
   spaceDetail?: unknown;
   devicesInSpace: any[];
+  endpointFilterSummary?: string;
+  actionsHint?: string;
 }
 
 export interface SetupSceneState {
@@ -246,7 +261,11 @@ export function sceneFromDevicesState(state: DevicesSceneState): ScenePanel[] {
           fitCell(item?.space_name ?? item?.space_id ?? 'n/a', 20, 'end')
         ])
       },
-      status: state.searchText ? `filter=${state.searchText}` : 'filter=none'
+      status: [
+        state.searchText ? `search=${state.searchText}` : 'search=none',
+        state.spaceFilter ? `space_id=${state.spaceFilter}` : 'space_id=all',
+        state.actionsHint ?? 'actions=a'
+      ].join(' | ')
     },
     {
       id: 'devices-detail',
@@ -289,7 +308,14 @@ export function sceneFromIncidentsState(state: IncidentsSceneState): ScenePanel[
           shortId(item?.device_id ?? item?.device?.id ?? 'n/a')
         ])
       },
-      status: state.severityFilter ? `severity=${state.severityFilter}` : 'severity=all'
+      status: [
+        state.severityFilter ? `severity=${state.severityFilter}` : 'severity=all',
+        state.statusFilter ? `status=${state.statusFilter}` : 'status=all',
+        state.priorityFilter ? `priority=${state.priorityFilter}` : 'priority=all',
+        `page=${state.page ?? 1}`,
+        `per=${state.perPage ?? 100}`,
+        state.actionsHint ?? 'actions=a'
+      ].join(' | ')
     },
     {
       id: 'incidents-detail',
@@ -335,7 +361,16 @@ export function sceneFromTicketsState(state: TicketsSceneState): ScenePanel[] {
           fitCell(item?.subject ?? item?.title ?? 'n/a', 28, 'end')
         ])
       },
-      status: `mode=${state.mode}${state.searchText ? ` filter=${state.searchText}` : ''}`
+      status: [
+        `mode=${state.mode}`,
+        state.searchText ? `search=${state.searchText}` : 'search=none',
+        state.statusFilter ? `status=${state.statusFilter}` : 'status=all',
+        state.priorityFilter ? `priority=${state.priorityFilter}` : 'priority=all',
+        `page=${state.page ?? 1}`,
+        `per=${state.perPage ?? 25}`,
+        `rows=${state.totalFiltered ?? state.tickets.length}`,
+        state.actionsHint ?? 'actions=a'
+      ].join(' | ')
     },
     {
       id: 'tickets-detail',
@@ -378,7 +413,11 @@ export function sceneFromSpacesState(state: SpacesSceneState): ScenePanel[] {
           fitCell(item?.path ?? item?.full_path ?? 'n/a', 28, 'end')
         ])
       },
-      status: state.searchText ? `filter=${state.searchText}` : 'filter=none'
+      status: [
+        state.searchText ? `search=${state.searchText}` : 'search=none',
+        state.endpointFilterSummary ? `endpoint=${state.endpointFilterSummary}` : 'endpoint=none',
+        state.actionsHint ?? 'actions=a'
+      ].join(' | ')
     },
     {
       id: 'spaces-detail',
