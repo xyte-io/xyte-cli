@@ -1,6 +1,6 @@
 {
   "name": "@xyteai/cli",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Xyte CLI, TUI, skills, and MCP bridge for zero-friction AI operations",
   "license": "Apache-2.0",
   "repository": {
