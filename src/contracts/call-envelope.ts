@@ -39,7 +39,8 @@ export const CallEnvelopeSchema = z.object({
       detail: z.string(),
       instance: z.string().optional(),
       xyteCode: z.string(),
-      retriable: z.boolean()
+      retriable: z.boolean(),
+      upstream: z.unknown().optional()
     })
     .optional()
 });

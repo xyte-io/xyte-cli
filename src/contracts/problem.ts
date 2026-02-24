@@ -8,6 +8,7 @@ export interface ProblemDetails {
   instance?: string;
   xyteCode: string;
   retriable: boolean;
+  upstream?: unknown;
 }
 
 function toMessage(error: unknown): string {
@@ -26,7 +27,8 @@ export function toProblemDetails(error: unknown, instance?: string): ProblemDeta
       detail: error.message,
       instance,
       xyteCode: error.code,
-      retriable: error.status >= 500
+      retriable: error.status >= 500,
+      upstream: error.details
     };
   }
 

@@ -133,7 +133,8 @@
         },
         "retriable": {
           "type": "boolean"
-        }
+        },
+        "upstream": {}
       }
     }
   }
