@@ -1,96 +1,55 @@
-# Utility Batch Flows (Non-Device Scope, AI-Assisted Preprocessing)
+# Utility Prepare Flows (Preprocess-First)
 
-`xyte-cli` executes only. AI may preprocess source data into canonical files.
+`xyte-cli` utility preprocessing is auth-agnostic. It creates structured files only.
 
-Contract and prompt templates:
-- `/Users/porton/Projects/xyte-cli/docs/ai-utility-preprocessing.md`
-- `/Users/porton/Projects/xyte-cli/scripts/templates/ai-bulk-rename.prompt.md`
-- `/Users/porton/Projects/xyte-cli/scripts/templates/ai-space-import.prompt.md`
-- `/Users/porton/Projects/xyte-cli/skills/xyte-cli/references/utility-ai-device-bulk-rename.md`
-- `/Users/porton/Projects/xyte-cli/skills/xyte-cli/references/utility-ai-space-import-tree.md`
+References:
+1. `/Users/porton/Projects/xyte-cli/docs/ai-utility-preprocessing.md`
+2. `/Users/porton/Projects/xyte-cli/scripts/templates/ai-utility-prepare-generic.prompt.md`
+3. `/Users/porton/Projects/xyte-cli/scripts/templates/ai-space-import.prompt.md`
 
-## Safety Defaults
+## Safety defaults
 
-- All utility commands are dry-run unless `--apply` is passed.
-- Default behavior is fail-fast.
-- Use `--continue-on-error` to process remaining rows.
-- Add `--report <path>` for per-row NDJSON output.
-- Agent behavior gate: after generating structured files, ask user whether to run dry-run, apply, or stop. Never auto-apply.
+1. Always run preprocessing first.
+2. After files are generated, ask user what to do next.
+3. Never auto-run `--apply`.
 
-## SOP #1: Spreadsheet to Device Bulk Rename
-
-Context scaffold:
+## SOP A: Bulk claim preprocessing (`organization.devices.claimDevice`)
 
 ```bash
-xyte-cli utility ai-context \
-  --input /path/to/raw-source \
-  --entity devices \
+xyte-cli utility prepare \
+  --action organization.devices.claimDevice \
+  --input /path/to/raw-source.xlsx \
   --tenant <tenant-id> \
   --output-dir /Users/porton/Projects/xyte-cli/tmp
 ```
 
-AI output files:
-- `/Users/porton/Projects/xyte-cli/tmp/bulk-rename.csv` (exact header: `device_id,new_name`)
-- `/Users/porton/Projects/xyte-cli/tmp/bulk-rename.rejected.csv` (with `reject_reason`)
-- `/Users/porton/Projects/xyte-cli/tmp/bulk-rename.mapping.md`
+Expected files:
+1. `/Users/porton/Projects/xyte-cli/tmp/organization-devices-claimdevice.csv`
+2. `/Users/porton/Projects/xyte-cli/tmp/organization-devices-claimdevice.rejected.csv`
+3. `/Users/porton/Projects/xyte-cli/tmp/organization-devices-claimdevice.notes.md`
 
 Decision gate:
-- Ask: `What should I do with this structured file? (dry-run / apply / stop)`
+1. Ask user whether to execute this action via `xyte-cli call` loop or stop.
 
-Dry-run:
+## SOP B: Space import preprocessing + execution (`space.import-tree`)
 
-```bash
-xyte-cli device bulk-rename \
-  --tenant <tenant-id> \
-  --input /Users/porton/Projects/xyte-cli/tmp/bulk-rename.csv \
-  --report /Users/porton/Projects/xyte-cli/tmp/bulk-rename.dryrun.ndjson
-```
-
-Apply:
+Prepare:
 
 ```bash
-xyte-cli device bulk-rename \
-  --tenant <tenant-id> \
-  --input /Users/porton/Projects/xyte-cli/tmp/bulk-rename.csv \
-  --apply \
-  --report /Users/porton/Projects/xyte-cli/tmp/bulk-rename.apply.ndjson
-```
-
-Verification:
-
-```bash
-xyte-cli call organization.devices.getDevice \
-  --tenant <tenant-id> \
-  --path-json '{"device_id":"<sample-device-id>"}'
-```
-
-## SOP #2: Unstructured Hierarchy to Space Import Tree
-
-Context scaffold:
-
-```bash
-xyte-cli utility ai-context \
-  --input /path/to/raw-source \
-  --entity spaces \
+xyte-cli utility prepare \
+  --action space.import-tree \
+  --input /path/to/raw-hierarchy.pdf \
   --tenant <tenant-id> \
   --output-dir /Users/porton/Projects/xyte-cli/tmp
 ```
-
-AI output files:
-- `/Users/porton/Projects/xyte-cli/tmp/space-import.jsonl`
-- `/Users/porton/Projects/xyte-cli/tmp/space-import.rejected.jsonl` (with `reject_reason`)
-- `/Users/porton/Projects/xyte-cli/tmp/space-import.notes.md`
-
-Decision gate:
-- Ask: `What should I do with this structured file? (dry-run / apply / stop)`
 
 Dry-run:
 
 ```bash
 xyte-cli space import-tree \
   --tenant <tenant-id> \
-  --input /Users/porton/Projects/xyte-cli/tmp/space-import.jsonl \
-  --report /Users/porton/Projects/xyte-cli/tmp/space-import.dryrun.ndjson
+  --input /Users/porton/Projects/xyte-cli/tmp/space-import-tree.csv \
+  --report /Users/porton/Projects/xyte-cli/tmp/space-import-tree.dryrun.ndjson
 ```
 
 Apply:
@@ -98,29 +57,41 @@ Apply:
 ```bash
 xyte-cli space import-tree \
   --tenant <tenant-id> \
-  --input /Users/porton/Projects/xyte-cli/tmp/space-import.jsonl \
+  --input /Users/porton/Projects/xyte-cli/tmp/space-import-tree.csv \
   --apply \
-  --report /Users/porton/Projects/xyte-cli/tmp/space-import.apply.ndjson
+  --report /Users/porton/Projects/xyte-cli/tmp/space-import-tree.apply.ndjson
 ```
 
-Verification:
+Verify:
 
 ```bash
 xyte-cli call organization.spaces.getSpaces \
   --tenant <tenant-id> \
-  --query-json '{"path_includes":"HQ/Floor-1/Room-A"}'
+  --query-json '{"path_includes":"HQ/Floor 1/Office 1"}'
 ```
 
-Idempotency verification:
+## SOP C: Generic endpoint preprocessing
+
+List actions:
 
 ```bash
-xyte-cli space import-tree \
-  --tenant <tenant-id> \
-  --input /Users/porton/Projects/xyte-cli/tmp/space-import.jsonl \
-  --apply
+xyte-cli utility list-actions --format text
 ```
 
-## Local Utility Sandbox
+Prepare generic action:
+
+```bash
+xyte-cli utility prepare \
+  --action organization.tickets.updateTicket \
+  --input /path/to/raw-ticket-updates.csv \
+  --tenant <tenant-id> \
+  --output-dir /Users/porton/Projects/xyte-cli/tmp
+```
+
+Generic canonical headers:
+1. `<path params in order>,query_json,body_json`
+
+## Local utility sandbox
 
 ```bash
 # terminal A
@@ -130,10 +101,7 @@ npm run mock:xyte:local -- --port 3001
 npm run smoke:local:utilities -- --base-url http://127.0.0.1:3001 --tenant local
 ```
 
-Success condition:
-- smoke command exits `0` and prints `Local utility smoke passed.`
-
 MCP parity tools:
-- `xyte_utility_ai_context`
-- `xyte_device_bulk_rename`
-- `xyte_space_import_tree`
+1. `xyte_utility_prepare`
+2. `xyte_utility_list_actions`
+3. `xyte_space_import_tree`

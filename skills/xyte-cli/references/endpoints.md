@@ -109,36 +109,29 @@ Partner:
 - `partner.devices.getDeviceInfo`
 - `partner.tickets.getTickets`
 
-## Utility Batch Commands (Non-Device Scope)
+## Utility Prepare + Space Import
 
 ```bash
-# generate AI decode contract + scaffold files
-xyte-cli utility ai-context --input ./raw-source.xlsx --entity devices --output-dir ./tmp
+# discover preprocess actions
+xyte-cli utility list-actions --format text
 
-# dry-run by default
-xyte-cli device bulk-rename --tenant <tenant-id> --input ./bulk-rename.csv
+# scaffold canonical files for one action
+xyte-cli utility prepare --action organization.devices.claimDevice --input ./raw-source.xlsx --output-dir ./tmp
 
-# explicit write mode
-xyte-cli device bulk-rename --tenant <tenant-id> --input ./bulk-rename.csv --apply --report ./rename.ndjson
-
-# idempotent find-or-create space paths
-xyte-cli space import-tree --tenant <tenant-id> --input ./space-import.csv --apply
+# scaffold and execute the dedicated import-tree utility
+xyte-cli utility prepare --action space.import-tree --input ./raw-tree.pdf --output-dir ./tmp
+xyte-cli space import-tree --tenant <tenant-id> --input ./tmp/space-import-tree.csv
+xyte-cli space import-tree --tenant <tenant-id> --input ./tmp/space-import-tree.csv --apply --report ./space-import.ndjson
 ```
 
-Supported input formats:
-- CSV
-- JSON array of objects
-- JSONL (one object per line)
+Supported prepare output formats:
+1. CSV (default)
+2. JSONL (optional override)
 
-Expected row fields:
-- `device bulk-rename`: `device_id`, `new_name`
-- `space import-tree`: `path`, optional `space_type`, optional `config`
-
-Output contract:
-- stdout summary: `xyte.utility.batch.v1`
-- optional per-row NDJSON: `--report <path>`
-- AI context scaffold contract: `xyte.utility.ai-context.v1`
-- MCP parity: `xyte_utility_ai_context`, `xyte_device_bulk_rename`, `xyte_space_import_tree`
+Prepare output contract:
+1. stdout summary: `xyte.utility.prepare.v1`
+2. scaffold files: primary + rejected + notes
+3. MCP parity: `xyte_utility_prepare`, `xyte_utility_list_actions`, `xyte_space_import_tree`
 
 ## Multi-tenant Determinism
 

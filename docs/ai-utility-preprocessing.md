@@ -1,113 +1,89 @@
-# AI-Assisted Utility Preprocessing (CLI Execution Only)
+# AI-Assisted Utility Preprocessing (Prepare-First, CLI stays AI-free)
 
-This runbook defines how AI may prepare utility batch files while `xyte-cli` remains the only execution path.
+This runbook defines utility preprocessing with `xyte-cli utility prepare`.
 
 ## Scope
 
-Supported utility flows:
-- `device bulk-rename`
-- `space import-tree`
+1. Preprocess all write-capable endpoint actions into canonical files.
+2. Keep `space import-tree` as the only utility execution command in this surface.
+3. Keep CLI AI-free: no OCR/model calls inside `xyte-cli`.
 
-Out of scope:
-- any embedded AI behavior inside `xyte-cli`
-- `device bulk-move`
+## Core model
 
-## Core Model
+1. Run `xyte-cli utility list-actions` to discover supported actions.
+2. Run `xyte-cli utility prepare --action <action-key> --input <source>`.
+3. CLI emits `xyte.utility.prepare.v1` and scaffolds canonical files.
+4. External AI fills primary/rejected/notes using the contract.
+5. Ask user what to do next. Never auto-apply.
+6. For `space.import-tree`, run dry-run then apply with explicit user approval.
+7. For other actions, use controlled `xyte-cli call` loops outside utility execution.
 
-1. Operator runs `xyte-cli utility ai-context` with explicit entity (`devices|spaces`).
-2. CLI emits decoding contract JSON and scaffolds canonical artifact files.
-3. AI ingests messy operator input and fills scaffolded files.
-4. Operator reviews AI outputs.
-5. Agent asks operator what to do next (`dry-run`, `apply`, or stop).
-6. Operator runs `xyte-cli` dry-run.
-7. Operator runs `xyte-cli` apply (only with explicit intent).
-8. Operator verifies via read endpoints and summary schemas.
+## Canonical outputs
 
-## Allowed Source Inputs
+`utility prepare` always creates:
+1. primary artifact
+2. rejected artifact with `reject_reason`
+3. notes artifact
 
-Rename sources:
-- `.xlsx`
-- `.csv`
-- `.json`
-- pasted table/text
+Friendly profiles:
+1. `space.import-tree`:
+- `path,space_type,config`
+2. `organization.devices.claimDevice`:
+- `name,space_id,sn,mac,cloud_id`
 
-Space import sources:
-- `.pdf`
-- `.md`
-- pasted hierarchy text
-- `.csv`
-- `.json`
+Generic profiles:
+1. `<path params...>,query_json,body_json`
 
-## Required AI Output Contracts
+## Required AI rules
 
-### 1) Device Bulk Rename
+1. Never guess unknown identifiers.
+2. Trim whitespace.
+3. Keep deterministic row ordering.
+4. Route ambiguous rows to rejected output with `reject_reason`.
+5. For generic profiles, keep `query_json` and `body_json` valid JSON object strings or empty.
 
-Primary:
-- `/Users/porton/Projects/xyte-cli/tmp/bulk-rename.csv`
-- exact header: `device_id,new_name`
+## Runbook
 
-Rejects:
-- `/Users/porton/Projects/xyte-cli/tmp/bulk-rename.rejected.csv`
-- includes original row data and `reject_reason`
-
-Notes:
-- `/Users/porton/Projects/xyte-cli/tmp/bulk-rename.mapping.md`
-- includes source-to-target mapping, normalization, and conflict decisions
-
-### 2) Space Import Tree
-
-Primary:
-- `/Users/porton/Projects/xyte-cli/tmp/space-import.jsonl`
-- JSONL objects where:
-  - `path` is required
-  - `space_type` is optional
-  - `config` is optional object
-
-Rejects:
-- `/Users/porton/Projects/xyte-cli/tmp/space-import.rejected.jsonl`
-- includes original row/object and `reject_reason`
-
-Notes:
-- `/Users/porton/Projects/xyte-cli/tmp/space-import.notes.md`
-- includes hierarchy/path normalization assumptions
-
-## Hard Validation Rules for AI
-
-Global:
-- do not guess unknown identifiers
-- trim leading/trailing whitespace
-- keep deterministic row ordering where possible
-
-Rename:
-- never invent `device_id`
-- dedupe by `device_id` and keep the last occurrence
-- write dropped/conflicting duplicates into notes and/or rejects
-
-Space import:
-- no empty `path`
-- normalize separators to `/`
-- remove repeated separators and extra whitespace around segments
-- do not infer missing hierarchy segments
-- keep ambiguous entries in rejects
-
-## Execution SOP
-
-### Build AI Context + Scaffold Artifacts
+Discover actions:
 
 ```bash
-xyte-cli utility ai-context \
-  --input /path/to/source-file \
-  --entity devices \
+xyte-cli utility list-actions --format text
+```
+
+Prepare claim action:
+
+```bash
+xyte-cli utility prepare \
+  --action organization.devices.claimDevice \
+  --input /path/to/raw-source.xlsx \
   --tenant <tenant-id> \
   --output-dir /Users/porton/Projects/xyte-cli/tmp
 ```
 
-Notes:
-- CLI remains AI-free (no OCR/model inference).
-- Entity selection is explicit (`devices` or `spaces`), no auto-inference.
-- Use `--force` to overwrite existing scaffold files.
+Prepare space import action:
 
-### Local Sandbox
+```bash
+xyte-cli utility prepare \
+  --action space.import-tree \
+  --input /path/to/raw-hierarchy.pdf \
+  --tenant <tenant-id> \
+  --output-dir /Users/porton/Projects/xyte-cli/tmp
+```
+
+Execute prepared space import (dry-run then apply):
+
+```bash
+xyte-cli space import-tree \
+  --tenant <tenant-id> \
+  --input /Users/porton/Projects/xyte-cli/tmp/space-import-tree.csv
+
+xyte-cli space import-tree \
+  --tenant <tenant-id> \
+  --input /Users/porton/Projects/xyte-cli/tmp/space-import-tree.csv \
+  --apply
+```
+
+## Local sandbox
 
 Terminal A:
 
@@ -121,67 +97,11 @@ Terminal B:
 npm run smoke:local:utilities -- --base-url http://127.0.0.1:3001 --tenant local
 ```
 
-### Production Sequence
+## Contracts
 
-Rename dry-run:
-
-```bash
-xyte-cli device bulk-rename \
-  --tenant <tenant-id> \
-  --input /Users/porton/Projects/xyte-cli/tmp/bulk-rename.csv \
-  --report /Users/porton/Projects/xyte-cli/tmp/bulk-rename.dryrun.ndjson
-```
-
-Rename apply:
-
-```bash
-xyte-cli device bulk-rename \
-  --tenant <tenant-id> \
-  --input /Users/porton/Projects/xyte-cli/tmp/bulk-rename.csv \
-  --apply \
-  --report /Users/porton/Projects/xyte-cli/tmp/bulk-rename.apply.ndjson
-```
-
-Space import dry-run:
-
-```bash
-xyte-cli space import-tree \
-  --tenant <tenant-id> \
-  --input /Users/porton/Projects/xyte-cli/tmp/space-import.jsonl \
-  --report /Users/porton/Projects/xyte-cli/tmp/space-import.dryrun.ndjson
-```
-
-Space import apply:
-
-```bash
-xyte-cli space import-tree \
-  --tenant <tenant-id> \
-  --input /Users/porton/Projects/xyte-cli/tmp/space-import.jsonl \
-  --apply \
-  --report /Users/porton/Projects/xyte-cli/tmp/space-import.apply.ndjson
-```
-
-## Manual Operator Validation Sequence
-
-1. Prepare AI output files from a messy source file.
-2. Run rename dry-run and confirm summary:
-   - `schemaVersion: "xyte.utility.batch.v1"`
-   - `mode: "dry-run"`
-3. Run rename apply and confirm:
-   - `mode: "apply"`
-   - `totals.succeeded > 0`
-4. Run space import dry-run then apply.
-5. Re-run space import apply to confirm idempotency (no failures due to existing paths).
-6. Verify server/device/space state:
-   - local mock: `GET /_mock/state`
-   - production read endpoints via `xyte-cli call`
-
-## Summary Contract
-
-All utility execution summaries must remain:
+1. Prepare contract:
+- schema ID: `xyte.utility.prepare.v1`
+- schema file: `/Users/porton/Projects/xyte-cli/docs/schemas/utility-prepare.v1.schema.json`
+2. Import-tree batch summary:
 - schema ID: `xyte.utility.batch.v1`
 - schema file: `/Users/porton/Projects/xyte-cli/docs/schemas/utility-batch.v1.schema.json`
-
-AI context scaffold summaries use:
-- schema ID: `xyte.utility.ai-context.v1`
-- schema file: `/Users/porton/Projects/xyte-cli/docs/schemas/utility-ai-context.v1.schema.json`

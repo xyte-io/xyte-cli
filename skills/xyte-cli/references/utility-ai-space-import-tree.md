@@ -1,6 +1,6 @@
 # Utility AI Node: Space Import Tree Decode
 
-Use this node only when the target action is `space import-tree`.
+Use this node only when the target action is `space.import-tree`.
 
 ## Objective
 
@@ -8,19 +8,17 @@ Decode a messy source hierarchy into canonical space-import artifacts for `xyte-
 
 ## Canonical Output Artifacts
 
-1. Primary JSONL:
-- `/Users/porton/Projects/xyte-cli/tmp/space-import.jsonl`
-- objects:
-  - `path` required
-  - `space_type` optional
-  - `config` optional object
+1. Primary CSV:
+- `/Users/porton/Projects/xyte-cli/tmp/space-import-tree.csv`
+- exact header:
+  - `path,space_type,config`
 
-2. Rejected JSONL:
-- `/Users/porton/Projects/xyte-cli/tmp/space-import.rejected.jsonl`
+2. Rejected CSV:
+- `/Users/porton/Projects/xyte-cli/tmp/space-import-tree.rejected.csv`
 - include original row/object and `reject_reason`
 
 3. Notes:
-- `/Users/porton/Projects/xyte-cli/tmp/space-import.notes.md`
+- `/Users/porton/Projects/xyte-cli/tmp/space-import-tree.notes.md`
 - include normalization assumptions and ambiguity handling
 
 ## Decode Rules
@@ -43,8 +41,8 @@ Dry-run:
 ```bash
 xyte-cli space import-tree \
   --tenant <tenant-id> \
-  --input /Users/porton/Projects/xyte-cli/tmp/space-import.jsonl \
-  --report /Users/porton/Projects/xyte-cli/tmp/space-import.dryrun.ndjson
+  --input /Users/porton/Projects/xyte-cli/tmp/space-import-tree.csv \
+  --report /Users/porton/Projects/xyte-cli/tmp/space-import-tree.dryrun.ndjson
 ```
 
 Apply:
@@ -52,9 +50,9 @@ Apply:
 ```bash
 xyte-cli space import-tree \
   --tenant <tenant-id> \
-  --input /Users/porton/Projects/xyte-cli/tmp/space-import.jsonl \
+  --input /Users/porton/Projects/xyte-cli/tmp/space-import-tree.csv \
   --apply \
-  --report /Users/porton/Projects/xyte-cli/tmp/space-import.apply.ndjson
+  --report /Users/porton/Projects/xyte-cli/tmp/space-import-tree.apply.ndjson
 ```
 
 Verify:
