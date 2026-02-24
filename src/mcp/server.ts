@@ -9,8 +9,11 @@ import { toProblemDetails } from '../contracts/problem';
 import { evaluateReadiness } from '../config/readiness';
 import type { SecretStore } from '../secure/secret-store';
 import type { ProfileStore } from '../secure/profile-store';
+import type { UtilityInputFormat } from '../utils/input-parser';
 import { getCliVersion } from '../utils/version';
 import { buildFleetInspect, collectFleetSnapshot, generateFleetReport } from '../workflows/fleet-insights';
+import { buildUtilityAiContext, type UtilityAiContextEntity } from '../workflows/utility-ai-context';
+import { runDeviceBulkRename, runSpaceImportTree } from '../workflows/utility-commands';
 
 interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -79,6 +82,31 @@ function parseObject(value: unknown, field: string): Record<string, unknown> {
     throw new Error(`Expected object for "${field}"`);
   }
   return value as Record<string, unknown>;
+}
+
+function parseOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
+function parseUtilityInputFormat(value: unknown): UtilityInputFormat {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : 'auto';
+  const allowed: UtilityInputFormat[] = ['auto', 'csv', 'json', 'jsonl'];
+  if (!allowed.includes(normalized as UtilityInputFormat)) {
+    throw new Error(`Invalid input_format: ${String(value)}. Use auto|csv|json|jsonl.`);
+  }
+  return normalized as UtilityInputFormat;
+}
+
+function parseUtilityAiContextEntity(value: unknown): UtilityAiContextEntity {
+  const normalized = parseString(value, 'entity').trim().toLowerCase();
+  if (normalized !== 'devices' && normalized !== 'spaces') {
+    throw new Error(`Invalid entity: ${String(value)}. Use devices|spaces.`);
+  }
+  return normalized as UtilityAiContextEntity;
 }
 
 function requiresWriteGuard(method: string): boolean {
@@ -167,6 +195,63 @@ function toolList(): McpTool[] {
           tenant: { type: 'string' }
         },
         required: ['tenant'],
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'xyte_device_bulk_rename',
+      description: 'Run device bulk-rename from input file (dry-run by default).',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          tenant: { type: 'string' },
+          input_path: { type: 'string' },
+          input_format: { type: 'string', enum: ['auto', 'csv', 'json', 'jsonl'] },
+          apply: { type: 'boolean' },
+          continue_on_error: { type: 'boolean' },
+          report_path: { type: 'string' },
+          device_id_field: { type: 'string' },
+          new_name_field: { type: 'string' },
+          rename_body_field: { type: 'string' }
+        },
+        required: ['tenant', 'input_path'],
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'xyte_space_import_tree',
+      description: 'Run space tree import from input file (dry-run by default).',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          tenant: { type: 'string' },
+          input_path: { type: 'string' },
+          input_format: { type: 'string', enum: ['auto', 'csv', 'json', 'jsonl'] },
+          apply: { type: 'boolean' },
+          continue_on_error: { type: 'boolean' },
+          report_path: { type: 'string' },
+          path_field: { type: 'string' },
+          space_type_field: { type: 'string' },
+          config_field: { type: 'string' }
+        },
+        required: ['tenant', 'input_path'],
+        additionalProperties: false
+      }
+    },
+    {
+      name: 'xyte_utility_ai_context',
+      description: 'Build AI decoding contract and scaffold canonical utility files.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          input_path: { type: 'string' },
+          entity: { type: 'string', enum: ['devices', 'spaces'] },
+          tenant: { type: 'string' },
+          output_dir: { type: 'string' },
+          interactive: { type: 'boolean' },
+          force: { type: 'boolean' }
+        },
+        required: ['input_path', 'entity'],
         additionalProperties: false
       }
     },
@@ -356,6 +441,52 @@ export function createMcpServer(options: McpServerOptions) {
       const client = withClient(tenant);
       const snapshot = await collectFleetSnapshot(client, tenant);
       return buildFleetInspect(snapshot);
+    }
+
+    if (name === 'xyte_device_bulk_rename') {
+      const tenant = parseString(args.tenant, 'tenant');
+      const inputPath = parseString(args.input_path, 'input_path');
+      const client = withClient(tenant);
+      return runDeviceBulkRename({
+        client,
+        tenantId: tenant,
+        inputPath,
+        inputFormat: parseUtilityInputFormat(args.input_format),
+        apply: parseBoolean(args.apply, false),
+        continueOnError: parseBoolean(args.continue_on_error, false),
+        reportPath: parseOptionalString(args.report_path),
+        deviceIdField: parseOptionalString(args.device_id_field),
+        newNameField: parseOptionalString(args.new_name_field),
+        renameBodyField: parseOptionalString(args.rename_body_field)
+      });
+    }
+
+    if (name === 'xyte_space_import_tree') {
+      const tenant = parseString(args.tenant, 'tenant');
+      const inputPath = parseString(args.input_path, 'input_path');
+      const client = withClient(tenant);
+      return runSpaceImportTree({
+        client,
+        tenantId: tenant,
+        inputPath,
+        inputFormat: parseUtilityInputFormat(args.input_format),
+        apply: parseBoolean(args.apply, false),
+        continueOnError: parseBoolean(args.continue_on_error, false),
+        reportPath: parseOptionalString(args.report_path),
+        pathField: parseOptionalString(args.path_field),
+        spaceTypeField: parseOptionalString(args.space_type_field),
+        configField: parseOptionalString(args.config_field)
+      });
+    }
+
+    if (name === 'xyte_utility_ai_context') {
+      return buildUtilityAiContext({
+        inputPath: parseString(args.input_path, 'input_path'),
+        entity: parseUtilityAiContextEntity(args.entity),
+        tenantId: parseOptionalString(args.tenant),
+        outputDir: parseOptionalString(args.output_dir),
+        force: parseBoolean(args.force, false)
+      });
     }
 
     if (name === 'xyte_report_generate') {

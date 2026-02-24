@@ -48,6 +48,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "mock:xyte:local": "node scripts/mock_xyte_local.mjs",
+    "smoke:local:utilities": "node scripts/smoke_local_utilities.mjs",
     "smoke:external-live": "node scripts/smoke_external_user_live.mjs",
     "report:endpoint-parity": "node scripts/report_external_endpoint_parity.mjs",
     "check:endpoint-parity": "node scripts/report_external_endpoint_parity.mjs --strict",

@@ -17,6 +17,7 @@ import { FileProfileStore, type ProfileStore } from '../secure/profile-store';
 import type { SecretProvider } from '../types/profile';
 import { parseJsonObject } from '../utils/json';
 import { writeJsonLine } from '../utils/json-output';
+import type { UtilityInputFormat } from '../utils/input-parser';
 import { getCliVersion } from '../utils/version';
 import {
   installSkills,
@@ -35,6 +36,8 @@ import {
   formatFleetInspectAscii,
   generateFleetReport
 } from '../workflows/fleet-insights';
+import { buildUtilityAiContext, type UtilityAiContextEntity } from '../workflows/utility-ai-context';
+import { runDeviceBulkRename, runSpaceImportTree } from '../workflows/utility-commands';
 import { createMcpServer } from '../mcp/server';
 
 type OutputStream = Pick<typeof process.stdout, 'write'>;
@@ -170,6 +173,23 @@ function parseQueryJson(value: string | undefined): Record<string, string | numb
     throw new Error(`Query parameter "${key}" must be scalar, null, or undefined.`);
   }
   return out;
+}
+
+function parseUtilityInputFormat(value: string | undefined): UtilityInputFormat {
+  const normalized = (value ?? 'auto').trim().toLowerCase();
+  const allowed: UtilityInputFormat[] = ['auto', 'csv', 'json', 'jsonl'];
+  if (!allowed.includes(normalized as UtilityInputFormat)) {
+    throw new Error(`Invalid input format: ${value}. Use auto|csv|json|jsonl.`);
+  }
+  return normalized as UtilityInputFormat;
+}
+
+function parseUtilityAiContextEntity(value: string | undefined): UtilityAiContextEntity {
+  const normalized = (value ?? '').trim().toLowerCase();
+  if (normalized !== 'devices' && normalized !== 'spaces') {
+    throw new Error(`Invalid entity: ${value}. Use devices|spaces.`);
+  }
+  return normalized as UtilityAiContextEntity;
 }
 
 function requiresWriteGuard(method: string): boolean {
@@ -817,6 +837,157 @@ export function createCli(runtime: CliRuntime = {}): Command {
         process.exitCode = 1;
       }
     });
+
+  const utility = program.command('utility').description('Utility AI context and preprocessing helpers');
+
+  utility
+    .command('ai-context')
+    .description('Build AI decoding contract and scaffold canonical utility files')
+    .requiredOption('--input <path>', 'Input source path')
+    .option('--entity <entity>', 'devices|spaces')
+    .option('--tenant <tenantId>', 'Tenant id used in suggested command strings')
+    .option('--output-dir <path>', 'Directory for scaffolded files')
+    .option('--interactive', 'Prompt for missing entity/output-dir values')
+    .option('--force', 'Overwrite scaffold files if they already exist')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(
+      async (options: {
+        input: string;
+        entity?: string;
+        tenant?: string;
+        outputDir?: string;
+        interactive?: boolean;
+        force?: boolean;
+        strictJson?: boolean;
+      }) => {
+        let entityValue = options.entity;
+        if (!entityValue && options.interactive === true) {
+          entityValue = await prompt({
+            question: 'Entity (devices|spaces)',
+            initial: 'devices',
+            stdout
+          });
+        }
+        if (!entityValue) {
+          throw new Error('Missing entity. Use --entity devices|spaces, or pass --interactive.');
+        }
+
+        let outputDir = options.outputDir;
+        if (!outputDir && options.interactive === true) {
+          outputDir = await prompt({
+            question: 'Output directory for scaffold files',
+            initial: './tmp',
+            stdout
+          });
+        }
+        const resolvedOutputDir = outputDir && outputDir.trim() ? outputDir.trim() : './tmp';
+
+        const result = buildUtilityAiContext({
+          inputPath: options.input,
+          entity: parseUtilityAiContextEntity(entityValue),
+          outputDir: resolvedOutputDir,
+          tenantId: options.tenant,
+          force: options.force === true
+        });
+        printJson(stdout, result, { strictJson: options.strictJson });
+      }
+    );
+
+  const device = program.command('device').description('Device utility operations');
+
+  device
+    .command('bulk-rename')
+    .description('Rename devices in bulk from input rows')
+    .requiredOption('--tenant <tenantId>', 'Tenant id')
+    .requiredOption('--input <path>', 'Input path (CSV/JSON/JSONL)')
+    .option('--input-format <format>', 'auto|csv|json|jsonl', 'auto')
+    .option('--device-id-field <name>', 'Input column/field for device id', 'device_id')
+    .option('--new-name-field <name>', 'Input column/field for new device name', 'new_name')
+    .option('--rename-body-field <name>', 'Body field used for rename payload', 'name')
+    .option('--apply', 'Apply changes (default is dry-run)')
+    .option('--continue-on-error', 'Continue processing rows after failures')
+    .option('--report <path>', 'Write NDJSON row report file')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(
+      async (options: {
+        tenant: string;
+        input: string;
+        inputFormat?: string;
+        deviceIdField?: string;
+        newNameField?: string;
+        renameBodyField?: string;
+        apply?: boolean;
+        continueOnError?: boolean;
+        report?: string;
+        strictJson?: boolean;
+      }) => {
+        const client = await withClient(options.tenant);
+        const result = await runDeviceBulkRename({
+          client,
+          tenantId: options.tenant,
+          inputPath: options.input,
+          inputFormat: parseUtilityInputFormat(options.inputFormat),
+          apply: options.apply === true,
+          continueOnError: options.continueOnError === true,
+          reportPath: options.report,
+          deviceIdField: options.deviceIdField,
+          newNameField: options.newNameField,
+          renameBodyField: options.renameBodyField
+        });
+        printJson(stdout, result, { strictJson: options.strictJson });
+        if (result.totals.failed > 0) {
+          process.exitCode = 1;
+        }
+      }
+    );
+
+  const space = program.command('space').description('Space utility operations');
+
+  space
+    .command('import-tree')
+    .description('Create or find spaces from file-defined paths')
+    .requiredOption('--tenant <tenantId>', 'Tenant id')
+    .requiredOption('--input <path>', 'Input path (CSV/JSON/JSONL)')
+    .option('--input-format <format>', 'auto|csv|json|jsonl', 'auto')
+    .option('--path-field <name>', 'Input column/field for full path', 'path')
+    .option('--space-type-field <name>', 'Input column/field for space type', 'space_type')
+    .option('--config-field <name>', 'Input column/field for config object', 'config')
+    .option('--apply', 'Apply changes (default is dry-run)')
+    .option('--continue-on-error', 'Continue processing rows after failures')
+    .option('--report <path>', 'Write NDJSON row report file')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(
+      async (options: {
+        tenant: string;
+        input: string;
+        inputFormat?: string;
+        pathField?: string;
+        spaceTypeField?: string;
+        configField?: string;
+        apply?: boolean;
+        continueOnError?: boolean;
+        report?: string;
+        strictJson?: boolean;
+      }) => {
+        const client = await withClient(options.tenant);
+        const result = await runSpaceImportTree({
+          client,
+          tenantId: options.tenant,
+          inputPath: options.input,
+          inputFormat: parseUtilityInputFormat(options.inputFormat),
+          apply: options.apply === true,
+          continueOnError: options.continueOnError === true,
+          reportPath: options.report,
+          pathField: options.pathField,
+          spaceTypeField: options.spaceTypeField,
+          configField: options.configField
+        });
+        printJson(stdout, result, { strictJson: options.strictJson });
+        if (result.totals.failed > 0) {
+          process.exitCode = 1;
+        }
+      }
+    );
 
   const inspect = program.command('inspect').description('Deterministic fleet insights');
 

@@ -74,13 +74,14 @@ xyte-cli call organization.devices.getHistories \
 
 ## Concrete Write/Delete Examples
 
-### `device.device-info.spaceMove` (write, guarded)
+### `organization.devices.updateDevice` (write, guarded)
 
 ```bash
-xyte-cli call device.device-info.spaceMove \
+xyte-cli call organization.devices.updateDevice \
   --tenant <tenant-id> \
   --allow-write \
-  --path-json '{"device_id":"<device-id>","space_id":"<space-id>"}'
+  --path-json '{"device_id":"<device-id>"}' \
+  --body-json '{"name":"New name"}'
 ```
 
 ### `organization.incidents.closeIncident` (destructive, guarded)
@@ -108,11 +109,36 @@ Partner:
 - `partner.devices.getDeviceInfo`
 - `partner.tickets.getTickets`
 
-Device:
-- `device.device-info.getDeviceInfo`
-- `device.device-info.spaceMove`
-- `device.telemetries.sendTelemetry`
-- `device.device-info.setCloudSettings`
+## Utility Batch Commands (Non-Device Scope)
+
+```bash
+# generate AI decode contract + scaffold files
+xyte-cli utility ai-context --input ./raw-source.xlsx --entity devices --output-dir ./tmp
+
+# dry-run by default
+xyte-cli device bulk-rename --tenant <tenant-id> --input ./bulk-rename.csv
+
+# explicit write mode
+xyte-cli device bulk-rename --tenant <tenant-id> --input ./bulk-rename.csv --apply --report ./rename.ndjson
+
+# idempotent find-or-create space paths
+xyte-cli space import-tree --tenant <tenant-id> --input ./space-import.csv --apply
+```
+
+Supported input formats:
+- CSV
+- JSON array of objects
+- JSONL (one object per line)
+
+Expected row fields:
+- `device bulk-rename`: `device_id`, `new_name`
+- `space import-tree`: `path`, optional `space_type`, optional `config`
+
+Output contract:
+- stdout summary: `xyte.utility.batch.v1`
+- optional per-row NDJSON: `--report <path>`
+- AI context scaffold contract: `xyte.utility.ai-context.v1`
+- MCP parity: `xyte_utility_ai_context`, `xyte_device_bulk_rename`, `xyte_space_import_tree`
 
 ## Multi-tenant Determinism
 

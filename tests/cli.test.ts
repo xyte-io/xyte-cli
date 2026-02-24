@@ -68,6 +68,186 @@ describe('cli integration', () => {
     ).rejects.toThrow('--allow-write');
   });
 
+  it('runs device bulk-rename in dry-run mode by default', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const tmpRoot = mkdtempSync(join(tmpdir(), 'xyte-cli-utility-rename-dry-'));
+    const inputPath = join(tmpRoot, 'bulk-rename.csv');
+    writeFileSync(inputPath, 'device_id,new_name\nd1,Camera A\n', 'utf8');
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'device',
+      'bulk-rename',
+      '--tenant',
+      'acme',
+      '--input',
+      inputPath
+    ]);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    const parsed = JSON.parse(output);
+    expect(parsed.schemaVersion).toBe('xyte.utility.batch.v1');
+    expect(parsed.command).toBe('device.bulk-rename');
+    expect(parsed.mode).toBe('dry-run');
+    expect(parsed.totals.rows).toBe(1);
+    expect(parsed.totals.skipped).toBe(1);
+  });
+
+  it('runs device bulk-rename apply mode and mutates via organization endpoint', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const tmpRoot = mkdtempSync(join(tmpdir(), 'xyte-cli-utility-rename-apply-'));
+    const inputPath = join(tmpRoot, 'bulk-rename.csv');
+    writeFileSync(inputPath, 'device_id,new_name\nd1,Camera A\n', 'utf8');
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('/core/v1/organization/devices/d1')) {
+          return new Response(JSON.stringify({ id: 'd1', name: 'Camera A' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        return new Response(JSON.stringify({ error: 'unsupported' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        });
+      })
+    );
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'device',
+      'bulk-rename',
+      '--tenant',
+      'acme',
+      '--input',
+      inputPath,
+      '--apply'
+    ]);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    const parsed = JSON.parse(output);
+    expect(parsed.schemaVersion).toBe('xyte.utility.batch.v1');
+    expect(parsed.command).toBe('device.bulk-rename');
+    expect(parsed.mode).toBe('apply');
+    expect(parsed.totals.succeeded).toBe(1);
+    expect(parsed.totals.failed).toBe(0);
+  });
+
+  it('builds utility ai-context for devices and scaffolds files', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const tmpRoot = mkdtempSync(join(tmpdir(), 'xyte-cli-utility-ai-context-devices-'));
+    const inputPath = join(tmpRoot, 'source.csv');
+    const outputDir = join(tmpRoot, 'out');
+    writeFileSync(inputPath, 'raw', 'utf8');
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'utility',
+      'ai-context',
+      '--input',
+      inputPath,
+      '--entity',
+      'devices',
+      '--tenant',
+      'acme',
+      '--output-dir',
+      outputDir
+    ]);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    const parsed = JSON.parse(output);
+    expect(parsed.schemaVersion).toBe('xyte.utility.ai-context.v1');
+    expect(parsed.entity).toBe('devices');
+    expect(parsed.mappedAction).toBe('device.bulk-rename');
+    expect(parsed.suggestedCommands.dryRun).toContain('--tenant acme');
+    expect(existsSync(join(outputDir, 'bulk-rename.csv'))).toBe(true);
+    expect(existsSync(join(outputDir, 'bulk-rename.rejected.csv'))).toBe(true);
+    expect(existsSync(join(outputDir, 'bulk-rename.mapping.md'))).toBe(true);
+  });
+
+  it('fails utility ai-context when entity is missing without interactive mode', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+    const tmpRoot = mkdtempSync(join(tmpdir(), 'xyte-cli-utility-ai-context-missing-'));
+    const inputPath = join(tmpRoot, 'source.csv');
+    writeFileSync(inputPath, 'raw', 'utf8');
+
+    await expect(
+      program.parseAsync(['node', 'xyte-cli', 'utility', 'ai-context', '--input', inputPath])
+    ).rejects.toThrow('Missing entity');
+  });
+
+  it('supports interactive utility ai-context entity selection', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const promptMock = vi.fn().mockResolvedValue('spaces');
+    const program = createCli({
+      profileStore,
+      secretStore,
+      stdout,
+      stderr,
+      promptValue: promptMock,
+      isTTY: true
+    });
+    const tmpRoot = mkdtempSync(join(tmpdir(), 'xyte-cli-utility-ai-context-interactive-'));
+    const inputPath = join(tmpRoot, 'source.pdf');
+    const outputDir = join(tmpRoot, 'out');
+    writeFileSync(inputPath, 'raw', 'utf8');
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'utility',
+      'ai-context',
+      '--input',
+      inputPath,
+      '--interactive',
+      '--output-dir',
+      outputDir
+    ]);
+
+    expect(promptMock).toHaveBeenCalled();
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    const parsed = JSON.parse(output);
+    expect(parsed.entity).toBe('spaces');
+    expect(parsed.mappedAction).toBe('space.import-tree');
+    expect(existsSync(join(outputDir, 'space-import.jsonl'))).toBe(true);
+    expect(existsSync(join(outputDir, 'space-import.rejected.jsonl'))).toBe(true);
+    expect(existsSync(join(outputDir, 'space-import.notes.md'))).toBe(true);
+  });
+
+  it('does not expose device bulk-move command', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+
+    await expect(program.parseAsync(['node', 'xyte-cli', 'device', 'bulk-move'])).rejects.toThrow(
+      /unknown command|process\.exit unexpectedly called with "1"/
+    );
+  });
+
   it('shows one-line remediation when running bare xyte-cli without setup in non-interactive mode', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();

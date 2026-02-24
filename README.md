@@ -21,6 +21,7 @@ Xyte CLI with SKILLS, built for coding agents and operators.
   - `a`, `e`, `u`, `t`, `x`, `n`, `c`, `r`
 - Headless JSON frames with stable contracts
 - Inspect/report pipelines with schema-versioned output
+- Utility batch commands (rename/import) with dry-run default and `--apply` execution gate
 - A4 PDF reports with humanized time labels, continuation-safe pagination, and readability-first table layout
 
 ## Requirements
@@ -151,6 +152,130 @@ xyte-cli call organization.commands.cancelCommand \
   --path-json '{"device_id":"DEVICE_ID","command_id":"COMMAND_ID"}'
 ```
 
+### Utility Operations (Non-Device Scope)
+
+All utility commands are dry-run by default. Add `--apply` to execute writes.
+The same utility surface is available in MCP for parity (`xyte_device_bulk_rename`, `xyte_space_import_tree`).
+
+```bash
+# device rename with apply + per-row report
+xyte-cli device bulk-rename \
+  --tenant <tenant-id> \
+  --input ./bulk-rename.csv \
+  --apply \
+  --report ./rename-report.ndjson
+
+# space tree import (idempotent find-or-create)
+xyte-cli space import-tree \
+  --tenant <tenant-id> \
+  --input ./space-import.csv \
+  --apply
+```
+
+Input examples:
+
+```csv
+# bulk-rename.csv
+device_id,new_name
+d1,Camera A
+d2,Camera B
+```
+
+```json
+[
+  { "device_id": "d1", "new_name": "Camera A" },
+  { "device_id": "d2", "new_name": "Camera B" }
+]
+```
+
+```json
+{"path":"HQ","space_type":"site","config":{"zone":"root"}}
+{"path":"HQ/Floor-1","space_type":"floor","config":{"zone":"north"}}
+```
+
+### Local Utility Sandbox
+
+```bash
+# terminal A
+npm run mock:xyte:local -- --port 3001
+
+# terminal B
+npm run smoke:local:utilities -- --base-url http://127.0.0.1:3001 --tenant local
+```
+
+### AI-Assisted Utility Workflows (CLI-only execution)
+
+`xyte-cli` has no embedded AI. AI is used only to preprocess messy input into canonical files, then CLI executes.
+
+Operator contract docs:
+- `/Users/porton/Projects/xyte-cli/docs/ai-utility-preprocessing.md`
+- `/Users/porton/Projects/xyte-cli/scripts/templates/ai-bulk-rename.prompt.md`
+- `/Users/porton/Projects/xyte-cli/scripts/templates/ai-space-import.prompt.md`
+- entity node (devices): `/Users/porton/Projects/xyte-cli/skills/xyte-cli/references/utility-ai-device-bulk-rename.md`
+- entity node (spaces): `/Users/porton/Projects/xyte-cli/skills/xyte-cli/references/utility-ai-space-import-tree.md`
+
+Required AI output files:
+- rename primary: `/Users/porton/Projects/xyte-cli/tmp/bulk-rename.csv` (`device_id,new_name`)
+- rename rejects: `/Users/porton/Projects/xyte-cli/tmp/bulk-rename.rejected.csv` (+ `reject_reason`)
+- rename notes: `/Users/porton/Projects/xyte-cli/tmp/bulk-rename.mapping.md`
+- space primary: `/Users/porton/Projects/xyte-cli/tmp/space-import.jsonl` (`path`, optional `space_type`, optional `config`)
+- space rejects: `/Users/porton/Projects/xyte-cli/tmp/space-import.rejected.jsonl` (+ `reject_reason`)
+- space notes: `/Users/porton/Projects/xyte-cli/tmp/space-import.notes.md`
+
+Step 1: build AI decoding context + scaffold files:
+
+```bash
+xyte-cli utility ai-context \
+  --input /path/to/source-file \
+  --entity devices \
+  --tenant <tenant-id> \
+  --output-dir /Users/porton/Projects/xyte-cli/tmp
+```
+
+Step 2: execute with existing utility commands.
+
+Production runbook:
+
+```bash
+# rename dry-run
+xyte-cli device bulk-rename \
+  --tenant <tenant-id> \
+  --input /Users/porton/Projects/xyte-cli/tmp/bulk-rename.csv \
+  --report /Users/porton/Projects/xyte-cli/tmp/bulk-rename.dryrun.ndjson
+
+# rename apply
+xyte-cli device bulk-rename \
+  --tenant <tenant-id> \
+  --input /Users/porton/Projects/xyte-cli/tmp/bulk-rename.csv \
+  --apply \
+  --report /Users/porton/Projects/xyte-cli/tmp/bulk-rename.apply.ndjson
+
+# space import dry-run
+xyte-cli space import-tree \
+  --tenant <tenant-id> \
+  --input /Users/porton/Projects/xyte-cli/tmp/space-import.jsonl \
+  --report /Users/porton/Projects/xyte-cli/tmp/space-import.dryrun.ndjson
+
+# space import apply
+xyte-cli space import-tree \
+  --tenant <tenant-id> \
+  --input /Users/porton/Projects/xyte-cli/tmp/space-import.jsonl \
+  --apply \
+  --report /Users/porton/Projects/xyte-cli/tmp/space-import.apply.ndjson
+```
+
+Verification examples:
+
+```bash
+xyte-cli call organization.devices.getDevice \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<sample-device-id>"}'
+
+xyte-cli call organization.spaces.getSpaces \
+  --tenant <tenant-id> \
+  --query-json '{"path_includes":"HQ/Floor-1/Room-A"}'
+```
+
 ### Insights + Reports
 
 ```bash
@@ -173,6 +298,11 @@ xyte-cli tui --headless --screen spaces --format json --follow --interval-ms 200
 xyte-cli mcp serve
 ```
 
+Utility parity in MCP:
+- `xyte_device_bulk_rename`
+- `xyte_space_import_tree`
+- `xyte_utility_ai_context`
+
 ## Headless Contract IDs
 
 - `xyte.headless.frame.v1`
@@ -180,6 +310,8 @@ xyte-cli mcp serve
 - `xyte.inspect.fleet.v1`
 - `xyte.inspect.deep-dive.v1`
 - `xyte.report.v1`
+- `xyte.utility.batch.v1`
+- `xyte.utility.ai-context.v1`
 
 Schemas:
 
@@ -188,6 +320,8 @@ Schemas:
 - `docs/schemas/inspect-fleet.v1.schema.json`
 - `docs/schemas/inspect-deep-dive.v1.schema.json`
 - `docs/schemas/report.v1.schema.json`
+- `docs/schemas/utility-batch.v1.schema.json`
+- `docs/schemas/utility-ai-context.v1.schema.json`
 
 ## Agent Quick Start
 

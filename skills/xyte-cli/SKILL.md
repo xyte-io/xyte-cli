@@ -1,6 +1,6 @@
 ---
 name: xyte-cli
-description: "Use for @xyteai/cli operations: first-run setup, tenant/key auth, guarded endpoint calls, inspect/report generation, JSON-only headless TUI snapshots, and MCP tool serving with schema-validated outputs."
+description: "Use for @xyteai/cli operations: first-run setup, tenant/key auth, guarded endpoint calls, utility batch flows, inspect/report generation, JSON-only headless TUI snapshots, and MCP tool serving with schema-validated outputs."
 ---
 
 # XYTE Skill Router (One-Stop, Agent-Native)
@@ -28,6 +28,7 @@ Use when the request involves any of:
 - setup/readiness for Xyte access
 - tenant/key-slot management
 - endpoint discovery or endpoint invocation
+- utility batch operations (bulk rename/import from files)
 - fleet inspection/deep-dive/reporting
 - headless TUI JSON frame consumption
 - MCP tool bridge for external agents
@@ -44,6 +45,12 @@ Use when the request involves any of:
 - Require explicit user intent before writes.
 - Non-read endpoint calls must include `--allow-write`.
 - Destructive endpoint calls must include `--confirm <endpoint-key>`.
+- Utility batch commands default to dry-run. Add `--apply` to execute writes.
+- Utility preprocessing is external: AI prepares files, `xyte-cli` executes them.
+- For utility workflows: always do `utility ai-context` + file structuring first.
+- Hard decision gate: after structuring output files, stop and ask the user what to do next (`dry-run`, `apply`, or stop).
+- Never run `device bulk-rename` or `space import-tree` until the user explicitly chooses the next action.
+- Never auto-apply and never infer permission to create/update from context.
 - In automation, always pass `--tenant <tenant-id>`.
 
 ## Deterministic Execution Order
@@ -69,7 +76,15 @@ Use when the request involves any of:
 - `xyte-cli inspect deep-dive --tenant <tenant-id> --window <hours> --format json`
 - `xyte-cli report generate --tenant <tenant-id> --input <deep-dive.json> --out <report.pdf>`
 
-5. Headless and MCP:
+5. Utility batches (agent parses file, CLI executes plan):
+- `xyte-cli utility ai-context --input <file> --entity devices|spaces [--tenant <tenant-id>] [--output-dir <dir>]`
+- Stop and ask user decision before any execution command.
+- `xyte-cli device bulk-rename --tenant <tenant-id> --input <file> [--apply]`
+- `xyte-cli space import-tree --tenant <tenant-id> --input <file> [--apply]`
+- preprocessing contract: `/Users/porton/Projects/xyte-cli/docs/ai-utility-preprocessing.md`
+- decision gate: after structuring files, ask user what to do next; do not assume apply.
+
+6. Headless and MCP:
 - `xyte-cli tui --headless --screen <screen> --format json --once --tenant <tenant-id>`
 - `xyte-cli mcp serve`
 
@@ -87,6 +102,9 @@ Use when the request involves any of:
 | Fleet summary | `xyte-cli inspect fleet --tenant <tenant-id> --format json` |
 | Deep-dive analytics | `xyte-cli inspect deep-dive --tenant <tenant-id> --window <hours> --format json` |
 | PDF report generation | `xyte-cli report generate --tenant <tenant-id> --input <deep-dive.json> --out <path>.pdf` |
+| Utility AI context scaffold | `xyte-cli utility ai-context --input <file> --entity devices|spaces --output-dir ./tmp` |
+| Device bulk rename | `xyte-cli device bulk-rename --tenant <tenant-id> --input <file> [--apply]` |
+| Space tree import | `xyte-cli space import-tree --tenant <tenant-id> --input <file> [--apply]` |
 | Headless snapshot (JSON NDJSON) | `xyte-cli tui --headless --screen <screen> --format json --once --tenant <tenant-id>` |
 | Continuous headless monitoring | `xyte-cli tui --headless --screen <screen> --format json --follow --interval-ms <ms> --tenant <tenant-id>` |
 | MCP tool bridge | `xyte-cli mcp serve` |
@@ -127,6 +145,25 @@ xyte-cli inspect deep-dive --tenant <tenant-id> --window 24 --format json > /tmp
 xyte-cli report generate --tenant <tenant-id> --input /tmp/deep-dive.json --out /tmp/xyte-findings.pdf
 ```
 
+Utility dry-run then apply:
+```bash
+xyte-cli utility ai-context --input ./raw-source.xlsx --entity devices --tenant <tenant-id> --output-dir ./tmp
+
+xyte-cli device bulk-rename --tenant <tenant-id> --input ./bulk-rename.csv
+xyte-cli device bulk-rename --tenant <tenant-id> --input ./bulk-rename.csv --apply --report ./rename-report.ndjson
+
+xyte-cli utility ai-context --input ./raw-tree.pdf --entity spaces --tenant <tenant-id> --output-dir ./tmp
+
+xyte-cli space import-tree --tenant <tenant-id> --input ./space-import.csv
+xyte-cli space import-tree --tenant <tenant-id> --input ./space-import.csv --apply --report ./space-import-report.ndjson
+```
+
+AI preprocessing prompt templates:
+```bash
+cat /Users/porton/Projects/xyte-cli/scripts/templates/ai-bulk-rename.prompt.md
+cat /Users/porton/Projects/xyte-cli/scripts/templates/ai-space-import.prompt.md
+```
+
 ## Contract IDs and Schemas
 
 Schema/version IDs:
@@ -135,6 +172,8 @@ Schema/version IDs:
 - inspect fleet: `xyte.inspect.fleet.v1`
 - inspect deep dive: `xyte.inspect.deep-dive.v1`
 - report metadata: `xyte.report.v1`
+- utility batch summary: `xyte.utility.batch.v1`
+- utility AI context: `xyte.utility.ai-context.v1`
 
 Canonical schemas:
 - `docs/schemas/call-envelope.v1.schema.json`
@@ -142,6 +181,8 @@ Canonical schemas:
 - `docs/schemas/inspect-fleet.v1.schema.json`
 - `docs/schemas/inspect-deep-dive.v1.schema.json`
 - `docs/schemas/report.v1.schema.json`
+- `docs/schemas/utility-batch.v1.schema.json`
+- `docs/schemas/utility-ai-context.v1.schema.json`
 
 ## MCP Tool Surface (Current)
 
@@ -152,6 +193,9 @@ Current tool names:
 - `xyte_describe_endpoint`
 - `xyte_call`
 - `xyte_inspect_fleet`
+- `xyte_utility_ai_context`
+- `xyte_device_bulk_rename`
+- `xyte_space_import_tree`
 - `xyte_report_generate`
 
 Guard semantics in MCP mirror CLI:
@@ -173,10 +217,18 @@ XYTE_TUI_DEBUG=1 XYTE_TUI_DEBUG_LOG=/tmp/xyte-tui-debug.log xyte-cli tui --tenan
 - Headless errors:
   - ensure `--headless --format json` (no text format in headless)
   - parse NDJSON and use the last runtime frame (`meta.startup != true`)
+- Local utility sandbox:
+```bash
+npm run mock:xyte:local -- --port 3001
+npm run smoke:local:utilities -- --base-url http://127.0.0.1:3001 --tenant local
+```
 
 ## References (Load As Needed)
 
 - `references/endpoints.md`
+- `references/utilities.md`
+- `references/utility-ai-device-bulk-rename.md`
+- `references/utility-ai-space-import-tree.md`
 - `references/tui-flows.md`
 - `references/headless-contract.md`
 

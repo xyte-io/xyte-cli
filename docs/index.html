@@ -1019,6 +1019,11 @@
               <p>Fleet inspect/deep-dive/report pipeline with versioned contract outputs.</p>
               <code>xyte-cli report generate --tenant acme --input /tmp/deep.json --out /tmp/report.pdf</code>
             </article>
+            <article class="feature-card">
+              <h3>Utility batches</h3>
+              <p>Bulk rename and space import workflows with dry-run by default and explicit apply gates.</p>
+              <code>xyte-cli device bulk-rename --tenant acme --input ./bulk-rename.csv</code>
+            </article>
           </div>
         </div>
       </section>
@@ -1050,6 +1055,31 @@
               <pre><span class="term-cmd">XYTE_CLI_KEY</span>=<span class="term-val">"&lt;real-key&gt;"</span> \
 <span class="term-cmd">XYTE_E2E_TENANT</span>=<span class="term-val">"&lt;tenant-id-or-default&gt;"</span> \
 <span class="term-cmd">npm run test:commit</span></pre>
+            </article>
+            <article class="panel">
+              <h3>Local utility sandbox</h3>
+              <p>Run utility commands safely against a local mock server. Expected pass criteria: <code>Local utility smoke passed.</code></p>
+              <pre><span class="term-cm"># terminal A</span>
+<span class="term-cmd">npm run mock:xyte:local</span> <span class="term-flg">-- --port</span> <span class="term-val">3001</span>
+
+<span class="term-cm"># terminal B</span>
+<span class="term-cmd">npm run smoke:local:utilities</span> <span class="term-flg">-- --base-url</span> <span class="term-val">http://127.0.0.1:3001</span> <span class="term-flg">--tenant</span> <span class="term-val">local</span></pre>
+              <p class="muted">Run dry-run first, then apply for <code>device bulk-rename</code> and <code>space import-tree</code>.</p>
+            </article>
+            <article class="panel">
+              <h3>AI preprocessing + CLI execution</h3>
+              <p><code>xyte-cli</code> has no embedded AI. AI may prepare files only; CLI remains the execution engine.</p>
+              <pre><span class="term-cm"># preprocess with external AI assistant</span>
+<span class="term-cmd">cat docs/ai-utility-preprocessing.md</span>
+<span class="term-cmd">cat scripts/templates/ai-bulk-rename.prompt.md</span>
+<span class="term-cmd">cat scripts/templates/ai-space-import.prompt.md</span>
+
+<span class="term-cm"># build decoding context + scaffold files</span>
+<span class="term-cmd">xyte-cli utility ai-context --input /path/to/raw-file --entity devices --tenant acme --output-dir ./tmp</span>
+
+<span class="term-cm"># execute with xyte-cli</span>
+<span class="term-cmd">xyte-cli device bulk-rename --tenant acme --input /Users/porton/Projects/xyte-cli/tmp/bulk-rename.csv</span>
+<span class="term-cmd">xyte-cli space import-tree --tenant acme --input /Users/porton/Projects/xyte-cli/tmp/space-import.jsonl</span></pre>
             </article>
           </div>
         </div>
@@ -1119,6 +1149,21 @@
                   <td>Feeds report generation pipeline.</td>
                 </tr>
                 <tr>
+                  <td>Utility AI context</td>
+                  <td><code>xyte-cli utility ai-context --input ./raw-source.xlsx --entity devices --output-dir ./tmp</code></td>
+                  <td>Returns machine-readable decode contract and scaffolds canonical files.</td>
+                </tr>
+                <tr>
+                  <td>Utility batch rename</td>
+                  <td><code>xyte-cli device bulk-rename --tenant acme --input ./bulk-rename.csv --apply</code></td>
+                  <td>Dry-run default; add <code>--report</code> for NDJSON row output.</td>
+                </tr>
+                <tr>
+                  <td>Space tree import</td>
+                  <td><code>xyte-cli space import-tree --tenant acme --input ./space-import.csv --apply</code></td>
+                  <td>Uses idempotent find-or-create behavior.</td>
+                </tr>
+                <tr>
                   <td>TUI / headless</td>
                   <td><code>xyte-cli tui --headless --screen spaces --format json --follow --interval-ms 2000 --tenant acme</code></td>
                   <td>Interactive screen parity with machine output mode.</td>
@@ -1158,6 +1203,7 @@
   <span class="term-flg">--path-json</span> <span class="term-val">'{"device_id":"DEVICE_ID","command_id":"COMMAND_ID"}'</span></pre>
             </article>
           </div>
+          <p class="muted">Utility batch commands are also gated: they run dry-run by default and require <code>--apply</code> for writes.</p>
         </div>
       </section>
 
@@ -1174,6 +1220,8 @@
             <a href="./schemas/inspect-fleet.v1.schema.json">xyte.inspect.fleet.v1</a>
             <a href="./schemas/inspect-deep-dive.v1.schema.json">xyte.inspect.deep-dive.v1</a>
             <a href="./schemas/report.v1.schema.json">xyte.report.v1</a>
+            <a href="./schemas/utility-batch.v1.schema.json">xyte.utility.batch.v1</a>
+            <a href="./schemas/utility-ai-context.v1.schema.json">xyte.utility.ai-context.v1</a>
           </div>
         </div>
       </section>
