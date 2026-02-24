@@ -991,7 +991,9 @@
       "device_model",
       "partner_name",
       "sub_model",
-      "space_id"
+      "space_id",
+      "page",
+      "per_page"
     ],
     "authScope": "organization",
     "bodyType": "none",

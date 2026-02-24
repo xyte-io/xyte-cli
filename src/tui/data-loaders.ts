@@ -50,6 +50,18 @@ function extractIncidentsArray(value: unknown): any[] {
   return primary;
 }
 
+function extractHasNextPage(value: unknown): boolean | undefined {
+  const record = asRecord(value);
+  if (typeof record.has_next_page === 'boolean') {
+    return record.has_next_page;
+  }
+  const data = asRecord(record.data);
+  if (typeof data.has_next_page === 'boolean') {
+    return data.has_next_page;
+  }
+  return undefined;
+}
+
 export interface LoadOutcome<T> {
   data: T;
   connectionState: ConnectionState;
@@ -196,8 +208,38 @@ export async function loadDevicesData(client: XyteClient, tenantId?: string): Pr
 export async function loadIncidentsData(client: XyteClient, tenantId?: string): Promise<LoadOutcome<any[]>> {
   return loadWithOutcome(
     async () => {
-      const raw = await client.organization.getIncidents({ tenantId });
-      return extractIncidentsArray(raw).map((incident) => (incident && typeof incident === 'object' ? incident : { value: incident }));
+      const perPage = 100;
+      const to = Math.floor(Date.now() / 1000);
+      const all: any[] = [];
+
+      for (let page = 1; page <= 50; page += 1) {
+        const raw = await client.organization.getIncidents({
+          tenantId,
+          query: {
+            status: 'active',
+            from: 0,
+            to,
+            page,
+            per_page: perPage
+          }
+        });
+        const pageItems = extractIncidentsArray(raw);
+        if (!pageItems.length) {
+          break;
+        }
+        all.push(...pageItems);
+        const hasNext = extractHasNextPage(raw);
+        if (hasNext === false || (hasNext === undefined && pageItems.length < perPage)) {
+          break;
+        }
+      }
+
+      if (!all.length) {
+        const raw = await client.organization.getIncidents({ tenantId });
+        return extractIncidentsArray(raw).map((incident) => (incident && typeof incident === 'object' ? incident : { value: incident }));
+      }
+
+      return all.map((incident) => (incident && typeof incident === 'object' ? incident : { value: incident }));
     },
     []
   );

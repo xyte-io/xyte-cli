@@ -42,7 +42,7 @@ Derived from the bundled public endpoint spec.
 | `organization.devices.getDevices` | `space_id` | none | Filter devices by one space |
 | `organization.devices.getHistories` | `status`, `from`, `to`, `device_id`, `space_id`, `name` | none | Filtered history lookup; can be time-windowed |
 | `organization.commands.getCommands` | `status`, `page`, `per_page` | `page`, `per_page` | Command history pagination and status filter |
-| `organization.incidents.getIncidents` | `from`, `to`, `status`, `priority`, `title`, `description`, `issue`, `device_model`, `partner_name`, `sub_model`, `space_id` | none | Incident filtering matrix |
+| `organization.incidents.getIncidents` | `from`, `to`, `status`, `priority`, `title`, `description`, `issue`, `device_model`, `partner_name`, `sub_model`, `space_id`, `page`, `per_page` | `page`, `per_page` | Incident filtering matrix. `from`/`to` are Unix integer timestamps when used. |
 
 All other current endpoint specs in this repo have no declared query params.
 
@@ -67,8 +67,8 @@ xyte-cli call organization.devices.getHistories \
   --tenant <tenant-id> \
   --query-json '{
     "status": "online",
-    "from": "2026-02-01T00:00:00Z",
-    "to": "2026-02-06T23:59:59Z",
+    "from": 0,
+    "to": 2000000000,
     "space_id": "<space-id>"
   }'
 ```

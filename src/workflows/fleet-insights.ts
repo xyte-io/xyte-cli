@@ -260,16 +260,80 @@ async function loadAllSpaces(client: XyteClient, tenantId: string): Promise<any[
   return extractArray(single, ['spaces', 'data', 'items']);
 }
 
+function extractHasNextPage(value: unknown): boolean | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  const direct = (value as Record<string, unknown>).has_next_page;
+  if (typeof direct === 'boolean') {
+    return direct;
+  }
+
+  const data = (value as Record<string, unknown>).data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return undefined;
+  }
+  const nested = (data as Record<string, unknown>).has_next_page;
+  return typeof nested === 'boolean' ? nested : undefined;
+}
+
+async function loadAllOrganizationIncidents(client: XyteClient, tenantId: string): Promise<any[]> {
+  const perPage = 100;
+  const to = Math.floor(Date.now() / 1000);
+  const merged = new Map<string, any>();
+  const statuses = ['active', 'closed'] as const;
+
+  for (const status of statuses) {
+    for (let page = 1; page <= 50; page += 1) {
+      const raw = await client.organization.getIncidents({
+        tenantId,
+        query: {
+          status,
+          from: 0,
+          to,
+          page,
+          per_page: perPage
+        }
+      });
+
+      const pageItems = extractArray(raw, ['incidents', 'data', 'items']);
+      if (!pageItems.length) {
+        break;
+      }
+
+      for (const incident of pageItems) {
+        const id = identifier(incident?.id ?? '');
+        if (id) {
+          merged.set(id, incident);
+        } else {
+          merged.set(`${status}:${merged.size}`, incident);
+        }
+      }
+
+      const hasNext = extractHasNextPage(raw);
+      if (hasNext === false || (hasNext === undefined && pageItems.length < perPage)) {
+        break;
+      }
+    }
+  }
+
+  if (merged.size > 0) {
+    return [...merged.values()];
+  }
+
+  const single = await client.organization.getIncidents({ tenantId });
+  return extractArray(single, ['incidents', 'data', 'items']);
+}
+
 export async function collectFleetSnapshot(client: XyteClient, tenantId: string, tenantName?: string): Promise<FleetSnapshot> {
   return withSpan('xyte.inspect.collect_snapshot', { 'xyte.tenant.id': tenantId }, async () => {
-    const [devices, spaces, incidentsRaw, orgTicketsRaw, partnerTicketsRaw] = await Promise.all([
+    const [devices, spaces, incidents, orgTicketsRaw, partnerTicketsRaw] = await Promise.all([
       loadAllDevices(client, tenantId),
       loadAllSpaces(client, tenantId),
-      client.organization.getIncidents({ tenantId }),
+      loadAllOrganizationIncidents(client, tenantId),
       client.organization.getTickets({ tenantId }).catch(() => ({ items: [] })),
       client.partner.getTickets({ tenantId }).catch(() => ({ items: [] }))
     ]);
-    const incidents = extractArray(incidentsRaw, ['incidents', 'data', 'items']);
     const orgTickets = extractArray(orgTicketsRaw, ['tickets', 'data', 'items']);
     const partnerTickets = extractArray(partnerTicketsRaw, ['tickets', 'data', 'items']);
     const tickets = [...orgTickets, ...partnerTickets];

@@ -55,6 +55,23 @@ describe('public endpoint catalog', () => {
     const getHistories = endpoints.find((item) => item.key === 'organization.devices.getHistories');
     expect(getHistories?.queryParams).toEqual(['status', 'from', 'to', 'device_id', 'space_id', 'name']);
 
+    const getIncidents = endpoints.find((item) => item.key === 'organization.incidents.getIncidents');
+    expect(getIncidents?.queryParams).toEqual([
+      'from',
+      'to',
+      'status',
+      'priority',
+      'title',
+      'description',
+      'issue',
+      'device_model',
+      'partner_name',
+      'sub_model',
+      'space_id',
+      'page',
+      'per_page'
+    ]);
+
     const getSpaces = endpoints.find((item) => item.key === 'organization.spaces.getSpaces');
     expect(getSpaces?.queryParams).toEqual([
       'id',

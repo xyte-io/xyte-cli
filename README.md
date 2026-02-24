@@ -134,6 +134,7 @@ xyte-cli list-endpoints
 xyte-cli describe-endpoint organization.devices.getDevices
 xyte-cli call organization.devices.getDevices --tenant <tenant-id>
 xyte-cli call organization.devices.getDevices --tenant <tenant-id> --output-mode envelope
+xyte-cli call organization.incidents.getIncidents --tenant <tenant-id> --query-json '{"status":"active","from":0,"to":1771934060,"page":1,"per_page":100}'
 ```
 
 ### Guarded Writes
