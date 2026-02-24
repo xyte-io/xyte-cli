@@ -40,10 +40,47 @@ describe('cli integration', () => {
       '--tenant',
       'acme',
       '--path-json',
-      '{"device_id":"dev-1"}'
+      '{"parent_id":"dev-1"}'
     ]);
 
     expect(stdout.write).toHaveBeenCalled();
+  });
+
+  it('passes query filters through call requests', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ items: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'call',
+      'organization.spaces.getSpaces',
+      '--tenant',
+      'acme',
+      '--query-json',
+      '{"name":"Chicago Office","space_type":"customer"}'
+    ]);
+
+    expect(fetchMock).toHaveBeenCalled();
+    const calledUrl = String(fetchMock.mock.calls[0][0]);
+    expect(calledUrl).toContain('name=Chicago+Office');
+    expect(calledUrl).toContain('space_type=customer');
   });
 
   it('blocks write calls without --allow-write', async () => {
@@ -475,7 +512,7 @@ describe('cli integration', () => {
       '--tenant',
       'acme',
       '--path-json',
-      '{"device_id":"dev-1"}',
+      '{"parent_id":"dev-1"}',
       '--output-mode',
       'envelope'
     ]);

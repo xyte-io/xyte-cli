@@ -22,18 +22,19 @@ describe('public endpoint catalog', () => {
     expect(cancelCommand?.hasBody).toBe(false);
 
     const cloudSettings = endpoints.find((endpoint) => endpoint.key === 'device.device-info.setCloudSettings');
-    expect(cloudSettings?.notes?.join(' ')).toContain('{ property, value }');
+    expect(cloudSettings?.method).toBe('PUT');
+    expect(cloudSettings?.hasBody).toBe(true);
   });
 
   it('includes device space move endpoint metadata', () => {
     const endpoint = endpoints.find((item) => item.key === 'device.device-info.spaceMove');
     expect(endpoint).toBeDefined();
     expect(endpoint?.method).toBe('PUT');
-    expect(endpoint?.pathTemplate).toBe('/v1/devices/:device_id/space/:space_id');
+    expect(endpoint?.pathTemplate).toBe('/v1/devices/:device_id/space/move');
     expect(endpoint?.authScope).toBe('device');
-    expect(endpoint?.bodyType).toBe('none');
-    expect(endpoint?.hasBody).toBe(false);
-    expect(endpoint?.pathParams).toEqual(['device_id', 'space_id']);
+    expect(endpoint?.bodyType).toBe('json');
+    expect(endpoint?.hasBody).toBe(true);
+    expect(endpoint?.pathParams).toEqual(['device_id']);
   });
 
   it('includes organization close incident endpoint metadata', () => {
@@ -45,5 +46,24 @@ describe('public endpoint catalog', () => {
     expect(endpoint?.bodyType).toBe('none');
     expect(endpoint?.hasBody).toBe(false);
     expect(endpoint?.pathParams).toEqual(['incident_id']);
+  });
+
+  it('includes documented filter params for key read endpoints', () => {
+    const getDevices = endpoints.find((item) => item.key === 'organization.devices.getDevices');
+    expect(getDevices?.queryParams).toEqual(['space_id']);
+
+    const getHistories = endpoints.find((item) => item.key === 'organization.devices.getHistories');
+    expect(getHistories?.queryParams).toEqual(['status', 'from', 'to', 'device_id', 'space_id', 'name']);
+
+    const getSpaces = endpoints.find((item) => item.key === 'organization.spaces.getSpaces');
+    expect(getSpaces?.queryParams).toEqual([
+      'id',
+      'name',
+      'parent_id',
+      'space_type',
+      'created_before',
+      'created_after',
+      'path_includes'
+    ]);
   });
 });
