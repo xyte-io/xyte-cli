@@ -132,11 +132,9 @@ async function main() {
     XYTE_CLI_CONFIG_DIR: configDir
   };
   const fixtures = {
-    rename: join(args.fixturesDir, 'bulk-rename.csv'),
     space: join(args.fixturesDir, 'space-import.csv')
   };
 
-  readFileSync(fixtures.rename, 'utf8');
   readFileSync(fixtures.space, 'utf8');
 
   await resetMock(args.baseUrl);
@@ -147,20 +145,18 @@ async function main() {
   const authAdd = ['auth', 'key', 'add', '--tenant', args.tenant, '--provider', 'xyte-org', '--name', 'local', '--key', 'local-key', '--set-active'];
   assertOk(await run(XYTE_COMMAND, authAdd, env), 'auth key add', XYTE_COMMAND, authAdd);
 
-  const renameDryArgs = ['device', 'bulk-rename', '--tenant', args.tenant, '--input', fixtures.rename];
-  const renameDry = await run(XYTE_COMMAND, renameDryArgs, env);
-  assertOk(renameDry, 'device bulk-rename dry-run', XYTE_COMMAND, renameDryArgs);
-  expectSummary(parseJsonOutput(renameDry.stdout), 'dry-run');
+  const prepareArgs = ['utility', 'prepare', '--action', 'space.import-tree', '--input', fixtures.space, '--output-dir', configDir, '--tenant', args.tenant, '--force'];
+  const prepare = await run(XYTE_COMMAND, prepareArgs, env);
+  assertOk(prepare, 'utility prepare for space.import-tree', XYTE_COMMAND, prepareArgs);
+  const prepareOutput = parseJsonOutput(prepare.stdout);
+  if (prepareOutput.schemaVersion !== 'xyte.utility.prepare.v1') {
+    throw new Error(`Unexpected prepare schemaVersion: ${prepareOutput.schemaVersion}`);
+  }
 
   const spaceDryArgs = ['space', 'import-tree', '--tenant', args.tenant, '--input', fixtures.space];
   const spaceDry = await run(XYTE_COMMAND, spaceDryArgs, env);
   assertOk(spaceDry, 'space import-tree dry-run', XYTE_COMMAND, spaceDryArgs);
   expectSummary(parseJsonOutput(spaceDry.stdout), 'dry-run');
-
-  const renameApplyArgs = ['device', 'bulk-rename', '--tenant', args.tenant, '--input', fixtures.rename, '--apply'];
-  const renameApply = await run(XYTE_COMMAND, renameApplyArgs, env);
-  assertOk(renameApply, 'device bulk-rename apply', XYTE_COMMAND, renameApplyArgs);
-  expectSummary(parseJsonOutput(renameApply.stdout), 'apply');
 
   const spaceApplyArgs = ['space', 'import-tree', '--tenant', args.tenant, '--input', fixtures.space, '--apply'];
   const spaceApply = await run(XYTE_COMMAND, spaceApplyArgs, env);
@@ -172,12 +168,8 @@ async function main() {
   expectSummary(parseJsonOutput(spaceApplyAgain.stdout), 'apply');
 
   const state = await getMockState(args.baseUrl);
-  const devicesById = new Map((state.devices ?? []).map((item) => [item.id, item]));
   const spacesByPath = new Map((state.spaces ?? []).map((item) => [item.full_path, item]));
 
-  if (devicesById.get('d1')?.name !== 'Camera A' || devicesById.get('d2')?.name !== 'Camera B') {
-    throw new Error('Rename verification failed in mock state.');
-  }
   if (!spacesByPath.has('HQ/Floor-1/Room-A')) {
     throw new Error('Space import verification failed in mock state.');
   }

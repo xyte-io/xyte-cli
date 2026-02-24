@@ -6,7 +6,7 @@ import Ajv2020 from 'ajv/dist/2020';
 import { describe, expect, it, vi } from 'vitest';
 
 import { loadInputRows } from '../src/utils/input-parser';
-import { runDeviceBulkRename, runSpaceImportTree } from '../src/workflows/utility-commands';
+import { runSpaceImportTree } from '../src/workflows/utility-commands';
 import type { XyteClient } from '../src/types/client';
 
 function tempPath(filename: string): string {
@@ -21,18 +21,18 @@ function writeFixture(filePath: string, content: string): string {
 
 describe('utility input parser', () => {
   it('parses csv rows', () => {
-    const file = writeFixture(tempPath('rows.csv'), 'device_id,new_name\nd1,A\nd2,B\n');
+    const file = writeFixture(tempPath('rows.csv'), 'path,space_type\nHQ,site\nHQ/F1,floor\n');
     const parsed = loadInputRows(file, 'csv');
     expect(parsed.format).toBe('csv');
     expect(parsed.rows).toHaveLength(2);
-    expect(parsed.rows[0]).toEqual({ device_id: 'd1', new_name: 'A' });
+    expect(parsed.rows[0]).toEqual({ path: 'HQ', space_type: 'site' });
   });
 
   it('parses json rows', () => {
-    const file = writeFixture(tempPath('rows.json'), '[{"device_id":"d1","new_name":"A"}]');
+    const file = writeFixture(tempPath('rows.json'), '[{"path":"HQ","space_type":"site"}]');
     const parsed = loadInputRows(file, 'json');
     expect(parsed.format).toBe('json');
-    expect(parsed.rows[0]).toEqual({ device_id: 'd1', new_name: 'A' });
+    expect(parsed.rows[0]).toEqual({ path: 'HQ', space_type: 'site' });
   });
 
   it('parses jsonl rows', () => {
@@ -48,14 +48,14 @@ describe('utility input parser', () => {
   });
 });
 
-describe('utility command workflows', () => {
-  it('runs bulk rename as dry-run without endpoint calls', async () => {
-    const inputPath = writeFixture(tempPath('bulk-rename.csv'), 'device_id,new_name\nd1,A\n');
+describe('space import workflow', () => {
+  it('runs import-tree as dry-run without endpoint calls', async () => {
+    const inputPath = writeFixture(tempPath('space-import.csv'), 'path,space_type\nHQ,site\n');
     const client = {
       callWithMeta: vi.fn()
     } as unknown as XyteClient;
 
-    const result = await runDeviceBulkRename({
+    const result = await runSpaceImportTree({
       client,
       tenantId: 'acme',
       inputPath,
@@ -65,93 +65,12 @@ describe('utility command workflows', () => {
 
     expect(client.callWithMeta).not.toHaveBeenCalled();
     expect(result.mode).toBe('dry-run');
-    expect(result.command).toBe('device.bulk-rename');
+    expect(result.command).toBe('space.import-tree');
     expect(result.totals.rows).toBe(1);
     expect(result.totals.skipped).toBe(1);
   });
 
-  it('runs bulk-rename against organization update endpoint', async () => {
-    const inputPath = writeFixture(tempPath('bulk-rename.csv'), 'device_id,new_name\nd1,A\n');
-    const calls: Array<{ endpointKey: string; args: any }> = [];
-    const client = {
-      callWithMeta: vi.fn(async (endpointKey: string, args: any) => {
-        calls.push({ endpointKey, args });
-        return { status: 200, durationMs: 3, retryCount: 0, data: { id: args.path?.device_id, name: args.body?.name }, headers: {}, attempts: 1 };
-      })
-    } as unknown as XyteClient;
-
-    const result = await runDeviceBulkRename({
-      client,
-      tenantId: 'acme',
-      inputPath,
-      apply: true,
-      continueOnError: false
-    });
-
-    expect(result.mode).toBe('apply');
-    expect(result.totals.succeeded).toBe(1);
-    expect(result.totals.failed).toBe(0);
-    expect(calls).toHaveLength(1);
-    expect(calls[0].endpointKey).toBe('organization.devices.updateDevice');
-    expect(calls[0].args).toEqual({
-      tenantId: 'acme',
-      path: { device_id: 'd1' },
-      body: { name: 'A' }
-    });
-  });
-
-  it('supports continue-on-error for rename apply mode', async () => {
-    const inputPath = writeFixture(tempPath('bulk-rename.csv'), 'device_id,new_name\nd1,A\nd2,B\n');
-    const client = {
-      callWithMeta: vi
-        .fn()
-        .mockResolvedValueOnce({ status: 200, durationMs: 2, retryCount: 0, data: {}, headers: {}, attempts: 1 })
-        .mockRejectedValueOnce(new Error('boom'))
-    } as unknown as XyteClient;
-
-    const result = await runDeviceBulkRename({
-      client,
-      tenantId: 'acme',
-      inputPath,
-      apply: true,
-      continueOnError: true
-    });
-
-    expect(client.callWithMeta).toHaveBeenCalledTimes(2);
-    expect(result.mode).toBe('apply');
-    expect(result.totals.succeeded).toBe(1);
-    expect(result.totals.failed).toBe(1);
-    expect(result.stoppedEarly).toBe(false);
-  });
-
-  it('continues after row validation errors when continue-on-error is enabled', async () => {
-    const inputPath = writeFixture(tempPath('bulk-rename.csv'), 'device_id,new_name\n,Missing Id\nd2,B\n');
-    const calls: Array<{ endpointKey: string; args: any }> = [];
-    const client = {
-      callWithMeta: vi.fn(async (endpointKey: string, args: any) => {
-        calls.push({ endpointKey, args });
-        return { status: 200, durationMs: 2, retryCount: 0, data: {}, headers: {}, attempts: 1 };
-      })
-    } as unknown as XyteClient;
-
-    const result = await runDeviceBulkRename({
-      client,
-      tenantId: 'acme',
-      inputPath,
-      apply: true,
-      continueOnError: true
-    });
-
-    expect(client.callWithMeta).toHaveBeenCalledTimes(1);
-    expect(calls[0].args.path).toEqual({ device_id: 'd2' });
-    expect(result.totals.rows).toBe(2);
-    expect(result.totals.succeeded).toBe(1);
-    expect(result.totals.failed).toBe(1);
-    expect(result.stoppedEarly).toBe(false);
-    expect(result.firstError?.rowIndex).toBe(1);
-  });
-
-  it('parses config json when importing spaces', async () => {
+  it('parses config json and imports spaces', async () => {
     const inputPath = writeFixture(
       tempPath('space-import.csv'),
       'path,space_type,config\nHQ/Floor-1,building,"{""zone"":""north""}"\n'
@@ -222,12 +141,12 @@ describe('utility command workflows', () => {
     const ajv = new Ajv2020({ strict: false });
     const validate = ajv.compile(schema);
 
-    const inputPath = writeFixture(tempPath('bulk-rename.csv'), 'device_id,new_name\nd1,A\n');
+    const inputPath = writeFixture(tempPath('space-import.csv'), 'path,space_type\nHQ,site\n');
     const client = {
       callWithMeta: vi.fn()
     } as unknown as XyteClient;
 
-    const result = await runDeviceBulkRename({
+    const result = await runSpaceImportTree({
       client,
       tenantId: 'acme',
       inputPath,

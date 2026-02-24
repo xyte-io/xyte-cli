@@ -26,7 +26,7 @@ function waitForLine(stream: PassThrough): Promise<any> {
 }
 
 describe('mcp server', () => {
-  it('responds to initialize and tools/list', async () => {
+  it('responds to initialize and utility tools', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();
     const input = new PassThrough();
@@ -42,14 +42,15 @@ describe('mcp server', () => {
     const listed = await waitForLine(output);
     expect(Array.isArray(listed.result.tools)).toBe(true);
     expect(listed.result.tools.some((tool: any) => tool.name === 'xyte_call')).toBe(true);
-    expect(listed.result.tools.some((tool: any) => tool.name === 'xyte_device_bulk_rename')).toBe(true);
+    expect(listed.result.tools.some((tool: any) => tool.name === 'xyte_utility_prepare')).toBe(true);
+    expect(listed.result.tools.some((tool: any) => tool.name === 'xyte_utility_list_actions')).toBe(true);
     expect(listed.result.tools.some((tool: any) => tool.name === 'xyte_space_import_tree')).toBe(true);
-    expect(listed.result.tools.some((tool: any) => tool.name === 'xyte_utility_ai_context')).toBe(true);
-    expect(listed.result.tools.some((tool: any) => tool.name === 'xyte_device_bulk_move')).toBe(false);
+    expect(listed.result.tools.some((tool: any) => tool.name === 'xyte_device_bulk_rename')).toBe(false);
+    expect(listed.result.tools.some((tool: any) => tool.name === 'xyte_utility_ai_context')).toBe(false);
 
     const tmpRoot = mkdtempSync(join(tmpdir(), 'xyte-mcp-utility-test-'));
-    const inputPath = join(tmpRoot, 'bulk-rename.csv');
-    writeFileSync(inputPath, 'device_id,new_name\nd1,Camera A\n', 'utf8');
+    const inputPath = join(tmpRoot, 'source.csv');
+    writeFileSync(inputPath, 'name,space_id,sn,mac,cloud_id\nCamera A,44,SN-1,,\n', 'utf8');
 
     input.write(
       `${JSON.stringify({
@@ -57,44 +58,38 @@ describe('mcp server', () => {
         id: 3,
         method: 'tools/call',
         params: {
-          name: 'xyte_device_bulk_rename',
+          name: 'xyte_utility_prepare',
           arguments: {
-            tenant: 'acme',
-            input_path: inputPath
+            input_path: inputPath,
+            action: 'organization.devices.claimDevice',
+            output_dir: tmpRoot
           }
         }
       })}\n`
     );
-    const renameResult = await waitForLine(output);
-    expect(renameResult.result?.structuredContent?.schemaVersion).toBe('xyte.utility.batch.v1');
-    expect(renameResult.result?.structuredContent?.command).toBe('device.bulk-rename');
-    expect(renameResult.result?.structuredContent?.mode).toBe('dry-run');
+    const prepareResult = await waitForLine(output);
+    expect(prepareResult.result?.structuredContent?.schemaVersion).toBe('xyte.utility.prepare.v1');
+    expect(prepareResult.result?.structuredContent?.actionKey).toBe('organization.devices.claimDevice');
+    expect(existsSync(prepareResult.result?.structuredContent?.artifacts?.primary)).toBe(true);
+    expect(existsSync(prepareResult.result?.structuredContent?.artifacts?.rejected)).toBe(true);
+    expect(existsSync(prepareResult.result?.structuredContent?.artifacts?.notes)).toBe(true);
 
-    const aiContextInputPath = join(tmpRoot, 'raw-source.pdf');
-    const aiContextOutDir = join(tmpRoot, 'ai-context-out');
-    writeFileSync(aiContextInputPath, 'placeholder', 'utf8');
     input.write(
       `${JSON.stringify({
         jsonrpc: '2.0',
         id: 4,
         method: 'tools/call',
         params: {
-          name: 'xyte_utility_ai_context',
-          arguments: {
-            input_path: aiContextInputPath,
-            entity: 'spaces',
-            output_dir: aiContextOutDir
-          }
+          name: 'xyte_utility_list_actions',
+          arguments: {}
         }
       })}\n`
     );
-    const aiContextResult = await waitForLine(output);
-    expect(aiContextResult.result?.structuredContent?.schemaVersion).toBe('xyte.utility.ai-context.v1');
-    expect(aiContextResult.result?.structuredContent?.entity).toBe('spaces');
-    expect(aiContextResult.result?.structuredContent?.skillNodePath).toContain('utility-ai-space-import-tree.md');
-    expect(existsSync(aiContextResult.result?.structuredContent?.artifacts?.primary)).toBe(true);
-    expect(existsSync(aiContextResult.result?.structuredContent?.artifacts?.rejected)).toBe(true);
-    expect(existsSync(aiContextResult.result?.structuredContent?.artifacts?.notes)).toBe(true);
+    const actionsResult = await waitForLine(output);
+    const actions = actionsResult.result?.structuredContent;
+    expect(Array.isArray(actions)).toBe(true);
+    expect(actions.some((item: any) => item.actionKey === 'organization.devices.claimDevice')).toBe(true);
+    expect(actions.some((item: any) => item.actionKey === 'space.import-tree')).toBe(true);
 
     input.end();
     await running;

@@ -1,0 +1,138 @@
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+import Ajv2020 from 'ajv/dist/2020';
+import { describe, expect, it } from 'vitest';
+
+import { buildUtilityPrepare, listUtilityPrepareActions } from '../src/workflows/utility-prepare';
+
+function makeTempRoot(prefix: string): string {
+  return mkdtempSync(join(tmpdir(), prefix));
+}
+
+describe('utility prepare workflow', () => {
+  it('builds claim-device friendly contract with expected scaffolds', () => {
+    const root = makeTempRoot('xyte-prepare-claim-');
+    const inputPath = join(root, 'source.xlsx');
+    const outDir = join(root, 'out');
+    writeFileSync(inputPath, 'placeholder', 'utf8');
+
+    const result = buildUtilityPrepare({
+      inputPath,
+      actionKey: 'organization.devices.claimDevice',
+      outputDir: outDir,
+      tenantId: 'acme'
+    });
+
+    expect(result.schemaVersion).toBe('xyte.utility.prepare.v1');
+    expect(result.actionKey).toBe('organization.devices.claimDevice');
+    expect(result.mode).toBe('friendly');
+    expect(result.entity).toBe('devices');
+    expect(result.canonical.headers).toEqual(['name', 'space_id', 'sn', 'mac', 'cloud_id']);
+    expect(result.suggestedCommands.next).toContain('claimDevice');
+    expect(existsSync(result.artifacts.primary)).toBe(true);
+    expect(existsSync(result.artifacts.rejected)).toBe(true);
+    expect(existsSync(result.artifacts.notes)).toBe(true);
+  });
+
+  it('builds space.import-tree friendly contract and csv scaffold', () => {
+    const root = makeTempRoot('xyte-prepare-space-');
+    const inputPath = join(root, 'tree.jpeg');
+    const outDir = join(root, 'out');
+    writeFileSync(inputPath, 'placeholder', 'utf8');
+
+    const result = buildUtilityPrepare({
+      inputPath,
+      actionKey: 'space.import-tree',
+      outputDir: outDir
+    });
+
+    expect(result.actionKey).toBe('space.import-tree');
+    expect(result.mode).toBe('friendly');
+    expect(result.input.kind).toBe('image');
+    expect(result.executionSupport).toBe('space.import-tree');
+    expect(readFileSync(result.artifacts.primary, 'utf8')).toBe('path,space_type,config\n');
+    expect(readFileSync(result.artifacts.rejected, 'utf8')).toBe('path,space_type,config,reject_reason\n');
+  });
+
+  it('builds generic endpoint contract with path/query/body canonical fields', () => {
+    const root = makeTempRoot('xyte-prepare-generic-');
+    const inputPath = join(root, 'source.csv');
+    const outDir = join(root, 'out');
+    writeFileSync(inputPath, 'x', 'utf8');
+
+    const result = buildUtilityPrepare({
+      inputPath,
+      actionKey: 'organization.tickets.updateTicket',
+      outputDir: outDir
+    });
+
+    expect(result.mode).toBe('generic');
+    expect(result.canonical.headers).toEqual(['ticket_id', 'query_json', 'body_json']);
+    expect(result.executionSupport).toBe('call-loop-only');
+  });
+
+  it('fails on unknown action and on scaffold collision without force', () => {
+    const root = makeTempRoot('xyte-prepare-force-');
+    const inputPath = join(root, 'source.csv');
+    const outDir = join(root, 'out');
+    writeFileSync(inputPath, 'x', 'utf8');
+
+    expect(() =>
+      buildUtilityPrepare({
+        inputPath,
+        actionKey: 'no.such.action',
+        outputDir: outDir
+      })
+    ).toThrow('Unknown utility action');
+
+    expect(() =>
+      buildUtilityPrepare({
+        inputPath,
+        actionKey: 'device.file-dumps.appendDumpFile',
+        outputDir: outDir
+      })
+    ).toThrow('Unknown utility action');
+
+    buildUtilityPrepare({
+      inputPath,
+      actionKey: 'space.import-tree',
+      outputDir: outDir
+    });
+
+    expect(() =>
+      buildUtilityPrepare({
+        inputPath,
+        actionKey: 'space.import-tree',
+        outputDir: outDir
+      })
+    ).toThrow('--force');
+  });
+
+  it('lists actions and validates prepare schema output', () => {
+    const actions = listUtilityPrepareActions();
+    expect(actions.some((item) => item.actionKey === 'organization.devices.claimDevice')).toBe(true);
+    expect(actions.some((item) => item.actionKey === 'space.import-tree')).toBe(true);
+
+    const root = makeTempRoot('xyte-prepare-schema-');
+    const inputPath = join(root, 'source.md');
+    const outDir = join(root, 'out');
+    writeFileSync(inputPath, '# source', 'utf8');
+
+    const schema = JSON.parse(
+      readFileSync(join(process.cwd(), 'docs/schemas/utility-prepare.v1.schema.json'), 'utf8')
+    ) as Record<string, unknown>;
+    const ajv = new Ajv2020({ strict: false });
+    const validate = ajv.compile(schema);
+
+    const result = buildUtilityPrepare({
+      inputPath,
+      actionKey: 'space.import-tree',
+      outputDir: outDir
+    });
+
+    expect(validate(result)).toBe(true);
+    expect(validate.errors).toBeNull();
+  });
+});
