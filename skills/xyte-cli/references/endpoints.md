@@ -38,8 +38,11 @@ Derived from the bundled public endpoint spec.
 
 | Endpoint Key | Query Fields | Pagination Fields | Notes |
 | --- | --- | --- | --- |
-| `organization.spaces.getSpaces` | `page`, `per_page`, `id`, `parent_id`, `name`, `path_includes`, `space_type`, `created_before`, `created_after` | `page`, `per_page` | Main listing endpoint with server-side filtering |
+| `organization.spaces.getSpaces` | `id`, `name`, `parent_id`, `space_type`, `created_before`, `created_after`, `path_includes` | none | Main listing endpoint with server-side filtering |
+| `organization.devices.getDevices` | `space_id` | none | Filter devices by one space |
 | `organization.devices.getHistories` | `status`, `from`, `to`, `device_id`, `space_id`, `name` | none | Filtered history lookup; can be time-windowed |
+| `organization.commands.getCommands` | `status`, `page`, `per_page` | `page`, `per_page` | Command history pagination and status filter |
+| `organization.incidents.getIncidents` | `from`, `to`, `status`, `priority`, `title`, `description`, `issue`, `device_model`, `partner_name`, `sub_model`, `space_id` | none | Incident filtering matrix |
 
 All other current endpoint specs in this repo have no declared query params.
 
@@ -51,8 +54,6 @@ All other current endpoint specs in this repo have no declared query params.
 xyte-cli call organization.spaces.getSpaces \
   --tenant <tenant-id> \
   --query-json '{
-    "page": 1,
-    "per_page": 25,
     "parent_id": "<space-id>",
     "name": "room",
     "space_type": "room"

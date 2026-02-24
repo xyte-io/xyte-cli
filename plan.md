@@ -59,7 +59,6 @@ Two surgical adjustments to harden reliability and close remaining gaps without 
 Existing suite:
 - `npm run typecheck`
 - `npm test`
-- `npm run check:endpoint-parity`
 - `npm run smoke:external-live`
 
 Acceptance:

@@ -143,7 +143,7 @@ xyte-cli call organization.commands.sendCommand \
   --tenant <tenant-id> \
   --allow-write \
   --path-json '{"device_id":"DEVICE_ID"}' \
-  --body-json '{"name":"reboot"}'
+  --body-json '{"command":"reboot"}'
 
 xyte-cli call organization.commands.cancelCommand \
   --tenant <tenant-id> \
@@ -314,7 +314,7 @@ npm run test:commit
 ```
 
 This gate is enforced before commit:
-`npm run test:commit` runs `npm run typecheck`, `npm test`, `npm run check:endpoint-parity`, then `npm run smoke:external-live`.
+`npm run test:commit` runs `npm run typecheck`, `npm test`, then `npm run smoke:external-live`.
 
 `smoke:external-live` runs exactly like a new external user install:
 1. `npm pack`

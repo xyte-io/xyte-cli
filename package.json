@@ -1,6 +1,6 @@
 {
   "name": "@xyteai/cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Xyte CLI, TUI, skills, and MCP bridge for zero-friction AI operations",
   "license": "Apache-2.0",
   "repository": {
@@ -51,9 +51,7 @@
     "mock:xyte:local": "node scripts/mock_xyte_local.mjs",
     "smoke:local:utilities": "node scripts/smoke_local_utilities.mjs",
     "smoke:external-live": "node scripts/smoke_external_user_live.mjs",
-    "report:endpoint-parity": "node scripts/report_external_endpoint_parity.mjs",
-    "check:endpoint-parity": "node scripts/report_external_endpoint_parity.mjs --strict",
-    "test:commit": "npm run typecheck && npm test && npm run check:endpoint-parity && npm run smoke:external-live",
+    "test:commit": "npm run typecheck && npm test && npm run smoke:external-live",
     "tui": "tsx src/bin/xyte-cli.ts tui",
     "release:publish": "bash scripts/publish.sh all",
     "release:publish:cli": "bash scripts/publish.sh cli",

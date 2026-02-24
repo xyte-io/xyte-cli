@@ -121,7 +121,7 @@ xyte-cli call organization.commands.sendCommand \
   --tenant <tenant-id> \
   --allow-write \
   --path-json '{"device_id":"<device-id>"}' \
-  --body-json '{"name":"reboot"}'
+  --body-json '{"command":"reboot"}'
 ```
 
 Delete call (guarded):
