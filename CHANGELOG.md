@@ -6,12 +6,21 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-02-25
+
 ### Added
-- New `xyte-cli watch` command (incidents-only profile) for continuous incident delta monitoring.
-- New watch frame contract and schema:
-  - `xyte.watch.frame.v1`
-  - `docs/schemas/watch-frame.v1.schema.json`
-- Contract and CLI coverage for snapshot/delta/heartbeat/error watch frames.
+- Action lifecycle logging and `xyte-cli logs` commands (`list`, `view`, `stats`, `gc`).
+- `xyte-cli watch` (incidents-only profile) with watch frame contract `xyte.watch.frame.v1`.
+- Org-scope `organization.devices.updateDevice` endpoint mapping and coverage.
+- AI Agent Ops flow-pack docs/skills routing and local `smoke:local:flow-pack` checks.
+
+### Changed
+- Removed `xyte-device` provider and device-scope API surface (`device.*` catalog entries, `device` auth scope, `client.device`, and `auth.device`).
+- Automatic cleanup for legacy `xyte-device` profile slots and secret-store records during normalization.
+- Expanded `utility prepare` command guidance for `sendCommand`, `claimDevice`, and `updateDevice` verification flows.
+
+### Fixed
+- Improved HTTP transport raw error surfaces to include upstream API detail payloads.
 
 ## [0.5.0] - 2026-02-25
 
@@ -28,8 +37,6 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 - Extended `xyte-cli setup run` with `--connectivity auto|always|never` and deterministic setup `steps` in JSON output.
 - Hardened release checks to include controlled upgrade smoke when Docker is available.
 - Updated docs and GitHub Pages content for new status/upgrade/setup behaviors.
-- Removed `xyte-device` provider and device-scope API surface (`device.*` catalog entries, `device` auth scope, `client.device`, and `auth.device`).
-- Added automatic cleanup for legacy `xyte-device` profile slots and secret-store records during read/normalization.
 
 ### Fixed
 - Corrected semantic version comparison for upgrade check paths.
