@@ -2,12 +2,7 @@
 
 Xyte CLI with SKILLS, built for coding agents and operators.
 
-`xyte-cli` provides deterministic access to Xyte APIs, a full TUI (without a Network tab), guarded write flows, headless NDJSON snapshots, and an MCP server.
-
-### xyte-cli vs xyte MCP
-
-- **CLI**: best fit for coding agents that need low-token, command-driven workflows.
-- **MCP**: available for tool-based integrations and external orchestration via `xyte-cli mcp serve`.
+`xyte-cli` provides deterministic access to Xyte APIs, a full TUI (without a Network tab), guarded write flows, and headless NDJSON snapshots.
 
 ### Key Features
 
@@ -250,17 +245,6 @@ Interactive TUI operations:
 
 Headless guardrail:
 - `--headless` is read-only snapshot mode; write actions are interactive-only.
-
-### MCP
-
-```bash
-xyte-cli mcp serve
-```
-
-Utility parity in MCP:
-- `xyte_utility_prepare`
-- `xyte_utility_list_actions`
-- `xyte_space_import_tree`
 
 ## Headless Contract IDs
 
