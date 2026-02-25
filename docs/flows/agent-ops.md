@@ -9,6 +9,26 @@ Deterministic operator flows for AI-agent usage on top of existing `xyte-cli` co
 3. `xyte-cli space import-tree` is dry-run by default unless `--apply` is provided.
 4. Human decision gate is mandatory before any write/apply loop.
 
+## Executable Flows
+
+These recipes are first-class executable flows:
+
+```bash
+xyte-cli flow list
+xyte-cli flow run <flow-id> --tenant <tenant-id> --plan
+xyte-cli flow run <flow-id> --tenant <tenant-id> --apply --allow-write --resume <run-id-or-path>
+```
+
+Runner behavior:
+- default mode is `--plan` (safe dry mode).
+- `--apply` advances one explicit human gate per invocation.
+- missing guard flags/context produce structured stop states (`pending_gate` or `needs_input`), not silent skips.
+- artifacts are persisted under `./tmp/flow-runs/<flow-id>/<timestamp>-<run-id>/`:
+  - `manifest.json`, `inputs.json`
+  - `decisions.ndjson`, `errors.ndjson`, `watch-frames.ndjson`
+  - per-step artifacts in `steps/` and generated outputs in `outputs/`
+- for create/edit/share/import custom aliases, see `custom-workflows.md`.
+
 ## flow.setup-readiness-10m
 
 - Flow ID: `flow.setup-readiness-10m`

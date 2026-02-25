@@ -51,6 +51,20 @@ import {
   formatFleetInspectAscii,
   generateFleetReport
 } from '../workflows/fleet-insights';
+import {
+  getBuiltInFlowDefinition,
+  hasBuiltInFlowDefinition,
+  listBuiltInFlowDefinitions
+} from '../workflows/flow-catalog';
+import { parseFlowVarOptions, runDeterministicFlow, type FlowRunMode } from '../workflows/flow-runner';
+import {
+  exportFlowDefinition,
+  getFlowDefinition,
+  importFlowDefinition,
+  listFlowDefinitions,
+  saveFlowDefinition,
+  updateFlowDefinition
+} from '../workflows/flow-user-definitions';
 import { runWatch } from '../workflows/watch';
 import { buildUtilityPrepare, listUtilityPrepareActions } from '../workflows/utility-prepare';
 import type { UtilityPreparePrimaryFormat } from '../workflows/utility-action-profiles';
@@ -395,8 +409,8 @@ function parseWatchIntervalMs(value: string | undefined): number {
   if (!Number.isFinite(parsed)) {
     throw new Error(`Invalid interval: ${value}.`);
   }
-  if (parsed < 250) {
-    throw new Error(`Invalid interval: ${parsed}. Minimum is 250ms.`);
+  if (parsed < 1000) {
+    throw new Error(`Invalid interval: ${parsed}. Minimum is 1000ms.`);
   }
   return parsed;
 }
@@ -409,7 +423,45 @@ function parseWatchMaxPolls(value: string | undefined): number | undefined {
   if (!Number.isFinite(parsed) || parsed <= 0) {
     throw new Error(`Invalid max-polls: ${value}. Use a positive integer.`);
   }
+  if (parsed > 3600) {
+    throw new Error(`Invalid max-polls: ${value}. Maximum is 3600.`);
+  }
   return parsed;
+}
+
+function parseFlowMode(options: { plan?: boolean; apply?: boolean }): FlowRunMode {
+  const plan = options.plan === true;
+  const apply = options.apply === true;
+  if (plan && apply) {
+    throw new Error('Invalid mode: use only one of --plan or --apply.');
+  }
+  if (apply) {
+    return 'apply';
+  }
+  return 'plan';
+}
+
+function parseFlowContextJson(value: string | undefined): Record<string, string> {
+  if (!value) {
+    return {};
+  }
+  const resolvedPath = path.resolve(value);
+  const raw = JSON.parse(readFileSync(resolvedPath, 'utf8')) as unknown;
+  if (!isRecord(raw)) {
+    throw new Error(`Invalid flow context file: ${resolvedPath}. Expected a JSON object.`);
+  }
+  const out: Record<string, string> = {};
+  for (const [key, item] of Object.entries(raw)) {
+    if (item === null || item === undefined) {
+      continue;
+    }
+    if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
+      out[key] = String(item);
+      continue;
+    }
+    throw new Error(`Invalid flow context value for "${key}". Use scalar string/number/boolean values.`);
+  }
+  return out;
 }
 
 function requiresWriteGuard(method: string): boolean {
@@ -1258,8 +1310,8 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .option('--tenant <tenantId>', 'Tenant id')
     .option('--profile <profile>', 'incidents-active', 'incidents-active')
     .option('--query-json <json>', 'Query params JSON object (merged over profile defaults)')
-    .option('--interval-ms <ms>', 'Polling interval in ms (minimum 250)', '2000')
-    .option('--max-polls <n>', 'Stop after N polls')
+    .option('--interval-ms <ms>', 'Polling interval in ms (minimum 1000)', '2000')
+    .option('--max-polls <n>', 'Stop after N polls (maximum 3600, default bounded)')
     .option('--once', 'Run one poll and exit')
     .option('--strict-json', 'Fail on non-serializable output')
     .action(
@@ -1290,6 +1342,222 @@ export function createCli(runtime: CliRuntime = {}): Command {
           maxPolls,
           onFrame: (frame) => printJson(stdout, frame, { strictJson, compact: true })
         });
+      }
+    );
+
+  const flow = program.command('flow').description('Deterministic flow orchestration');
+
+  flow
+    .command('list')
+    .description('List built-in and custom flow IDs')
+    .action(async () => {
+      const builtIn = listBuiltInFlowDefinitions().map((item) => ({
+        type: 'built-in' as const,
+        id: item.id,
+        title: item.title,
+        intent: item.intent,
+        writeCapable: item.writeCapable
+      }));
+      const customDefs = await listFlowDefinitions();
+      const custom = customDefs.map((item) => ({
+        type: 'custom' as const,
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        basedOn: item.basedOn,
+        defaults: item.defaults,
+        path: item.path,
+        updatedAtUtc: item.updatedAtUtc
+      }));
+
+      printJson(stdout, {
+        schemaVersion: 'xyte.flow.catalog.v1',
+        generatedAtUtc: new Date().toISOString(),
+        builtIn,
+        custom
+      });
+    });
+
+  flow
+    .command('create')
+    .description('Create a custom shareable flow definition (aliasing a built-in flow)')
+    .argument('<flowId>', 'Custom flow id (flow.<name>)')
+    .requiredOption('--based-on <flowId>', 'Built-in flow id to alias')
+    .option('--title <title>', 'Flow title')
+    .option('--description <description>', 'Flow description')
+    .option('--context-json <path>', 'JSON object of default context values')
+    .option('--var <key=value>', 'Default context override (repeatable)', (value: string, previous: string[]) => [...previous, value], [])
+    .option('--force', 'Overwrite if flow already exists')
+    .action(
+      async (
+        flowId: string,
+        options: {
+          basedOn: string;
+          title?: string;
+          description?: string;
+          contextJson?: string;
+          var?: string[];
+          force?: boolean;
+        }
+      ) => {
+        if (!hasBuiltInFlowDefinition(options.basedOn)) {
+          throw new Error(`Custom flows must be based on a built-in flow id. Unknown: ${options.basedOn}`);
+        }
+        const defaults = {
+          ...parseFlowContextJson(options.contextJson),
+          ...parseFlowVarOptions(options.var)
+        };
+        const saved = await saveFlowDefinition({
+          flowId,
+          basedOn: options.basedOn,
+          title: options.title,
+          description: options.description,
+          defaults,
+          overwrite: options.force === true
+        });
+        printJson(stdout, saved);
+      }
+    );
+
+  flow
+    .command('edit')
+    .description('Edit a custom flow definition')
+    .argument('<flowId>', 'Custom flow id')
+    .option('--based-on <flowId>', 'Built-in flow id to alias')
+    .option('--title <title>', 'Flow title')
+    .option('--description <description>', 'Flow description')
+    .option('--context-json <path>', 'JSON object of default context values')
+    .option('--var <key=value>', 'Default context override (repeatable)', (value: string, previous: string[]) => [...previous, value], [])
+    .option('--replace-defaults', 'Replace defaults instead of merging')
+    .action(
+      async (
+        flowId: string,
+        options: {
+          basedOn?: string;
+          title?: string;
+          description?: string;
+          contextJson?: string;
+          var?: string[];
+          replaceDefaults?: boolean;
+        }
+      ) => {
+        if (options.basedOn && !hasBuiltInFlowDefinition(options.basedOn)) {
+          throw new Error(`Custom flows must be based on a built-in flow id. Unknown: ${options.basedOn}`);
+        }
+        const mergedDefaults = {
+          ...parseFlowContextJson(options.contextJson),
+          ...parseFlowVarOptions(options.var)
+        };
+        const defaultsProvided = Object.keys(mergedDefaults).length > 0 || options.replaceDefaults === true;
+        const updated = await updateFlowDefinition({
+          flowId,
+          basedOn: options.basedOn,
+          title: options.title,
+          description: options.description,
+          ...(defaultsProvided ? { defaults: mergedDefaults } : {}),
+          replaceDefaults: options.replaceDefaults === true
+        });
+        printJson(stdout, updated);
+      }
+    );
+
+  flow
+    .command('share')
+    .description('Export a custom flow definition for sharing')
+    .argument('<flowId>', 'Custom flow id')
+    .requiredOption('--out <path>', 'Export path')
+    .action(async (flowId: string, options: { out: string }) => {
+      printJson(stdout, await exportFlowDefinition(flowId, options.out));
+    });
+
+  flow
+    .command('import')
+    .description('Import a shared custom flow definition')
+    .requiredOption('--file <path>', 'Path to a shared flow definition JSON')
+    .option('--force', 'Overwrite existing flow definition')
+    .action(async (options: { file: string; force?: boolean }) => {
+      const imported = await importFlowDefinition(options.file, options.force === true);
+      if (!hasBuiltInFlowDefinition(imported.basedOn)) {
+        throw new Error(`Imported flow ${imported.id} references unknown built-in base flow: ${imported.basedOn}`);
+      }
+      printJson(stdout, imported);
+    });
+
+  flow
+    .command('run')
+    .description('Run a deterministic flow by id')
+    .argument('<flowId>', 'Flow id (built-in or custom alias)')
+    .requiredOption('--tenant <tenantId>', 'Tenant id')
+    .option('--plan', 'Dry mode (default)')
+    .option('--apply', 'Guarded apply mode')
+    .option('--allow-write', 'Allow write steps after explicit gate approval')
+    .option('--resume <runRef>', 'Resume from a previous run id or bundle path')
+    .option('--out-dir <path>', 'Flow run bundle root directory', './tmp/flow-runs')
+    .option('--context-json <path>', 'JSON object file for flow context')
+    .option('--var <key=value>', 'Flow context override (repeatable)', (value: string, previous: string[]) => [...previous, value], [])
+    .option('--once', 'Shorten long watch loops')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(
+      async (
+        flowId: string,
+        options: {
+          tenant: string;
+          plan?: boolean;
+          apply?: boolean;
+          allowWrite?: boolean;
+          resume?: string;
+          outDir?: string;
+          contextJson?: string;
+          var?: string[];
+          once?: boolean;
+          strictJson?: boolean;
+        }
+      ) => {
+        const mode = parseFlowMode(options);
+        const runtimeContext = {
+          ...parseFlowContextJson(options.contextJson),
+          ...parseFlowVarOptions(options.var)
+        };
+
+        let resolvedFlowId = flowId;
+        let defaults: Record<string, string> = {};
+        if (!hasBuiltInFlowDefinition(flowId)) {
+          const custom = await getFlowDefinition(flowId);
+          if (!custom) {
+            throw new Error(`Unknown flow id: ${flowId}`);
+          }
+          if (!hasBuiltInFlowDefinition(custom.basedOn)) {
+            throw new Error(`Custom flow ${flowId} references unknown built-in base flow: ${custom.basedOn}`);
+          }
+          resolvedFlowId = custom.basedOn;
+          defaults = custom.defaults;
+        }
+
+        const definition = getBuiltInFlowDefinition(resolvedFlowId);
+        const summary = await runDeterministicFlow({
+          flowId,
+          resolvedFlowId,
+          definition,
+          tenantId: options.tenant,
+          mode,
+          allowWrite: options.allowWrite === true,
+          outDir: options.outDir ?? './tmp/flow-runs',
+          resume: options.resume,
+          context: {
+            ...defaults,
+            ...runtimeContext
+          },
+          once: options.once === true,
+          strictJson: options.strictJson === true,
+          profileStore,
+          secretStore: await getSecretStore(),
+          client: await withClient(options.tenant)
+        });
+
+        printJson(stdout, summary, { strictJson: options.strictJson });
+        if (summary.outcome === 'failed' && summary.classifications.bug > 0) {
+          process.exitCode = 1;
+        }
       }
     );
 

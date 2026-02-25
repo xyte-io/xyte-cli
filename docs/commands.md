@@ -1,8 +1,9 @@
-# Command Reference
+# Command Reference: Workflows + Utilities
 
 This page is a high-signal map of common commands. For full flags and subcommands, use `xyte-cli --help` and `<command> --help`.
+Use it as a unified map for flow runner execution, utility pipelines, and endpoint operations.
 
-## Flow Index
+## Built-In Flow Index
 
 - [`flow.setup-readiness-10m`](flows/agent-ops.md#flowsetup-readiness-10m): establish install/readiness/connectivity baseline before ops.
 - [`flow.incidents-delta-watch`](flows/agent-ops.md#flowincidents-delta-watch): stream incident snapshots and deltas as watch frames.
@@ -10,6 +11,29 @@ This page is a high-signal map of common commands. For full flags and subcommand
 - [`flow.guided-remediation`](flows/agent-ops.md#flowguided-remediation): execute guarded org command/ticket/incident actions with verification.
 - [`flow.bulk-claim-and-space-import`](flows/agent-ops.md#flowbulk-claim-and-space-import): preprocess, dry-run, then approve claim/import writes.
 - [`flow.daily-deep-dive-report`](flows/agent-ops.md#flowdaily-deep-dive-report): produce daily deep-dive JSON and markdown report outputs.
+
+## Flow Commands
+
+```bash
+xyte-cli flow list
+xyte-cli flow run <flow-id> --tenant <tenant-id> [--plan|--apply] [--allow-write] [--resume <run-id-or-path>] [--out-dir <path>] [--context-json <path>] [--var key=value ...] [--once] [--strict-json]
+```
+
+Notes:
+- `--plan` is the default mode; `--plan` and `--apply` are mutually exclusive.
+- `--apply` advances one human gate per invocation and should be paired with `--resume`.
+- mutating steps require `--allow-write`; missing approval produces a structured pending-gate state.
+- run bundles are written to `./tmp/flow-runs` by default and return `xyte.flow.run.v1` summary JSON on stdout.
+- full authoring walkthrough: [`flows/custom-workflows.md`](flows/custom-workflows.md).
+
+Custom flow lifecycle:
+
+```bash
+xyte-cli flow create <flow-id> --based-on <built-in-flow-id> [--title <title>] [--description <text>] [--context-json <path>] [--var key=value ...] [--force]
+xyte-cli flow edit <flow-id> [--based-on <built-in-flow-id>] [--title <title>] [--description <text>] [--context-json <path>] [--var key=value ...] [--replace-defaults]
+xyte-cli flow share <flow-id> --out <path>
+xyte-cli flow import --file <path> [--force]
+```
 
 ## Core
 
@@ -56,6 +80,11 @@ xyte-cli watch --tenant <tenant-id> --profile incidents-active --once
 xyte-cli watch --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 10
 ```
 
+Watch guardrails:
+- `--interval-ms` minimum is `1000`.
+- default watch loops are bounded when `--max-polls` is omitted.
+- `--max-polls` hard cap is `3600`.
+
 Reliable incident fetch:
 
 ```bash
@@ -95,7 +124,7 @@ xyte-cli call organization.commands.cancelCommand \
   --path-json '{"device_id":"DEVICE_ID","command_id":"COMMAND_ID"}'
 ```
 
-## Utility Preprocess And Space Import
+## Utility Pipelines And Space Import
 
 ```bash
 xyte-cli utility list-actions --format text

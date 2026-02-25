@@ -17,6 +17,27 @@ Inspect tenant acme and generate a report.
 Use xyte-cli commands directly and keep outputs JSON-first.
 ```
 
+## Flow-First Agent Operations
+
+Prefer one deterministic command over multi-step ad-hoc orchestration:
+
+```bash
+xyte-cli flow list
+xyte-cli flow run <flow-id> --tenant <tenant-id> --plan
+```
+
+For custom aliases and pinned defaults:
+
+```bash
+xyte-cli flow create flow.<team-name> --based-on <built-in-flow-id> --var key=value
+xyte-cli flow edit flow.<team-name> --var key=value
+xyte-cli flow share flow.<team-name> --out ./tmp/flow.<team-name>.json
+xyte-cli flow import --file ./tmp/flow.<team-name>.json
+```
+
+Detailed workflow authoring guide:
+- [`flows/custom-workflows.md`](flows/custom-workflows.md)
+
 ## Agent-Specific Notes
 
 ### Claude
