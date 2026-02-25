@@ -1,11 +1,23 @@
-import { createHash } from 'node:crypto';
+import { pbkdf2Sync } from 'node:crypto';
 
 import type { ApiKeySlotMeta } from '../types/profile';
 
 export const DEFAULT_SLOT_ID = 'default';
 
+const KEY_FINGERPRINT_ITERATIONS = 100_000;
+const KEY_FINGERPRINT_KEYLEN_BYTES = 16;
+const KEY_FINGERPRINT_SALT = 'xyte-cli:key-fingerprint:v1';
+
 export function makeKeyFingerprint(secret: string): string {
-  return `sha256:${createHash('sha256').update(secret).digest('hex').slice(0, 12)}`;
+  const derived = pbkdf2Sync(
+    secret,
+    KEY_FINGERPRINT_SALT,
+    KEY_FINGERPRINT_ITERATIONS,
+    KEY_FINGERPRINT_KEYLEN_BYTES,
+    'sha256'
+  );
+  const hex = derived.toString('hex').slice(0, 12);
+  return `sha256:${hex}`;
 }
 
 export function slugifySlotName(name: string): string {
