@@ -164,7 +164,17 @@ export class FileSecretStore implements SecretStore {
     normalized.records = sanitized.records;
     const changed = sanitized.changed || asRecord.version !== SECRET_STORE_VERSION;
     if (changed) {
-      await this.writeData(normalized);
+      try {
+        await this.writeData(normalized);
+      } catch (error) {
+        // Best-effort migration: log and continue returning normalized data even if we cannot write.
+        // This avoids breaking reads when the secrets file is readable but not writable (e.g. read-only filesystem).
+        if (error instanceof Error) {
+          console.warn(`Failed to persist normalized secret store at ${this.filePath}: ${error.message}`);
+        } else {
+          console.warn(`Failed to persist normalized secret store at ${this.filePath}.`);
+        }
+      }
     }
     return normalized;
   }
