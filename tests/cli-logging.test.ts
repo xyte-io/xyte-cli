@@ -1,11 +1,11 @@
-import { appendFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { describe, expect, it, vi } from 'vitest';
 
 import { createCli } from '../src/cli/index';
-import { createCliActionLogger, sanitizeArgvForLog } from '../src/cli/action-logger';
+import { createCliActionLogger, listCliActionLogFiles, sanitizeArgvForLog } from '../src/cli/action-logger';
 import { readCliActionLog } from '../src/cli/action-log-store';
 import { MemorySecretStore } from '../src/secure/secret-store';
 import { MemoryProfileStore } from './support/memory-profile-store';
@@ -79,6 +79,66 @@ describe('cli action logging', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it('rotates files and keeps secure file permissions', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-rotation-log-'));
+    const logPath = join(dir, 'actions.ndjson');
+    const logger = createCliActionLogger({
+      enabled: true,
+      path: logPath,
+      maxFileBytes: 700,
+      maxFiles: 3
+    });
+
+    for (let index = 0; index < 80; index += 1) {
+      logger.log('test.rotation', {
+        commandPath: 'xyte-cli test',
+        message: 'x'.repeat(120),
+        index
+      });
+    }
+    logger.close();
+
+    const files = listCliActionLogFiles(logPath);
+    expect(files.length).toBeLessThanOrEqual(3);
+    expect(files.some((file) => file.kind === 'rotated')).toBe(true);
+
+    const mode = statSync(logPath).mode & 0o777;
+    expect(mode).toBe(0o600);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('returns filtered tail entries from large log files', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-tail-log-'));
+    const logPath = join(dir, 'actions.ndjson');
+    const logger = createCliActionLogger({
+      enabled: true,
+      path: logPath,
+      maxFileBytes: 50 * 1024 * 1024,
+      maxFiles: 2
+    });
+
+    for (let index = 1; index <= 2000; index += 1) {
+      logger.log('test.tail', {
+        commandPath: 'xyte-cli tail',
+        seq: index
+      });
+    }
+    logger.close();
+
+    const result = readCliActionLog({
+      path: logPath,
+      event: 'test.tail',
+      limit: 20
+    });
+    const tailSeq = result.entries.map((entry) => Number(asRecord(entry.data).seq));
+    expect(tailSeq.length).toBe(20);
+    expect(tailSeq[0]).toBe(1981);
+    expect(tailSeq[tailSeq.length - 1]).toBe(2000);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it('records command lifecycle events when enabled globally', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-lifecycle-log-'));
     const logPath = join(dir, 'lifecycle.ndjson');
@@ -102,6 +162,28 @@ describe('cli action logging', () => {
     expect(result.entries.some((entry) => entry.event === 'command.start')).toBe(true);
     expect(result.entries.some((entry) => entry.event === 'command.complete')).toBe(true);
     expect(result.entries.some((entry) => entry.commandPath === 'xyte-cli tenant list')).toBe(true);
+    const commandStart = result.entries.find((entry) => entry.event === 'command.start');
+    const commandStartData = asRecord(commandStart?.data);
+    expect(commandStartData.commandPath).toBe('xyte-cli tenant list');
+    expect(commandStartData.options).toBeUndefined();
+    expect(commandStartData.argv).toBeUndefined();
+
+    const verbosePath = join(dir, 'verbose.ndjson');
+    const verboseProgram = createCli({ profileStore, secretStore, stdout, stderr });
+    await verboseProgram.parseAsync([
+      'node',
+      'xyte-cli',
+      '--log-actions',
+      '--log-actions-verbose',
+      '--log-actions-path',
+      verbosePath,
+      'tenant',
+      'list'
+    ]);
+    const verboseResult = readCliActionLog({ path: verbosePath, event: 'command.start', limit: 1 });
+    const verboseData = asRecord(verboseResult.entries[0]?.data);
+    expect(Array.isArray(verboseData.argv)).toBe(true);
+    expect(verboseData.options).toBeDefined();
 
     rmSync(dir, { recursive: true, force: true });
   });
@@ -137,6 +219,49 @@ describe('cli action logging', () => {
     await expect(program.parseAsync(['node', 'xyte-cli', 'logs', 'view', '--path', logPath])).rejects.toThrow(
       'requires a TTY'
     );
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reports stats and applies log gc retention', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-gc-log-'));
+    const logPath = join(dir, 'actions.ndjson');
+    const seedLogger = createCliActionLogger({
+      enabled: true,
+      path: logPath,
+      maxFileBytes: 700,
+      maxFiles: 6
+    });
+    for (let index = 0; index < 120; index += 1) {
+      seedLogger.log('test.gc', {
+        commandPath: 'xyte-cli status',
+        message: 'x'.repeat(120),
+        index
+      });
+    }
+    seedLogger.close();
+
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr, isTTY: false });
+
+    await program.parseAsync(['node', 'xyte-cli', 'logs', 'stats', '--path', logPath, '--format', 'json']);
+    const statsOutput = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    const statsPayload = JSON.parse(statsOutput) as { fileCount: number; totalBytes: number };
+    expect(statsPayload.fileCount).toBeGreaterThan(1);
+    expect(statsPayload.totalBytes).toBeGreaterThan(0);
+
+    stdout.write.mockClear();
+    await program.parseAsync(['node', 'xyte-cli', 'logs', 'gc', '--path', logPath, '--max-files', '2', '--format', 'json']);
+    const gcOutput = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    const gcPayload = JSON.parse(gcOutput) as { removedCount: number; kept: string[] };
+    expect(gcPayload.removedCount).toBeGreaterThan(0);
+    expect(gcPayload.kept.length).toBeLessThanOrEqual(2);
+
+    const filesAfter = listCliActionLogFiles(logPath);
+    expect(filesAfter.length).toBeLessThanOrEqual(2);
 
     rmSync(dir, { recursive: true, force: true });
   });

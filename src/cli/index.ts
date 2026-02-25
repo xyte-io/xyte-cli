@@ -9,8 +9,11 @@ import { Command } from 'commander';
 import { readCliActionLog } from './action-log-store';
 import { runActionLogViewer } from './action-log-viewer';
 import {
+  gcCliActionLogFiles,
+  listCliActionLogFiles,
   createCliActionLogger,
   extractCommandPathFromLogEntry,
+  resolveCliActionLogPath,
   sanitizeArgvForLog,
   type CliActionLogEntry,
   type CliActionLogger
@@ -84,6 +87,7 @@ interface InstallDoctorResult {
 interface CliGlobalOptions {
   logActions?: boolean;
   logActionsPath?: string;
+  logActionsVerbose?: boolean;
 }
 
 interface ActiveCliAction {
@@ -94,6 +98,7 @@ interface ActiveCliAction {
 interface CliActionLogState {
   logger?: CliActionLogger;
   activeAction?: ActiveCliAction;
+  verbose?: boolean;
 }
 
 const CLI_ACTION_LOG_STATE = Symbol('xyte-cli-action-log-state');
@@ -142,6 +147,17 @@ function parseBooleanEnvFlag(value: string | undefined): boolean {
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
+function parsePositiveIntegerEnv(value: string | undefined, fallback: number): number {
+  if (!value) {
+    return fallback;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
 function commandPathFor(command: Command): string {
   const names: string[] = [];
   let current: Command | undefined = command;
@@ -178,6 +194,31 @@ function parsePositiveIntegerOption(value: string | undefined, fallback: number,
     throw new Error(`Invalid ${label}: ${value}. Use a positive integer.`);
   }
   return parsed;
+}
+
+function parsePositiveNumberOption(value: string | undefined, fallback: number | undefined, label: string): number | undefined {
+  if (value === undefined) {
+    return fallback;
+  }
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`Invalid ${label}: ${value}. Use a positive number.`);
+  }
+  return parsed;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  const units = ['KB', 'MB', 'GB'];
+  let size = bytes / 1024;
+  let unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  return `${size.toFixed(1)} ${units[unitIndex]}`;
 }
 
 function formatActionLogText(entry: CliActionLogEntry): string {
@@ -709,6 +750,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
   const program = new Command();
   let actionLogger: CliActionLogger | undefined;
+  let actionLogVerbose = false;
   let activeAction: ActiveCliAction | undefined;
   const actionStartByCommand = new WeakMap<Command, number>();
 
@@ -720,15 +762,21 @@ export function createCli(runtime: CliRuntime = {}): Command {
     const options = command.optsWithGlobals() as CliGlobalOptions;
     const envEnabled = parseBooleanEnvFlag(process.env.XYTE_LOG_ACTIONS);
     const envMirrorToStderr = parseBooleanEnvFlag(process.env.XYTE_LOG_ACTIONS_STDERR);
+    const envVerbose = parseBooleanEnvFlag(process.env.XYTE_LOG_ACTIONS_VERBOSE);
     const configuredPath = options.logActionsPath ?? process.env.XYTE_LOG_ACTIONS_PATH;
     const enabled = options.logActions === true || envEnabled || Boolean(configuredPath);
+    const maxFileBytes = parsePositiveIntegerEnv(process.env.XYTE_LOG_ACTIONS_MAX_FILE_BYTES, 10 * 1024 * 1024);
+    const maxFiles = parsePositiveIntegerEnv(process.env.XYTE_LOG_ACTIONS_MAX_FILES, 5);
+    actionLogVerbose = options.logActionsVerbose === true || envVerbose;
 
     actionLogger = createCliActionLogger({
       enabled,
       path: configuredPath,
       mirrorToStderr: options.logActions === true || envMirrorToStderr,
       stderr,
-      argv: argvForCommand(command)
+      argv: actionLogVerbose ? argvForCommand(command) : undefined,
+      maxFileBytes,
+      maxFiles
     });
     return actionLogger;
   };
@@ -737,6 +785,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
   program.option('--error-format <format>', 'text|json', 'text');
   program.option('--log-actions', 'Log each CLI action (start/complete/error) to NDJSON');
   program.option('--log-actions-path <path>', 'Write action logs to this NDJSON file');
+  program.option('--log-actions-verbose', 'Include command args/options payloads in action logs');
 
   program
     .command('install')
@@ -1952,6 +2001,113 @@ export function createCli(runtime: CliRuntime = {}): Command {
     );
 
   logs
+    .command('stats')
+    .description('Show action log storage stats')
+    .option('--path <path>', 'Action log file override')
+    .option('--format <format>', 'text|json', 'text')
+    .action((options: { path?: string; format?: string }) => {
+      const format = (options.format ?? 'text').trim().toLowerCase();
+      if (format !== 'text' && format !== 'json') {
+        throw new Error(`Invalid format: ${options.format}. Use text|json.`);
+      }
+
+      const path = resolveCliActionLogPath(options.path);
+      const files = listCliActionLogFiles(path);
+      const totalBytes = files.reduce((sum, item) => sum + item.sizeBytes, 0);
+
+      if (format === 'json') {
+        printJson(stdout, {
+          schemaVersion: 'xyte.cli.action-log.stats.v1',
+          path,
+          fileCount: files.length,
+          totalBytes,
+          files: files.map((item) => ({
+            path: item.path,
+            kind: item.kind,
+            index: item.index,
+            sizeBytes: item.sizeBytes,
+            modifiedAtUtc: item.modifiedAtUtc
+          }))
+        });
+        return;
+      }
+
+      stdout.write(`Path: ${path}\n`);
+      stdout.write(`Files: ${files.length}\n`);
+      stdout.write(`Total size: ${formatBytes(totalBytes)} (${totalBytes} bytes)\n`);
+      if (!files.length) {
+        return;
+      }
+      for (const item of files) {
+        const label = item.kind === 'active' ? 'active' : `rotated.${item.index}`;
+        stdout.write(`- ${label} | ${formatBytes(item.sizeBytes)} | ${item.modifiedAtUtc} | ${item.path}\n`);
+      }
+    });
+
+  logs
+    .command('gc')
+    .description('Prune rotated action log files by count/age retention')
+    .option('--path <path>', 'Action log file override')
+    .option('--max-files <n>', 'Maximum total files to retain (active + rotated)')
+    .option('--max-age-days <days>', 'Remove rotated files older than this many days')
+    .option('--dry-run', 'Preview cleanup without deleting files')
+    .option('--format <format>', 'text|json', 'text')
+    .action(
+      (options: {
+        path?: string;
+        maxFiles?: string;
+        maxAgeDays?: string;
+        dryRun?: boolean;
+        format?: string;
+      }) => {
+        const format = (options.format ?? 'text').trim().toLowerCase();
+        if (format !== 'text' && format !== 'json') {
+          throw new Error(`Invalid format: ${options.format}. Use text|json.`);
+        }
+
+        const maxFilesDefault = parsePositiveIntegerEnv(process.env.XYTE_LOG_ACTIONS_MAX_FILES, 5);
+        const maxFiles = parsePositiveIntegerOption(options.maxFiles, maxFilesDefault, 'max-files');
+        const maxAgeDays = parsePositiveNumberOption(options.maxAgeDays, undefined, 'max-age-days');
+        const maxAgeMs = maxAgeDays === undefined ? undefined : Math.round(maxAgeDays * 24 * 60 * 60 * 1000);
+
+        const before = listCliActionLogFiles(options.path);
+        const beforeMap = new Map(before.map((item) => [item.path, item]));
+        const result = gcCliActionLogFiles({
+          path: options.path,
+          maxFiles,
+          maxAgeMs,
+          dryRun: options.dryRun === true
+        });
+        const removedBytes = result.removed.reduce((sum, item) => sum + (beforeMap.get(item)?.sizeBytes ?? 0), 0);
+
+        if (format === 'json') {
+          printJson(stdout, {
+            schemaVersion: 'xyte.cli.action-log.gc.v1',
+            path: result.path,
+            dryRun: options.dryRun === true,
+            maxFiles,
+            maxAgeDays,
+            removedCount: result.removed.length,
+            removedBytes,
+            removed: result.removed,
+            kept: result.kept
+          });
+          return;
+        }
+
+        stdout.write(`Path: ${result.path}\n`);
+        stdout.write(`Mode: ${options.dryRun === true ? 'dry-run' : 'apply'}\n`);
+        stdout.write(`Removed files: ${result.removed.length}\n`);
+        stdout.write(`Freed: ${formatBytes(removedBytes)} (${removedBytes} bytes)\n`);
+        if (result.removed.length) {
+          for (const item of result.removed) {
+            stdout.write(`- removed ${item}\n`);
+          }
+        }
+      }
+    );
+
+  logs
     .command('view')
     .description('Interactive arrow-key action log viewer')
     .option('--path <path>', 'Action log file override')
@@ -2059,11 +2215,18 @@ export function createCli(runtime: CliRuntime = {}): Command {
       commandPath,
       startedAt
     };
+    if (actionLogVerbose) {
+      logger.log('command.start', {
+        commandPath,
+        argv: sanitizeArgvForLog(argvForCommand(actionCommand)),
+        args: actionCommand.args,
+        options: actionCommand.optsWithGlobals()
+      });
+      return;
+    }
+
     logger.log('command.start', {
-      commandPath,
-      argv: sanitizeArgvForLog(argvForCommand(actionCommand)),
-      args: actionCommand.args,
-      options: actionCommand.optsWithGlobals()
+      commandPath
     });
   });
 
@@ -2091,7 +2254,8 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
   (program as CliProgramWithActionLogState)[CLI_ACTION_LOG_STATE] = () => ({
     logger: actionLogger,
-    activeAction
+    activeAction,
+    verbose: actionLogVerbose
   });
 
   program.exitOverride((error) => {
@@ -2120,14 +2284,22 @@ export async function runCli(argv = process.argv, runtime: CliRuntime = {}): Pro
     const state = stateReader?.();
     if (state?.logger?.enabled) {
       const activeAction = state.activeAction;
+      const verbose = state.verbose === true;
+      const baseErrorPayload: Record<string, unknown> = {
+        commandPath: activeAction?.commandPath ?? inferCommandPathFromArgv(argv),
+        durationMs: activeAction ? Date.now() - activeAction.startedAt : undefined
+      };
+
+      if (verbose) {
+        baseErrorPayload.argv = sanitizeArgvForLog(argv.slice(2));
+        baseErrorPayload.error = toProblemDetails(error);
+      } else {
+        baseErrorPayload.error = error instanceof Error ? error.message : String(error);
+      }
+
       state.logger.log(
         'command.error',
-        {
-          commandPath: activeAction?.commandPath ?? inferCommandPathFromArgv(argv),
-          durationMs: activeAction ? Date.now() - activeAction.startedAt : undefined,
-          argv: sanitizeArgvForLog(argv.slice(2)),
-          error: toProblemDetails(error)
-        },
+        baseErrorPayload,
         'error'
       );
     }

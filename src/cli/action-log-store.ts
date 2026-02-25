@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { closeSync, existsSync, openSync, readSync, statSync } from 'node:fs';
 
 import {
   extractCommandPathFromLogEntry,
@@ -18,6 +18,8 @@ export interface ReadCliActionLogResult {
   entries: CliActionLogEntry[];
   parseErrors: number;
 }
+
+const READ_CHUNK_BYTES = 64 * 1024;
 
 function normalizeLimit(limit: number | undefined): number | undefined {
   if (limit === undefined) {
@@ -61,6 +63,51 @@ function entryMatchesFilters(entry: CliActionLogEntry, eventFilter: string | und
   return commandPath.includes(commandFilter);
 }
 
+function scanLogLinesFromEnd(filePath: string, onLine: (line: string) => void, shouldStop: () => boolean): void {
+  const fd = openSync(filePath, 'r');
+  try {
+    const totalBytes = statSync(filePath).size;
+    let position = totalBytes;
+    let carry = '';
+
+    while (position > 0 && !shouldStop()) {
+      const bytesToRead = Math.min(READ_CHUNK_BYTES, position);
+      position -= bytesToRead;
+
+      const buffer = Buffer.allocUnsafe(bytesToRead);
+      const bytesRead = readSync(fd, buffer, 0, bytesToRead, position);
+      if (bytesRead <= 0) {
+        break;
+      }
+
+      const chunk = buffer.toString('utf8', 0, bytesRead);
+      const text = chunk + carry;
+      const parts = text.split('\n');
+      carry = parts.shift() ?? '';
+
+      for (let index = parts.length - 1; index >= 0; index -= 1) {
+        if (shouldStop()) {
+          return;
+        }
+        const line = parts[index].trim();
+        if (!line) {
+          continue;
+        }
+        onLine(line);
+      }
+    }
+
+    if (!shouldStop()) {
+      const firstLine = carry.trim();
+      if (firstLine) {
+        onLine(firstLine);
+      }
+    }
+  } finally {
+    closeSync(fd);
+  }
+}
+
 export function readCliActionLog(options: ReadCliActionLogOptions = {}): ReadCliActionLogResult {
   const path = resolveCliActionLogPath(options.path);
   if (!existsSync(path)) {
@@ -74,30 +121,26 @@ export function readCliActionLog(options: ReadCliActionLogOptions = {}): ReadCli
   const maxEntries = normalizeLimit(options.limit);
   const eventFilter = options.event?.trim();
   const commandFilter = options.command?.trim().toLowerCase();
-  const lines = readFileSync(path, 'utf8').split('\n');
+
   const entries: CliActionLogEntry[] = [];
   let parseErrors = 0;
 
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const line = lines[index].trim();
-    if (!line) {
-      continue;
-    }
+  scanLogLinesFromEnd(
+    path,
+    (line) => {
+      const parsed = parseEntry(line);
+      if (!parsed) {
+        parseErrors += 1;
+        return;
+      }
+      if (!entryMatchesFilters(parsed, eventFilter, commandFilter)) {
+        return;
+      }
 
-    const parsed = parseEntry(line);
-    if (!parsed) {
-      parseErrors += 1;
-      continue;
-    }
-    if (!entryMatchesFilters(parsed, eventFilter, commandFilter)) {
-      continue;
-    }
-
-    entries.push(parsed);
-    if (maxEntries !== undefined && entries.length >= maxEntries) {
-      break;
-    }
-  }
+      entries.push(parsed);
+    },
+    () => maxEntries !== undefined && entries.length >= maxEntries
+  );
 
   entries.reverse();
   return {
