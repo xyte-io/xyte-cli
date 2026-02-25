@@ -117,6 +117,17 @@ xyte-cli logs view --path /tmp/xyte-cli.actions.ndjson
 
 ## Common Workflows
 
+### Flow-First Ops
+
+Use deterministic flow packs when an agent/operator needs repeatable incident and remediation loops:
+
+- [`flow.setup-readiness-10m`](docs/flows/agent-ops.md#flowsetup-readiness-10m): readiness and connectivity baseline.
+- [`flow.incidents-delta-watch`](docs/flows/agent-ops.md#flowincidents-delta-watch): incident NDJSON delta streaming.
+- [`flow.watch-to-triage`](docs/flows/agent-ops.md#flowwatch-to-triage): convert watch output into triage artifacts.
+- [`flow.guided-remediation`](docs/flows/agent-ops.md#flowguided-remediation): guarded command/ticket/incident writes.
+- [`flow.bulk-claim-and-space-import`](docs/flows/agent-ops.md#flowbulk-claim-and-space-import): preprocess + dry-run + apply for claim/import operations.
+- [`flow.daily-deep-dive-report`](docs/flows/agent-ops.md#flowdaily-deep-dive-report): daily deep-dive and markdown reporting.
+
 ### Skills install for coding agents
 
 ```bash
@@ -165,6 +176,7 @@ xyte-cli space import-tree --tenant acme --input ./tmp/space-import-tree.csv --a
 
 - Getting started and setup: [`docs/getting-started.md`](docs/getting-started.md)
 - Command reference: [`docs/commands.md`](docs/commands.md)
+- Agent ops flow pack: [`docs/flows/agent-ops.md`](docs/flows/agent-ops.md)
 - Agent usage patterns: [`docs/agents.md`](docs/agents.md)
 - Development and test gates: [`docs/development.md`](docs/development.md)
 - Utility AI preprocess runbook: [`docs/ai-utility-preprocessing.md`](docs/ai-utility-preprocessing.md)

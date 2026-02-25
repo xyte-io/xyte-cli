@@ -71,4 +71,21 @@ describe('http transport', () => {
       endpointKey: 'test.key'
     } satisfies Partial<XyteHttpError>);
   });
+
+  it('includes upstream detail in http error message', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: 'Either a valid command or friendly_name is required' }), {
+        status: 422,
+        statusText: 'Unprocessable Content',
+        headers: { 'content-type': 'application/json' }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const transport = new HttpTransport({ retryAttempts: 0 });
+
+    await expect(
+      transport.request({ method: 'POST', url: 'https://example.test/v1/devices/dev-1/commands', endpointKey: 'test.key' })
+    ).rejects.toThrow('Either a valid command or friendly_name is required');
+  });
 });

@@ -193,7 +193,9 @@ describe('cli integration', () => {
     expect(parsed.schemaVersion).toBe('xyte.utility.prepare.v1');
     expect(parsed.actionKey).toBe('organization.devices.claimDevice');
     expect(parsed.mode).toBe('friendly');
-    expect(parsed.suggestedCommands.next).toContain('claimDevice');
+    expect(parsed.suggestedCommands.next).toContain('Preflight gate');
+    expect(parsed.suggestedCommands.apply).toContain('organization.devices.claimDevice');
+    expect(parsed.suggestedCommands.apply).toContain('--body-json');
     expect(existsSync(join(outputDir, 'organization-devices-claimdevice.csv'))).toBe(true);
     expect(existsSync(join(outputDir, 'organization-devices-claimdevice.rejected.csv'))).toBe(true);
     expect(existsSync(join(outputDir, 'organization-devices-claimdevice.notes.md'))).toBe(true);

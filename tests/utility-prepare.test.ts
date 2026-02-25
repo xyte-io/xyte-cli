@@ -30,7 +30,10 @@ describe('utility prepare workflow', () => {
     expect(result.mode).toBe('friendly');
     expect(result.entity).toBe('devices');
     expect(result.canonical.headers).toEqual(['name', 'space_id', 'sn', 'mac', 'cloud_id']);
-    expect(result.suggestedCommands.next).toContain('claimDevice');
+    expect(result.suggestedCommands.next).toContain('Preflight gate');
+    expect(result.suggestedCommands.apply).toContain('organization.devices.claimDevice');
+    expect(result.suggestedCommands.apply).toContain('--body-json');
+    expect(result.suggestedCommands.verify).toContain('organization.devices.getDevices');
     expect(existsSync(result.artifacts.primary)).toBe(true);
     expect(existsSync(result.artifacts.rejected)).toBe(true);
     expect(existsSync(result.artifacts.notes)).toBe(true);
@@ -71,6 +74,42 @@ describe('utility prepare workflow', () => {
     expect(result.mode).toBe('generic');
     expect(result.canonical.headers).toEqual(['ticket_id', 'query_json', 'body_json']);
     expect(result.executionSupport).toBe('call-loop-only');
+  });
+
+  it('adds send-command preflight guidance in suggested commands', () => {
+    const root = makeTempRoot('xyte-prepare-send-command-');
+    const inputPath = join(root, 'source.csv');
+    const outDir = join(root, 'out');
+    writeFileSync(inputPath, 'x', 'utf8');
+
+    const result = buildUtilityPrepare({
+      inputPath,
+      actionKey: 'organization.commands.sendCommand',
+      outputDir: outDir,
+      tenantId: 'acme'
+    });
+
+    expect(result.suggestedCommands.next).toContain('Preflight gate');
+    expect(result.suggestedCommands.apply).toContain('organization.commands.sendCommand');
+    expect(result.suggestedCommands.verify).toContain('organization.commands.getCommands');
+  });
+
+  it('adds update-device read-back verification guidance in suggested commands', () => {
+    const root = makeTempRoot('xyte-prepare-update-device-');
+    const inputPath = join(root, 'source.csv');
+    const outDir = join(root, 'out');
+    writeFileSync(inputPath, 'x', 'utf8');
+
+    const result = buildUtilityPrepare({
+      inputPath,
+      actionKey: 'organization.devices.updateDevice',
+      outputDir: outDir,
+      tenantId: 'acme'
+    });
+
+    expect(result.suggestedCommands.next).toContain('read back');
+    expect(result.suggestedCommands.apply).toContain('organization.devices.updateDevice');
+    expect(result.suggestedCommands.verify).toContain('organization.devices.getDevice');
   });
 
   it('fails on unknown action and on scaffold collision without force', () => {

@@ -29,7 +29,9 @@ Expected files:
 3. `/Users/porton/Projects/xyte-cli/tmp/organization-devices-claimdevice.notes.md`
 
 Decision gate:
-1. Ask user whether to execute this action via `xyte-cli call` loop or stop.
+1. Validate each target `space_id` with `organization.spaces.getSpace` before write loops.
+2. Run a single probe claim with `--output-mode envelope`; if upstream returns `No device found`, stop bulk claim writes.
+3. Ask user whether to execute this action via `xyte-cli call` loop or stop.
 
 ## SOP B: Space import preprocessing + execution (`space.import-tree`)
 
