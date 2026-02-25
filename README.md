@@ -89,6 +89,32 @@ xyte-cli watch --tenant acme --profile incidents-active --interval-ms 2000 --max
   - `xyte.upgrade.result.v1`
 - Schemas live in [`docs/schemas`](docs/schemas).
 
+## Action Logging
+
+- Enable real command lifecycle logging with `--log-actions` (writes NDJSON logs and mirrors action events to stderr for that invocation).
+- Override the log file path with `--log-actions-path <path>`.
+- Default payload is minimal (`commandPath`, lifecycle event, duration/exit status). Use `--log-actions-verbose` only when you need args/options detail.
+- Rotation defaults: `10MB` per file, `5` files total (active + rotated).
+- Set `XYTE_LOG_ACTIONS_MAX_FILES=1` to keep only the active file (no rotated history).
+- Environment toggles (logging and stderr mirroring are separate when set via env):
+  - `XYTE_LOG_ACTIONS=1`
+  - `XYTE_LOG_ACTIONS_PATH=/abs/path/cli-actions.ndjson`
+  - `XYTE_LOG_ACTIONS_STDERR=1`
+  - `XYTE_LOG_ACTIONS_VERBOSE=1`
+  - `XYTE_LOG_ACTIONS_MAX_FILE_BYTES=10485760`
+  - `XYTE_LOG_ACTIONS_MAX_FILES=5`
+
+Examples:
+
+```bash
+xyte-cli --log-actions --log-actions-path /tmp/xyte-cli.actions.ndjson status --tenant acme
+xyte-cli --log-actions --log-actions-verbose call organization.devices.getDevices --tenant acme
+xyte-cli logs list --path /tmp/xyte-cli.actions.ndjson --limit 200
+xyte-cli logs stats --path /tmp/xyte-cli.actions.ndjson
+xyte-cli logs gc --path /tmp/xyte-cli.actions.ndjson --max-files 3 --max-age-days 14 --dry-run
+xyte-cli logs view --path /tmp/xyte-cli.actions.ndjson
+```
+
 ## Common Workflows
 
 ### Skills install for coding agents

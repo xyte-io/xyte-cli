@@ -53,3 +53,17 @@ This builds tarball A/B from the current package, runs a clean Docker environmen
 ## Release
 
 See [`release.md`](release.md) for publish and release-asset workflows.
+
+## Manual Check: Interactive Logs Viewer
+
+```bash
+xyte-cli --log-actions --log-actions-path /tmp/xyte-cli.actions.ndjson status --tenant acme
+xyte-cli logs view --path /tmp/xyte-cli.actions.ndjson
+```
+
+Quick verification:
+
+- Press `↑/↓`: selected row changes and details pane updates.
+- Press `Tab`: focus switches between list/details panes.
+- Press `PageUp/PageDown` on details pane: details scroll.
+- Press `q`: viewer exits and shell prompt returns cleanly.

@@ -13,6 +13,11 @@ xyte-cli setup run [--non-interactive] [--tenant <tenant-id>] [--key <value>] [-
 xyte-cli config doctor --tenant <tenant-id> --format json
 xyte-cli upgrade --check --format json
 xyte-cli upgrade --yes --format json
+xyte-cli --log-actions [--log-actions-verbose] status --tenant <tenant-id>
+xyte-cli logs list [--path <path>] [--limit <n>] [--format text|json]
+xyte-cli logs stats [--path <path>] [--format text|json]
+xyte-cli logs gc [--path <path>] [--max-files <n>] [--max-age-days <days>] [--dry-run] [--format text|json]
+xyte-cli logs view [--path <path>] [--limit <n>]
 ```
 
 ## Tenant And Auth Slots
@@ -114,6 +119,21 @@ xyte-cli report generate --tenant <tenant-id> --input /tmp/deep-dive.json --out 
 xyte-cli tui
 xyte-cli tui --headless --screen dashboard --format json --once --tenant <tenant-id>
 xyte-cli tui --headless --screen spaces --format json --follow --interval-ms 2000 --tenant <tenant-id>
+```
+
+## Action Log Environment Flags
+
+`XYTE_LOG_ACTIONS` enables NDJSON logging.
+`XYTE_LOG_ACTIONS_STDERR` independently controls stderr mirroring.
+Set `XYTE_LOG_ACTIONS_MAX_FILES=1` to keep only the active file (no rotated history).
+
+```bash
+XYTE_LOG_ACTIONS=1
+XYTE_LOG_ACTIONS_PATH=/tmp/xyte-cli.actions.ndjson
+XYTE_LOG_ACTIONS_STDERR=1
+XYTE_LOG_ACTIONS_VERBOSE=1
+XYTE_LOG_ACTIONS_MAX_FILE_BYTES=10485760
+XYTE_LOG_ACTIONS_MAX_FILES=5
 ```
 
 Interactive hotkeys on ops screens:
