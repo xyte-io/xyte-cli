@@ -5,6 +5,7 @@ import { evaluateReadiness, type ReadinessCheck } from '../config/readiness';
 import type { SecretStore } from '../secure/secret-store';
 import type { ProfileStore } from '../secure/profile-store';
 import type { SecretProvider } from '../types/profile';
+import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
 import type { XyteClient } from '../types/client';
 import { startupFrames } from './animation';
 import { XYTE_LOGO_COMPACT } from './assets/logo';
@@ -48,7 +49,7 @@ export interface HeadlessRenderOptions {
 
 type SafeWrite = (text: string) => boolean;
 
-const PROVIDERS: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device'];
+const PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
 
 function getRefreshState(args: { connectionState: ReadinessCheck['connectionState']; retried?: boolean }): 'idle' | 'retrying' | 'error' {
   if (args.connectionState === 'connected' || args.connectionState === 'not_checked') {

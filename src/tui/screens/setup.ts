@@ -12,10 +12,11 @@ import {
 import { SCREEN_PANE_CONFIG } from '../panes';
 import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
 import type { SecretProvider } from '../../types/profile';
+import { SUPPORTED_SECRET_PROVIDERS } from '../../types/profile';
 import { sceneFromSetupState } from '../scene';
 import { runKeyCreateWizard } from '../key-wizard';
 
-const PROVIDERS: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device'];
+const PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
 
 function parseProvider(value: string): SecretProvider {
   const normalized = value.trim() as SecretProvider;

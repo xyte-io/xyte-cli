@@ -15,7 +15,7 @@ describe('cli integration', () => {
     await profileStore.setActiveTenant('acme');
 
     const secretStore = new MemorySecretStore();
-    await secretStore.setSecret('acme', 'xyte-device', 'device-key');
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
 
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
@@ -36,11 +36,9 @@ describe('cli integration', () => {
       'node',
       'xyte-cli',
       'call',
-      'device.registration.getChildDevices',
+      'organization.getOrganizationInfo',
       '--tenant',
-      'acme',
-      '--path-json',
-      '{"parent_id":"dev-1"}'
+      'acme'
     ]);
 
     expect(stdout.write).toHaveBeenCalled();
@@ -81,6 +79,16 @@ describe('cli integration', () => {
     const calledUrl = String(fetchMock.mock.calls[0][0]);
     expect(calledUrl).toContain('name=Chicago+Office');
     expect(calledUrl).toContain('space_type=customer');
+  });
+
+  it('rejects removed device endpoint metadata lookups', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+
+    await expect(
+      program.parseAsync(['node', 'xyte-cli', 'describe-endpoint', 'device.registration.getChildDevices'])
+    ).rejects.toThrow('Unknown endpoint key');
   });
 
   it('blocks write calls without --allow-write', async () => {
@@ -143,15 +151,15 @@ describe('cli integration', () => {
     expect(calledUrl).toContain('/core/v1/organization/devices/dev-1');
   });
 
-  it('blocks device spaceMove call without --allow-write', async () => {
+  it('blocks partner close ticket call without --allow-write', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();
 
     const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
 
-    await expect(
-      program.parseAsync(['node', 'xyte-cli', 'call', 'device.device-info.spaceMove'])
-    ).rejects.toThrow('--allow-write');
+    await expect(program.parseAsync(['node', 'xyte-cli', 'call', 'partner.tickets.closeTicket'])).rejects.toThrow(
+      '--allow-write'
+    );
   });
 
   it('builds utility prepare for claim-device and scaffolds files', async () => {
@@ -581,6 +589,34 @@ describe('cli integration', () => {
     expect(parsed.slots[0].hasSecret).toBe(true);
   });
 
+  it('rejects unsupported auth provider', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await expect(
+      program.parseAsync([
+        'node',
+        'xyte-cli',
+        'auth',
+        'key',
+        'add',
+        '--tenant',
+        'acme',
+        '--provider',
+        'xyte-device',
+        '--name',
+        'legacy',
+        '--key',
+        'legacy-key'
+      ])
+    ).rejects.toThrow('Invalid provider: xyte-device');
+  });
+
   it('reports install diagnostics', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();
@@ -601,7 +637,7 @@ describe('cli integration', () => {
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
     const secretStore = new MemorySecretStore();
-    await secretStore.setSecret('acme', 'xyte-device', 'device-key');
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
     const program = createCli({ profileStore, secretStore, stdout, stderr });
@@ -620,11 +656,9 @@ describe('cli integration', () => {
       'node',
       'xyte-cli',
       'call',
-      'device.registration.getChildDevices',
+      'organization.devices.getDevices',
       '--tenant',
       'acme',
-      '--path-json',
-      '{"parent_id":"dev-1"}',
       '--output-mode',
       'envelope'
     ]);
@@ -632,7 +666,7 @@ describe('cli integration', () => {
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     const parsed = JSON.parse(output);
     expect(parsed.schemaVersion).toBe('xyte.call.envelope.v1');
-    expect(parsed.endpointKey).toBe('device.registration.getChildDevices');
+    expect(parsed.endpointKey).toBe('organization.devices.getDevices');
     expect(parsed.response.status).toBe(200);
   });
 

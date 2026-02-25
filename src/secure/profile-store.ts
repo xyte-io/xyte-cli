@@ -8,6 +8,7 @@ import type {
   TenantKeyRegistry,
   TenantProfile
 } from '../types/profile';
+import { SUPPORTED_SECRET_PROVIDERS, isSecretProvider } from '../types/profile';
 import { getXyteConfigDir } from '../utils/config-dir';
 import { buildSlotId, ensureSlotName, matchesSlotRef } from './key-slots';
 
@@ -59,12 +60,22 @@ function cloneRegistry(input: TenantKeyRegistry | undefined): TenantKeyRegistry 
   };
 }
 
-function normalizeTenant(raw: TenantProfile): TenantProfile {
+function normalizeTenant(raw: TenantProfile): { tenant: TenantProfile; changed: boolean } {
   const now = new Date().toISOString();
   const registry = cloneRegistry(raw.keyRegistry);
-  const normalizedSlots: ApiKeySlotMeta[] = registry.slots
-    .filter((slot) => slot && typeof slot.provider === 'string' && typeof slot.slotId === 'string')
-    .map((slot) => ({
+  let changed = false;
+  const normalizedSlots: ApiKeySlotMeta[] = [];
+  for (const slot of registry.slots) {
+    if (!slot || typeof slot.provider !== 'string' || typeof slot.slotId !== 'string') {
+      changed = true;
+      continue;
+    }
+    if (!isSecretProvider(slot.provider)) {
+      changed = true;
+      continue;
+    }
+
+    const normalizedSlot: ApiKeySlotMeta = {
       slotId: slot.slotId,
       provider: slot.provider,
       name: slot.name || slot.slotId,
@@ -72,19 +83,50 @@ function normalizeTenant(raw: TenantProfile): TenantProfile {
       createdAt: slot.createdAt || now,
       updatedAt: slot.updatedAt || now,
       lastValidatedAt: slot.lastValidatedAt
-    }));
+    };
 
-  const activeSlotByProvider: Partial<Record<SecretProvider, string>> = { ...(registry.activeSlotByProvider ?? {}) };
-  const providers = new Set(normalizedSlots.map((slot) => slot.provider));
-  for (const provider of providers) {
+    if (
+      normalizedSlot.name !== slot.name ||
+      normalizedSlot.fingerprint !== slot.fingerprint ||
+      normalizedSlot.createdAt !== slot.createdAt ||
+      normalizedSlot.updatedAt !== slot.updatedAt
+    ) {
+      changed = true;
+    }
+
+    normalizedSlots.push(normalizedSlot);
+  }
+
+  const activeSlotByProvider: Partial<Record<SecretProvider, string>> = {};
+  for (const [provider, slotId] of Object.entries(registry.activeSlotByProvider ?? {})) {
+    if (!isSecretProvider(provider)) {
+      changed = true;
+      continue;
+    }
+    if (typeof slotId !== 'string') {
+      changed = true;
+      continue;
+    }
+    activeSlotByProvider[provider] = slotId;
+  }
+
+  for (const provider of SUPPORTED_SECRET_PROVIDERS) {
     const active = activeSlotByProvider[provider];
     const exists = normalizedSlots.some((slot) => slot.provider === provider && slot.slotId === active);
     if (!exists) {
-      activeSlotByProvider[provider] = normalizedSlots.find((slot) => slot.provider === provider)?.slotId;
+      const fallback = normalizedSlots.find((slot) => slot.provider === provider)?.slotId;
+      if (fallback) {
+        activeSlotByProvider[provider] = fallback;
+      } else {
+        delete activeSlotByProvider[provider];
+      }
+      if (active !== fallback) {
+        changed = true;
+      }
     }
   }
 
-  return {
+  const tenant: TenantProfile = {
     id: raw.id,
     name: raw.name ?? raw.id,
     hubBaseUrl: raw.hubBaseUrl,
@@ -95,6 +137,15 @@ function normalizeTenant(raw: TenantProfile): TenantProfile {
     },
     createdAt: raw.createdAt ?? now,
     updatedAt: raw.updatedAt ?? now
+  };
+
+  if (tenant.name !== raw.name || tenant.createdAt !== raw.createdAt || tenant.updatedAt !== raw.updatedAt) {
+    changed = true;
+  }
+
+  return {
+    tenant,
+    changed
   };
 }
 
@@ -109,7 +160,20 @@ export class FileProfileStore implements ProfileStore {
     try {
       const content = await fs.readFile(this.filePath, 'utf8');
       const parsed = JSON.parse(content) as ProfileStoreData;
-      return this.normalize(parsed);
+      const normalized = this.normalize(parsed);
+      if (normalized.changed) {
+        try {
+          await this.writeData(normalized.data);
+        } catch (writeError) {
+          // Best-effort migration: return normalized data even if persistence fails.
+          // eslint-disable-next-line no-console
+          console.warn(
+            `Failed to persist normalized profile data to ${this.filePath}:`,
+            writeError
+          );
+        }
+      }
+      return normalized.data;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return structuredClone(DEFAULT_DATA);
@@ -349,15 +413,50 @@ export class FileProfileStore implements ProfileStore {
     return slot;
   }
 
-  private normalize(input: ProfileStoreData): ProfileStoreData {
-    const tenants = (Array.isArray(input.tenants) ? input.tenants : [])
-      .filter((tenant): tenant is TenantProfile => Boolean(tenant?.id))
-      .map((tenant) => normalizeTenant(tenant));
+  private normalize(input: ProfileStoreData): { data: ProfileStoreData; changed: boolean } {
+    let changed = false;
+    const rawTenants = Array.isArray(input.tenants) ? input.tenants : [];
+    if (!Array.isArray(input.tenants)) {
+      changed = true;
+    }
+
+    const tenants: TenantProfile[] = [];
+    for (const candidate of rawTenants) {
+      if (!candidate?.id) {
+        changed = true;
+        continue;
+      }
+      const normalizedTenant = normalizeTenant(candidate);
+      tenants.push(normalizedTenant.tenant);
+      if (normalizedTenant.changed) {
+        changed = true;
+      }
+    }
+
+    const incomingActiveTenantId = typeof input.activeTenantId === 'string' ? input.activeTenantId : undefined;
+    if (input.activeTenantId !== incomingActiveTenantId) {
+      changed = true;
+    }
+
+    const activeTenantId =
+      incomingActiveTenantId && tenants.some((tenant) => tenant.id === incomingActiveTenantId)
+        ? incomingActiveTenantId
+        : tenants[0]?.id;
+    if (activeTenantId !== incomingActiveTenantId) {
+      changed = true;
+    }
+
+    if (input.version !== 2) {
+      changed = true;
+    }
 
     return {
-      version: 2,
-      activeTenantId: input.activeTenantId,
-      tenants
+      data: {
+        version: 2,
+        activeTenantId,
+        tenants
+      },
+      changed
     };
   }
 

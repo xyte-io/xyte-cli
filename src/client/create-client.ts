@@ -1,7 +1,6 @@
 import { getEndpoint, listEndpoints } from './catalog';
 import { HttpTransport } from '../http/transport';
 import { XyteAuthError, XyteValidationError } from '../http/errors';
-import { createDeviceNamespace } from '../namespaces/device';
 import { createOrganizationNamespace } from '../namespaces/organization';
 import { createPartnerNamespace } from '../namespaces/partner';
 import { createSecretStore, type SecretStore } from '../secure/secret-store';
@@ -15,27 +14,6 @@ const DEFAULT_ENTRY_BASE_URL = 'https://entry.xyte.io';
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
-}
-
-function normalizeCloudSettingsPayload(body: unknown): Record<string, unknown> {
-  if (!isPlainRecord(body)) {
-    throw new XyteValidationError('Cloud settings body must be an object.');
-  }
-
-  if (typeof body.property === 'string' && Object.prototype.hasOwnProperty.call(body, 'value')) {
-    return {
-      property: body.property,
-      value: body.value
-    };
-  }
-
-  const entries = Object.entries(body);
-  if (entries.length !== 1) {
-    throw new XyteValidationError('Cloud settings body must be { property, value } or a single key-value pair.');
-  }
-
-  const [property, value] = entries[0];
-  return { property, value };
 }
 
 function withPathParams(pathTemplate: string, pathParams: PublicEndpointSpec['pathParams'], path: XyteCallArgs['path']): string {
@@ -70,9 +48,6 @@ function authProviderFromScope(scope: PublicEndpointSpec['authScope']): SecretPr
   if (scope === 'partner') {
     return 'xyte-partner';
   }
-  if (scope === 'device') {
-    return 'xyte-device';
-  }
   return undefined;
 }
 
@@ -82,9 +57,6 @@ function directAuthValue(options: XyteClientOptions, scope: PublicEndpointSpec['
   }
   if (scope === 'partner') {
     return options.auth?.partner;
-  }
-  if (scope === 'device') {
-    return options.auth?.device;
   }
   return undefined;
 }
@@ -177,17 +149,12 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
 
     let body: string | FormData | undefined;
     if (endpoint.hasBody && args.body !== undefined) {
-      let requestBody = args.body;
-      if (endpoint.key === 'device.device-info.setCloudSettings') {
-        requestBody = normalizeCloudSettingsPayload(args.body);
-      }
-
       if (endpoint.bodyType === 'multipart-form') {
-        if (requestBody instanceof FormData) {
-          body = requestBody;
-        } else if (isPlainRecord(requestBody)) {
+        if (args.body instanceof FormData) {
+          body = args.body;
+        } else if (isPlainRecord(args.body)) {
           const form = new FormData();
-          for (const [key, value] of Object.entries(requestBody)) {
+          for (const [key, value] of Object.entries(args.body)) {
             form.append(key, typeof value === 'string' ? value : JSON.stringify(value));
           }
           body = form;
@@ -196,7 +163,7 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
         }
       } else {
         headers['Content-Type'] = headers['Content-Type'] ?? 'application/json';
-        body = JSON.stringify(requestBody);
+        body = JSON.stringify(args.body);
       }
     }
 
@@ -226,7 +193,6 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
   };
 
   return {
-    device: createDeviceNamespace(call),
     organization: createOrganizationNamespace(call),
     partner: createPartnerNamespace(call),
     call,
@@ -235,16 +201,14 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
     listEndpoints: () => listEndpoints(),
     listTenantEndpoints: async (tenantId: string) => {
       const secretStore = await getSecretStore();
-      const [orgSlot, partnerSlot, deviceSlot] = await Promise.all([
+      const [orgSlot, partnerSlot] = await Promise.all([
         profileStore.getActiveKeySlot(tenantId, 'xyte-org'),
-        profileStore.getActiveKeySlot(tenantId, 'xyte-partner'),
-        profileStore.getActiveKeySlot(tenantId, 'xyte-device')
+        profileStore.getActiveKeySlot(tenantId, 'xyte-partner')
       ]);
 
-      const [org, partner, device] = await Promise.all([
+      const [org, partner] = await Promise.all([
         secretStore.getSlotSecret(tenantId, 'xyte-org', orgSlot?.slotId ?? 'default'),
-        secretStore.getSlotSecret(tenantId, 'xyte-partner', partnerSlot?.slotId ?? 'default'),
-        secretStore.getSlotSecret(tenantId, 'xyte-device', deviceSlot?.slotId ?? 'default')
+        secretStore.getSlotSecret(tenantId, 'xyte-partner', partnerSlot?.slotId ?? 'default')
       ]);
 
       return listEndpoints().filter((endpoint) => {
@@ -256,9 +220,6 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
         }
         if (endpoint.authScope === 'partner') {
           return Boolean(partner);
-        }
-        if (endpoint.authScope === 'device') {
-          return Boolean(device);
         }
         return false;
       });

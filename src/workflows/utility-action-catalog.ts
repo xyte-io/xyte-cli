@@ -8,18 +8,9 @@ import {
 } from './utility-action-profiles';
 
 const WRITE_METHODS = new Set<PublicEndpointSpec['method']>(['POST', 'PUT', 'PATCH', 'DELETE']);
-const EXCLUDED_ENDPOINTS = new Set<string>(['device.file-dumps.appendDumpFile', 'device.file-dumps.sendDump']);
 
 function loadWriteEndpoints(): PublicEndpointSpec[] {
-  return (rawEndpoints as PublicEndpointSpec[]).filter((endpoint) => {
-    if (!WRITE_METHODS.has(endpoint.method)) {
-      return false;
-    }
-    if (EXCLUDED_ENDPOINTS.has(endpoint.key)) {
-      return false;
-    }
-    return true;
-  });
+  return (rawEndpoints as PublicEndpointSpec[]).filter((endpoint) => WRITE_METHODS.has(endpoint.method));
 }
 
 function endpointKeyComparator(left: PublicEndpointSpec, right: PublicEndpointSpec): number {

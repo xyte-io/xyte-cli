@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 import type { SecretProvider } from '../types/profile';
+import { isSecretProvider } from '../types/profile';
 import { getXyteConfigDir } from '../utils/config-dir';
 import { DEFAULT_SLOT_ID } from './key-slots';
 
@@ -34,6 +35,50 @@ function cloneData(data: PersistedSecrets): PersistedSecrets {
   return {
     version: SECRET_STORE_VERSION,
     records: { ...(data.records ?? {}) }
+  };
+}
+
+function parseAccountKey(value: string): { tenantId: string; provider: string; slotId: string } | undefined {
+  const firstSeparator = value.indexOf(':');
+  const secondSeparator = value.indexOf(':', firstSeparator + 1);
+  if (firstSeparator <= 0 || secondSeparator <= firstSeparator + 1 || secondSeparator >= value.length - 1) {
+    return undefined;
+  }
+  return {
+    tenantId: value.slice(0, firstSeparator),
+    provider: value.slice(firstSeparator + 1, secondSeparator),
+    slotId: value.slice(secondSeparator + 1)
+  };
+}
+
+function sanitizeRecords(records: Record<string, string>): { records: Record<string, string>; changed: boolean } {
+  const sanitized: Record<string, string> = {};
+  let changed = false;
+
+  for (const [account, secret] of Object.entries(records)) {
+    if (typeof secret !== 'string') {
+      changed = true;
+      continue;
+    }
+
+    const parsed = parseAccountKey(account);
+    if (!parsed || !isSecretProvider(parsed.provider)) {
+      changed = true;
+      continue;
+    }
+
+    sanitized[account] = secret;
+  }
+
+  const originalCount = Object.keys(records).length;
+  const sanitizedCount = Object.keys(sanitized).length;
+  if (originalCount !== sanitizedCount) {
+    changed = true;
+  }
+
+  return {
+    records: sanitized,
+    changed
   };
 }
 
@@ -111,10 +156,27 @@ export class FileSecretStore implements SecretStore {
       throw new Error(`Secret store is invalid at ${this.filePath}. Delete or fix this file and rerun setup.`);
     }
 
-    return cloneData({
+    const normalized = cloneData({
       version: asRecord.version === SECRET_STORE_VERSION ? asRecord.version : SECRET_STORE_VERSION,
       records: asRecord.records
     });
+    const sanitized = sanitizeRecords(normalized.records);
+    normalized.records = sanitized.records;
+    const changed = sanitized.changed || asRecord.version !== SECRET_STORE_VERSION;
+    if (changed) {
+      try {
+        await this.writeData(normalized);
+      } catch (error) {
+        // Best-effort migration: log and continue returning normalized data even if we cannot write.
+        // This avoids breaking reads when the secrets file is readable but not writable (e.g. read-only filesystem).
+        if (error instanceof Error) {
+          console.warn(`Failed to persist normalized secret store at ${this.filePath}: ${error.message}`);
+        } else {
+          console.warn(`Failed to persist normalized secret store at ${this.filePath}.`);
+        }
+      }
+    }
+    return normalized;
   }
 
   private async writeData(data: PersistedSecrets): Promise<void> {

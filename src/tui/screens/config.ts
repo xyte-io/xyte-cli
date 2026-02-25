@@ -14,9 +14,10 @@ import { SCREEN_PANE_CONFIG } from '../panes';
 import { sceneFromConfigState } from '../scene';
 import { runKeyCreateWizard, runKeyUpdateWizard } from '../key-wizard';
 import type { SecretProvider } from '../../types/profile';
+import { SUPPORTED_SECRET_PROVIDERS } from '../../types/profile';
 import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
 
-const PROVIDERS: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device'];
+const PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
 
 function providerAt(index: number): SecretProvider {
   return PROVIDERS[clampIndex(index, PROVIDERS.length)];
@@ -54,10 +55,6 @@ async function runSlotConnectivityProbe(args: {
     });
     await client.partner.getDevices({ tenantId });
     return 'partner.getDevices ok';
-  }
-
-  if (provider === 'xyte-device') {
-    return 'device-key check: secret present (remote probe skipped)';
   }
 
   return 'provider key check: secret present (remote probe skipped)';

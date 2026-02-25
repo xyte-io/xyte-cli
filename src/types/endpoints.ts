@@ -1,8 +1,8 @@
-export type EndpointNamespace = 'device' | 'organization' | 'partner';
+export type EndpointNamespace = 'organization' | 'partner';
 
 export type EndpointBase = 'hub' | 'entry';
 
-export type EndpointAuthScope = 'none' | 'device' | 'organization' | 'partner';
+export type EndpointAuthScope = 'none' | 'organization' | 'partner';
 
 export type EndpointBodyType = 'none' | 'json' | 'multipart-form' | 'unknown';
 

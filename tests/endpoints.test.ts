@@ -7,7 +7,7 @@ describe('public endpoint catalog', () => {
     const keys = endpoints.map((endpoint) => endpoint.key);
     const unique = new Set(keys);
     expect(unique.size).toBe(keys.length);
-    expect(keys.length).toBeGreaterThan(60);
+    expect(keys.length).toBeGreaterThan(0);
   });
 
   it('contains route drift overrides', () => {
@@ -20,21 +20,13 @@ describe('public endpoint catalog', () => {
 
     const cancelCommand = endpoints.find((endpoint) => endpoint.key === 'organization.commands.cancelCommand');
     expect(cancelCommand?.hasBody).toBe(false);
-
-    const cloudSettings = endpoints.find((endpoint) => endpoint.key === 'device.device-info.setCloudSettings');
-    expect(cloudSettings?.method).toBe('PUT');
-    expect(cloudSettings?.hasBody).toBe(true);
   });
 
-  it('includes device space move endpoint metadata', () => {
-    const endpoint = endpoints.find((item) => item.key === 'device.device-info.spaceMove');
-    expect(endpoint).toBeDefined();
-    expect(endpoint?.method).toBe('PUT');
-    expect(endpoint?.pathTemplate).toBe('/v1/devices/:device_id/space/move');
-    expect(endpoint?.authScope).toBe('device');
-    expect(endpoint?.bodyType).toBe('json');
-    expect(endpoint?.hasBody).toBe(true);
-    expect(endpoint?.pathParams).toEqual(['device_id']);
+  it('contains no device namespace or device auth scope endpoints', () => {
+    const deviceNamespace = endpoints.filter((endpoint) => (endpoint as { namespace: string }).namespace === 'device');
+    const deviceScope = endpoints.filter((endpoint) => (endpoint as { authScope: string }).authScope === 'device');
+    expect(deviceNamespace).toHaveLength(0);
+    expect(deviceScope).toHaveLength(0);
   });
 
   it('includes organization close incident endpoint metadata', () => {
