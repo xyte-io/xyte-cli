@@ -17,6 +17,13 @@ npm run build
 echo "== release check: package dry-run =="
 npm pack --dry-run
 
+if command -v docker >/dev/null 2>&1; then
+  echo "== release check: controlled upgrade smoke =="
+  npm run smoke:upgrade:controlled
+else
+  echo "== release check: controlled upgrade smoke skipped (docker not found) =="
+fi
+
 echo "== release check: security audit (high/critical) =="
 npm audit --audit-level=high
 

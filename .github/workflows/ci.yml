@@ -63,3 +63,21 @@ jobs:
 
       - name: Audit high/critical vulnerabilities
         run: npm audit --audit-level=high
+
+  upgrade-controlled-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Controlled upgrade docker smoke
+        run: npm run smoke:upgrade:controlled
