@@ -79,6 +79,42 @@ function buildSuggestedCommands(
   primaryPath: string,
   outputDir: string
 ): UtilityPrepareResult['suggestedCommands'] {
+  if (profile.actionKey === 'organization.commands.sendCommand') {
+    return {
+      next: [
+        `Review ${primaryPath}.`,
+        'Preflight gate: for each device_id, run organization.commands.getCommands first and pick only valid command/friendly_name values.',
+        'If no valid command/friendly_name is known for a device, skip writes for that row.'
+      ].join(' '),
+      apply: `xyte-cli call organization.commands.sendCommand --tenant ${tenant} --allow-write --path-json '{"device_id":"<device_id>"}' --body-json '{"command":"<valid-command>"}'`,
+      verify: `xyte-cli call organization.commands.getCommands --tenant ${tenant} --path-json '{"device_id":"<device_id>"}' --query-json '{"page":1,"per_page":20}'`
+    };
+  }
+
+  if (profile.actionKey === 'organization.devices.claimDevice') {
+    return {
+      next: [
+        `Review ${primaryPath}.`,
+        'Preflight gate: validate target space_id rows with organization.spaces.getSpace before write loops.',
+        'Run one envelope probe row first; if upstream returns "No device found", skip bulk claim writes and collect claimable identifiers.'
+      ].join(' '),
+      apply: `xyte-cli call organization.devices.claimDevice --tenant ${tenant} --allow-write --output-mode envelope --body-json '{"name":"<name>","space_id":<space_id>,"sn":"<sn>","mac":"<mac>","cloud_id":"<cloud_id>"}'`,
+      verify: `xyte-cli call organization.devices.getDevices --tenant ${tenant} --query-json '{"space_id":"<space_id>"}'`
+    };
+  }
+
+  if (profile.actionKey === 'organization.devices.updateDevice') {
+    return {
+      next: [
+        `Review ${primaryPath}.`,
+        'Preflight gate: capture baseline values with organization.devices.getDevice before write loops.',
+        'After each update, read back the device and verify the targeted fields changed as expected.'
+      ].join(' '),
+      apply: `xyte-cli call organization.devices.updateDevice --tenant ${tenant} --allow-write --path-json '{"device_id":"<device_id>"}' --body-json '{"name":"<updated-name>"}'`,
+      verify: `xyte-cli call organization.devices.getDevice --tenant ${tenant} --path-json '{"device_id":"<device_id>"}'`
+    };
+  }
+
   if (profile.executionSupport === 'space.import-tree') {
     return {
       next: `xyte-cli space import-tree --tenant ${tenant} --input ${primaryPath}`,

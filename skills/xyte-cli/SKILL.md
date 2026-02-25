@@ -109,6 +109,19 @@ Use when the request involves any of:
 | Headless snapshot (JSON NDJSON) | `xyte-cli tui --headless --screen <screen> --format json --once --tenant <tenant-id>` |
 | Continuous headless monitoring | `xyte-cli tui --headless --screen <screen> --format json --follow --interval-ms <ms> --tenant <tenant-id>` |
 
+## Flow Selector (Deterministic)
+
+Use this selector when the user asks for repeatable operator workflows. Full recipes: `references/flow-recipes.md`.
+
+| Intent | Flow ID | First command |
+| --- | --- | --- |
+| Readiness check in a new or stale environment | `flow.setup-readiness-10m` | `xyte-cli doctor install --format json` |
+| Continuous incident monitoring | `flow.incidents-delta-watch` | `xyte-cli watch --tenant <tenant-id> --profile incidents-active --once --strict-json` |
+| Convert watch deltas into triage artifacts | `flow.watch-to-triage` | `xyte-cli watch --tenant <tenant-id> --profile incidents-active --once --strict-json` |
+| Operator-approved remediation writes | `flow.guided-remediation` | `xyte-cli watch --tenant <tenant-id> --profile incidents-active --once --strict-json` |
+| Bulk claim preprocessing + space import execution | `flow.bulk-claim-and-space-import` | `xyte-cli utility prepare --action organization.devices.claimDevice --tenant <tenant-id> --input ./claims-source.csv --output-dir ./tmp/flow-bulk-claim` |
+| Daily analytics summary and report artifact | `flow.daily-deep-dive-report` | `xyte-cli setup status --tenant <tenant-id> --format json` |
+
 ## Minimal Command Recipes
 
 Read call:
@@ -124,11 +137,16 @@ xyte-cli call organization.incidents.getIncidents --tenant <tenant-id> --query-j
 
 Write call (guarded):
 ```bash
+xyte-cli call organization.commands.getCommands \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}' \
+  --query-json '{"page":1,"per_page":20}'
+
 xyte-cli call organization.commands.sendCommand \
   --tenant <tenant-id> \
   --allow-write \
   --path-json '{"device_id":"<device-id>"}' \
-  --body-json '{"command":"reboot"}'
+  --body-json '{"command":"<valid-command-from-history>"}'
 ```
 
 Delete call (guarded):
@@ -161,6 +179,9 @@ Utility prepare then execute:
 ```bash
 xyte-cli utility list-actions --format text
 xyte-cli utility prepare --action organization.devices.claimDevice --input ./raw-source.xlsx --tenant <tenant-id> --output-dir ./tmp
+
+xyte-cli call organization.spaces.getSpace --tenant <tenant-id> --path-json '{"space_id":"<space-id>"}'
+xyte-cli call organization.devices.claimDevice --tenant <tenant-id> --allow-write --output-mode envelope --body-json '{"name":"<name>","space_id":<space-id>,"sn":"<sn>","mac":"<mac>","cloud_id":"<cloud-id>"}'
 
 xyte-cli utility prepare --action space.import-tree --input ./raw-tree.pdf --tenant <tenant-id> --output-dir ./tmp
 xyte-cli space import-tree --tenant <tenant-id> --input ./space-import-tree.csv
@@ -219,6 +240,7 @@ npm run smoke:local:utilities -- --base-url http://127.0.0.1:3001 --tenant local
 - `references/endpoints.md`
 - `references/utilities.md`
 - `references/utility-ai-space-import-tree.md`
+- `references/flow-recipes.md`
 - `references/tui-flows.md`
 - `references/headless-contract.md`
 

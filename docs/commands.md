@@ -2,6 +2,15 @@
 
 This page is a high-signal map of common commands. For full flags and subcommands, use `xyte-cli --help` and `<command> --help`.
 
+## Flow Index
+
+- [`flow.setup-readiness-10m`](flows/agent-ops.md#flowsetup-readiness-10m): establish install/readiness/connectivity baseline before ops.
+- [`flow.incidents-delta-watch`](flows/agent-ops.md#flowincidents-delta-watch): stream incident snapshots and deltas as watch frames.
+- [`flow.watch-to-triage`](flows/agent-ops.md#flowwatch-to-triage): convert watch output into inspect/report triage artifacts.
+- [`flow.guided-remediation`](flows/agent-ops.md#flowguided-remediation): execute guarded org command/ticket/incident actions with verification.
+- [`flow.bulk-claim-and-space-import`](flows/agent-ops.md#flowbulk-claim-and-space-import): preprocess, dry-run, then approve claim/import writes.
+- [`flow.daily-deep-dive-report`](flows/agent-ops.md#flowdaily-deep-dive-report): produce daily deep-dive JSON and markdown report outputs.
+
 ## Core
 
 ```bash

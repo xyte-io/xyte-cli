@@ -8,6 +8,31 @@ Use `xyte-cli tui --headless` as the visual/tooling interface for agents.
 xyte-cli tui --headless --screen <screen> --format json --once --tenant <tenant-id>
 ```
 
+## Watch-First Triage Handoff
+
+For incident operations, run this sequence before any optional writes:
+
+1. Watch snapshot and short delta loop:
+```bash
+xyte-cli watch --tenant <tenant-id> --profile incidents-active --once --strict-json
+xyte-cli watch --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 30 --strict-json
+```
+
+2. Triage artifacts:
+```bash
+xyte-cli inspect fleet --tenant <tenant-id> --format json > /tmp/xyte-fleet.triage.json
+xyte-cli inspect deep-dive --tenant <tenant-id> --window 24 --format json > /tmp/xyte-deep-dive.triage.json
+xyte-cli report generate --tenant <tenant-id> --input /tmp/xyte-deep-dive.triage.json --out /tmp/xyte-triage.md --format markdown
+```
+
+3. Optional write handoff:
+- run writes only after explicit human approval.
+- run `organization.commands.getCommands` preflight before `organization.commands.sendCommand`.
+- after `organization.devices.updateDevice`, read back with `organization.devices.getDevice` and verify target fields changed.
+- non-read endpoint calls require `--allow-write`.
+- destructive deletes require `--allow-write --confirm <endpoint-key>`.
+- `space import-tree` remains dry-run unless `--apply` is provided.
+
 Supported screens:
 - `setup`
 - `config`

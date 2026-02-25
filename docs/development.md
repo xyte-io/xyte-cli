@@ -42,6 +42,15 @@ Terminal B:
 npm run smoke:local:utilities -- --base-url http://127.0.0.1:3001 --tenant local
 ```
 
+## Local Flow-Pack Smoke
+
+Runs build/test + flow-pack command coverage against a local tenant and emits a readable per-step summary.
+Expected guard rejections (`--allow-write`, `--confirm`) are treated as pass conditions.
+
+```bash
+npm run smoke:local:flow-pack -- --tenant local3000
+```
+
 ## Controlled Upgrade Docker Smoke
 
 ```bash

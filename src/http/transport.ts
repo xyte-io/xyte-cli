@@ -42,6 +42,47 @@ function toLowerCaseMap(headers: Headers): Record<string, string> {
   return out;
 }
 
+function summarizeHttpErrorDetails(details: unknown): string | undefined {
+  if (typeof details === 'string') {
+    const value = details.trim();
+    return value ? value : undefined;
+  }
+
+  if (!details || typeof details !== 'object') {
+    return undefined;
+  }
+
+  const record = details as Record<string, unknown>;
+  const directKeys = ['error_description', 'error', 'message', 'detail', 'title'];
+  for (const key of directKeys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  for (const key of directKeys) {
+    const value = record[key];
+    if (Array.isArray(value)) {
+      const first = value.find((entry) => typeof entry === 'string' && entry.trim());
+      if (typeof first === 'string' && first.trim()) {
+        return first.trim();
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function buildHttpErrorMessage(status: number, statusText: string, details: unknown): string {
+  const base = `HTTP ${status} ${statusText}`;
+  const summary = summarizeHttpErrorDetails(details);
+  if (!summary) {
+    return base;
+  }
+  return `${base}: ${summary}`;
+}
+
 async function parseResponseBody(response: Response): Promise<unknown> {
   const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
   if (contentType.includes('application/json')) {
@@ -111,7 +152,7 @@ export class HttpTransport {
             const parsed = await parseResponseBody(response);
             if (!response.ok) {
               throw new XyteHttpError({
-                message: `HTTP ${response.status} ${response.statusText}`,
+                message: buildHttpErrorMessage(response.status, response.statusText, parsed),
                 status: response.status,
                 statusText: response.statusText,
                 endpointKey: request.endpointKey,
