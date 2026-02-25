@@ -162,7 +162,16 @@ export class FileProfileStore implements ProfileStore {
       const parsed = JSON.parse(content) as ProfileStoreData;
       const normalized = this.normalize(parsed);
       if (normalized.changed) {
-        await this.writeData(normalized.data);
+        try {
+          await this.writeData(normalized.data);
+        } catch (writeError) {
+          // Best-effort migration: return normalized data even if persistence fails.
+          // eslint-disable-next-line no-console
+          console.warn(
+            `Failed to persist normalized profile data to ${this.filePath}:`,
+            writeError
+          );
+        }
       }
       return normalized.data;
     } catch (error) {
