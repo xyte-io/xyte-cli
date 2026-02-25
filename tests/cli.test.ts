@@ -94,6 +94,55 @@ describe('cli integration', () => {
     ).rejects.toThrow('--allow-write');
   });
 
+  it('blocks organization update device call without --allow-write', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+
+    await expect(
+      program.parseAsync(['node', 'xyte-cli', 'call', 'organization.devices.updateDevice'])
+    ).rejects.toThrow('--allow-write');
+  });
+
+  it('allows organization update device call without --confirm', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'call',
+      'organization.devices.updateDevice',
+      '--tenant',
+      'acme',
+      '--allow-write',
+      '--path-json',
+      '{"device_id":"dev-1"}',
+      '--body-json',
+      '{"nickname":"Lab Unit"}'
+    ]);
+
+    expect(fetchMock).toHaveBeenCalled();
+    const calledUrl = String(fetchMock.mock.calls[0][0]);
+    expect(calledUrl).toContain('/core/v1/organization/devices/dev-1');
+  });
+
   it('blocks device spaceMove call without --allow-write', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();

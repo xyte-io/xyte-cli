@@ -48,6 +48,17 @@ describe('public endpoint catalog', () => {
     expect(endpoint?.pathParams).toEqual(['incident_id']);
   });
 
+  it('includes organization update device endpoint metadata', () => {
+    const endpoint = endpoints.find((item) => item.key === 'organization.devices.updateDevice');
+    expect(endpoint).toBeDefined();
+    expect(endpoint?.method).toBe('PATCH');
+    expect(endpoint?.pathTemplate).toBe('/core/v1/organization/devices/:device_id');
+    expect(endpoint?.authScope).toBe('organization');
+    expect(endpoint?.bodyType).toBe('json');
+    expect(endpoint?.hasBody).toBe(true);
+    expect(endpoint?.pathParams).toEqual(['device_id']);
+  });
+
   it('includes documented filter params for key read endpoints', () => {
     const getDevices = endpoints.find((item) => item.key === 'organization.devices.getDevices');
     expect(getDevices?.queryParams).toEqual(['space_id']);

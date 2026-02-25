@@ -25,4 +25,16 @@ describe('namespace endpoint mappings', () => {
       path: { incident_id: 'inc-1' }
     });
   });
+
+  it('maps organization.updateDevice to organization.devices.updateDevice', async () => {
+    const call = vi.fn().mockResolvedValue({ ok: true });
+    const organization = createOrganizationNamespace(call);
+
+    await organization.updateDevice({ path: { device_id: 'dev-1' }, body: { nickname: 'Lab Unit' } });
+
+    expect(call).toHaveBeenCalledWith('organization.devices.updateDevice', {
+      path: { device_id: 'dev-1' },
+      body: { nickname: 'Lab Unit' }
+    });
+  });
 });

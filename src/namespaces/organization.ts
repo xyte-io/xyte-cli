@@ -6,6 +6,7 @@ export interface OrganizationNamespace {
   getCommands: NamespaceCall;
   sendCommand: NamespaceCall;
   claimDevice: NamespaceCall;
+  updateDevice: NamespaceCall;
   deleteDevice: NamespaceCall;
   getDevice: NamespaceCall;
   getDevices: NamespaceCall;
@@ -32,6 +33,7 @@ export function createOrganizationNamespace(call: (endpointKey: string, args?: X
     getCommands: (args) => call('organization.commands.getCommands', args),
     sendCommand: (args) => call('organization.commands.sendCommand', args),
     claimDevice: (args) => call('organization.devices.claimDevice', args),
+    updateDevice: (args) => call('organization.devices.updateDevice', args),
     deleteDevice: (args) => call('organization.devices.deleteDevice', args),
     getDevice: (args) => call('organization.devices.getDevice', args),
     getDevices: (args) => call('organization.devices.getDevices', args),
