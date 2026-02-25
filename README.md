@@ -2,6 +2,10 @@
 
 Xyte CLI with SKILLS, built for coding agents and operators.
 
+- Changelog: [`CHANGELOG.md`](CHANGELOG.md)
+- Security policy: [`SECURITY.md`](SECURITY.md)
+- Release process: [`docs/release.md`](docs/release.md)
+
 `xyte-cli` provides deterministic access to Xyte APIs, a full TUI (without a Network tab), guarded write flows, and headless NDJSON snapshots.
 
 ### Key Features
@@ -266,6 +270,13 @@ Schemas:
 - `docs/schemas/utility-batch.v1.schema.json`
 - `docs/schemas/utility-prepare.v1.schema.json`
 
+## Compatibility Policy
+
+- Stable automation boundary: schema-versioned JSON output (`docs/schemas/*`).
+- Breaking command-surface or contract changes are called out explicitly in `CHANGELOG.md`.
+- Security-sensitive error output is redacted by default in both JSON and text error modes.
+- During `0.x`, breaking changes may still occur, but every break is documented in release notes.
+
 ## Agent Quick Start
 
 ### Claude
@@ -297,6 +308,7 @@ npm run typecheck
 npm test
 npm run build
 npm pack
+npm run release:check
 ```
 
 Local package smoke:
