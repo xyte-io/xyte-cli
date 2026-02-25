@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { compareSemver } from '../utils/upgrade';
 import { UPGRADE_CHECK_SCHEMA_VERSION, UPGRADE_RESULT_SCHEMA_VERSION } from './versions';
 
 export const UpgradeCheckSchema = z.object({
@@ -64,7 +65,7 @@ export function buildUpgradeCheck(args: {
   currentVersion: string;
   latestVersion: string;
 }): UpgradeCheckV1 {
-  const upToDate = args.currentVersion === args.latestVersion;
+  const upToDate = compareSemver(args.currentVersion, args.latestVersion) >= 0;
   return {
     schemaVersion: UPGRADE_CHECK_SCHEMA_VERSION,
     generatedAtUtc: new Date().toISOString(),
