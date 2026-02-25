@@ -51,6 +51,7 @@
     "smoke:local:utilities": "node scripts/smoke_local_utilities.mjs",
     "smoke:external-live": "node scripts/smoke_external_user_live.mjs",
     "test:commit": "npm run typecheck && npm test && npm run smoke:external-live",
+    "release:check": "bash scripts/release_check.sh",
     "tui": "tsx src/bin/xyte-cli.ts tui",
     "release:publish": "bash scripts/publish.sh all",
     "release:publish:cli": "bash scripts/publish.sh cli",
