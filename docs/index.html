@@ -3,10 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>xyte-cli — Deterministic Xyte Operations for Agents and Operators</title>
+    <title>xyte-cli — Deterministic Xyte Operations</title>
     <meta
       name="description"
-      content="xyte-cli provides deterministic endpoint calls, guarded write flows, a full TUI, headless NDJSON snapshots, and schema contracts."
+      content="xyte-cli provides deterministic endpoint calls, guarded write flows, a full TUI, and headless JSON contracts for automation."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -76,12 +76,12 @@
       }
 
       .wrap {
-        width: min(1180px, 100% - 44px);
+        width: min(1120px, 100% - 40px);
         margin: 0 auto;
       }
 
       .section {
-        padding: 92px 0;
+        padding: 76px 0;
       }
 
       .section + .section {
@@ -94,7 +94,7 @@
         font-size: 12px;
         color: var(--gold);
         text-transform: uppercase;
-        letter-spacing: 0.13em;
+        letter-spacing: 0.12em;
       }
 
       h1,
@@ -106,8 +106,8 @@
       }
 
       h2 {
-        font-size: clamp(32px, 4vw, 48px);
-        margin-bottom: 14px;
+        font-size: clamp(30px, 4vw, 44px);
+        margin-bottom: 12px;
       }
 
       p {
@@ -211,19 +211,19 @@
       }
 
       .hero {
-        padding: 88px 0 68px;
+        padding: 84px 0 56px;
       }
 
       .hero-grid {
         display: grid;
         grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-        gap: 34px;
+        gap: 30px;
         align-items: end;
       }
 
       .hero h1 {
-        font-size: clamp(42px, 6vw, 76px);
-        margin-bottom: 22px;
+        font-size: clamp(40px, 6vw, 70px);
+        margin-bottom: 18px;
         max-width: 12ch;
       }
 
@@ -235,11 +235,11 @@
       .hero-copy {
         color: var(--muted-strong);
         font-size: clamp(17px, 2vw, 21px);
-        max-width: 62ch;
+        max-width: 60ch;
       }
 
       .hero-actions {
-        margin-top: 32px;
+        margin-top: 28px;
         display: flex;
         flex-wrap: wrap;
         gap: 12px;
@@ -254,541 +254,264 @@
         font-size: 14px;
         font-weight: 700;
         padding: 12px 18px;
-        transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        border: 1px solid transparent;
       }
 
       .btn-primary {
-        color: #02252c;
-        background: linear-gradient(135deg, var(--aqua), #7ce2e5);
-        box-shadow: var(--shadow-glow);
-      }
-
-      .btn-primary:hover {
-        transform: translateY(-1px);
+        background: linear-gradient(135deg, var(--aqua), #8de7ea);
+        color: #03272a;
       }
 
       .btn-ghost {
+        background: rgba(255, 255, 255, 0.02);
         color: var(--text);
-        border: 1px solid var(--line-strong);
-        background: rgba(255, 255, 255, 0.03);
-      }
-
-      .btn-ghost:hover {
-        border-color: var(--aqua);
+        border-color: var(--line);
       }
 
       .hero-badges {
-        margin-top: 28px;
+        margin-top: 18px;
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
       }
 
       .hero-badges span {
+        border: 1px solid var(--line);
+        padding: 5px 10px;
+        border-radius: 999px;
         font-family: var(--font-mono);
         font-size: 11px;
         color: var(--muted);
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        padding: 6px 11px;
-        background: rgba(255, 255, 255, 0.02);
       }
 
       .terminal-card {
+        background: linear-gradient(180deg, rgba(23, 36, 45, 0.95), rgba(13, 24, 31, 0.92));
         border: 1px solid var(--line);
         border-radius: var(--radius-l);
         overflow: hidden;
-        background: linear-gradient(165deg, rgba(16, 27, 36, 0.92), rgba(10, 17, 24, 0.94));
-        box-shadow: var(--shadow-soft);
+        box-shadow: var(--shadow-soft), var(--shadow-glow);
       }
 
       .terminal-head {
-        border-bottom: 1px solid var(--line);
-        padding: 11px 14px;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--line);
       }
 
       .dot {
         width: 9px;
         height: 9px;
-        border-radius: 50%;
+        border-radius: 999px;
       }
 
       .dot-red {
-        background: var(--coral);
+        background: #ff6f7a;
       }
 
       .dot-gold {
-        background: var(--gold);
+        background: #f6ce7e;
       }
 
       .dot-aqua {
-        background: var(--aqua);
+        background: #34d3d8;
       }
 
       .terminal-title {
         margin-left: 8px;
         font-family: var(--font-mono);
-        font-size: 11px;
+        font-size: 12px;
         color: var(--muted);
       }
 
       .terminal-body {
-        font-family: var(--font-mono);
-        font-size: 13px;
-        line-height: 1.7;
         margin: 0;
-        padding: 16px 18px;
-        background: var(--bg-code);
-        color: #d5e6ef;
-      }
-
-      .term-cmd {
-        color: var(--aqua);
-      }
-
-      .term-flg {
-        color: var(--gold);
-      }
-
-      .term-val {
-        color: #ffd6c8;
+        padding: 16px;
+        overflow-x: auto;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        line-height: 1.58;
+        background: linear-gradient(180deg, rgba(9, 18, 24, 0.96), rgba(9, 16, 21, 0.92));
+        color: #cde8f6;
       }
 
       .term-cm {
-        color: #8ea9b6;
+        color: #6f93a8;
+      }
+
+      .term-cmd {
+        color: #8de7ea;
+      }
+
+      .term-flg {
+        color: #ffe4a8;
+      }
+
+      .term-val {
+        color: #ffb9a6;
       }
 
       .lead {
-        max-width: 68ch;
         color: var(--muted-strong);
-        font-size: 18px;
+        max-width: 72ch;
       }
 
-      .split-cards {
-        margin-top: 26px;
+      .feature-grid {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 16px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
       }
 
       .card {
+        background: var(--bg-card);
         border: 1px solid var(--line);
         border-radius: var(--radius-m);
-        padding: 20px;
-        background: linear-gradient(180deg, rgba(23, 36, 45, 0.88), rgba(13, 23, 31, 0.88));
+        padding: 18px;
+        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.2);
       }
 
       .card h3 {
-        font-size: 22px;
         margin-bottom: 8px;
+        font-size: 22px;
       }
 
-      .chip-row {
-        margin-top: 14px;
+      .card p {
+        color: var(--muted);
+      }
+
+      .card pre {
+        margin-top: 10px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--bg-code);
+        overflow-x: auto;
+        color: #cde8f6;
+        font-family: var(--font-mono);
+        font-size: 12px;
+      }
+
+      .chips {
+        margin-top: 10px;
         display: flex;
         gap: 8px;
         flex-wrap: wrap;
       }
 
-      .chip {
+      .chips span {
+        border: 1px solid var(--line);
         border-radius: 999px;
-        border: 1px solid var(--line-strong);
-        padding: 5px 10px;
+        padding: 4px 9px;
         font-family: var(--font-mono);
         font-size: 11px;
         color: var(--muted);
       }
 
-      .features-grid {
-        margin-top: 26px;
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 16px;
-      }
-
-      .feature-card {
-        border: 1px solid var(--line);
-        border-radius: var(--radius-m);
-        padding: 18px 18px 20px;
-        background: linear-gradient(180deg, rgba(17, 27, 34, 0.84), rgba(9, 16, 21, 0.88));
-        transition: transform 0.2s ease, border-color 0.2s ease;
-      }
-
-      .feature-card:hover {
-        transform: translateY(-2px);
-        border-color: var(--line-strong);
-      }
-
-      .feature-card h3 {
-        font-size: 20px;
-        margin-bottom: 9px;
-      }
-
-      .feature-card p {
-        color: var(--muted);
-      }
-
-      .feature-card code {
-        display: block;
-        margin-top: 12px;
-        font-family: var(--font-mono);
-        font-size: 12px;
-        color: #d9edf7;
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid var(--line);
-        border-radius: var(--radius-s);
-        padding: 8px 9px;
-      }
-
-      .flow-grid {
-        margin-top: 26px;
+      .docs-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 16px;
+        gap: 12px;
       }
 
-      .panel {
+      .doc-link {
+        display: block;
         border: 1px solid var(--line);
         border-radius: var(--radius-m);
         background: var(--bg-card);
-        overflow: hidden;
-      }
-
-      .panel h3 {
-        font-size: 20px;
-        padding: 16px 16px 0;
-      }
-
-      .panel p {
-        padding: 8px 16px 0;
-        color: var(--muted);
-      }
-
-      .panel pre {
-        margin: 16px;
         padding: 14px;
-        border-radius: var(--radius-s);
-        border: 1px solid var(--line);
-        background: var(--bg-code);
-        overflow-x: auto;
-        font-family: var(--font-mono);
-        font-size: 12px;
-        line-height: 1.68;
-        color: #d8e9f1;
+        text-decoration: none;
       }
 
-      .table-wrap {
-        margin-top: 24px;
-        border: 1px solid var(--line);
-        border-radius: var(--radius-m);
-        overflow-x: auto;
+      .doc-link strong {
+        display: block;
+        color: var(--aqua);
+        margin-bottom: 3px;
       }
 
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        min-width: 840px;
-        background: rgba(9, 16, 21, 0.9);
-      }
-
-      th,
-      td {
-        text-align: left;
-        border-bottom: 1px solid var(--line);
-        padding: 12px 14px;
-        vertical-align: top;
-      }
-
-      th {
-        font-family: var(--font-mono);
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
+      .doc-link span {
         color: var(--muted);
-      }
-
-      td {
-        font-size: 14px;
-        color: #d7eaf3;
-      }
-
-      td code {
-        font-family: var(--font-mono);
-        font-size: 12px;
-        color: #d3ebf6;
-      }
-
-      .warn-grid {
-        margin-top: 24px;
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 16px;
-      }
-
-      .warn {
-        border: 1px solid rgba(255, 142, 114, 0.45);
-        border-radius: var(--radius-m);
-        background: linear-gradient(180deg, rgba(40, 20, 15, 0.78), rgba(25, 13, 10, 0.84));
-        padding: 18px;
-      }
-
-      .warn h3 {
-        font-size: 20px;
-        color: #ffc2b2;
-        margin-bottom: 9px;
-      }
-
-      .warn pre {
-        margin: 12px 0 0;
-        padding: 12px;
-        border: 1px solid rgba(255, 142, 114, 0.35);
-        border-radius: var(--radius-s);
-        background: rgba(0, 0, 0, 0.25);
-        overflow-x: auto;
-        font-family: var(--font-mono);
-        font-size: 12px;
-        line-height: 1.7;
       }
 
       .schema-chips {
-        margin-top: 22px;
         display: flex;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: 9px;
+        margin-top: 14px;
       }
 
       .schema-chips a {
         text-decoration: none;
+        padding: 6px 10px;
         border: 1px solid var(--line);
-        background: rgba(255, 255, 255, 0.02);
         border-radius: 999px;
-        padding: 8px 12px;
         font-family: var(--font-mono);
-        font-size: 12px;
-        color: #d0e7f2;
+        font-size: 11px;
+        color: var(--muted-strong);
       }
 
       .schema-chips a:hover {
-        border-color: var(--aqua);
+        border-color: var(--line-strong);
+        color: var(--text);
       }
 
-      .shots-grid {
-        margin-top: 26px;
+      .shots {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 16px;
+        gap: 14px;
       }
 
-      .shot {
-        border: 1px solid var(--line);
-        border-radius: var(--radius-m);
-        overflow: hidden;
-        background: var(--bg-card);
+      figure {
+        margin: 0;
       }
 
-      .shot img {
-        display: block;
+      .shots img {
         width: 100%;
-        height: auto;
-      }
-
-      .shot figcaption {
-        padding: 12px 14px 13px;
-        color: var(--muted);
-        font-size: 14px;
-      }
-
-      .agent-quick {
-        margin-top: 30px;
-        display: grid;
-        grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
-        gap: 24px;
-        align-items: start;
-      }
-
-      .agent-install {
-        border: 1px solid var(--line-strong);
-        border-radius: var(--radius-l);
-        padding: 24px;
-        background:
-          radial-gradient(circle at 88% 8%, rgba(52, 211, 216, 0.18), transparent 50%),
-          linear-gradient(160deg, rgba(17, 27, 34, 0.95), rgba(10, 17, 24, 0.95));
-        box-shadow: var(--shadow-soft);
-        display: flex;
-        flex-direction: column;
-        gap: 11px;
-      }
-
-      .agent-step {
-        display: inline-block;
-        margin-bottom: 2px;
-        font-family: var(--font-mono);
-        font-size: 11px;
-        letter-spacing: 0.11em;
-        text-transform: uppercase;
-        color: var(--gold);
-      }
-
-      .agent-install h3 {
-        font-size: 24px;
-        margin-bottom: 2px;
-      }
-
-      .agent-install p {
-        color: var(--muted);
-        margin: 0;
-        line-height: 1.44;
-      }
-
-      .agent-install pre {
-        margin: 2px 0 0;
-        padding: 14px 16px;
         border-radius: 12px;
         border: 1px solid var(--line);
-        background: rgba(4, 18, 26, 0.9);
-        overflow-x: auto;
-        font-family: var(--font-mono);
+        display: block;
+      }
+
+      figcaption {
+        margin-top: 8px;
         font-size: 13px;
-        line-height: 1.6;
-      }
-
-      .agent-note {
-        font-size: 13px;
-        margin-top: 2px;
-      }
-
-      .agent-prompt-single {
-        border: 1px solid var(--line);
-        border-radius: var(--radius-l);
-        padding: 24px;
-        background:
-          radial-gradient(circle at 10% 0%, rgba(249, 196, 107, 0.12), transparent 48%),
-          linear-gradient(160deg, rgba(13, 23, 30, 0.95), rgba(8, 15, 21, 0.95));
-        box-shadow: var(--shadow-soft);
-        display: flex;
-        flex-direction: column;
-        gap: 11px;
-      }
-
-      .agent-prompt-single h3 {
-        font-size: 24px;
-        margin-bottom: 2px;
-      }
-
-      .agent-prompt-single p {
-        color: var(--muted-strong);
-        margin: 0;
-        line-height: 1.44;
-      }
-
-      .agent-prompt-single code {
-        font-family: var(--font-mono);
-        font-size: 12px;
-        color: var(--aqua);
-      }
-
-      .agent-example-label {
-        margin: 4px 0 0;
-        font-family: var(--font-mono);
-        font-size: 11px;
-        letter-spacing: 0.11em;
-        text-transform: uppercase;
-        color: var(--gold);
-      }
-
-      .agent-prompt-single pre {
-        margin: 2px 0 0;
-        padding: 14px 16px;
-        border-radius: 12px;
-        border: 1px solid var(--line);
-        background: rgba(4, 18, 26, 0.86);
-        white-space: pre-wrap;
-        overflow-wrap: anywhere;
-        font-family: var(--font-mono);
-        font-size: 12px;
-        line-height: 1.65;
-      }
-
-      #agents .lead {
-        margin-top: 10px;
-        max-width: 68ch;
-      }
-
-      .cta-shell {
-        border: 1px solid var(--line);
-        border-radius: var(--radius-l);
-        padding: 34px;
-        background:
-          radial-gradient(circle at 80% 0%, rgba(249, 196, 107, 0.2), transparent 45%),
-          linear-gradient(180deg, rgba(14, 24, 31, 0.95), rgba(9, 16, 21, 0.95));
-      }
-
-      .cta-shell h2 {
-        margin-bottom: 12px;
-      }
-
-      .cta-actions {
-        margin-top: 22px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
+        color: var(--muted);
       }
 
       .footer {
         border-top: 1px solid var(--line);
-        padding: 26px 0 40px;
+        margin-top: 24px;
       }
 
       .footer-row {
         display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
         flex-wrap: wrap;
-        align-items: center;
-        gap: 10px 16px;
-      }
-
-      .footer-left {
-        margin-right: auto;
-        display: inline-flex;
-        align-items: center;
-        gap: 9px;
+        padding: 18px 0 26px;
         color: var(--muted);
-      }
-
-      .footer-left img {
-        width: 24px;
-        height: 24px;
-        border-radius: 6px;
-        background: #ffffff;
-        padding: 3px;
+        font-size: 14px;
       }
 
       .footer-links {
         display: inline-flex;
-        flex-wrap: wrap;
-        gap: 8px;
+        gap: 12px;
+        align-items: center;
       }
 
       .footer-links a {
-        font-family: var(--font-mono);
-        font-size: 12px;
-        color: var(--muted);
+        color: var(--muted-strong);
         text-decoration: none;
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        padding: 6px 10px;
       }
 
       .footer-links a:hover {
         color: var(--text);
-        border-color: var(--line-strong);
       }
 
       .reveal {
         opacity: 0;
-        transform: translateY(22px);
+        transform: translateY(20px);
         transition: opacity 0.55s ease, transform 0.55s ease;
       }
 
@@ -797,90 +520,22 @@
         transform: translateY(0);
       }
 
-      .stagger > * {
-        opacity: 0;
-        transform: translateY(16px);
-        animation: rise 0.55s ease forwards;
-      }
-
-      .stagger > *:nth-child(1) {
-        animation-delay: 0.06s;
-      }
-
-      .stagger > *:nth-child(2) {
-        animation-delay: 0.12s;
-      }
-
-      .stagger > *:nth-child(3) {
-        animation-delay: 0.18s;
-      }
-
-      .stagger > *:nth-child(4) {
-        animation-delay: 0.24s;
-      }
-
-      @keyframes rise {
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-
-      :focus-visible {
-        outline: 2px solid var(--focus);
-        outline-offset: 2px;
-      }
-
-      @media (max-width: 1060px) {
+      @media (max-width: 980px) {
         .hero-grid,
-        .split-cards,
-        .flow-grid,
-        .warn-grid,
-        .shots-grid,
-        .agent-quick {
+        .feature-grid,
+        .docs-grid,
+        .shots {
           grid-template-columns: 1fr;
         }
-
-        .agent-quick {
-          gap: 16px;
-        }
-
-        .agent-install,
-        .agent-prompt-single {
-          padding: 22px;
-        }
-
-        .features-grid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
       }
 
-      @media (max-width: 760px) {
-        .wrap {
-          width: min(1180px, 100% - 28px);
-        }
-
+      @media (max-width: 740px) {
         .section {
-          padding: 72px 0;
+          padding: 62px 0;
         }
 
         .hero {
-          padding: 64px 0 52px;
-        }
-
-        .features-grid {
-          grid-template-columns: 1fr;
-        }
-
-        .agent-install,
-        .agent-prompt-single {
-          padding: 18px;
-          gap: 9px;
-        }
-
-        .agent-install h3,
-        .agent-prompt-single h3 {
-          font-size: 22px;
+          padding: 70px 0 40px;
         }
 
         .nav-cta {
@@ -899,13 +554,12 @@
           <span class="brand-name">xyte-cli</span>
         </a>
         <nav class="nav-links" aria-label="Primary">
-          <a href="#compare">Compare</a>
-          <a href="#capabilities">Capabilities</a>
-          <a href="#commands">Commands</a>
-          <a href="#contracts">Contracts</a>
-          <a href="#agents">Agents</a>
+          <a href="#quickstart">Quick Start</a>
+          <a href="#workflows">Workflows</a>
+          <a href="#safety">Safety</a>
+          <a href="#docs">Docs</a>
         </nav>
-        <a class="nav-cta" href="#start">Get Started</a>
+        <a class="nav-cta" href="#quickstart">Get Started</a>
       </div>
     </header>
 
@@ -914,14 +568,15 @@
         <div class="wrap hero-grid">
           <div class="stagger">
             <p class="eyebrow">CLI + TUI + headless</p>
-            <h1>Operate Xyte fleets with <em>predictable CLI flows</em>.</h1>
+            <h1>Operate Xyte fleets with <em>predictable command flows</em>.</h1>
             <p class="hero-copy">
-              <code>xyte-cli</code> gives coding agents and operators one deterministic runtime for endpoint calls, guarded writes,
-              full-screen TUI operations, headless NDJSON snapshots, and schema-validated output contracts.
+              <code>xyte-cli</code> gives coding agents and operators one deterministic runtime for endpoint calls,
+              guarded writes, interactive TUI workflows, and schema-validated JSON outputs.
             </p>
             <div class="hero-actions">
-              <a class="btn btn-primary" href="#install">Install + setup</a>
-              <a class="btn btn-ghost" href="#commands">Command map</a>
+              <a class="btn btn-primary" href="#quickstart">Install + setup</a>
+              <a class="btn btn-ghost" href="https://github.com/xyte-io/xyte-cli">GitHub</a>
+              <a class="btn btn-ghost" href="https://www.npmjs.com/package/@xyteai/cli">npm package</a>
             </div>
             <div class="hero-badges">
               <span>Guarded mutations</span>
@@ -936,291 +591,155 @@
               <span class="dot dot-aqua" aria-hidden="true"></span>
               <span class="terminal-title">xyte-cli quickstart</span>
             </div>
-            <pre class="terminal-body"><span class="term-cm"># install + verify</span>
+            <pre class="terminal-body"><span class="term-cm"># install</span>
 <span class="term-cmd">npm install -g @xyteai/cli@latest</span>
 <span class="term-cmd">xyte-cli --help</span>
 
-<span class="term-cm"># setup readiness</span>
-<span class="term-cmd">xyte-cli setup status</span> <span class="term-flg">--tenant</span> <span class="term-val">acme</span> <span class="term-flg">--format</span> <span class="term-val">json</span>
+<span class="term-cm"># setup</span>
+<span class="term-cmd">XYTE_CLI_KEY</span>=<span class="term-val">"&lt;your-key&gt;"</span> \
+<span class="term-cmd">xyte-cli setup run</span> <span class="term-flg">--non-interactive --tenant</span> <span class="term-val">acme</span>
 
-<span class="term-cm"># headless frame for agents</span>
-<span class="term-cmd">xyte-cli tui</span> <span class="term-flg">--headless --screen</span> <span class="term-val">dashboard</span> <span class="term-flg">--once</span> <span class="term-flg">--format</span> <span class="term-val">json</span></pre>
+<span class="term-cm"># headless snapshot for agents</span>
+<span class="term-cmd">xyte-cli tui</span> <span class="term-flg">--headless --screen</span> <span class="term-val">dashboard</span> <span class="term-flg">--once --format</span> <span class="term-val">json</span> <span class="term-flg">--tenant</span> <span class="term-val">acme</span></pre>
           </article>
         </div>
       </section>
 
-      <section class="section reveal" id="compare" aria-labelledby="compare-title">
+      <section class="section reveal" id="quickstart" aria-labelledby="quickstart-title">
         <div class="wrap">
-          <p class="eyebrow">Model fit</p>
-          <h2 id="compare-title">`xyte-cli` interactive vs headless</h2>
-          <p class="lead">
-            Both run the same CLI contracts. Choose interactive TUI for operator workflows, or headless JSON frames for automation loops.
-          </p>
-          <div class="split-cards">
-            <article class="card">
-              <h3>CLI mode</h3>
-              <p>
-                Best for low-token, deterministic command workflows where the agent shells out and controls flow explicitly.
-              </p>
-              <div class="chip-row">
-                <span class="chip">Fast command loops</span>
-                <span class="chip">Predictable stdout</span>
-                <span class="chip">Easy CI integration</span>
-              </div>
-            </article>
-            <article class="card">
-              <h3>Headless mode</h3>
-              <p>
-                Best for machine-driven workflows that consume JSON-only frames while keeping the CLI as the execution surface.
-              </p>
-              <div class="chip-row">
-                <span class="chip">Machine snapshots</span>
-                <span class="chip">JSON-only frames</span>
-                <span class="chip">Automation-friendly</span>
-              </div>
-            </article>
-          </div>
+          <p class="eyebrow">60-second flow</p>
+          <h2 id="quickstart-title">Install, inspect, report</h2>
+          <p class="lead">Configure once, run read-only checks, and generate reports immediately.</p>
+          <article class="card" style="margin-top: 16px;">
+            <pre><span class="term-cmd">XYTE_CLI_KEY</span>=<span class="term-val">"&lt;your-key&gt;"</span> <span class="term-cmd">xyte-cli setup run --non-interactive --tenant acme</span>
+<span class="term-cmd">xyte-cli inspect fleet --tenant acme --format json</span>
+<span class="term-cmd">xyte-cli inspect deep-dive --tenant acme --window 24 --format json &gt; /tmp/deep-dive.json</span>
+<span class="term-cmd">xyte-cli report generate --tenant acme --input /tmp/deep-dive.json --out /tmp/xyte-report.pdf</span></pre>
+          </article>
         </div>
       </section>
 
-      <section class="section reveal" id="capabilities" aria-labelledby="cap-title">
+      <section class="section reveal" id="workflows" aria-labelledby="workflows-title">
         <div class="wrap">
-          <p class="eyebrow">Core capabilities</p>
-          <h2 id="cap-title">Built for production operations</h2>
-          <div class="features-grid">
-            <article class="feature-card">
-              <h3>Skill bootstrap</h3>
-              <p>Install bundled skill docs for Claude, Copilot, and Codex from one command.</p>
-              <code>xyte-cli install --skills</code>
+          <p class="eyebrow">Common workflows</p>
+          <h2 id="workflows-title">High-signal command map</h2>
+          <div class="feature-grid">
+            <article class="card">
+              <h3>Skills install</h3>
+              <p>Install coding-agent skill bundles once per workspace.</p>
+              <pre>xyte-cli install --skills</pre>
             </article>
-            <article class="feature-card">
-              <h3>Provider + slot auth</h3>
-              <p>Named key slots per provider with add/use/update/rename/test/remove lifecycle.</p>
-              <code>xyte-cli auth key list --tenant acme --format json</code>
+            <article class="card">
+              <h3>Endpoint calls</h3>
+              <p>Discover endpoints and emit structured envelope outputs.</p>
+              <pre>xyte-cli list-endpoints
+xyte-cli describe-endpoint organization.devices.getDevices
+xyte-cli call organization.devices.getDevices --tenant acme --output-mode envelope --strict-json</pre>
             </article>
-            <article class="feature-card">
-              <h3>Full TUI</h3>
-              <p>Operational screens plus action palette (`a`), structured filters (`f`), and paging controls (`[` `]` `p`) for ops workflows.</p>
-              <code>xyte-cli tui</code>
-            </article>
-            <article class="feature-card">
-              <h3>Headless NDJSON</h3>
-              <p>Machine-only snapshots for agent loops with schema-stable IDs.</p>
-              <code>xyte-cli tui --headless --screen dashboard --once --format json</code>
-            </article>
-            <article class="feature-card">
-              <h3>Guarded writes</h3>
-              <p>Write and destructive endpoints require explicit confirmation flags.</p>
-              <code>xyte-cli call ... --allow-write --confirm ...</code>
-            </article>
-            <article class="feature-card">
-              <h3>Deterministic reports</h3>
-              <p>Fleet inspect/deep-dive/report pipeline with versioned contract outputs.</p>
-              <code>xyte-cli report generate --tenant acme --input /tmp/deep.json --out /tmp/report.pdf</code>
-            </article>
-            <article class="feature-card">
+            <article class="card">
               <h3>Utility prepare</h3>
-              <p>Action-based preprocessing for all write endpoints, with deterministic scaffold files.</p>
-              <code>xyte-cli utility prepare --action organization.devices.claimDevice --input ./raw.xlsx</code>
+              <p>Preprocess data externally; execute intentionally via CLI.</p>
+              <pre>xyte-cli utility list-actions --format text
+xyte-cli utility prepare --action organization.devices.claimDevice --input ./raw.xlsx --output-dir ./tmp</pre>
+            </article>
+            <article class="card">
+              <h3>Space import</h3>
+              <p>Dry-run first, then apply with explicit approval.</p>
+              <pre>xyte-cli space import-tree --tenant acme --input ./tmp/space-import-tree.csv
+xyte-cli space import-tree --tenant acme --input ./tmp/space-import-tree.csv --apply</pre>
+            </article>
+            <article class="card">
+              <h3>Insights + reports</h3>
+              <p>Use inspect outputs as report input contracts.</p>
+              <pre>xyte-cli inspect deep-dive --tenant acme --window 24 --format json
+xyte-cli report generate --tenant acme --input /tmp/deep-dive.json --out /tmp/xyte-report.pdf</pre>
+            </article>
+            <article class="card">
+              <h3>TUI + headless</h3>
+              <p>Human operations in TUI, machine snapshots in headless mode.</p>
+              <pre>xyte-cli tui
+xyte-cli tui --headless --screen spaces --follow --format json --tenant acme</pre>
             </article>
           </div>
         </div>
       </section>
 
-      <section class="section reveal" id="install" aria-labelledby="install-title">
+      <section class="section reveal" id="safety" aria-labelledby="safety-title">
         <div class="wrap">
-          <p class="eyebrow">Install + setup</p>
-          <h2 id="install-title">From zero to ready in one flow</h2>
-          <div class="flow-grid">
-            <article class="panel">
-              <h3>Global install</h3>
-              <p>Install package and verify command wiring.</p>
-              <pre><span class="term-cmd">npm install -g @xyteai/cli@latest</span>
-<span class="term-cmd">xyte-cli --help</span>
-<span class="term-cmd">xyte-cli doctor install</span> <span class="term-flg">--format</span> <span class="term-val">json</span></pre>
+          <p class="eyebrow">Safety model</p>
+          <h2 id="safety-title">Guardrails and contracts</h2>
+          <div class="feature-grid">
+            <article class="card">
+              <h3>Guarded writes</h3>
+              <p>Mutations require <code>--allow-write</code>. Destructive calls also require <code>--confirm &lt;endpoint-key&gt;</code>.</p>
+              <div class="chips">
+                <span>explicit mutation intent</span>
+                <span>destructive confirmation token</span>
+              </div>
             </article>
-            <article class="panel">
-              <h3>Guided readiness</h3>
-              <p>Use guided setup or non-interactive setup in automation contexts.</p>
-              <pre><span class="term-cmd">xyte-cli setup run</span>
-
-<span class="term-cm"># CI/non-interactive</span>
-<span class="term-cmd">XYTE_CLI_KEY</span>=<span class="term-val">"&lt;your-key&gt;"</span> \
-<span class="term-cmd">xyte-cli setup run</span> <span class="term-flg">--non-interactive --tenant</span> <span class="term-val">acme</span> <span class="term-flg">--key</span> <span class="term-val">&lt;value&gt;</span></pre>
+            <article class="card">
+              <h3>Headless is read-only</h3>
+              <p><code>tui --headless</code> emits snapshots only; interactive write actions are disabled in headless mode.</p>
+              <div class="chips">
+                <span>JSON frames</span>
+                <span>automation-safe</span>
+              </div>
             </article>
-            <article class="panel">
-              <h3>Commit gate (fresh user)</h3>
-              <p>Run this sequence before merging: isolated install + skills + setup + persisted key reuse + live call.</p>
-              <pre><span class="term-cmd">XYTE_CLI_KEY</span>=<span class="term-val">"&lt;real-key&gt;"</span> \
-<span class="term-cmd">XYTE_E2E_TENANT</span>=<span class="term-val">"&lt;tenant-id-or-default&gt;"</span> \
-<span class="term-cmd">npm run test:commit</span></pre>
-            </article>
-            <article class="panel">
-              <h3>Local utility sandbox</h3>
-              <p>Run utility commands safely against a local mock server. Expected pass criteria: <code>Local utility smoke passed.</code></p>
-              <pre><span class="term-cm"># terminal A</span>
-<span class="term-cmd">npm run mock:xyte:local</span> <span class="term-flg">-- --port</span> <span class="term-val">3001</span>
-
-<span class="term-cm"># terminal B</span>
-<span class="term-cmd">npm run smoke:local:utilities</span> <span class="term-flg">-- --base-url</span> <span class="term-val">http://127.0.0.1:3001</span> <span class="term-flg">--tenant</span> <span class="term-val">local</span></pre>
-              <p class="muted">Run prepare first, then dry-run and apply only when explicitly approved.</p>
-            </article>
-            <article class="panel">
-              <h3>AI preprocessing + CLI execution</h3>
-              <p><code>xyte-cli</code> has no embedded AI. AI may prepare files only; CLI remains the execution engine.</p>
-              <pre><span class="term-cm"># preprocess with external AI assistant</span>
-<span class="term-cmd">cat docs/ai-utility-preprocessing.md</span>
-<span class="term-cmd">cat scripts/templates/ai-utility-prepare-generic.prompt.md</span>
-<span class="term-cmd">cat scripts/templates/ai-space-import.prompt.md</span>
-
-<span class="term-cm"># build decoding context + scaffold files</span>
-<span class="term-cmd">xyte-cli utility prepare --action organization.devices.claimDevice --input /path/to/raw-file --tenant acme --output-dir ./tmp</span>
-<span class="term-cmd">xyte-cli utility prepare --action space.import-tree --input /path/to/raw-tree --tenant acme --output-dir ./tmp</span>
-
-<span class="term-cm"># execute with xyte-cli</span>
-<span class="term-cmd">xyte-cli space import-tree --tenant acme --input /Users/porton/Projects/xyte-cli/tmp/space-import-tree.csv</span></pre>
+            <article class="card">
+              <h3>Stable schema IDs</h3>
+              <p>Validate outputs against versioned contracts before automation rollout.</p>
+              <div class="schema-chips">
+                <a href="./schemas/headless-frame.v1.schema.json">xyte.headless.frame.v1</a>
+                <a href="./schemas/call-envelope.v1.schema.json">xyte.call.envelope.v1</a>
+                <a href="./schemas/inspect-fleet.v1.schema.json">xyte.inspect.fleet.v1</a>
+                <a href="./schemas/inspect-deep-dive.v1.schema.json">xyte.inspect.deep-dive.v1</a>
+                <a href="./schemas/report.v1.schema.json">xyte.report.v1</a>
+                <a href="./schemas/utility-batch.v1.schema.json">xyte.utility.batch.v1</a>
+                <a href="./schemas/utility-prepare.v1.schema.json">xyte.utility.prepare.v1</a>
+              </div>
             </article>
           </div>
         </div>
       </section>
 
-      <section class="section reveal" id="skills" aria-labelledby="skills-title">
+      <section class="section reveal" id="docs" aria-labelledby="docs-title">
         <div class="wrap">
-          <p class="eyebrow">Skill install flow</p>
-          <h2 id="skills-title">Install skills where your agents live</h2>
-          <p class="lead">
-            The installer supports project/user scopes, agent targeting, forced overwrite, and setup skip. Non-interactive fallback defaults
-            to project scope and all agents.
-          </p>
-          <div class="flow-grid">
-            <article class="panel">
-              <h3>Interactive or targeted install</h3>
-              <pre><span class="term-cmd">xyte-cli install --skills</span>
-<span class="term-cmd">xyte-cli install --skills --scope project --agents claude,codex</span>
-<span class="term-cmd">xyte-cli install --skills --scope both --agents all --force</span></pre>
-            </article>
-            <article class="panel">
-              <h3>No-setup path</h3>
-              <pre><span class="term-cmd">xyte-cli install --skills --no-setup</span>
-<span class="term-cmd">xyte-cli install --skills --target /path/to/workspace</span></pre>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="section reveal" id="commands" aria-labelledby="commands-title">
-        <div class="wrap">
-          <p class="eyebrow">Command reference</p>
-          <h2 id="commands-title">High-signal command map</h2>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Area</th>
-                  <th>Example</th>
-                  <th>Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Core diagnostics</td>
-                  <td><code>xyte-cli config doctor --tenant acme --format json</code></td>
-                  <td>Readiness + connectivity checks.</td>
-                </tr>
-                <tr>
-                  <td>Tenant profile</td>
-                  <td><code>xyte-cli tenant add acme --name "Acme"</code></td>
-                  <td>Use <code>tenant use</code> and <code>tenant list</code> for profile management.</td>
-                </tr>
-                <tr>
-                  <td>Auth slots</td>
-                  <td><code>xyte-cli auth key add --tenant acme --provider xyte-org --name primary --key "&lt;value&gt;" --set-active</code></td>
-                  <td>Named slots per provider, with test/rotate support.</td>
-                </tr>
-                <tr>
-                  <td>Endpoint calls</td>
-                  <td><code>xyte-cli call organization.devices.getDevices --tenant acme --output-mode envelope</code></td>
-                  <td>Deterministic endpoint and envelope surface.</td>
-                </tr>
-                <tr>
-                  <td>Incident fetch (reliable)</td>
-                  <td><code>NOW=$(date +%s); xyte-cli call organization.incidents.getIncidents --tenant acme --query-json "{\"status\":\"active\",\"from\":0,\"to\":$NOW,\"page\":1,\"per_page\":100}"</code></td>
-                  <td>Use explicit integer time bounds for active incident queries.</td>
-                </tr>
-                <tr>
-                  <td>Insights</td>
-                  <td><code>xyte-cli inspect deep-dive --tenant acme --window 24 --format json</code></td>
-                  <td>Feeds report generation pipeline.</td>
-                </tr>
-                <tr>
-                  <td>Utility list actions</td>
-                  <td><code>xyte-cli utility list-actions --format text</code></td>
-                  <td>Lists preprocess-capable action keys from the endpoint catalog.</td>
-                </tr>
-                <tr>
-                  <td>Utility prepare</td>
-                  <td><code>xyte-cli utility prepare --action organization.devices.claimDevice --input ./raw-source.xlsx --output-dir ./tmp</code></td>
-                  <td>Returns machine-readable preprocess contract and scaffolds canonical files.</td>
-                </tr>
-                <tr>
-                  <td>Space tree import</td>
-                  <td><code>xyte-cli space import-tree --tenant acme --input ./space-import-tree.csv --apply</code></td>
-                  <td>Prepare-first flow with idempotent find-or-create behavior.</td>
-                </tr>
-                <tr>
-                  <td>TUI / headless</td>
-                  <td><code>xyte-cli tui --headless --screen spaces --format json --follow --interval-ms 2000 --tenant acme</code></td>
-                  <td>Interactive TUI has org-only write actions; headless remains read-only snapshots.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <section class="section reveal" id="guardrails" aria-labelledby="guardrails-title">
-        <div class="wrap">
-          <p class="eyebrow">Guarded writes</p>
-          <h2 id="guardrails-title">Mutations require explicit intent</h2>
-          <div class="warn-grid">
-            <article class="warn">
-              <h3>Write endpoint</h3>
-              <p class="muted">Non-read calls require <code>--allow-write</code>.</p>
-              <pre><span class="term-cmd">xyte-cli call organization.commands.sendCommand</span> \
-  <span class="term-flg">--tenant</span> <span class="term-val">acme</span> \
-  <span class="term-flg">--allow-write</span> \
-  <span class="term-flg">--path-json</span> <span class="term-val">'{"device_id":"DEVICE_ID"}'</span> \
-  <span class="term-flg">--body-json</span> <span class="term-val">'{"command":"reboot"}'</span></pre>
-            </article>
-            <article class="warn">
-              <h3>Destructive endpoint</h3>
-              <p class="muted">Delete-like behavior also requires endpoint confirmation token.</p>
-              <pre><span class="term-cmd">xyte-cli call organization.commands.cancelCommand</span> \
-  <span class="term-flg">--tenant</span> <span class="term-val">acme</span> \
-  <span class="term-flg">--allow-write</span> \
-  <span class="term-flg">--confirm</span> <span class="term-val">organization.commands.cancelCommand</span> \
-  <span class="term-flg">--path-json</span> <span class="term-val">'{"device_id":"DEVICE_ID","command_id":"COMMAND_ID"}'</span></pre>
-            </article>
-          </div>
-          <p class="muted">Utility prepare commands are read-only scaffolds. TUI headless mode is read-only. Import-tree execution remains dry-run by default and requires <code>--apply</code> for writes.</p>
-        </div>
-      </section>
-
-      <section class="section reveal" id="contracts" aria-labelledby="contracts-title">
-        <div class="wrap">
-          <p class="eyebrow">Machine contracts</p>
-          <h2 id="contracts-title">Schema IDs and source files</h2>
-          <p class="lead">
-            Headless and workflow outputs are versioned with stable contract IDs. Validate them in CI before production automation loops.
-          </p>
-          <div class="schema-chips">
-            <a href="./schemas/headless-frame.v1.schema.json">xyte.headless.frame.v1</a>
-            <a href="./schemas/call-envelope.v1.schema.json">xyte.call.envelope.v1</a>
-            <a href="./schemas/inspect-fleet.v1.schema.json">xyte.inspect.fleet.v1</a>
-            <a href="./schemas/inspect-deep-dive.v1.schema.json">xyte.inspect.deep-dive.v1</a>
-            <a href="./schemas/report.v1.schema.json">xyte.report.v1</a>
-            <a href="./schemas/utility-batch.v1.schema.json">xyte.utility.batch.v1</a>
-            <a href="./schemas/utility-prepare.v1.schema.json">xyte.utility.prepare.v1</a>
+          <p class="eyebrow">Documentation</p>
+          <h2 id="docs-title">Focused pages by task</h2>
+          <p class="lead">Detailed reference is split into smaller docs to keep this landing page concise.</p>
+          <div class="docs-grid" style="margin-top: 14px;">
+            <a class="doc-link" href="https://github.com/xyte-io/xyte-cli#readme">
+              <strong>README</strong>
+              <span>Concise onboarding and compatibility policy.</span>
+            </a>
+            <a class="doc-link" href="./getting-started.md">
+              <strong>Getting started</strong>
+              <span>Install, setup, skill install options, and first-run flow.</span>
+            </a>
+            <a class="doc-link" href="./commands.md">
+              <strong>Command reference</strong>
+              <span>High-signal commands by feature area.</span>
+            </a>
+            <a class="doc-link" href="./agents.md">
+              <strong>Agent usage</strong>
+              <span>Prompt patterns and agent-specific tips.</span>
+            </a>
+            <a class="doc-link" href="./development.md">
+              <strong>Development</strong>
+              <span>Validation loop, smoke gates, and local sandbox.</span>
+            </a>
+            <a class="doc-link" href="./ai-utility-preprocessing.md">
+              <strong>AI utility preprocess</strong>
+              <span>Prepare-first runbook for utility workflows.</span>
+            </a>
+            <a class="doc-link" href="./release.md">
+              <strong>Release guide</strong>
+              <span>CI/publish flow, release assets, and rollback path.</span>
+            </a>
+            <a class="doc-link" href="./schemas/headless-frame.v1.schema.json">
+              <strong>Schemas</strong>
+              <span>Versioned JSON contract definitions.</span>
+            </a>
           </div>
         </div>
       </section>
@@ -1228,58 +747,16 @@
       <section class="section reveal" id="visuals" aria-labelledby="visuals-title">
         <div class="wrap">
           <p class="eyebrow">Visual demo</p>
-          <h2 id="visuals-title">Interactive TUI and headless output</h2>
-          <div class="shots-grid">
-            <figure class="shot">
-              <img src="./media/tui-dashboard-synthetic.png" alt="xyte-cli TUI dashboard with KPIs, incidents table, and ticket list" />
-              <figcaption>TUI dashboard for human operators.</figcaption>
+          <h2 id="visuals-title">Interactive and headless views</h2>
+          <div class="shots" style="margin-top: 14px;">
+            <figure>
+              <img src="./media/tui-dashboard-synthetic.png" alt="xyte-cli TUI dashboard" />
+              <figcaption>TUI dashboard for operator workflows.</figcaption>
             </figure>
-            <figure class="shot">
-              <img src="./media/headless-frame-synthetic.png" alt="xyte-cli headless JSON frame output with schema and metadata fields" />
-              <figcaption>Headless frame for coding-agent loops.</figcaption>
+            <figure>
+              <img src="./media/headless-frame-synthetic.png" alt="xyte-cli headless frame JSON output" />
+              <figcaption>Headless JSON frame for coding-agent loops.</figcaption>
             </figure>
-          </div>
-        </div>
-      </section>
-
-      <section class="section reveal" id="agents" aria-labelledby="agents-title">
-        <div class="wrap">
-          <p class="eyebrow">Agent quick start</p>
-          <h2 id="agents-title">Install once, then prompt away</h2>
-          <p class="lead">Two steps only: install once, then use any coding agent and prompt it to run <code>xyte-cli</code> directly.</p>
-          <div class="agent-quick">
-            <article class="agent-install">
-              <span class="agent-step">Step 1</span>
-              <h3>Install skills once</h3>
-              <p>Run this once in the workspace where your agent will operate.</p>
-              <pre><span class="term-cmd">xyte-cli install --skills</span></pre>
-              <p class="agent-note">Done. No repeats needed.</p>
-            </article>
-
-            <article class="agent-prompt-single" aria-label="Step 2 prompt guidance">
-              <span class="agent-step">Step 2</span>
-              <h3>Use any agent and prompt away</h3>
-              <p>Open Claude, Codex, or GitHub Copilot and give it a direct task prompt that explicitly says to run <code>xyte-cli</code> commands.</p>
-              <p class="agent-example-label">Prompt example</p>
-              <pre><span class="term-cm">Inspect tenant acme and generate a report.</span>
-<span class="term-cm">Use xyte-cli commands directly and keep outputs JSON-first.</span></pre>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="section reveal" id="start" aria-labelledby="start-title">
-        <div class="wrap">
-          <div class="cta-shell">
-            <p class="eyebrow">Start now</p>
-            <h2 id="start-title">Deploy deterministic Xyte operations into your agent workflows.</h2>
-            <p class="lead">
-              Install the CLI, initialize skills, run setup once, and keep outputs JSON-first where possible for reliable automation.
-            </p>
-            <div class="cta-actions">
-              <a class="btn btn-primary" href="#install">Install now</a>
-              <a class="btn btn-ghost" href="#commands">Review command map</a>
-            </div>
           </div>
         </div>
       </section>
@@ -1287,13 +764,9 @@
 
     <footer class="footer" role="contentinfo">
       <div class="wrap footer-row">
-        <div class="footer-left">
-          <img src="./media/xyte-logo.jpg" alt="" aria-hidden="true" />
-          <span>xyte-cli · deterministic fleet operations for humans and AI agents</span>
-        </div>
+        <span>xyte-cli · deterministic fleet operations for humans and AI agents</span>
         <div class="footer-links">
           <a href="#top">Top</a>
-          <a href="./schemas/report.v1.schema.json">Schemas</a>
           <a href="https://github.com/xyte-io/xyte-cli">GitHub</a>
           <a href="https://www.npmjs.com/package/@xyteai/cli">@xyteai/cli</a>
         </div>
@@ -1302,22 +775,24 @@
 
     <script>
       (() => {
-        const revealed = document.querySelectorAll(".reveal");
-        if (!("IntersectionObserver" in window)) {
-          revealed.forEach((el) => el.classList.add("is-visible"));
+        const revealed = document.querySelectorAll('.reveal');
+        if (!('IntersectionObserver' in window)) {
+          revealed.forEach((el) => el.classList.add('is-visible'));
           return;
         }
+
         const observer = new IntersectionObserver(
           (entries) => {
             entries.forEach((entry) => {
               if (entry.isIntersecting) {
-                entry.target.classList.add("is-visible");
+                entry.target.classList.add('is-visible');
                 observer.unobserve(entry.target);
               }
             });
           },
-          { threshold: 0.12, rootMargin: "0px 0px -32px 0px" }
+          { threshold: 0.12, rootMargin: '0px 0px -32px 0px' }
         );
+
         revealed.forEach((el) => observer.observe(el));
       })();
     </script>

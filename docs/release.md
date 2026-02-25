@@ -4,13 +4,13 @@ This repository ships one npm package: `@xyteai/cli`.
 
 ## Governance
 
-- Versioning and release notes live in `/Users/porton/Projects/xyte-cli/CHANGELOG.md`.
-- Security handling policy lives in `/Users/porton/Projects/xyte-cli/SECURITY.md`.
+- Versioning and release notes live in `CHANGELOG.md`.
+- Security handling policy lives in `SECURITY.md`.
 - JSON contracts in `docs/schemas/*.schema.json` are treated as the automation compatibility boundary.
 
 ## CI Gates
 
-`/Users/porton/Projects/xyte-cli/.github/workflows/ci.yml` runs on pushes and pull requests:
+`.github/workflows/ci.yml` runs on pushes and pull requests:
 
 - matrix validation on `ubuntu-latest` and `macos-latest`, Node `18` and `22`
 - `npm ci`
@@ -38,7 +38,7 @@ This script runs install, typecheck, tests, build, dry-run pack, audit, and opti
 
 ## Publish Workflow
 
-`/Users/porton/Projects/xyte-cli/.github/workflows/publish.yml` publishes to npm on semver tags (`vX.Y.Z` or `X.Y.Z`) or manual dispatch.
+`.github/workflows/publish.yml` publishes to npm on semver tags (`vX.Y.Z` or `X.Y.Z`) or manual dispatch.
 
 Workflow gates:
 
@@ -55,7 +55,7 @@ Prerequisites:
 
 ## Release Assets Workflow
 
-`/Users/porton/Projects/xyte-cli/.github/workflows/release-assets.yml` runs on the same tags (or manually) and attaches release artifacts to GitHub Releases:
+`.github/workflows/release-assets.yml` runs on the same tags (or manually) and attaches release artifacts to GitHub Releases:
 
 - built npm tarball (`*.tgz`)
 - CycloneDX SBOM (`sbom.cdx.json`)
