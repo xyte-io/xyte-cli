@@ -61,7 +61,7 @@
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/sdk-node": "^0.211.0",
     "@types/pdfkit": "^0.17.4",
-    "ajv": "^8.17.1",
+    "ajv": "^8.18.0",
     "blessed": "^0.1.81",
     "commander": "^14.0.3",
     "pdfkit": "^0.17.2",
