@@ -30,21 +30,49 @@ describe('secret store backends', () => {
     const store = new FileSecretStore(filePath);
 
     await store.setSlotSecret('acme', 'xyte-org', 'primary', 'org-key');
-    await store.setSlotSecret('acme', 'xyte-device', 'edge', 'device-key');
+    await store.setSlotSecret('acme', 'xyte-partner', 'primary', 'partner-key');
 
     const reloaded = new FileSecretStore(filePath);
     expect(await reloaded.getSlotSecret('acme', 'xyte-org', 'primary')).toBe('org-key');
-    expect(await reloaded.getSlotSecret('acme', 'xyte-device', 'edge')).toBe('device-key');
+    expect(await reloaded.getSlotSecret('acme', 'xyte-partner', 'primary')).toBe('partner-key');
 
     const raw = JSON.parse(await readFile(filePath, 'utf8')) as { version: number; records: Record<string, string> };
     expect(raw.version).toBe(1);
     expect(raw.records['acme:xyte-org:primary']).toBe('org-key');
-    expect(raw.records['acme:xyte-device:edge']).toBe('device-key');
+    expect(raw.records['acme:xyte-partner:primary']).toBe('partner-key');
 
     if (process.platform !== 'win32') {
       const mode = (await stat(filePath)).mode & 0o777;
       expect(mode).toBe(0o600);
     }
+  });
+
+  it('auto-purges unsupported provider secrets from persisted file', async () => {
+    const { FileSecretStore } = await loadSecretStoreModule();
+    const root = mkdtempSync(join(tmpdir(), 'xyte-secret-store-legacy-'));
+    const filePath = join(root, 'secrets.v1.json');
+    writeFileSync(
+      filePath,
+      JSON.stringify(
+        {
+          version: 1,
+          records: {
+            'acme:xyte-org:primary': 'org-key',
+            'acme:xyte-device:edge': 'device-key'
+          }
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const store = new FileSecretStore(filePath);
+    expect(await store.getSlotSecret('acme', 'xyte-org', 'primary')).toBe('org-key');
+
+    const raw = JSON.parse(await readFile(filePath, 'utf8')) as { version: number; records: Record<string, string> };
+    expect(raw.records['acme:xyte-org:primary']).toBe('org-key');
+    expect(raw.records['acme:xyte-device:edge']).toBeUndefined();
   });
 
   it('raises explicit error when persisted file is corrupt', async () => {

@@ -50,35 +50,28 @@ describe('client auth behavior', () => {
     await expect(client.organization.getDevices()).rejects.toBeInstanceOf(XyteAuthError);
   });
 
-  it('normalizes cloud settings payload to property/value', async () => {
+  it('injects partner auth header from tenant secretStore', async () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
 
     const secretStore = new MemorySecretStore();
     const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-device',
-      name: 'device-primary',
-      fingerprint: 'sha256:dev'
+      provider: 'xyte-partner',
+      name: 'partner-primary',
+      fingerprint: 'sha256:partner'
     });
-    await secretStore.setSlotSecret('acme', 'xyte-device', slot.slotId, 'device-key-456');
+    await secretStore.setSlotSecret('acme', 'xyte-partner', slot.slotId, 'partner-key-456');
 
     const transport = {
       request: vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } })
     } as any;
 
     const client = createXyteClient({ profileStore, secretStore, transport });
+    await client.partner.getDevices();
 
-    await client.device.setCloudSettings({
-      path: { device_id: 'dev-1' },
-      body: { 'incidents.suspend_creation': true }
-    });
-
-    const request = transport.request.mock.calls[0][0];
-    expect(JSON.parse(request.body)).toEqual({
-      property: 'incidents.suspend_creation',
-      value: true
-    });
+    expect(transport.request).toHaveBeenCalledTimes(1);
+    expect(transport.request.mock.calls[0][0].headers.Authorization).toBe('partner-key-456');
   });
 
   it('uses active slot secret when multiple slots exist', async () => {

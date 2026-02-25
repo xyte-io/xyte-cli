@@ -28,6 +28,7 @@ import { createSecretStore, type SecretStore } from '../secure/secret-store';
 import { makeKeyFingerprint, matchesSlotRef } from '../secure/key-slots';
 import { FileProfileStore, type ProfileStore } from '../secure/profile-store';
 import type { SecretProvider } from '../types/profile';
+import { SUPPORTED_SECRET_PROVIDERS, isSecretProvider } from '../types/profile';
 import { parseJsonObject } from '../utils/json';
 import { writeJsonLine } from '../utils/json-output';
 import type { UtilityInputFormat } from '../utils/input-parser';
@@ -261,13 +262,10 @@ function printJson(stream: OutputStream, value: unknown, options: { strictJson?:
 }
 
 function parseProvider(value: string): SecretProvider {
-  const allowed: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device'];
-
-  if (!allowed.includes(value as SecretProvider)) {
+  if (!isSecretProvider(value)) {
     throw new Error(`Invalid provider: ${value}`);
   }
-
-  return value as SecretProvider;
+  return value;
 }
 
 function parseSkillInstallScope(value: string | undefined): SkillInstallScope | undefined {
@@ -642,14 +640,6 @@ async function runSlotConnectivityTest(args: {
     return {
       strategy: 'partner.getDevices',
       ok: true
-    };
-  }
-
-  if (args.provider === 'xyte-device') {
-    return {
-      strategy: 'local-only',
-      ok: true,
-      note: 'Device-key probe skipped (requires device-specific path context).'
     };
   }
 
@@ -1596,7 +1586,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
   authKey
     .command('add')
     .requiredOption('--tenant <tenantId>', 'Tenant id')
-    .requiredOption('--provider <provider>', 'xyte-org|xyte-partner|xyte-device')
+    .requiredOption('--provider <provider>', SUPPORTED_SECRET_PROVIDERS.join('|'))
     .requiredOption('--name <name>', 'Slot display name')
     .option('--slot-id <slotId>', 'Optional explicit slot id')
     .option('--key <value>', 'API key value')

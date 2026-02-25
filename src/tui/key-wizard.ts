@@ -1,8 +1,9 @@
 import { makeKeyFingerprint, matchesSlotRef } from '../secure/key-slots';
 import type { ApiKeySlotMeta, SecretProvider } from '../types/profile';
+import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
 import type { TuiContext } from './types';
 
-const PROVIDERS: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device'];
+const PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
 
 interface WizardContext
   extends Pick<TuiContext, 'prompt' | 'promptSecret' | 'confirmWrite' | 'setStatus' | 'profileStore' | 'secretStore'> {}

@@ -1,4 +1,10 @@
-export type SecretProvider = 'xyte-org' | 'xyte-partner' | 'xyte-device';
+export const SUPPORTED_SECRET_PROVIDERS = ['xyte-org', 'xyte-partner'] as const;
+
+export type SecretProvider = (typeof SUPPORTED_SECRET_PROVIDERS)[number];
+
+export function isSecretProvider(value: string): value is SecretProvider {
+  return (SUPPORTED_SECRET_PROVIDERS as readonly string[]).includes(value);
+}
 
 export interface ApiKeySlotMeta {
   slotId: string;

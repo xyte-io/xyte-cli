@@ -2,7 +2,6 @@ import type { PublicEndpointSpec } from './endpoints';
 import type { HttpTransport } from '../http/transport';
 import type { SecretStore } from '../secure/secret-store';
 import type { ProfileStore } from '../secure/profile-store';
-import type { DeviceNamespace } from '../namespaces/device';
 import type { OrganizationNamespace } from '../namespaces/organization';
 import type { PartnerNamespace } from '../namespaces/partner';
 
@@ -40,7 +39,6 @@ export interface XyteClientOptions {
   auth?: {
     organization?: string;
     partner?: string;
-    device?: string;
   };
   profileStore?: ProfileStore;
   secretStore?: SecretStore;
@@ -48,7 +46,6 @@ export interface XyteClientOptions {
 }
 
 export interface XyteClient {
-  device: DeviceNamespace;
   organization: OrganizationNamespace;
   partner: PartnerNamespace;
   call<T = unknown>(endpointKey: string, args?: XyteCallArgs): Promise<T>;

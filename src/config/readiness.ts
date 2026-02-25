@@ -1,6 +1,7 @@
 import type { SecretStore } from '../secure/secret-store';
 import type { ProfileStore } from '../secure/profile-store';
 import type { SecretProvider, TenantProfile } from '../types/profile';
+import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
 import type { XyteClient } from '../types/client';
 import { probeConnectivity, type ConnectivityResult } from './connectivity';
 
@@ -33,7 +34,7 @@ export interface ReadinessOptions {
   checkConnectivity?: boolean;
 }
 
-const XYTE_PROVIDERS: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device'];
+const XYTE_PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
 
 function defaultConnectivity(): ConnectivityResult {
   return {
@@ -107,7 +108,7 @@ export async function evaluateReadiness(options: ReadinessOptions): Promise<Read
 
   const hasXyteCredential = providers.some((provider) => XYTE_PROVIDERS.includes(provider.provider) && provider.hasActiveSecret);
   if (!hasXyteCredential) {
-    missingItems.push('No active Xyte API key slot is configured (xyte-org / xyte-partner / xyte-device).');
+    missingItems.push('No active Xyte API key slot is configured (xyte-org / xyte-partner).');
     recommendedActions.push('Run "xyte-cli" for guided setup, or "xyte-cli setup run --tenant <tenant-id> --key <value>".');
   }
 
