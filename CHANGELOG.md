@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 
 The format is inspired by Keep a Changelog and this project follows SemVer for `@xyteai/cli`.
 
+## [0.4.0] - 2026-02-25
+
+### Changed
+- Removed MCP transport and command surface from `xyte-cli` (`xyte-cli mcp serve` no longer exists).
+- Added CI matrix validation and security audit jobs.
+- Hardened npm publish workflow with typecheck, test, build, and package gate checks.
+- Added release-assets workflow to attach package tarball, SBOM, and checksums to GitHub releases.
+- Added `release:check` script for local pre-release gating.
+- Added golden contract regression tests for core JSON outputs.
+- Added redaction for sensitive values in text and JSON error surfaces.
+- Added governance docs (`SECURITY.md`, release governance updates) and compatibility policy notes.
+
 ## [0.3.2] - 2026-02-25
 
 ### Changed
