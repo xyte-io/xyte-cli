@@ -5,3 +5,6 @@ export const INSPECT_DEEP_DIVE_SCHEMA_VERSION = 'xyte.inspect.deep-dive.v1';
 export const REPORT_SCHEMA_VERSION = 'xyte.report.v1';
 export const UTILITY_BATCH_SCHEMA_VERSION = 'xyte.utility.batch.v1';
 export const UTILITY_PREPARE_SCHEMA_VERSION = 'xyte.utility.prepare.v1';
+export const STATUS_SCHEMA_VERSION = 'xyte.status.v1';
+export const UPGRADE_CHECK_SCHEMA_VERSION = 'xyte.upgrade.check.v1';
+export const UPGRADE_RESULT_SCHEMA_VERSION = 'xyte.upgrade.result.v1';
