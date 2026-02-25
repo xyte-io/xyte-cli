@@ -433,6 +433,59 @@ describe('cli integration', () => {
     expect(parsed.state).toBe('needs_setup');
   });
 
+  it('prints status contract in fast mode', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await program.parseAsync(['node', 'xyte-cli', 'status', '--mode', 'fast', '--format', 'json']);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    const parsed = JSON.parse(output);
+    expect(parsed.schemaVersion).toBe('xyte.status.v1');
+    expect(parsed.mode).toBe('fast');
+    expect(parsed.checkConnectivity).toBe(false);
+    expect(parsed.readiness.connectionState).toBe('not_checked');
+  });
+
+  it('prints status contract in full mode with connectivity check', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    const slot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-org',
+      name: 'primary',
+      fingerprint: 'sha256:test'
+    });
+    await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key');
+    await profileStore.setActiveKeySlot('acme', 'xyte-org', slot.slotId);
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ id: 'org-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+    );
+
+    await program.parseAsync(['node', 'xyte-cli', 'status', '--mode', 'full', '--format', 'json']);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    const parsed = JSON.parse(output);
+    expect(parsed.schemaVersion).toBe('xyte.status.v1');
+    expect(parsed.mode).toBe('full');
+    expect(parsed.checkConnectivity).toBe(true);
+    expect(parsed.readiness.connectionState).toBe('connected');
+  });
+
   it('supports named auth key lifecycle basics', async () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });
@@ -704,6 +757,74 @@ describe('cli integration', () => {
     expect(parsed.readiness.state).toBe('ready');
   });
 
+  it('runs setup with connectivity mode never and marks connectivity step as skipped', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'setup',
+      'run',
+      '--non-interactive',
+      '--tenant',
+      'playground',
+      '--key',
+      'org-key',
+      '--connectivity',
+      'never'
+    ]);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    const parsed = JSON.parse(output);
+    expect(parsed.connectivityMode).toBe('never');
+    const step = parsed.steps.find((item: any) => item.key === 'connectivity_checked');
+    expect(step.status).toBe('skipped');
+    expect(parsed.readiness.connectionState).toBe('not_checked');
+  });
+
+  it('runs setup with connectivity mode always and marks connectivity step as ok', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ id: 'org-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+    );
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'setup',
+      'run',
+      '--non-interactive',
+      '--tenant',
+      'playground',
+      '--key',
+      'org-key',
+      '--connectivity',
+      'always'
+    ]);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    const parsed = JSON.parse(output);
+    expect(parsed.connectivityMode).toBe('always');
+    const step = parsed.steps.find((item: any) => item.key === 'connectivity_checked');
+    expect(step.status).toBe('ok');
+    expect(parsed.readiness.connectionState).toBe('connected');
+  });
+
   it('installs skill to target workspace with --no-setup', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();
@@ -935,5 +1056,175 @@ describe('cli integration', () => {
     expect(authCommand).toBeDefined();
     expect(authCommand?.commands.map((command) => command.name())).not.toContain('set-key');
     expect(authCommand?.commands.map((command) => command.name())).not.toContain('clear-key');
+  });
+
+  it('checks for upgrade without mutating', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const commandRunner = vi.fn();
+    const program = createCli({
+      profileStore,
+      secretStore,
+      stdout,
+      stderr,
+      upgradeDependencies: {
+        fetchImpl: vi.fn().mockImplementation(async () =>
+          new Response(JSON.stringify({ version: '0.5.0' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        ),
+        commandRunner,
+        getCurrentVersion: () => '0.4.0'
+      }
+    });
+
+    await program.parseAsync(['node', 'xyte-cli', 'upgrade', '--check', '--format', 'json']);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    const parsed = JSON.parse(output);
+    expect(parsed.schemaVersion).toBe('xyte.upgrade.check.v1');
+    expect(parsed.currentVersion).toBe('0.4.0');
+    expect(parsed.latestVersion).toBe('0.5.0');
+    expect(commandRunner).not.toHaveBeenCalled();
+  });
+
+  it('warns and succeeds when upgrade skill refresh partially fails', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const commandRunner = vi.fn(async (command: string) => {
+      if (command === 'xyte-cli') {
+        return {
+          code: 0,
+          stdout: 'xyte-cli 0.5.0\n',
+          stderr: ''
+        };
+      }
+      return {
+        code: 0,
+        stdout: '',
+        stderr: ''
+      };
+    });
+    const installSkillsImpl = vi.fn().mockResolvedValue({
+      workspaceRoot: '/tmp/workspace',
+      homeRoot: '/tmp/home',
+      sourceDir: '/tmp/skills/xyte-cli',
+      outcomes: [
+        {
+          scope: 'user',
+          agent: 'claude',
+          rootDir: '/tmp/home/.claude/skills',
+          targetDir: '/tmp/home/.claude/skills/xyte-cli',
+          status: 'installed'
+        },
+        {
+          scope: 'user',
+          agent: 'copilot',
+          rootDir: '/tmp/home/.copilot/skills',
+          targetDir: '/tmp/home/.copilot/skills/xyte-cli',
+          status: 'failed',
+          error: 'permission denied'
+        }
+      ],
+      createdRoots: []
+    });
+
+    const program = createCli({
+      profileStore,
+      secretStore,
+      stdout,
+      stderr,
+      upgradeDependencies: {
+        fetchImpl: vi.fn().mockImplementation(async () =>
+          new Response(JSON.stringify({ version: '0.5.0' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        ),
+        commandRunner,
+        installSkillsImpl,
+        getCurrentVersion: () => '0.4.0'
+      }
+    });
+
+    await program.parseAsync(['node', 'xyte-cli', 'upgrade', '--yes', '--format', 'json']);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    const parsed = JSON.parse(output);
+    expect(parsed.schemaVersion).toBe('xyte.upgrade.result.v1');
+    expect(parsed.updated).toBe(true);
+    expect(parsed.skills.scope).toBe('user');
+    expect(parsed.skills.failedCount).toBe(1);
+    expect(parsed.warnings.length).toBeGreaterThan(0);
+  });
+
+  it('uses controlled upgrade spec from environment when provided', async () => {
+    const previousSpec = process.env.XYTE_CLI_UPGRADE_SPEC;
+    const previousTarget = process.env.XYTE_CLI_UPGRADE_TARGET_VERSION;
+    process.env.XYTE_CLI_UPGRADE_SPEC = '/artifacts/xyteai-cli-b.tgz';
+    process.env.XYTE_CLI_UPGRADE_TARGET_VERSION = '0.5.0';
+
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const fetchImpl = vi.fn();
+    const commandRunner = vi.fn(async (command: string, args: string[]) => {
+      if (command === 'npm') {
+        expect(args).toEqual(['install', '--global', '/artifacts/xyteai-cli-b.tgz']);
+        return {
+          code: 0,
+          stdout: '',
+          stderr: ''
+        };
+      }
+      return {
+        code: 0,
+        stdout: 'xyte-cli 0.5.0\n',
+        stderr: ''
+      };
+    });
+    const installSkillsImpl = vi.fn().mockResolvedValue({
+      workspaceRoot: '/tmp/workspace',
+      homeRoot: '/tmp/home',
+      sourceDir: '/tmp/skills/xyte-cli',
+      outcomes: [],
+      createdRoots: []
+    });
+
+    const program = createCli({
+      profileStore,
+      secretStore,
+      stdout,
+      stderr,
+      upgradeDependencies: {
+        fetchImpl: fetchImpl as any,
+        commandRunner,
+        installSkillsImpl,
+        getCurrentVersion: () => '0.4.0'
+      }
+    });
+
+    try {
+      await program.parseAsync(['node', 'xyte-cli', 'upgrade', '--yes', '--format', 'json']);
+    } finally {
+      if (previousSpec === undefined) {
+        delete process.env.XYTE_CLI_UPGRADE_SPEC;
+      } else {
+        process.env.XYTE_CLI_UPGRADE_SPEC = previousSpec;
+      }
+      if (previousTarget === undefined) {
+        delete process.env.XYTE_CLI_UPGRADE_TARGET_VERSION;
+      } else {
+        process.env.XYTE_CLI_UPGRADE_TARGET_VERSION = previousTarget;
+      }
+    }
+
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

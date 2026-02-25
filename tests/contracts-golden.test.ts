@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { buildCallEnvelope } from '../src/contracts/call-envelope';
+import { buildStatusContract } from '../src/contracts/status';
+import { buildUpgradeCheck } from '../src/contracts/upgrade';
 import { MemorySecretStore } from '../src/secure/secret-store';
 import { runHeadlessRenderer } from '../src/tui/headless-renderer';
 import { buildUtilityPrepare } from '../src/workflows/utility-prepare';
@@ -53,6 +55,12 @@ function normalizeHeadlessFrame(value: unknown) {
   frame.sessionId = '<SESSION_ID>';
   frame.sequence = '<SEQUENCE>';
   return frame;
+}
+
+function normalizeGenerated(value: unknown) {
+  const output = JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+  output.generatedAtUtc = '<ISO_TIMESTAMP>';
+  return output;
 }
 
 describe('golden contracts', () => {
@@ -210,5 +218,36 @@ describe('golden contracts', () => {
       .find((frame) => !(frame.meta?.startup ?? false));
 
     expect(normalizeHeadlessFrame(runtimeFrame)).toEqual(readGolden('headless-frame.json'));
+  });
+
+  it('matches status contract', () => {
+    const status = buildStatusContract({
+      mode: 'fast',
+      checkConnectivity: false,
+      readiness: {
+        state: 'needs_setup',
+        missingItems: ['No active tenant is configured.'],
+        recommendedActions: ['Run "xyte-cli setup run --non-interactive --tenant default --key <value>".'],
+        providers: [],
+        connectionState: 'not_checked',
+        connectivity: {
+          state: 'not_checked',
+          message: 'Connectivity not checked.',
+          retriable: false
+        }
+      }
+    });
+
+    expect(normalizeGenerated(status)).toEqual(readGolden('status.json'));
+  });
+
+  it('matches upgrade check contract', () => {
+    const check = buildUpgradeCheck({
+      packageName: '@xyteai/cli',
+      currentVersion: '0.4.0',
+      latestVersion: '0.4.1'
+    });
+
+    expect(normalizeGenerated(check)).toEqual(readGolden('upgrade-check.json'));
   });
 });
