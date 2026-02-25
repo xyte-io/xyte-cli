@@ -245,6 +245,16 @@ describe('cli integration', () => {
     );
   });
 
+  it('does not expose mcp serve command', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+
+    await expect(program.parseAsync(['node', 'xyte-cli', 'mcp', 'serve'])).rejects.toThrow(
+      /unknown command|process\.exit unexpectedly called with "1"|too many arguments/
+    );
+  });
+
   it('shows one-line remediation when running bare xyte-cli without setup in non-interactive mode', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();

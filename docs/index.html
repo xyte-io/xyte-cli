@@ -6,7 +6,7 @@
     <title>xyte-cli — Deterministic Xyte Operations for Agents and Operators</title>
     <meta
       name="description"
-      content="xyte-cli provides deterministic endpoint calls, guarded write flows, a full TUI, headless NDJSON snapshots, schema contracts, and MCP server support."
+      content="xyte-cli provides deterministic endpoint calls, guarded write flows, a full TUI, headless NDJSON snapshots, and schema contracts."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -913,7 +913,7 @@
       <section class="hero">
         <div class="wrap hero-grid">
           <div class="stagger">
-            <p class="eyebrow">CLI + TUI + headless + MCP</p>
+            <p class="eyebrow">CLI + TUI + headless</p>
             <h1>Operate Xyte fleets with <em>predictable CLI flows</em>.</h1>
             <p class="hero-copy">
               <code>xyte-cli</code> gives coding agents and operators one deterministic runtime for endpoint calls, guarded writes,
@@ -952,10 +952,9 @@
       <section class="section reveal" id="compare" aria-labelledby="compare-title">
         <div class="wrap">
           <p class="eyebrow">Model fit</p>
-          <h2 id="compare-title">`xyte-cli` vs `xyte-cli mcp serve`</h2>
+          <h2 id="compare-title">`xyte-cli` interactive vs headless</h2>
           <p class="lead">
-            Both expose the same operational surface. The choice is execution model: command-driven loops for coding agents, or
-            tool transport for orchestration platforms.
+            Both run the same CLI contracts. Choose interactive TUI for operator workflows, or headless JSON frames for automation loops.
           </p>
           <div class="split-cards">
             <article class="card">
@@ -970,14 +969,14 @@
               </div>
             </article>
             <article class="card">
-              <h3>MCP mode</h3>
+              <h3>Headless mode</h3>
               <p>
-                Best for tool-native runtimes that call `xyte-cli` capabilities over stdio through Model Context Protocol.
+                Best for machine-driven workflows that consume JSON-only frames while keeping the CLI as the execution surface.
               </p>
               <div class="chip-row">
-                <span class="chip">Tool invocation</span>
-                <span class="chip">Orchestrator-friendly</span>
-                <span class="chip">Shared command contracts</span>
+                <span class="chip">Machine snapshots</span>
+                <span class="chip">JSON-only frames</span>
+                <span class="chip">Automation-friendly</span>
               </div>
             </article>
           </div>
@@ -1172,11 +1171,6 @@
                   <td>TUI / headless</td>
                   <td><code>xyte-cli tui --headless --screen spaces --format json --follow --interval-ms 2000 --tenant acme</code></td>
                   <td>Interactive TUI has org-only write actions; headless remains read-only snapshots.</td>
-                </tr>
-                <tr>
-                  <td>MCP server</td>
-                  <td><code>xyte-cli mcp serve</code></td>
-                  <td>Tool transport for MCP-compatible clients.</td>
                 </tr>
               </tbody>
             </table>

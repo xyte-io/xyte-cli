@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "xyte.utility.prepare.v1",
+  "generatedAtUtc": "<ISO_TIMESTAMP>",
+  "actionKey": "organization.devices.claimDevice",
+  "entity": "devices",
+  "mode": "friendly",
+  "input": {
+    "path": "<INPUT_PATH>",
+    "kind": "tabular",
+    "extension": ".csv",
+    "sizeBytes": 3
+  },
+  "canonical": {
+    "primaryFormat": "csv",
+    "headers": [
+      "name",
+      "space_id",
+      "sn",
+      "mac",
+      "cloud_id"
+    ],
+    "jsonShape": {
+      "name": "Friendly device name",
+      "space_id": 123,
+      "sn": "SERIAL-001",
+      "mac": "aa:bb:cc:dd:ee:ff",
+      "cloud_id": ""
+    }
+  },
+  "decodeRules": [
+    "Map source rows into name,space_id,sn,mac,cloud_id columns.",
+    "Keep rows deterministic and trim surrounding whitespace.",
+    "Do not guess missing identifiers; reject ambiguous rows.",
+    "Write unresolved rows to rejected output with reject_reason."
+  ],
+  "artifacts": {
+    "primary": "<OUTPUT_DIR>/organization-devices-claimdevice.csv",
+    "rejected": "<OUTPUT_DIR>/organization-devices-claimdevice.rejected.csv",
+    "notes": "<OUTPUT_DIR>/organization-devices-claimdevice.notes.md"
+  },
+  "promptTemplatePath": "scripts/templates/ai-utility-prepare-generic.prompt.md",
+  "skillNodePath": "skills/xyte-cli/references/utilities.md",
+  "suggestedCommands": {
+    "next": "Review <OUTPUT_DIR>/organization-devices-claimdevice.csv, then decide whether to execute organization.devices.claimDevice via xyte-cli call loop.",
+    "apply": "xyte-cli call organization.devices.claimDevice --tenant acme --allow-write --path-json '{\"name\":\"<name>\",\"space_id\":\"<space_id>\",\"sn\":\"<sn>\",\"mac\":\"<mac>\",\"cloud_id\":\"<cloud_id>\"}' --query-json '{\"...\":\"...\"}' --body-json '{\"...\":\"...\"}'",
+    "verify": "xyte-cli describe-endpoint organization.devices.claimDevice"
+  },
+  "executionSupport": "call-loop-only"
+}

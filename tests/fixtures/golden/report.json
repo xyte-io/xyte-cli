@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "xyte.report.v1",
+  "generatedAtUtc": "<ISO_TIMESTAMP>",
+  "tenantId": "acme",
+  "format": "markdown",
+  "outputPath": "<REPORT_PATH>",
+  "includeSensitive": false
+}

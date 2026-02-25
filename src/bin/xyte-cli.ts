@@ -3,6 +3,7 @@
 import { runCli } from '../cli/index';
 import { toProblemDetails } from '../contracts/problem';
 import { resolveCliErrorFormat } from '../utils/error-format';
+import { redactSensitiveText } from '../utils/redact';
 
 runCli().catch((error) => {
   const errorFormat = resolveCliErrorFormat(process.argv.slice(2), process.env.XYTE_ERROR_FORMAT);
@@ -13,6 +14,6 @@ runCli().catch((error) => {
   }
 
   const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`${message}\n`);
+  process.stderr.write(`${redactSensitiveText(message)}\n`);
   process.exit(1);
 });

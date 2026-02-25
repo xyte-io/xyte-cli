@@ -39,7 +39,6 @@ import {
 import { buildUtilityPrepare, listUtilityPrepareActions } from '../workflows/utility-prepare';
 import type { UtilityPreparePrimaryFormat } from '../workflows/utility-action-profiles';
 import { runSpaceImportTree } from '../workflows/utility-commands';
-import { createMcpServer } from '../mcp/server';
 
 type OutputStream = Pick<typeof process.stdout, 'write'>;
 type ErrorStream = Pick<typeof process.stderr, 'write'>;
@@ -1069,19 +1068,6 @@ export function createCli(runtime: CliRuntime = {}): Command {
         printJson(stdout, generated, { strictJson: options.strictJson });
       }
     );
-
-  const mcp = program.command('mcp').description('Model Context Protocol tools');
-  mcp
-    .command('serve')
-    .description('Run MCP server over stdio')
-    .action(async () => {
-      const secretStore = await getSecretStore();
-      const server = createMcpServer({
-        profileStore,
-        secretStore
-      });
-      await server.start();
-    });
 
   const tenant = program.command('tenant').description('Manage tenant profiles');
 

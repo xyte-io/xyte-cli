@@ -1,6 +1,6 @@
 ---
 name: xyte-cli
-description: "Use for @xyteai/cli operations: first-run setup, tenant/key auth, guarded endpoint calls, utility preprocessing + import-tree execution, inspect/report generation, JSON-only headless TUI snapshots, and MCP tool serving with schema-validated outputs."
+description: "Use for @xyteai/cli operations: first-run setup, tenant/key auth, guarded endpoint calls, utility preprocessing + import-tree execution, inspect/report generation, and JSON-only headless TUI snapshots with schema-validated outputs."
 ---
 
 # XYTE Skill Router (One-Stop, Agent-Native)
@@ -31,7 +31,6 @@ Use when the request involves any of:
 - utility preprocessing operations (prepare structured files from messy input)
 - fleet inspection/deep-dive/reporting
 - headless TUI JSON frame consumption
-- MCP tool bridge for external agents
 
 ## Non-Goals
 
@@ -86,9 +85,8 @@ Use when the request involves any of:
 - preprocessing contract: `/Users/porton/Projects/xyte-cli/docs/ai-utility-preprocessing.md`
 - decision gate: after structuring files, ask user what to do next; do not assume apply.
 
-6. Headless and MCP:
+6. Headless snapshots:
 - `xyte-cli tui --headless --screen <screen> --format json --once --tenant <tenant-id>`
-- `xyte-cli mcp serve`
 
 ## Workflow Selector
 
@@ -110,7 +108,6 @@ Use when the request involves any of:
 | TUI interactive ops | `xyte-cli tui` then use `a` (actions), `f` (filters), `[`/`]` (pages), `p` (per-page) |
 | Headless snapshot (JSON NDJSON) | `xyte-cli tui --headless --screen <screen> --format json --once --tenant <tenant-id>` |
 | Continuous headless monitoring | `xyte-cli tui --headless --screen <screen> --format json --follow --interval-ms <ms> --tenant <tenant-id>` |
-| MCP tool bridge | `xyte-cli mcp serve` |
 
 ## Minimal Command Recipes
 
@@ -195,24 +192,6 @@ Canonical schemas:
 - `docs/schemas/report.v1.schema.json`
 - `docs/schemas/utility-batch.v1.schema.json`
 - `docs/schemas/utility-prepare.v1.schema.json`
-
-## MCP Tool Surface (Current)
-
-Current tool names:
-- `xyte_setup_status`
-- `xyte_config_doctor`
-- `xyte_list_endpoints`
-- `xyte_describe_endpoint`
-- `xyte_call`
-- `xyte_inspect_fleet`
-- `xyte_utility_prepare`
-- `xyte_utility_list_actions`
-- `xyte_space_import_tree`
-- `xyte_report_generate`
-
-Guard semantics in MCP mirror CLI:
-- write endpoints require `allow_write: true`
-- destructive endpoints require matching `confirm`
 
 ## Troubleshooting Entrypoints
 

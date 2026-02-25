@@ -1,58 +1,78 @@
 # Release Guide
 
-This project is prepared for manual npm publishing of `@xyteai/cli`.
+This repository ships one npm package: `@xyteai/cli`.
 
-## Prerequisites
+## Governance
 
-- npm account has publish rights for the `@xyte` scope.
-- Scope visibility is set so public packages are allowed.
-- You are logged in: `npm whoami`.
+- Versioning and release notes live in `/Users/porton/Projects/xyte-cli/CHANGELOG.md`.
+- Security handling policy lives in `/Users/porton/Projects/xyte-cli/SECURITY.md`.
+- JSON contracts in `docs/schemas/*.schema.json` are treated as the automation compatibility boundary.
 
-## Manual Release Steps
+## CI Gates
 
-1. Install dependencies:
-   - `npm ci`
-2. Verify types:
-   - `npm run typecheck`
-3. Run tests:
-   - `npm test`
-4. Validate package contents:
-   - `npm pack --dry-run`
-5. Bump version in `/Users/porton/Projects/xyte-cli/package.json` (and lockfile if needed).
-6. Publish:
-   - `npm publish`
+`/Users/porton/Projects/xyte-cli/.github/workflows/ci.yml` runs on pushes and pull requests:
 
-`publishConfig.access=public` is already configured, so first publish for the scoped package will be public.
+- matrix validation on `ubuntu-latest` and `macos-latest`, Node `18` and `22`
+- `npm ci`
+- `npm run typecheck`
+- `npm test`
+- `npm run build`
+- `npm pack --dry-run`
+- separate security job: `npm audit --audit-level=high`
 
-## Helper Script
+Recommended branch protection:
 
-Use the repo script when delegating deploy actions:
+- require `CI / validate`
+- require `CI / security`
+- require up-to-date branch before merge
 
-- `npm run release:publish:cli` - publish only `@xyteai/cli`
-- `npm run release:publish:pages` - trigger GitHub Pages workflow only
-- `npm run release:publish` - publish npm package, then trigger GitHub Pages workflow
+## Local Pre-Release Check
 
-## GitHub Actions Publish (Recommended)
+Run the full local gate:
 
-`/Users/porton/Projects/xyte-cli/.github/workflows/publish.yml` publishes `@xyteai/cli` using npm trusted publishing (OIDC provenance).
+```bash
+npm run release:check
+```
 
-One-time npm setup (admin):
+This script runs install, typecheck, tests, build, dry-run pack, audit, and optional external smoke (`XYTE_CLI_KEY` required).
 
-1. In npm package settings for `@xyteai/cli`, configure a Trusted Publisher:
-   - Provider: GitHub Actions
-   - Repository: `xyte-io/xyte-cli`
-   - Workflow file: `.github/workflows/publish.yml`
+## Publish Workflow
 
-Run a release:
+`/Users/porton/Projects/xyte-cli/.github/workflows/publish.yml` publishes to npm on semver tags (`vX.Y.Z` or `X.Y.Z`) or manual dispatch.
 
-1. Ensure `package.json` version matches the release tag.
-2. Push a semver tag for the target release (for example `0.2.0` or `v0.2.0`) OR run workflow `Publish CLI` manually with `tag` input.
-3. The workflow validates tag/version match, runs install/build checks, and publishes to npm.
-4. The workflow pins publish runtime to Node `22` and npm `11.5.1`.
+Workflow gates:
+
+1. Resolve and validate semver tag.
+2. Checkout the exact tag commit.
+3. Validate `package.json` version matches tag version.
+4. Run `typecheck`, `test`, `build`, and `npm pack --dry-run`.
+5. Publish to npm with provenance on Node `22` + npm `11.5.1`.
+
+Prerequisites:
+
+- npm package publish rights for `@xyteai/cli`.
+- `NPM_TOKEN` configured in repository/environment secrets.
+
+## Release Assets Workflow
+
+`/Users/porton/Projects/xyte-cli/.github/workflows/release-assets.yml` runs on the same tags (or manually) and attaches release artifacts to GitHub Releases:
+
+- built npm tarball (`*.tgz`)
+- CycloneDX SBOM (`sbom.cdx.json`)
+- SHA-256 checksums (`checksums.txt`)
+
+## Manual Emergency Publish
+
+If GitHub Actions is unavailable:
+
+1. `npm run release:check`
+2. Bump `package.json` version and update `CHANGELOG.md`.
+3. `npm publish --access public --provenance`
+4. Backfill release assets with `release-assets.yml` once actions are restored.
 
 ## Rollback / Recovery
 
-- If a bad version is published, prefer a fast patch release with a bumped patch version.
-- To warn users away from a bad version, deprecate it:
+- Prefer a fast patch release with a bumped patch version.
+- Deprecate bad versions instead of unpublish:
   - `npm deprecate @xyteai/cli@<bad-version> "<message>"`
-- Avoid unpublish except where npm policy allows and only when absolutely necessary.
+- Avoid unpublish except where npm policy allows.

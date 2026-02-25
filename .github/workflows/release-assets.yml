@@ -1,4 +1,4 @@
-name: Publish CLI
+name: Release Assets
 
 on:
   push:
@@ -8,22 +8,20 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to publish (e.g. 0.1.0 or v0.1.0)"
+        description: "Tag to package (e.g. 0.1.0 or v0.1.0)"
         required: true
         type: string
 
 permissions:
-  contents: read
-  id-token: write
+  contents: write
 
 concurrency:
-  group: npm-publish
+  group: release-assets
   cancel-in-progress: false
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
-    environment: ci
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,16 +62,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          registry-url: "https://registry.npmjs.org"
           cache: "npm"
-
-      - name: Setup npm
-        run: npm install -g npm@11.5.1
-
-      - name: Show tool versions
-        run: |
-          node --version
-          npm --version
 
       - name: Install dependencies
         run: npm ci
@@ -89,19 +78,28 @@ jobs:
             exit 1
           fi
 
-      - name: Typecheck
-        run: npm run typecheck
+      - name: Build and package
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build
+          npm pack
 
-      - name: Test
-        run: npm test
+      - name: Generate SBOM
+        run: npx --yes @cyclonedx/cyclonedx-npm --output-file sbom.cdx.json --omit dev
 
-      - name: Build
-        run: npm run build
+      - name: Generate checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum *.tgz sbom.cdx.json > checksums.txt
 
-      - name: Validate package contents
-        run: npm pack --dry-run
-
-      - name: Publish to npm
-        run: npm publish --access public --tag latest --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish GitHub release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            *.tgz
+            sbom.cdx.json
+            checksums.txt

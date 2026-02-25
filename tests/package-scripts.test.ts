@@ -11,5 +11,6 @@ describe('package scripts', () => {
 
     expect(pkg.scripts?.['smoke:external-live']).toBe('node scripts/smoke_external_user_live.mjs');
     expect(pkg.scripts?.['test:commit']).toBe('npm run typecheck && npm test && npm run smoke:external-live');
+    expect(pkg.scripts?.['release:check']).toBe('bash scripts/release_check.sh');
   });
 });

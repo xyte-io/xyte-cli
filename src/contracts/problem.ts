@@ -1,4 +1,5 @@
 import { XyteAuthError, XyteHttpError, XyteValidationError } from '../http/errors';
+import { redactSensitiveData, redactSensitiveText } from '../utils/redact';
 
 export interface ProblemDetails {
   type: string;
@@ -13,9 +14,9 @@ export interface ProblemDetails {
 
 function toMessage(error: unknown): string {
   if (error instanceof Error) {
-    return error.message;
+    return redactSensitiveText(error.message);
   }
-  return String(error);
+  return redactSensitiveText(String(error));
 }
 
 export function toProblemDetails(error: unknown, instance?: string): ProblemDetails {
@@ -24,11 +25,11 @@ export function toProblemDetails(error: unknown, instance?: string): ProblemDeta
       type: 'https://xyte.dev/problems/http-error',
       title: 'HTTP request failed',
       status: error.status,
-      detail: error.message,
+      detail: redactSensitiveText(error.message),
       instance,
       xyteCode: error.code,
       retriable: error.status >= 500,
-      upstream: error.details
+      upstream: redactSensitiveData(error.details)
     };
   }
 
@@ -37,7 +38,7 @@ export function toProblemDetails(error: unknown, instance?: string): ProblemDeta
       type: 'https://xyte.dev/problems/auth-error',
       title: 'Authentication required',
       status: 401,
-      detail: error.message,
+      detail: redactSensitiveText(error.message),
       instance,
       xyteCode: error.code,
       retriable: false
@@ -49,7 +50,7 @@ export function toProblemDetails(error: unknown, instance?: string): ProblemDeta
       type: 'https://xyte.dev/problems/validation-error',
       title: 'Invalid request',
       status: 400,
-      detail: error.message,
+      detail: redactSensitiveText(error.message),
       instance,
       xyteCode: error.code,
       retriable: false
