@@ -13,6 +13,9 @@ xyte-cli setup run [--non-interactive] [--tenant <tenant-id>] [--key <value>] [-
 xyte-cli config doctor --tenant <tenant-id> --format json
 xyte-cli upgrade --check --format json
 xyte-cli upgrade --yes --format json
+xyte-cli --log-actions status --tenant <tenant-id>
+xyte-cli logs list [--path <path>] [--limit <n>] [--format text|json]
+xyte-cli logs view [--path <path>] [--limit <n>]
 ```
 
 ## Tenant And Auth Slots
@@ -98,6 +101,14 @@ xyte-cli report generate --tenant <tenant-id> --input /tmp/deep-dive.json --out 
 xyte-cli tui
 xyte-cli tui --headless --screen dashboard --format json --once --tenant <tenant-id>
 xyte-cli tui --headless --screen spaces --format json --follow --interval-ms 2000 --tenant <tenant-id>
+```
+
+## Action Log Environment Flags
+
+```bash
+XYTE_LOG_ACTIONS=1
+XYTE_LOG_ACTIONS_PATH=/tmp/xyte-cli.actions.ndjson
+XYTE_LOG_ACTIONS_STDERR=1
 ```
 
 Interactive hotkeys on ops screens:

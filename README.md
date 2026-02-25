@@ -82,6 +82,23 @@ xyte-cli call organization.devices.getDevices --tenant acme --output-mode envelo
   - `xyte.upgrade.result.v1`
 - Schemas live in [`docs/schemas`](docs/schemas).
 
+## Action Logging
+
+- Enable real command lifecycle logging with `--log-actions` (writes NDJSON logs and mirrors action events to stderr).
+- Override the log file path with `--log-actions-path <path>`.
+- Environment toggles:
+  - `XYTE_LOG_ACTIONS=1`
+  - `XYTE_LOG_ACTIONS_PATH=/abs/path/cli-actions.ndjson`
+  - `XYTE_LOG_ACTIONS_STDERR=1`
+
+Examples:
+
+```bash
+xyte-cli --log-actions --log-actions-path /tmp/xyte-cli.actions.ndjson status --tenant acme
+xyte-cli logs list --path /tmp/xyte-cli.actions.ndjson --limit 200
+xyte-cli logs view --path /tmp/xyte-cli.actions.ndjson
+```
+
 ## Common Workflows
 
 ### Skills install for coding agents
