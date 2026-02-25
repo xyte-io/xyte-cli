@@ -100,8 +100,3 @@ npm run mock:xyte:local -- --port 3001
 # terminal B
 npm run smoke:local:utilities -- --base-url http://127.0.0.1:3001 --tenant local
 ```
-
-MCP parity tools:
-1. `xyte_utility_prepare`
-2. `xyte_utility_list_actions`
-3. `xyte_space_import_tree`

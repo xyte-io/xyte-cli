@@ -143,7 +143,6 @@ Supported prepare output formats:
 Prepare output contract:
 1. stdout summary: `xyte.utility.prepare.v1`
 2. scaffold files: primary + rejected + notes
-3. MCP parity: `xyte_utility_prepare`, `xyte_utility_list_actions`, `xyte_space_import_tree`
 
 ## Multi-tenant Determinism
 
