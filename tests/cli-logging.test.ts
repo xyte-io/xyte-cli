@@ -108,6 +108,33 @@ describe('cli action logging', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it('keeps only an active log file when maxFiles is 1', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-maxfiles1-log-'));
+    const logPath = join(dir, 'actions.ndjson');
+    const logger = createCliActionLogger({
+      enabled: true,
+      path: logPath,
+      maxFileBytes: 700,
+      maxFiles: 1
+    });
+
+    for (let index = 0; index < 80; index += 1) {
+      logger.log('test.maxfiles1', {
+        commandPath: 'xyte-cli test',
+        message: 'x'.repeat(120),
+        index
+      });
+    }
+    logger.close();
+
+    const files = listCliActionLogFiles(logPath);
+    expect(files.length).toBe(1);
+    expect(files[0]?.kind).toBe('active');
+    expect(files.some((file) => file.kind === 'rotated')).toBe(false);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it('returns filtered tail entries from large log files', () => {
     const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-tail-log-'));
     const logPath = join(dir, 'actions.ndjson');

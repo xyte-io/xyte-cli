@@ -101,6 +101,7 @@ interface CliActionLogState {
   verbose?: boolean;
 }
 
+// Use a symbol to avoid collisions with Commander internals or plugin-added properties.
 const CLI_ACTION_LOG_STATE = Symbol('xyte-cli-action-log-state');
 
 type CliProgramWithActionLogState = Command & {
@@ -754,7 +755,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
   let activeAction: ActiveCliAction | undefined;
   const actionStartByCommand = new WeakMap<Command, number>();
 
-  const resolveActionLogger = (command: Command): CliActionLogger => {
+  const getOrCreateActionLogger = (command: Command): CliActionLogger => {
     if (actionLogger) {
       return actionLogger;
     }
@@ -2203,7 +2204,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     });
 
   program.hook('preAction', (_thisCommand, actionCommand) => {
-    const logger = resolveActionLogger(actionCommand);
+    const logger = getOrCreateActionLogger(actionCommand);
     if (!logger.enabled) {
       return;
     }
@@ -2231,7 +2232,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
   });
 
   program.hook('postAction', (_thisCommand, actionCommand) => {
-    const logger = resolveActionLogger(actionCommand);
+    const logger = getOrCreateActionLogger(actionCommand);
     if (!logger.enabled) {
       return;
     }
@@ -2291,6 +2292,7 @@ export async function runCli(argv = process.argv, runtime: CliRuntime = {}): Pro
       };
 
       if (verbose) {
+        // inferCommandPathFromArgv expects full process-style argv, but logged argv should exclude runtime/executable tokens.
         baseErrorPayload.argv = sanitizeArgvForLog(argv.slice(2));
         baseErrorPayload.error = toProblemDetails(error);
       } else {

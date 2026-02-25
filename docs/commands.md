@@ -107,6 +107,10 @@ xyte-cli tui --headless --screen spaces --format json --follow --interval-ms 200
 
 ## Action Log Environment Flags
 
+`XYTE_LOG_ACTIONS` enables NDJSON logging.
+`XYTE_LOG_ACTIONS_STDERR` independently controls stderr mirroring.
+Set `XYTE_LOG_ACTIONS_MAX_FILES=1` to keep only the active file (no rotated history).
+
 ```bash
 XYTE_LOG_ACTIONS=1
 XYTE_LOG_ACTIONS_PATH=/tmp/xyte-cli.actions.ndjson

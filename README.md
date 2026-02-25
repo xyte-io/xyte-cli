@@ -84,11 +84,12 @@ xyte-cli call organization.devices.getDevices --tenant acme --output-mode envelo
 
 ## Action Logging
 
-- Enable real command lifecycle logging with `--log-actions` (writes NDJSON logs and mirrors action events to stderr).
+- Enable real command lifecycle logging with `--log-actions` (writes NDJSON logs and mirrors action events to stderr for that invocation).
 - Override the log file path with `--log-actions-path <path>`.
 - Default payload is minimal (`commandPath`, lifecycle event, duration/exit status). Use `--log-actions-verbose` only when you need args/options detail.
 - Rotation defaults: `10MB` per file, `5` files total (active + rotated).
-- Environment toggles:
+- Set `XYTE_LOG_ACTIONS_MAX_FILES=1` to keep only the active file (no rotated history).
+- Environment toggles (logging and stderr mirroring are separate when set via env):
   - `XYTE_LOG_ACTIONS=1`
   - `XYTE_LOG_ACTIONS_PATH=/abs/path/cli-actions.ndjson`
   - `XYTE_LOG_ACTIONS_STDERR=1`

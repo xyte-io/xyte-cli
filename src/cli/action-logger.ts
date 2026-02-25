@@ -229,6 +229,7 @@ function rotateLogFiles(basePath: string, maxFiles: number): void {
 
   const rotatedCount = Math.max(0, maxFiles - 1);
   if (rotatedCount === 0) {
+    // maxFiles=1 intentionally keeps no rotation history: drop the current file and start fresh on next write.
     rmSync(basePath, { force: true });
     return;
   }
@@ -421,6 +422,7 @@ export function gcCliActionLogFiles(options: GcCliActionLogOptions = {}): GcCliA
     }
   }
 
+  // Re-list after deletion attempts so kept reflects the actual on-disk state (including force-delete no-ops).
   const keptFiles = listCliActionLogFiles(basePath).map((item) => item.path);
   if (active && !keptFiles.includes(active.path) && !options.dryRun) {
     // base file may be absent if log has not been written yet after cleanup

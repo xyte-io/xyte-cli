@@ -74,7 +74,7 @@ function scanLogLinesFromEnd(filePath: string, onLine: (line: string) => void, s
       const bytesToRead = Math.min(READ_CHUNK_BYTES, position);
       position -= bytesToRead;
 
-      const buffer = Buffer.allocUnsafe(bytesToRead);
+      const buffer = Buffer.alloc(bytesToRead);
       const bytesRead = readSync(fd, buffer, 0, bytesToRead, position);
       if (bytesRead <= 0) {
         break;
