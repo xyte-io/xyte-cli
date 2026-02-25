@@ -1,0 +1,127 @@
+{
+  "schemaVersion": "xyte.headless.frame.v1",
+  "timestamp": "<ISO_TIMESTAMP>",
+  "sessionId": "<SESSION_ID>",
+  "sequence": "<SEQUENCE>",
+  "mode": "headless",
+  "screen": "spaces",
+  "title": "Spaces",
+  "status": "Spaces snapshot",
+  "tenantId": "acme",
+  "motionEnabled": false,
+  "motionPhase": 0,
+  "logo": "XYTE",
+  "panels": [
+    {
+      "id": "spaces-list",
+      "title": "Spaces",
+      "kind": "table",
+      "table": {
+        "columns": [
+          "ID",
+          "Name",
+          "Type",
+          "Path"
+        ],
+        "rows": [
+          [
+            "sp-1",
+            "Room A",
+            "room",
+            "n/a"
+          ]
+        ]
+      },
+      "status": "search=none | endpoint=none | interactive-only: a claim/create/rename, f endpoint filters"
+    },
+    {
+      "id": "spaces-detail",
+      "title": "Space Detail",
+      "kind": "text",
+      "text": {
+        "lines": [
+          "ID: sp-1",
+          "Name: Room A",
+          "Type: room",
+          "Path: n/a",
+          "",
+          "Preview:",
+          "{",
+          "  \"id\": \"sp-1\",",
+          "  \"name\": \"Room A\"",
+          "}"
+        ]
+      },
+      "status": "loading=0"
+    },
+    {
+      "id": "spaces-devices",
+      "title": "Devices In Space",
+      "kind": "table",
+      "table": {
+        "columns": [
+          "ID",
+          "Name",
+          "State"
+        ],
+        "rows": [
+          [
+            "dev-1",
+            "Device One",
+            "online"
+          ]
+        ]
+      },
+      "status": "Loaded space detail and device listing."
+    }
+  ],
+  "meta": {
+    "inputState": "idle",
+    "queueDepth": 0,
+    "droppedEvents": 0,
+    "transitionState": "idle",
+    "refreshState": "idle",
+    "navigationMode": "pane-focus",
+    "availablePanes": [
+      "spaces-table",
+      "detail-box",
+      "devices-table"
+    ],
+    "activePane": "spaces-table",
+    "tabNavBoundary": null,
+    "renderSafety": "ok",
+    "tableFormat": "compact-v1",
+    "contract": {
+      "frameVersion": "xyte.headless.frame.v1",
+      "tableFormat": "compact-v1",
+      "navigationMode": "pane-focus"
+    },
+    "tabId": "spaces",
+    "tabOrder": [
+      "setup",
+      "config",
+      "dashboard",
+      "spaces",
+      "devices",
+      "incidents",
+      "tickets"
+    ],
+    "headlessWrite": false,
+    "writePolicy": "organization-only",
+    "readiness": "ready",
+    "connection": {
+      "state": "connected"
+    },
+    "actionsHint": "interactive-only writes (organization-only)",
+    "retry": {
+      "spaces": {
+        "attempts": 1,
+        "retried": false
+      },
+      "drilldown": {
+        "attempts": 1,
+        "retried": false
+      }
+    }
+  }
+}
