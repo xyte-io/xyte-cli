@@ -34,15 +34,37 @@ function parseArgs(argv) {
 }
 
 function makeInitialState() {
+  const rootSpace = {
+    id: 1,
+    name: 'ROOT',
+    full_path: '',
+    parent_id: null,
+    space_type: 'site',
+    config: {}
+  };
+  const defaultSpace = {
+    id: 2,
+    name: 'Default',
+    full_path: 'Default',
+    parent_id: 1,
+    space_type: 'site',
+    config: {}
+  };
+
   return {
     devices: new Map([
-      ['d1', { id: 'd1', name: 'Device One', space_id: 'default' }],
-      ['d2', { id: 'd2', name: 'Device Two', space_id: 'default' }]
+      ['d1', { id: 'd1', name: 'Device One', space_id: 2 }],
+      ['d2', { id: 'd2', name: 'Device Two', space_id: 2 }]
+    ]),
+    spacesById: new Map([
+      [rootSpace.id, rootSpace],
+      [defaultSpace.id, defaultSpace]
     ]),
     spacesByPath: new Map([
-      ['default', { id: 'default', name: 'Default', full_path: 'default', space_type: 'site', config: {} }]
+      [rootSpace.full_path, rootSpace],
+      [defaultSpace.full_path, defaultSpace]
     ]),
-    nextSpaceId: 1
+    nextSpaceId: 3
   };
 }
 
@@ -82,30 +104,59 @@ function authGuard(request, response) {
   return true;
 }
 
-function listSpaces() {
-  return Array.from(state.spacesByPath.values());
+function parseInteger(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number.parseInt(value.trim(), 10);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return undefined;
 }
 
-function makeSpaceFromPath(fullPath, body) {
+function listSpaces(parentId) {
+  const allSpaces = Array.from(state.spacesById.values());
+  if (parentId === undefined) {
+    return allSpaces;
+  }
+  return allSpaces.filter((space) => space.parent_id === parentId);
+}
+
+function findOrCreateSpace(body) {
+  const rawName = typeof body.name === 'string' ? body.name.trim() : '';
+  if (!rawName) {
+    throw new Error('Body must include non-empty "name".');
+  }
+
+  const parentId = parseInteger(body.parent_id);
+  if (parentId === undefined) {
+    throw new Error('Body must include numeric "parent_id".');
+  }
+
+  const parent = state.spacesById.get(parentId);
+  if (!parent) {
+    throw new Error(`Unknown parent_id ${parentId}.`);
+  }
+
+  const fullPath = parent.full_path ? `${parent.full_path}/${rawName}` : rawName;
   const existing = state.spacesByPath.get(fullPath);
   if (existing) {
     return { ...existing, found: true };
   }
 
-  const pathParts = String(fullPath)
-    .split('/')
-    .map((part) => part.trim())
-    .filter(Boolean);
-  const name = pathParts[pathParts.length - 1] ?? fullPath;
-
   const created = {
-    id: `sp-${state.nextSpaceId}`,
-    name,
+    id: state.nextSpaceId,
+    name: rawName,
     full_path: fullPath,
+    parent_id: parentId,
     space_type: typeof body.space_type === 'string' ? body.space_type : 'space',
     config: body.config && typeof body.config === 'object' && !Array.isArray(body.config) ? body.config : {}
   };
   state.nextSpaceId += 1;
+  state.spacesById.set(created.id, created);
   state.spacesByPath.set(fullPath, created);
   return { ...created, found: false };
 }
@@ -139,17 +190,25 @@ const server = http.createServer(async (request, response) => {
   }
 
   if (pathname === '/core/v1/organization/spaces' && method === 'GET') {
-    writeJson(response, 200, { items: listSpaces() });
+    const parentId = parseInteger(url.searchParams.get('parent_id'));
+    writeJson(response, 200, { items: listSpaces(parentId), next_page: null });
     return;
   }
 
   if (pathname === '/core/v1/organization/spaces/find_or_create' && method === 'POST') {
     const body = await readJson(request);
-    if (!body || typeof body !== 'object' || typeof body.name !== 'string' || !body.name.trim()) {
-      writeJson(response, 400, { error: 'Body must include non-empty "name".' });
+    if (!body || typeof body !== 'object') {
+      writeJson(response, 400, { error: 'Body must include name and parent_id.' });
       return;
     }
-    const created = makeSpaceFromPath(body.name.trim(), body);
+    let created;
+    try {
+      created = findOrCreateSpace(body);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      writeJson(response, 422, { error: message });
+      return;
+    }
     writeJson(response, 200, created);
     return;
   }
