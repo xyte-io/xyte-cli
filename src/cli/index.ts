@@ -38,6 +38,7 @@ import {
   formatFleetInspectAscii,
   generateFleetReport
 } from '../workflows/fleet-insights';
+import { runWatch } from '../workflows/watch';
 import { buildUtilityPrepare, listUtilityPrepareActions } from '../workflows/utility-prepare';
 import type { UtilityPreparePrimaryFormat } from '../workflows/utility-action-profiles';
 import { runSpaceImportTree } from '../workflows/utility-commands';
@@ -104,8 +105,8 @@ function resolveSkillSourceDir(): string {
   return path.resolve(__dirname, '../../skills/xyte-cli');
 }
 
-function printJson(stream: OutputStream, value: unknown, options: { strictJson?: boolean } = {}) {
-  writeJsonLine(stream, value, { strictJson: options.strictJson });
+function printJson(stream: OutputStream, value: unknown, options: { strictJson?: boolean; compact?: boolean } = {}) {
+  writeJsonLine(stream, value, { strictJson: options.strictJson, compact: options.compact });
 }
 
 function parseProvider(value: string): SecretProvider {
@@ -230,6 +231,36 @@ function parseSetupConnectivityMode(value: string | undefined): SetupConnectivit
     throw new Error(`Invalid connectivity mode: ${value}. Use auto|always|never.`);
   }
   return normalized as SetupConnectivityMode;
+}
+
+function parseWatchProfile(value: string | undefined): 'incidents-active' {
+  const normalized = (value ?? 'incidents-active').trim().toLowerCase();
+  if (normalized !== 'incidents-active') {
+    throw new Error(`Invalid watch profile: ${value}. Use incidents-active.`);
+  }
+  return 'incidents-active';
+}
+
+function parseWatchIntervalMs(value: string | undefined): number {
+  const parsed = Number.parseInt(value ?? '2000', 10);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Invalid interval: ${value}.`);
+  }
+  if (parsed < 250) {
+    throw new Error(`Invalid interval: ${parsed}. Minimum is 250ms.`);
+  }
+  return parsed;
+}
+
+function parseWatchMaxPolls(value: string | undefined): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`Invalid max-polls: ${value}. Use a positive integer.`);
+  }
+  return parsed;
 }
 
 function requiresWriteGuard(method: string): boolean {
@@ -1044,6 +1075,47 @@ export function createCli(runtime: CliRuntime = {}): Command {
         process.exitCode = 1;
       }
     });
+
+  program
+    .command('watch')
+    .description('Continuously watch incident deltas as NDJSON frames')
+    .option('--tenant <tenantId>', 'Tenant id')
+    .option('--profile <profile>', 'incidents-active', 'incidents-active')
+    .option('--query-json <json>', 'Query params JSON object (merged over profile defaults)')
+    .option('--interval-ms <ms>', 'Polling interval in ms (minimum 250)', '2000')
+    .option('--max-polls <n>', 'Stop after N polls')
+    .option('--once', 'Run one poll and exit')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(
+      async (options: {
+        tenant?: string;
+        profile?: string;
+        queryJson?: string;
+        intervalMs?: string;
+        maxPolls?: string;
+        once?: boolean;
+        strictJson?: boolean;
+      }) => {
+        const profile = parseWatchProfile(options.profile);
+        const intervalMs = parseWatchIntervalMs(options.intervalMs);
+        const maxPolls = parseWatchMaxPolls(options.maxPolls);
+        const query = parseQueryJson(options.queryJson);
+        const strictJson = options.strictJson === true;
+        const tenantId = options.tenant;
+
+        const client = await withClient(tenantId);
+        await runWatch({
+          client,
+          tenantId,
+          profile,
+          query,
+          intervalMs,
+          once: options.once === true,
+          maxPolls,
+          onFrame: (frame) => printJson(stdout, frame, { strictJson, compact: true })
+        });
+      }
+    );
 
   const utility = program.command('utility').description('Utility preprocessing helpers');
 

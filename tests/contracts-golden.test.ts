@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { buildCallEnvelope } from '../src/contracts/call-envelope';
 import { buildStatusContract } from '../src/contracts/status';
+import { buildWatchFrame } from '../src/contracts/watch-frame';
 import { buildUpgradeCheck } from '../src/contracts/upgrade';
 import { MemorySecretStore } from '../src/secure/secret-store';
 import { runHeadlessRenderer } from '../src/tui/headless-renderer';
@@ -61,6 +62,13 @@ function normalizeGenerated(value: unknown) {
   const output = JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
   output.generatedAtUtc = '<ISO_TIMESTAMP>';
   return output;
+}
+
+function normalizeWatchFrame(value: unknown) {
+  const frame = JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+  frame.timestamp = '<ISO_TIMESTAMP>';
+  frame.runId = '<RUN_ID>';
+  return frame;
 }
 
 describe('golden contracts', () => {
@@ -249,5 +257,39 @@ describe('golden contracts', () => {
     });
 
     expect(normalizeGenerated(check)).toEqual(readGolden('upgrade-check.json'));
+  });
+
+  it('matches watch frame contract', () => {
+    const frame = buildWatchFrame({
+      runId: 'run-1',
+      sequence: 0,
+      pollIndex: 1,
+      intervalMs: 2000,
+      profile: 'incidents-active',
+      endpointKey: 'organization.incidents.getIncidents',
+      tenantId: 'acme',
+      eventType: 'delta',
+      query: {
+        status: 'active',
+        from: 0,
+        to: 1700000000,
+        page: 1,
+        per_page: 100
+      },
+      summary: {
+        total: 2,
+        added: 1,
+        removed: 0,
+        updated: 1,
+        changed: true
+      },
+      delta: {
+        added: [{ id: 'inc-2', current: { id: 'inc-2', status: 'active' } }],
+        removed: [],
+        updated: [{ id: 'inc-1', before: { id: 'inc-1', status: 'active' }, after: { id: 'inc-1', status: 'resolved' } }]
+      }
+    });
+
+    expect(normalizeWatchFrame(frame)).toEqual(readGolden('watch-frame.json'));
   });
 });
