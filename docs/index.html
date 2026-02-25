@@ -597,7 +597,8 @@
 
 <span class="term-cm"># setup</span>
 <span class="term-cmd">XYTE_CLI_KEY</span>=<span class="term-val">"&lt;your-key&gt;"</span> \
-<span class="term-cmd">xyte-cli setup run</span> <span class="term-flg">--non-interactive --tenant</span> <span class="term-val">acme</span>
+<span class="term-cmd">xyte-cli setup run</span> <span class="term-flg">--non-interactive --tenant</span> <span class="term-val">acme</span> <span class="term-flg">--connectivity</span> <span class="term-val">auto</span>
+<span class="term-cmd">xyte-cli status</span> <span class="term-flg">--tenant</span> <span class="term-val">acme</span> <span class="term-flg">--mode</span> <span class="term-val">fast</span> <span class="term-flg">--format</span> <span class="term-val">json</span>
 
 <span class="term-cm"># headless snapshot for agents</span>
 <span class="term-cmd">xyte-cli tui</span> <span class="term-flg">--headless --screen</span> <span class="term-val">dashboard</span> <span class="term-flg">--once --format</span> <span class="term-val">json</span> <span class="term-flg">--tenant</span> <span class="term-val">acme</span></pre>
@@ -611,7 +612,8 @@
           <h2 id="quickstart-title">Install, inspect, report</h2>
           <p class="lead">Configure once, run read-only checks, and generate reports immediately.</p>
           <article class="card" style="margin-top: 16px;">
-            <pre><span class="term-cmd">XYTE_CLI_KEY</span>=<span class="term-val">"&lt;your-key&gt;"</span> <span class="term-cmd">xyte-cli setup run --non-interactive --tenant acme</span>
+            <pre><span class="term-cmd">XYTE_CLI_KEY</span>=<span class="term-val">"&lt;your-key&gt;"</span> <span class="term-cmd">xyte-cli setup run --non-interactive --tenant acme --connectivity auto</span>
+<span class="term-cmd">xyte-cli status --tenant acme --mode fast --format json</span>
 <span class="term-cmd">xyte-cli inspect fleet --tenant acme --format json</span>
 <span class="term-cmd">xyte-cli inspect deep-dive --tenant acme --window 24 --format json &gt; /tmp/deep-dive.json</span>
 <span class="term-cmd">xyte-cli report generate --tenant acme --input /tmp/deep-dive.json --out /tmp/xyte-report.pdf</span></pre>
@@ -628,6 +630,13 @@
               <h3>Skills install</h3>
               <p>Install coding-agent skill bundles once per workspace.</p>
               <pre>xyte-cli install --skills</pre>
+            </article>
+            <article class="card">
+              <h3>Status + upgrade</h3>
+              <p>Fast readiness checks and deterministic global updates with user-scope skill refresh.</p>
+              <pre>xyte-cli status --mode fast --format json
+xyte-cli upgrade --check --format json
+xyte-cli upgrade --yes --format json</pre>
             </article>
             <article class="card">
               <h3>Endpoint calls</h3>
@@ -696,6 +705,9 @@ xyte-cli tui --headless --screen spaces --follow --format json --tenant acme</pr
                 <a href="./schemas/report.v1.schema.json">xyte.report.v1</a>
                 <a href="./schemas/utility-batch.v1.schema.json">xyte.utility.batch.v1</a>
                 <a href="./schemas/utility-prepare.v1.schema.json">xyte.utility.prepare.v1</a>
+                <a href="./schemas/status.v1.schema.json">xyte.status.v1</a>
+                <a href="./schemas/upgrade-check.v1.schema.json">xyte.upgrade.check.v1</a>
+                <a href="./schemas/upgrade-result.v1.schema.json">xyte.upgrade.result.v1</a>
               </div>
             </article>
           </div>

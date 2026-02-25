@@ -7,9 +7,12 @@ This page is a high-signal map of common commands. For full flags and subcommand
 ```bash
 xyte-cli install --skills [--scope project|user|both] [--agents all|claude|copilot|codex] [--force] [--no-setup]
 xyte-cli doctor install --format json
+xyte-cli status [--tenant <tenant-id>] [--mode fast|full] [--format json|text]
 xyte-cli setup status --tenant <tenant-id> --format json
-xyte-cli setup run [--non-interactive] [--tenant <tenant-id>] [--key <value>]
+xyte-cli setup run [--non-interactive] [--tenant <tenant-id>] [--key <value>] [--connectivity auto|always|never]
 xyte-cli config doctor --tenant <tenant-id> --format json
+xyte-cli upgrade --check --format json
+xyte-cli upgrade --yes --format json
 ```
 
 ## Tenant And Auth Slots
