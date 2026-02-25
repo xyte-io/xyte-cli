@@ -178,7 +178,7 @@ export function classifyStep(stepId, result, context = {}) {
   }
 
   if (stepId.startsWith('skip_')) {
-    return { status: 'skip', reason: result.stderr.trim() || 'Skipped due missing prerequisite data.' };
+    return { status: 'skip', reason: result.stderr.trim() || 'Skipped due to missing prerequisite data.' };
   }
 
   if (result.code === 0) {
