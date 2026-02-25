@@ -38,6 +38,8 @@ xyte-cli list-endpoints
 xyte-cli describe-endpoint organization.devices.getDevices
 xyte-cli call organization.devices.getDevices --tenant <tenant-id>
 xyte-cli call organization.devices.getDevices --tenant <tenant-id> --output-mode envelope --strict-json
+xyte-cli watch --tenant <tenant-id> --profile incidents-active --once
+xyte-cli watch --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 10
 ```
 
 Reliable incident fetch:
@@ -48,6 +50,20 @@ xyte-cli call organization.incidents.getIncidents \
   --tenant <tenant-id> \
   --query-json "{\"status\":\"active\",\"from\":0,\"to\":$NOW,\"page\":1,\"per_page\":100}"
 ```
+
+Incident delta watch (NDJSON frames):
+
+```bash
+xyte-cli watch --tenant <tenant-id> --profile incidents-active --once
+xyte-cli watch --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 10
+```
+
+Frame event types:
+
+- `snapshot`: first poll with normalized incident set.
+- `delta`: added/removed/updated changes versus previous successful poll.
+- `heartbeat`: no changes detected.
+- `error`: poll failed; baseline is preserved for the next successful poll.
 
 ## Guarded Writes
 

@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xyte.dev/schemas/watch-frame.v1.schema.json",
+  "title": "Xyte Watch Frame V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "timestamp",
+    "runId",
+    "sequence",
+    "pollIndex",
+    "intervalMs",
+    "profile",
+    "endpointKey",
+    "eventType",
+    "query",
+    "summary"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "xyte.watch.frame.v1"
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "runId": {
+      "type": "string"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "pollIndex": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "intervalMs": {
+      "type": "integer",
+      "minimum": 250
+    },
+    "profile": {
+      "const": "incidents-active"
+    },
+    "endpointKey": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string"
+    },
+    "eventType": {
+      "type": "string",
+      "enum": ["snapshot", "delta", "heartbeat", "error"]
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": {
+        "type": ["string", "number", "boolean", "null"]
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "added", "removed", "updated", "changed"],
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "added": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "removed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "updated": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "changed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {}
+    },
+    "delta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["added", "removed", "updated"],
+      "properties": {
+        "added": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "current": {}
+            }
+          }
+        },
+        "removed": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "previous": {}
+            }
+          }
+        },
+        "updated": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "before": {},
+              "after": {}
+            }
+          }
+        }
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "title", "detail", "xyteCode", "retriable"],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "status": {
+          "type": "integer"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "xyteCode": {
+          "type": "string"
+        },
+        "retriable": {
+          "type": "boolean"
+        },
+        "upstream": {}
+      }
+    }
+  }
+}

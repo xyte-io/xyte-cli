@@ -68,10 +68,17 @@ xyte-cli call organization.commands.sendCommand \
 xyte-cli call organization.devices.getDevices --tenant acme --output-mode envelope --strict-json
 ```
 
+- Incident delta watch can emit NDJSON watch frames:
+
+```bash
+xyte-cli watch --tenant acme --profile incidents-active --interval-ms 2000 --max-polls 2 --strict-json
+```
+
 - CLI error output can be forced to machine-readable JSON with `--error-format json` (or `XYTE_ERROR_FORMAT=json`).
 - Stable schema IDs:
   - `xyte.headless.frame.v1`
   - `xyte.call.envelope.v1`
+  - `xyte.watch.frame.v1`
   - `xyte.inspect.fleet.v1`
   - `xyte.inspect.deep-dive.v1`
   - `xyte.report.v1`
@@ -103,6 +110,13 @@ xyte-cli upgrade --yes --format json
 xyte-cli list-endpoints
 xyte-cli describe-endpoint organization.devices.getDevices
 xyte-cli call organization.devices.getDevices --tenant acme
+```
+
+### Incident delta watch
+
+```bash
+xyte-cli watch --tenant acme --profile incidents-active --once
+xyte-cli watch --tenant acme --profile incidents-active --interval-ms 2000 --max-polls 10
 ```
 
 ### Utility prepare (AI-assisted preprocess, CLI-executed operations)

@@ -1,8 +1,9 @@
 export interface JsonWriteOptions {
   strictJson?: boolean;
+  compact?: boolean;
 }
 
-function safeStringify(value: unknown): string {
+function safeStringify(value: unknown, spacing: number): string {
   const seen = new WeakSet<object>();
   return JSON.stringify(
     value,
@@ -20,15 +21,16 @@ function safeStringify(value: unknown): string {
 
       return item;
     },
-    2
+    spacing
   );
 }
 
 export function stringifyForOutput(value: unknown, options: JsonWriteOptions = {}): string {
+  const spacing = options.compact ? 0 : 2;
   if (options.strictJson) {
-    return JSON.stringify(value, null, 2);
+    return JSON.stringify(value, null, spacing);
   }
-  return safeStringify(value);
+  return safeStringify(value, spacing);
 }
 
 export function writeJsonLine(

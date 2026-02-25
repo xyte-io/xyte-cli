@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 The format is inspired by Keep a Changelog and this project follows SemVer for `@xyteai/cli`.
 
+## [Unreleased]
+
+### Added
+- New `xyte-cli watch` command (incidents-only profile) for continuous incident delta monitoring.
+- New watch frame contract and schema:
+  - `xyte.watch.frame.v1`
+  - `docs/schemas/watch-frame.v1.schema.json`
+- Contract and CLI coverage for snapshot/delta/heartbeat/error watch frames.
+
 ## [0.5.0] - 2026-02-25
 
 ### Added

@@ -587,6 +587,222 @@ describe('cli integration', () => {
     expect(parsed.response.status).toBe(200);
   });
 
+  it('emits one snapshot frame for watch --once', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ items: [{ id: 'inc-1', status: 'active' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ items: [{ id: 'inc-1', status: 'active' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync(['node', 'xyte-cli', 'watch', '--tenant', 'acme', '--once']);
+
+    const lines = stdout.write.mock.calls.map((call) => String(call[0]).trim()).filter(Boolean);
+    expect(lines).toHaveLength(1);
+    const frame = JSON.parse(lines[0]);
+    expect(frame.schemaVersion).toBe('xyte.watch.frame.v1');
+    expect(frame.eventType).toBe('snapshot');
+    expect(frame.summary.total).toBe(1);
+    expect(Array.isArray(frame.items)).toBe(true);
+    expect(frame.items[0].id).toBe('inc-1');
+  });
+
+  it('emits snapshot then heartbeat for unchanged watch polls', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ items: [{ id: 'inc-1', status: 'active' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ items: [{ id: 'inc-1', status: 'active' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'watch',
+      '--tenant',
+      'acme',
+      '--interval-ms',
+      '250',
+      '--max-polls',
+      '2'
+    ]);
+
+    const frames = stdout.write.mock.calls.map((call) => JSON.parse(String(call[0])));
+    expect(frames).toHaveLength(2);
+    expect(frames[0].eventType).toBe('snapshot');
+    expect(frames[1].eventType).toBe('heartbeat');
+    expect(frames[1].summary.changed).toBe(false);
+  });
+
+  it('emits snapshot then delta for changed watch polls', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ items: [{ id: 'inc-1', status: 'active' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ items: [{ id: 'inc-1', status: 'resolved' }, { id: 'inc-2', status: 'active' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'watch',
+      '--tenant',
+      'acme',
+      '--interval-ms',
+      '250',
+      '--max-polls',
+      '2'
+    ]);
+
+    const frames = stdout.write.mock.calls.map((call) => JSON.parse(String(call[0])));
+    expect(frames).toHaveLength(2);
+    expect(frames[0].eventType).toBe('snapshot');
+    expect(frames[1].eventType).toBe('delta');
+    expect(frames[1].summary.added).toBe(1);
+    expect(frames[1].summary.updated).toBe(1);
+    expect(frames[1].delta.added[0].id).toBe('inc-2');
+    expect(frames[1].delta.updated[0].id).toBe('inc-1');
+  });
+
+  it('emits error frame and preserves baseline on transient watch poll failures', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ items: [{ id: 'inc-1', status: 'active' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: 'upstream unavailable' }), {
+          status: 503,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: 'upstream unavailable' }), {
+          status: 503,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: 'upstream unavailable' }), {
+          status: 503,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ items: [{ id: 'inc-1', status: 'active' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'watch',
+      '--tenant',
+      'acme',
+      '--interval-ms',
+      '250',
+      '--max-polls',
+      '3'
+    ]);
+
+    const frames = stdout.write.mock.calls.map((call) => JSON.parse(String(call[0])));
+    expect(frames).toHaveLength(3);
+    expect(frames[0].eventType).toBe('snapshot');
+    expect(frames[1].eventType).toBe('error');
+    expect(frames[2].eventType).toBe('heartbeat');
+    expect(frames[2].summary.total).toBe(1);
+    expect(frames[2].summary.changed).toBe(false);
+  });
+
+  it('rejects invalid watch profile', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+
+    await expect(
+      program.parseAsync(['node', 'xyte-cli', 'watch', '--profile', 'devices', '--once'])
+    ).rejects.toThrow('Invalid watch profile');
+  });
+
+  it('rejects watch interval below 250ms', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+
+    await expect(
+      program.parseAsync(['node', 'xyte-cli', 'watch', '--interval-ms', '100', '--once'])
+    ).rejects.toThrow('Minimum is 250ms');
+  });
+
   it('runs inspect fleet with deterministic json output', async () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });

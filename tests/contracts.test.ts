@@ -9,8 +9,10 @@ import reportSchema from '../docs/schemas/report.v1.schema.json';
 import statusSchema from '../docs/schemas/status.v1.schema.json';
 import upgradeCheckSchema from '../docs/schemas/upgrade-check.v1.schema.json';
 import upgradeResultSchema from '../docs/schemas/upgrade-result.v1.schema.json';
+import watchFrameSchema from '../docs/schemas/watch-frame.v1.schema.json';
 import { buildCallEnvelope } from '../src/contracts/call-envelope';
 import { buildStatusContract } from '../src/contracts/status';
+import { buildWatchFrame } from '../src/contracts/watch-frame';
 import { buildUpgradeCheck } from '../src/contracts/upgrade';
 import { buildDeepDive, buildFleetInspect, generateFleetReport } from '../src/workflows/fleet-insights';
 import { runHeadlessRenderer } from '../src/tui/headless-renderer';
@@ -26,6 +28,7 @@ const validateReport = ajv.compile(reportSchema);
 const validateStatus = ajv.compile(statusSchema);
 const validateUpgradeCheck = ajv.compile(upgradeCheckSchema);
 const validateUpgradeResult = ajv.compile(upgradeResultSchema);
+const validateWatchFrame = ajv.compile(watchFrameSchema);
 
 describe('schema contracts', () => {
   it('validates call envelope payload', () => {
@@ -200,5 +203,39 @@ describe('schema contracts', () => {
     expect(validateStatus(status)).toBe(true);
     expect(validateUpgradeCheck(upgradeCheck)).toBe(true);
     expect(validateUpgradeResult(upgradeResult)).toBe(true);
+  });
+
+  it('validates watch frame payload', () => {
+    const frame = buildWatchFrame({
+      runId: 'run-1',
+      sequence: 0,
+      pollIndex: 1,
+      intervalMs: 2000,
+      profile: 'incidents-active',
+      endpointKey: 'organization.incidents.getIncidents',
+      tenantId: 'acme',
+      eventType: 'delta',
+      query: {
+        status: 'active',
+        from: 0,
+        to: 1700000000,
+        page: 1,
+        per_page: 100
+      },
+      summary: {
+        total: 1,
+        added: 1,
+        removed: 0,
+        updated: 0,
+        changed: true
+      },
+      delta: {
+        added: [{ id: 'inc-1', current: { id: 'inc-1', status: 'active' } }],
+        removed: [],
+        updated: []
+      }
+    });
+
+    expect(validateWatchFrame(frame)).toBe(true);
   });
 });
