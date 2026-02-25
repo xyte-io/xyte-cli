@@ -4,6 +4,26 @@ All notable changes to this project are documented in this file.
 
 The format is inspired by Keep a Changelog and this project follows SemVer for `@xyteai/cli`.
 
+## [0.5.0] - 2026-02-25
+
+### Added
+- New `xyte-cli status` command for fast/full readiness checks with contract output `xyte.status.v1`.
+- New `xyte-cli upgrade` command with `--check` and `--yes`, including user-scope skills refresh.
+- Controlled upgrade smoke workflow and scripts to validate deterministic tarball A -> tarball B upgrades in CI.
+- New status/upgrade schemas and contract validation coverage:
+  - `xyte.status.v1`
+  - `xyte.upgrade.check.v1`
+  - `xyte.upgrade.result.v1`
+
+### Changed
+- Extended `xyte-cli setup run` with `--connectivity auto|always|never` and deterministic setup `steps` in JSON output.
+- Hardened release checks to include controlled upgrade smoke when Docker is available.
+- Updated docs and GitHub Pages content for new status/upgrade/setup behaviors.
+
+### Fixed
+- Corrected semantic version comparison for upgrade check paths.
+- Removed non-existent endpoint surface `organization.devices.updateDevice` from namespace/spec and related references.
+
 ## [0.4.0] - 2026-02-25
 
 ### Changed
