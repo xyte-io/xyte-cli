@@ -57,7 +57,7 @@ xyte-cli utility prepare \
   --action organization.devices.claimDevice \
   --input /path/to/raw-source.xlsx \
   --tenant <tenant-id> \
-  --output-dir /Users/porton/Projects/xyte-cli/tmp
+  --output-dir ./tmp
 ```
 
 Prepare space import action:
@@ -67,7 +67,7 @@ xyte-cli utility prepare \
   --action space.import-tree \
   --input /path/to/raw-hierarchy.pdf \
   --tenant <tenant-id> \
-  --output-dir /Users/porton/Projects/xyte-cli/tmp
+  --output-dir ./tmp
 ```
 
 Execute prepared space import (dry-run then apply):
@@ -75,11 +75,11 @@ Execute prepared space import (dry-run then apply):
 ```bash
 xyte-cli space import-tree \
   --tenant <tenant-id> \
-  --input /Users/porton/Projects/xyte-cli/tmp/space-import-tree.csv
+  --input ./tmp/space-import-tree.csv
 
 xyte-cli space import-tree \
   --tenant <tenant-id> \
-  --input /Users/porton/Projects/xyte-cli/tmp/space-import-tree.csv \
+  --input ./tmp/space-import-tree.csv \
   --apply
 ```
 
@@ -101,7 +101,7 @@ npm run smoke:local:utilities -- --base-url http://127.0.0.1:3001 --tenant local
 
 1. Prepare contract:
 - schema ID: `xyte.utility.prepare.v1`
-- schema file: `/Users/porton/Projects/xyte-cli/docs/schemas/utility-prepare.v1.schema.json`
+- schema file: `docs/schemas/utility-prepare.v1.schema.json`
 2. Import-tree batch summary:
 - schema ID: `xyte.utility.batch.v1`
-- schema file: `/Users/porton/Projects/xyte-cli/docs/schemas/utility-batch.v1.schema.json`
+- schema file: `docs/schemas/utility-batch.v1.schema.json`

@@ -1,0 +1,105 @@
+# Command Reference
+
+This page is a high-signal map of common commands. For full flags and subcommands, use `xyte-cli --help` and `<command> --help`.
+
+## Core
+
+```bash
+xyte-cli install --skills [--scope project|user|both] [--agents all|claude|copilot|codex] [--force] [--no-setup]
+xyte-cli doctor install --format json
+xyte-cli setup status --tenant <tenant-id> --format json
+xyte-cli setup run [--non-interactive] [--tenant <tenant-id>] [--key <value>]
+xyte-cli config doctor --tenant <tenant-id> --format json
+```
+
+## Tenant And Auth Slots
+
+```bash
+xyte-cli tenant add <tenant-id> --name "Acme"
+xyte-cli tenant use <tenant-id>
+xyte-cli tenant list
+
+xyte-cli auth key add --tenant <tenant-id> --provider xyte-org --name primary --key "<value>" --set-active
+xyte-cli auth key list --tenant <tenant-id> --format json
+xyte-cli auth key use --tenant <tenant-id> --provider xyte-org --slot primary
+xyte-cli auth key update --tenant <tenant-id> --provider xyte-org --slot primary --key "<value>"
+xyte-cli auth key rename --tenant <tenant-id> --provider xyte-org --slot primary --name prod-primary
+xyte-cli auth key test --tenant <tenant-id> --provider xyte-org --slot prod-primary
+xyte-cli auth key remove --tenant <tenant-id> --provider xyte-org --slot prod-primary --confirm
+```
+
+## Endpoint Operations
+
+```bash
+xyte-cli list-endpoints
+xyte-cli describe-endpoint organization.devices.getDevices
+xyte-cli call organization.devices.getDevices --tenant <tenant-id>
+xyte-cli call organization.devices.getDevices --tenant <tenant-id> --output-mode envelope --strict-json
+```
+
+Reliable incident fetch:
+
+```bash
+NOW=$(date +%s)
+xyte-cli call organization.incidents.getIncidents \
+  --tenant <tenant-id> \
+  --query-json "{\"status\":\"active\",\"from\":0,\"to\":$NOW,\"page\":1,\"per_page\":100}"
+```
+
+## Guarded Writes
+
+```bash
+xyte-cli call organization.commands.sendCommand \
+  --tenant <tenant-id> \
+  --allow-write \
+  --path-json '{"device_id":"DEVICE_ID"}' \
+  --body-json '{"command":"reboot"}'
+
+xyte-cli call organization.commands.cancelCommand \
+  --tenant <tenant-id> \
+  --allow-write \
+  --confirm organization.commands.cancelCommand \
+  --path-json '{"device_id":"DEVICE_ID","command_id":"COMMAND_ID"}'
+```
+
+## Utility Preprocess And Space Import
+
+```bash
+xyte-cli utility list-actions --format text
+
+xyte-cli utility prepare \
+  --action organization.devices.claimDevice \
+  --input ./raw-claims.xlsx \
+  --output-dir ./tmp
+
+xyte-cli utility prepare \
+  --action space.import-tree \
+  --input ./raw-hierarchy.pdf \
+  --output-dir ./tmp
+
+xyte-cli space import-tree --tenant <tenant-id> --input ./tmp/space-import-tree.csv
+xyte-cli space import-tree --tenant <tenant-id> --input ./tmp/space-import-tree.csv --apply --report ./space-import.apply.ndjson
+```
+
+## Insights And Reports
+
+```bash
+xyte-cli inspect fleet --tenant <tenant-id> --format json
+xyte-cli inspect deep-dive --tenant <tenant-id> --window 24 --format json > /tmp/deep-dive.json
+xyte-cli report generate --tenant <tenant-id> --input /tmp/deep-dive.json --out /tmp/xyte-report.pdf
+```
+
+## TUI And Headless
+
+```bash
+xyte-cli tui
+xyte-cli tui --headless --screen dashboard --format json --once --tenant <tenant-id>
+xyte-cli tui --headless --screen spaces --format json --follow --interval-ms 2000 --tenant <tenant-id>
+```
+
+Interactive hotkeys on ops screens:
+
+- `a`: action palette
+- `f`: structured filter editor
+- `[` / `]`: pagination where supported
+- `p`: per-page size where supported
