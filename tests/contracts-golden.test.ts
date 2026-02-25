@@ -44,8 +44,6 @@ function normalizeUtilityPrepare(
   result.artifacts.rejected = result.artifacts.rejected.replace(paths.outputDir, '<OUTPUT_DIR>');
   result.artifacts.notes = result.artifacts.notes.replace(paths.outputDir, '<OUTPUT_DIR>');
   result.suggestedCommands.next = String(result.suggestedCommands.next).replace(paths.outputDir, '<OUTPUT_DIR>');
-  result.promptTemplatePath = String(result.promptTemplatePath).replace(`${process.cwd()}/`, '');
-  result.skillNodePath = String(result.skillNodePath).replace(`${process.cwd()}/`, '');
   return result;
 }
 

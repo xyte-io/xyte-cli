@@ -21,6 +21,11 @@ export interface UtilityActionProfile {
   executionSupport: UtilityExecutionSupport;
 }
 
+const GENERIC_PROMPT_TEMPLATE_PATH = 'scripts/templates/ai-utility-prepare-generic.prompt.md';
+const SPACE_IMPORT_PROMPT_TEMPLATE_PATH = 'scripts/templates/ai-space-import.prompt.md';
+const UTILITIES_SKILL_NODE_PATH = 'skills/xyte-cli/references/utilities.md';
+const SPACE_IMPORT_SKILL_NODE_PATH = 'skills/xyte-cli/references/utility-ai-space-import-tree.md';
+
 export function buildFriendlySpaceImportProfile(): UtilityActionProfile {
   return {
     actionKey: 'space.import-tree',
@@ -47,8 +52,8 @@ export function buildFriendlySpaceImportProfile(): UtilityActionProfile {
       'config must be an object (or JSON string that parses to object).',
       'Write ambiguous rows to rejected output with reject_reason.'
     ],
-    promptTemplatePath: '/Users/porton/Projects/xyte-cli/scripts/templates/ai-space-import.prompt.md',
-    skillNodePath: '/Users/porton/Projects/xyte-cli/skills/xyte-cli/references/utility-ai-space-import-tree.md',
+    promptTemplatePath: SPACE_IMPORT_PROMPT_TEMPLATE_PATH,
+    skillNodePath: SPACE_IMPORT_SKILL_NODE_PATH,
     executionSupport: 'space.import-tree'
   };
 }
@@ -77,8 +82,8 @@ export function buildFriendlyClaimDeviceProfile(endpoint: PublicEndpointSpec): U
       'Do not guess missing identifiers; reject ambiguous rows.',
       'Write unresolved rows to rejected output with reject_reason.'
     ],
-    promptTemplatePath: '/Users/porton/Projects/xyte-cli/scripts/templates/ai-utility-prepare-generic.prompt.md',
-    skillNodePath: '/Users/porton/Projects/xyte-cli/skills/xyte-cli/references/utilities.md',
+    promptTemplatePath: GENERIC_PROMPT_TEMPLATE_PATH,
+    skillNodePath: UTILITIES_SKILL_NODE_PATH,
     executionSupport: 'call-loop-only'
   };
 }
@@ -115,8 +120,8 @@ export function buildGenericEndpointProfile(endpoint: PublicEndpointSpec): Utili
       'Do not guess identifiers from context.',
       'Write ambiguous rows to rejected output with reject_reason.'
     ],
-    promptTemplatePath: '/Users/porton/Projects/xyte-cli/scripts/templates/ai-utility-prepare-generic.prompt.md',
-    skillNodePath: '/Users/porton/Projects/xyte-cli/skills/xyte-cli/references/utilities.md',
+    promptTemplatePath: GENERIC_PROMPT_TEMPLATE_PATH,
+    skillNodePath: UTILITIES_SKILL_NODE_PATH,
     executionSupport: 'call-loop-only'
   };
 }
