@@ -4,6 +4,7 @@ import Ajv2020 from 'ajv/dist/2020';
 import callEnvelopeSchema from '../docs/schemas/call-envelope.v1.schema.json';
 import deepDiveSchema from '../docs/schemas/inspect-deep-dive.v1.schema.json';
 import fleetSchema from '../docs/schemas/inspect-fleet.v1.schema.json';
+import flowRunSchema from '../docs/schemas/flow-run.v1.schema.json';
 import headlessSchema from '../docs/schemas/headless-frame.v1.schema.json';
 import reportSchema from '../docs/schemas/report.v1.schema.json';
 import statusSchema from '../docs/schemas/status.v1.schema.json';
@@ -11,6 +12,7 @@ import upgradeCheckSchema from '../docs/schemas/upgrade-check.v1.schema.json';
 import upgradeResultSchema from '../docs/schemas/upgrade-result.v1.schema.json';
 import watchFrameSchema from '../docs/schemas/watch-frame.v1.schema.json';
 import { buildCallEnvelope } from '../src/contracts/call-envelope';
+import { buildFlowRunSummary } from '../src/contracts/flow-run';
 import { buildStatusContract } from '../src/contracts/status';
 import { buildWatchFrame } from '../src/contracts/watch-frame';
 import { buildUpgradeCheck } from '../src/contracts/upgrade';
@@ -24,6 +26,7 @@ const validateCallEnvelope = ajv.compile(callEnvelopeSchema);
 const validateHeadless = ajv.compile(headlessSchema);
 const validateFleet = ajv.compile(fleetSchema);
 const validateDeepDive = ajv.compile(deepDiveSchema);
+const validateFlowRun = ajv.compile(flowRunSchema);
 const validateReport = ajv.compile(reportSchema);
 const validateStatus = ajv.compile(statusSchema);
 const validateUpgradeCheck = ajv.compile(upgradeCheckSchema);
@@ -237,5 +240,48 @@ describe('schema contracts', () => {
     });
 
     expect(validateWatchFrame(frame)).toBe(true);
+  });
+
+  it('validates flow run summary payload', () => {
+    const summary = buildFlowRunSummary({
+      runId: 'run-1',
+      flowId: 'flow.setup-readiness-10m',
+      resolvedFlowId: 'flow.setup-readiness-10m',
+      mode: 'plan',
+      tenantId: 'acme',
+      bundleDir: '/tmp/flow-runs/flow.setup-readiness-10m/run-1',
+      manifestPath: '/tmp/flow-runs/flow.setup-readiness-10m/run-1/manifest.json',
+      inputsPath: '/tmp/flow-runs/flow.setup-readiness-10m/run-1/inputs.json',
+      decisionsPath: '/tmp/flow-runs/flow.setup-readiness-10m/run-1/decisions.ndjson',
+      errorsPath: '/tmp/flow-runs/flow.setup-readiness-10m/run-1/errors.ndjson',
+      watchFramesPath: '/tmp/flow-runs/flow.setup-readiness-10m/run-1/watch-frames.ndjson',
+      startedAtUtc: new Date().toISOString(),
+      endedAtUtc: new Date().toISOString(),
+      durationMs: 123,
+      outcome: 'completed',
+      steps: [
+        {
+          stepId: 'doctor_install',
+          title: 'Doctor Install',
+          kind: 'task',
+          command: 'xyte-cli doctor install --format json',
+          status: 'completed'
+        }
+      ],
+      decisions: {
+        pending: 0,
+        approved: 0,
+        blocked: 0
+      },
+      classifications: {
+        needs_data: 0,
+        bug: 0
+      },
+      cursor: {
+        nextStepIndex: 1
+      }
+    });
+
+    expect(validateFlowRun(summary)).toBe(true);
   });
 });

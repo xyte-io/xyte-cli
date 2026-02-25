@@ -8,6 +8,9 @@ import type { XyteClient } from '../types/client';
 type QueryValue = string | number | boolean | null | undefined;
 
 const WATCH_ENDPOINT_KEY = 'organization.incidents.getIncidents';
+const WATCH_MIN_INTERVAL_MS = 1000;
+const WATCH_DEFAULT_MAX_POLLS = 600;
+const WATCH_MAX_POLLS = 3600;
 
 interface NormalizedIncident {
   id: string;
@@ -189,8 +192,9 @@ export interface RunWatchOptions {
 
 export async function runWatch(options: RunWatchOptions): Promise<void> {
   const profile = options.profile ?? 'incidents-active';
-  const intervalMs = Math.max(250, options.intervalMs ?? 2000);
-  const maxPolls = options.once ? 1 : options.maxPolls;
+  const intervalMs = Math.max(WATCH_MIN_INTERVAL_MS, options.intervalMs ?? 2000);
+  const requestedMaxPolls = options.once ? 1 : options.maxPolls ?? WATCH_DEFAULT_MAX_POLLS;
+  const maxPolls = Math.max(1, Math.min(WATCH_MAX_POLLS, requestedMaxPolls));
   const queryOverrides = options.query ?? {};
 
   const runId = randomUUID();

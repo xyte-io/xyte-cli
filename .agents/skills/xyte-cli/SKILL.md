@@ -5,7 +5,7 @@ description: "Use for @xyteai/cli operations: first-run setup, tenant/key auth, 
 
 # XYTE Skill Router (One-Stop, Agent-Native)
 
-Last updated: 2026-02-15
+Last updated: 2026-02-25
 
 This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
 
@@ -28,6 +28,8 @@ Use when the request involves any of:
 - setup/readiness for Xyte access
 - tenant/key-slot management
 - endpoint discovery or endpoint invocation
+- deterministic flow orchestration (`xyte-cli flow run`)
+- custom flow definition lifecycle (`flow create|edit|share|import`) for agent workflows
 - utility preprocessing operations (prepare structured files from messy input)
 - fleet inspection/deep-dive/reporting
 - headless TUI JSON frame consumption
@@ -54,7 +56,26 @@ Use when the request involves any of:
 - In automation, always pass `--tenant <tenant-id>`.
 - For `organization.incidents.getIncidents`, prefer explicit integer time bounds (`from=0`, `to=<unix-now>`) to avoid empty responses from null/omitted bounds in some environments.
 
+## Flow Runner First (Agent Context)
+
+For multi-step operations, prefer one deterministic command over hand-built step chains:
+
+- `xyte-cli flow run <flow-id> --tenant <tenant-id> --plan`
+- `xyte-cli flow run <flow-id> --tenant <tenant-id> --apply --allow-write --resume <run-id-or-path>`
+
+Rules:
+- default to `--plan`.
+- only use `--apply` after explicit user approval.
+- treat flow IDs as agent-facing contracts; users can speak naturally and the agent maps intent -> flow ID.
+- use `xyte-cli flow list` for discoverability before proposing a flow.
+- parse run summary contract `xyte.flow.run.v1` and return artifact paths/resume command to users.
+
 ## Deterministic Execution Order
+
+0. Preferred multi-step execution:
+- `xyte-cli flow list`
+- `xyte-cli flow run <flow-id> --tenant <tenant-id> --plan`
+- `xyte-cli flow run <flow-id> --tenant <tenant-id> --apply --allow-write --resume <run-id-or-path>`
 
 1. Setup/readiness:
 - `xyte-cli doctor install --format json`
@@ -92,6 +113,7 @@ Use when the request involves any of:
 
 | Intent | Primary command |
 | --- | --- |
+| Deterministic multi-step ops | `xyte-cli flow run <flow-id> --tenant <tenant-id> --plan` |
 | First-time onboarding (interactive) | `xyte-cli` |
 | Setup non-interactive | `xyte-cli setup run --non-interactive --tenant <tenant-id> --key <value>` |
 | Readiness snapshot | `xyte-cli setup status --tenant <tenant-id> --format json` |
@@ -109,6 +131,48 @@ Use when the request involves any of:
 | Headless snapshot (JSON NDJSON) | `xyte-cli tui --headless --screen <screen> --format json --once --tenant <tenant-id>` |
 | Continuous headless monitoring | `xyte-cli tui --headless --screen <screen> --format json --follow --interval-ms <ms> --tenant <tenant-id>` |
 
+## Flow Selector (Deterministic)
+
+Use this selector when the user asks for repeatable operator workflows. Full recipes: `references/flow-recipes.md`.
+
+| Intent | Flow ID | First command |
+| --- | --- | --- |
+| Readiness check in a new or stale environment | `flow.setup-readiness-10m` | `xyte-cli doctor install --format json` |
+| Continuous incident monitoring | `flow.incidents-delta-watch` | `xyte-cli watch --tenant <tenant-id> --profile incidents-active --once --strict-json` |
+| Convert watch deltas into triage artifacts | `flow.watch-to-triage` | `xyte-cli watch --tenant <tenant-id> --profile incidents-active --once --strict-json` |
+| Operator-approved remediation writes | `flow.guided-remediation` | `xyte-cli watch --tenant <tenant-id> --profile incidents-active --once --strict-json` |
+| Bulk claim preprocessing + space import execution | `flow.bulk-claim-and-space-import` | `xyte-cli utility prepare --action organization.devices.claimDevice --tenant <tenant-id> --input ./claims-source.csv --output-dir ./tmp/flow-bulk-claim` |
+| Daily analytics summary and report artifact | `flow.daily-deep-dive-report` | `xyte-cli setup status --tenant <tenant-id> --format json` |
+
+## Agent-Only Flow Authoring
+
+Use this when a user asks for a new flow tailored to their workflow:
+
+1. Ask for:
+- intent/outcome
+- base built-in flow (`flow list`)
+- required default context values (`device_id`, `ticket_id`, `incident_id`, etc.)
+- whether they want an exported share file
+2. Create or edit:
+
+```bash
+xyte-cli flow create <custom-flow-id> --based-on <built-in-flow-id> --title "<title>" --description "<description>" --var key=value
+xyte-cli flow edit <custom-flow-id> --var key=value
+```
+
+3. Share/import when requested:
+
+```bash
+xyte-cli flow share <custom-flow-id> --out <path>
+xyte-cli flow import --file <path>
+```
+
+4. Validate with a safe dry run:
+
+```bash
+xyte-cli flow run <custom-flow-id> --tenant <tenant-id> --plan
+```
+
 ## Minimal Command Recipes
 
 Read call:
@@ -124,11 +188,16 @@ xyte-cli call organization.incidents.getIncidents --tenant <tenant-id> --query-j
 
 Write call (guarded):
 ```bash
+xyte-cli call organization.commands.getCommands \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}' \
+  --query-json '{"page":1,"per_page":20}'
+
 xyte-cli call organization.commands.sendCommand \
   --tenant <tenant-id> \
   --allow-write \
   --path-json '{"device_id":"<device-id>"}' \
-  --body-json '{"command":"reboot"}'
+  --body-json '{"command":"<valid-command-from-history>"}'
 ```
 
 Delete call (guarded):
@@ -161,6 +230,9 @@ Utility prepare then execute:
 ```bash
 xyte-cli utility list-actions --format text
 xyte-cli utility prepare --action organization.devices.claimDevice --input ./raw-source.xlsx --tenant <tenant-id> --output-dir ./tmp
+
+xyte-cli call organization.spaces.getSpace --tenant <tenant-id> --path-json '{"space_id":"<space-id>"}'
+xyte-cli call organization.devices.claimDevice --tenant <tenant-id> --allow-write --output-mode envelope --body-json '{"name":"<name>","space_id":<space-id>,"sn":"<sn>","mac":"<mac>","cloud_id":"<cloud-id>"}'
 
 xyte-cli utility prepare --action space.import-tree --input ./raw-tree.pdf --tenant <tenant-id> --output-dir ./tmp
 xyte-cli space import-tree --tenant <tenant-id> --input ./space-import-tree.csv
@@ -219,6 +291,7 @@ npm run smoke:local:utilities -- --base-url http://127.0.0.1:3001 --tenant local
 - `references/endpoints.md`
 - `references/utilities.md`
 - `references/utility-ai-space-import-tree.md`
+- `references/flow-recipes.md`
 - `references/tui-flows.md`
 - `references/headless-contract.md`
 

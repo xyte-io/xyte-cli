@@ -5,7 +5,7 @@ description: "Use for @xyteai/cli operations: first-run setup, tenant/key auth, 
 
 # XYTE Skill Router (One-Stop, Agent-Native)
 
-Last updated: 2026-02-15
+Last updated: 2026-02-25
 
 This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
 
@@ -28,6 +28,8 @@ Use when the request involves any of:
 - setup/readiness for Xyte access
 - tenant/key-slot management
 - endpoint discovery or endpoint invocation
+- deterministic flow orchestration (`xyte-cli flow run`)
+- custom flow definition lifecycle (`flow create|edit|share|import`) for agent workflows
 - utility preprocessing operations (prepare structured files from messy input)
 - fleet inspection/deep-dive/reporting
 - headless TUI JSON frame consumption
@@ -54,7 +56,26 @@ Use when the request involves any of:
 - In automation, always pass `--tenant <tenant-id>`.
 - For `organization.incidents.getIncidents`, prefer explicit integer time bounds (`from=0`, `to=<unix-now>`) to avoid empty responses from null/omitted bounds in some environments.
 
+## Flow Runner First (Agent Context)
+
+For multi-step operations, prefer one deterministic command over hand-built step chains:
+
+- `xyte-cli flow run <flow-id> --tenant <tenant-id> --plan`
+- `xyte-cli flow run <flow-id> --tenant <tenant-id> --apply --allow-write --resume <run-id-or-path>`
+
+Rules:
+- default to `--plan`.
+- only use `--apply` after explicit user approval.
+- treat flow IDs as agent-facing contracts; users can speak naturally and the agent maps intent -> flow ID.
+- use `xyte-cli flow list` for discoverability before proposing a flow.
+- parse run summary contract `xyte.flow.run.v1` and return artifact paths/resume command to users.
+
 ## Deterministic Execution Order
+
+0. Preferred multi-step execution:
+- `xyte-cli flow list`
+- `xyte-cli flow run <flow-id> --tenant <tenant-id> --plan`
+- `xyte-cli flow run <flow-id> --tenant <tenant-id> --apply --allow-write --resume <run-id-or-path>`
 
 1. Setup/readiness:
 - `xyte-cli doctor install --format json`
@@ -92,6 +113,7 @@ Use when the request involves any of:
 
 | Intent | Primary command |
 | --- | --- |
+| Deterministic multi-step ops | `xyte-cli flow run <flow-id> --tenant <tenant-id> --plan` |
 | First-time onboarding (interactive) | `xyte-cli` |
 | Setup non-interactive | `xyte-cli setup run --non-interactive --tenant <tenant-id> --key <value>` |
 | Readiness snapshot | `xyte-cli setup status --tenant <tenant-id> --format json` |
@@ -121,6 +143,35 @@ Use this selector when the user asks for repeatable operator workflows. Full rec
 | Operator-approved remediation writes | `flow.guided-remediation` | `xyte-cli watch --tenant <tenant-id> --profile incidents-active --once --strict-json` |
 | Bulk claim preprocessing + space import execution | `flow.bulk-claim-and-space-import` | `xyte-cli utility prepare --action organization.devices.claimDevice --tenant <tenant-id> --input ./claims-source.csv --output-dir ./tmp/flow-bulk-claim` |
 | Daily analytics summary and report artifact | `flow.daily-deep-dive-report` | `xyte-cli setup status --tenant <tenant-id> --format json` |
+
+## Agent-Only Flow Authoring
+
+Use this when a user asks for a new flow tailored to their workflow:
+
+1. Ask for:
+- intent/outcome
+- base built-in flow (`flow list`)
+- required default context values (`device_id`, `ticket_id`, `incident_id`, etc.)
+- whether they want an exported share file
+2. Create or edit:
+
+```bash
+xyte-cli flow create <custom-flow-id> --based-on <built-in-flow-id> --title "<title>" --description "<description>" --var key=value
+xyte-cli flow edit <custom-flow-id> --var key=value
+```
+
+3. Share/import when requested:
+
+```bash
+xyte-cli flow share <custom-flow-id> --out <path>
+xyte-cli flow import --file <path>
+```
+
+4. Validate with a safe dry run:
+
+```bash
+xyte-cli flow run <custom-flow-id> --tenant <tenant-id> --plan
+```
 
 ## Minimal Command Recipes
 

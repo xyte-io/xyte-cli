@@ -9,3 +9,4 @@ export const UTILITY_PREPARE_SCHEMA_VERSION = 'xyte.utility.prepare.v1';
 export const STATUS_SCHEMA_VERSION = 'xyte.status.v1';
 export const UPGRADE_CHECK_SCHEMA_VERSION = 'xyte.upgrade.check.v1';
 export const UPGRADE_RESULT_SCHEMA_VERSION = 'xyte.upgrade.result.v1';
+export const FLOW_RUN_SCHEMA_VERSION = 'xyte.flow.run.v1';

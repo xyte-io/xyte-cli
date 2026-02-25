@@ -743,7 +743,7 @@ describe('cli integration', () => {
       '--tenant',
       'acme',
       '--interval-ms',
-      '250',
+      '1000',
       '--max-polls',
       '2'
     ]);
@@ -788,7 +788,7 @@ describe('cli integration', () => {
       '--tenant',
       'acme',
       '--interval-ms',
-      '250',
+      '1000',
       '--max-polls',
       '2'
     ]);
@@ -854,7 +854,7 @@ describe('cli integration', () => {
       '--tenant',
       'acme',
       '--interval-ms',
-      '250',
+      '1000',
       '--max-polls',
       '3'
     ]);
@@ -878,14 +878,24 @@ describe('cli integration', () => {
     ).rejects.toThrow('Invalid watch profile');
   });
 
-  it('rejects watch interval below 250ms', async () => {
+  it('rejects watch interval below 1000ms', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();
     const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
 
     await expect(
       program.parseAsync(['node', 'xyte-cli', 'watch', '--interval-ms', '100', '--once'])
-    ).rejects.toThrow('Minimum is 250ms');
+    ).rejects.toThrow('Minimum is 1000ms');
+  });
+
+  it('rejects watch max-polls above hard cap', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+
+    await expect(
+      program.parseAsync(['node', 'xyte-cli', 'watch', '--max-polls', '3601', '--once'])
+    ).rejects.toThrow('Maximum is 3600');
   });
 
   it('runs inspect fleet with deterministic json output', async () => {
@@ -1527,5 +1537,420 @@ describe('cli integration', () => {
     }
 
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('runs flow setup-readiness in default plan mode and writes a structured bundle', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const slot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-org',
+      name: 'primary',
+      fingerprint: 'sha256:test'
+    });
+    await profileStore.setActiveKeySlot('acme', 'xyte-org', slot.slotId);
+
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const outDir = mkdtempSync(join(tmpdir(), 'xyte-flow-run-cli-'));
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('/organization/info')) {
+          return new Response(JSON.stringify({ id: 'org-1' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/organization/devices')) {
+          return new Response(JSON.stringify({ items: [{ id: 'dev-1', status: 'online' }] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/organization/spaces')) {
+          return new Response(JSON.stringify({ items: [{ id: 'sp-1', name: 'HQ', space_type: 'site' }] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/organization/incidents')) {
+          return new Response(JSON.stringify({ items: [] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/organization/tickets')) {
+          return new Response(JSON.stringify({ items: [] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/partner/tickets')) {
+          return new Response(JSON.stringify({ items: [] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        return new Response(JSON.stringify({}), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      })
+    );
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'flow',
+      'run',
+      'flow.setup-readiness-10m',
+      '--tenant',
+      'acme',
+      '--out-dir',
+      outDir
+    ]);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    const parsed = JSON.parse(output);
+    expect(parsed.schemaVersion).toBe('xyte.flow.run.v1');
+    expect(parsed.mode).toBe('plan');
+    expect(parsed.outcome).toBe('completed');
+    expect(parsed.steps.map((item: any) => item.stepId)).toEqual([
+      'doctor_install',
+      'setup_status',
+      'config_doctor',
+      'status_fast',
+      'inspect_fleet_setup'
+    ]);
+    expect(parsed.steps.every((item: any) => item.status === 'completed')).toBe(true);
+    expect(parsed.cursor.nextStepIndex).toBe(parsed.steps.length);
+    expect(parsed.resumeCommand).toBeUndefined();
+    expect(existsSync(parsed.manifestPath)).toBe(true);
+    expect(existsSync(parsed.inputsPath)).toBe(true);
+    expect(existsSync(parsed.decisionsPath)).toBe(true);
+    expect(existsSync(parsed.errorsPath)).toBe(true);
+    expect(existsSync(parsed.watchFramesPath)).toBe(true);
+  });
+
+  it('stops write-capable flow at gate in --plan and advances one gate in --apply --resume', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const outDir = mkdtempSync(join(tmpdir(), 'xyte-flow-run-gates-'));
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.includes('/organization/incidents')) {
+          return new Response(JSON.stringify({ items: [{ id: 'inc-1', uuid: 'inc-1', device_id: 'dev-1', status: 'active' }] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'GET') {
+          return new Response(JSON.stringify({ items: [{ command: 'restart' }] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'POST') {
+          return new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        return new Response(JSON.stringify({}), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      })
+    );
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'flow',
+      'run',
+      'flow.guided-remediation',
+      '--tenant',
+      'acme',
+      '--plan',
+      '--out-dir',
+      outDir,
+      '--var',
+      'device_id=dev-1',
+      '--var',
+      'command=restart'
+    ]);
+
+    const firstOutput = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    const first = JSON.parse(firstOutput);
+    expect(first.outcome).toBe('pending_gate');
+    expect(first.nextResumeStepId).toBe('gate_send_command');
+
+    stdout.write.mockClear();
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'flow',
+      'run',
+      'flow.guided-remediation',
+      '--tenant',
+      'acme',
+      '--apply',
+      '--resume',
+      first.runId,
+      '--out-dir',
+      outDir,
+      '--var',
+      'device_id=dev-1',
+      '--var',
+      'command=restart'
+    ]);
+    const secondBlocked = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(secondBlocked.outcome).toBe('pending_gate');
+    expect(secondBlocked.nextResumeStepId).toBe('gate_send_command');
+
+    stdout.write.mockClear();
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'flow',
+      'run',
+      'flow.guided-remediation',
+      '--tenant',
+      'acme',
+      '--apply',
+      '--allow-write',
+      '--resume',
+      first.runId,
+      '--out-dir',
+      outDir,
+      '--var',
+      'device_id=dev-1',
+      '--var',
+      'command=restart'
+    ]);
+    const third = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(third.outcome).toBe('pending_gate');
+    expect(third.nextResumeStepId).toBe('gate_update_device');
+    const thirdStepStatus = new Map<string, string>(third.steps.map((item: any) => [item.stepId, item.status]));
+    expect(thirdStepStatus.get('watch_before')).toBe('completed');
+    expect(thirdStepStatus.get('commands_get')).toBe('completed');
+    expect(thirdStepStatus.get('gate_send_command')).toBe('gate_approved');
+    expect(thirdStepStatus.get('commands_send')).toBe('completed');
+    expect(thirdStepStatus.get('gate_update_device')).toBe('gate_pending');
+  });
+
+  it('merges flow context from --context-json and --var with var precedence', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const outDir = mkdtempSync(join(tmpdir(), 'xyte-flow-run-context-'));
+    const contextPath = join(outDir, 'context.json');
+    writeFileSync(contextPath, JSON.stringify({ device_id: 'dev-from-file', command: 'restart' }), 'utf8');
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('/organization/incidents')) {
+          return new Response(JSON.stringify({ items: [] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/organization/devices/dev-from-var/commands')) {
+          return new Response(JSON.stringify({ items: [] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        return new Response(JSON.stringify({}), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      })
+    );
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'flow',
+      'run',
+      'flow.guided-remediation',
+      '--tenant',
+      'acme',
+      '--plan',
+      '--out-dir',
+      outDir,
+      '--context-json',
+      contextPath,
+      '--var',
+      'device_id=dev-from-var'
+    ]);
+
+    const output = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    const inputs = JSON.parse(readFileSync(output.inputsPath, 'utf8'));
+    expect(inputs.context.device_id).toBe('dev-from-var');
+    expect(inputs.context.command).toBe('restart');
+  });
+
+  it('supports custom flow create/edit/share/import and runs custom alias flow', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const slot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-org',
+      name: 'primary',
+      fingerprint: 'sha256:test'
+    });
+    await profileStore.setActiveKeySlot('acme', 'xyte-org', slot.slotId);
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const tempConfig = mkdtempSync(join(tmpdir(), 'xyte-flow-config-'));
+    const previousConfig = process.env.XYTE_CLI_CONFIG_DIR;
+    process.env.XYTE_CLI_CONFIG_DIR = tempConfig;
+    const outDir = mkdtempSync(join(tmpdir(), 'xyte-flow-run-custom-'));
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('/organization/info')) {
+          return new Response(JSON.stringify({ id: 'org-1' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/organization/devices')) {
+          return new Response(JSON.stringify({ items: [{ id: 'dev-1', status: 'online' }] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/organization/spaces')) {
+          return new Response(JSON.stringify({ items: [{ id: 'sp-1', name: 'HQ', space_type: 'site' }] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/organization/incidents')) {
+          return new Response(JSON.stringify({ items: [] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/organization/tickets')) {
+          return new Response(JSON.stringify({ items: [] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/partner/tickets')) {
+          return new Response(JSON.stringify({ items: [] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        return new Response(JSON.stringify({}), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      })
+    );
+
+    try {
+      await program.parseAsync([
+        'node',
+        'xyte-cli',
+        'flow',
+        'create',
+        'flow.custom-daily',
+        '--based-on',
+        'flow.daily-deep-dive-report',
+        '--title',
+        'Custom Daily',
+        '--var',
+        'window_hours=12'
+      ]);
+      const created = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+      expect(created.id).toBe('flow.custom-daily');
+      expect(created.basedOn).toBe('flow.daily-deep-dive-report');
+
+      stdout.write.mockClear();
+      await program.parseAsync(['node', 'xyte-cli', 'flow', 'list']);
+      const listed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+      expect(listed.custom.some((item: any) => item.id === 'flow.custom-daily')).toBe(true);
+
+      stdout.write.mockClear();
+      await program.parseAsync([
+        'node',
+        'xyte-cli',
+        'flow',
+        'edit',
+        'flow.custom-daily',
+        '--description',
+        'Daily report for AI agent context',
+        '--var',
+        'region=us'
+      ]);
+      const edited = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+      expect(edited.defaults.region).toBe('us');
+
+      const sharePath = join(outDir, 'flow.custom-daily.json');
+      stdout.write.mockClear();
+      await program.parseAsync(['node', 'xyte-cli', 'flow', 'share', 'flow.custom-daily', '--out', sharePath]);
+      expect(existsSync(sharePath)).toBe(true);
+
+      stdout.write.mockClear();
+      await program.parseAsync(['node', 'xyte-cli', 'flow', 'import', '--file', sharePath, '--force']);
+      const imported = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+      expect(imported.id).toBe('flow.custom-daily');
+
+      stdout.write.mockClear();
+      await program.parseAsync([
+        'node',
+        'xyte-cli',
+        'flow',
+        'run',
+        'flow.custom-daily',
+        '--tenant',
+        'acme',
+        '--out-dir',
+        outDir
+      ]);
+      const runOutput = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+      expect(runOutput.resolvedFlowId).toBe('flow.daily-deep-dive-report');
+      expect(runOutput.outcome).toBe('pending_gate');
+      const runStepStatus = new Map<string, string>(runOutput.steps.map((item: any) => [item.stepId, item.status]));
+      expect(runStepStatus.get('setup_status_daily')).toBe('completed');
+      expect(runStepStatus.get('inspect_deep_dive_daily')).toBe('completed');
+      expect(runStepStatus.get('report_daily')).toBe('completed');
+      expect(runStepStatus.get('inspect_fleet_daily')).toBe('completed');
+      expect(runStepStatus.get('decision_distribute_or_escalate')).toBe('gate_pending');
+    } finally {
+      if (previousConfig === undefined) {
+        delete process.env.XYTE_CLI_CONFIG_DIR;
+      } else {
+        process.env.XYTE_CLI_CONFIG_DIR = previousConfig;
+      }
+    }
   });
 });

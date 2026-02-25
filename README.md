@@ -74,6 +74,11 @@ xyte-cli call organization.devices.getDevices --tenant acme --output-mode envelo
 xyte-cli watch --tenant acme --profile incidents-active --interval-ms 2000 --max-polls 2 --strict-json
 ```
 
+- Watch guardrails are enforced to protect API capacity:
+  - `--interval-ms` minimum is `1000`.
+  - default polling is bounded when `--max-polls` is omitted.
+  - `--max-polls` hard cap is `3600`.
+
 - CLI error output can be forced to machine-readable JSON with `--error-format json` (or `XYTE_ERROR_FORMAT=json`).
 - Stable schema IDs:
   - `xyte.headless.frame.v1`
@@ -87,6 +92,7 @@ xyte-cli watch --tenant acme --profile incidents-active --interval-ms 2000 --max
   - `xyte.status.v1`
   - `xyte.upgrade.check.v1`
   - `xyte.upgrade.result.v1`
+  - `xyte.flow.run.v1`
 - Schemas live in [`docs/schemas`](docs/schemas).
 
 ## Action Logging
@@ -115,9 +121,9 @@ xyte-cli logs gc --path /tmp/xyte-cli.actions.ndjson --max-files 3 --max-age-day
 xyte-cli logs view --path /tmp/xyte-cli.actions.ndjson
 ```
 
-## Common Workflows
+## Common Workflows And Utilities
 
-### Flow-First Ops
+### Deterministic Flow Runner
 
 Use deterministic flow packs when an agent/operator needs repeatable incident and remediation loops:
 
@@ -127,6 +133,61 @@ Use deterministic flow packs when an agent/operator needs repeatable incident an
 - [`flow.guided-remediation`](docs/flows/agent-ops.md#flowguided-remediation): guarded command/ticket/incident writes.
 - [`flow.bulk-claim-and-space-import`](docs/flows/agent-ops.md#flowbulk-claim-and-space-import): preprocess + dry-run + apply for claim/import operations.
 - [`flow.daily-deep-dive-report`](docs/flows/agent-ops.md#flowdaily-deep-dive-report): daily deep-dive and markdown reporting.
+
+```bash
+xyte-cli flow list
+xyte-cli flow run flow.setup-readiness-10m --tenant acme --plan
+xyte-cli flow run flow.guided-remediation --tenant acme --plan --context-json ./flow.ctx.json
+xyte-cli flow run flow.guided-remediation --tenant acme --apply --allow-write --resume <run-id-or-path>
+```
+
+Utilities prepare and normalize inputs; flows orchestrate deterministic multi-step execution.
+
+<details>
+<summary>Toggle: flow run modes and gates</summary>
+
+- `--plan` is the default and runs safe/read steps until the first explicit human gate.
+- `--apply` only advances one gate per invocation and should be used with `--resume`.
+- Mutating gate steps require `--allow-write`; otherwise the run pauses with a structured pending decision.
+
+</details>
+
+Each run writes a deterministic bundle under `./tmp/flow-runs/<flow-id>/<timestamp>-<run-id>/`:
+- `manifest.json` (run summary, resume pointer, classifications)
+- `inputs.json` (resolved inputs/context)
+- `steps/*` and `outputs/*` (per-step artifacts)
+- `watch-frames.ndjson`, `decisions.ndjson`, `errors.ndjson`
+
+Custom flow authoring guide:
+- [`docs/flows/custom-workflows.md`](docs/flows/custom-workflows.md)
+
+Custom flows are shareable aliases over built-ins:
+
+```bash
+xyte-cli flow create flow.noc-guided-remediation --based-on flow.guided-remediation --title "NOC Guided Remediation" --var device_id=DEVICE_ID --var ticket_id=TICKET_ID --var incident_id=INCIDENT_ID
+xyte-cli flow edit flow.noc-guided-remediation --description "Pinned context defaults for NOC shift handoff"
+xyte-cli flow share flow.noc-guided-remediation --out ./tmp/flow.noc-guided-remediation.json
+xyte-cli flow import --file ./tmp/flow.noc-guided-remediation.json
+```
+
+<details>
+<summary>Toggle: custom workflow lifecycle details</summary>
+
+Create:
+`xyte-cli flow create <custom-flow-id> --based-on <built-in-flow-id> [--title ...] [--description ...] [--context-json ...] [--var key=value ...]`
+
+Edit:
+`xyte-cli flow edit <custom-flow-id> [--based-on ...] [--title ...] [--description ...] [--context-json ...] [--var key=value ...] [--replace-defaults]`
+
+Share/import:
+`xyte-cli flow share <custom-flow-id> --out <path>`
+`xyte-cli flow import --file <path> [--force]`
+
+</details>
+
+GitHub docs for authoring and examples:
+- [`docs/flows/custom-workflows.md`](https://github.com/xyte-io/xyte-cli/blob/main/docs/flows/custom-workflows.md)
+- [`docs/flows/agent-ops.md`](https://github.com/xyte-io/xyte-cli/blob/main/docs/flows/agent-ops.md)
 
 ### Skills install for coding agents
 
@@ -156,7 +217,7 @@ xyte-cli watch --tenant acme --profile incidents-active --once
 xyte-cli watch --tenant acme --profile incidents-active --interval-ms 2000 --max-polls 10
 ```
 
-### Utility prepare (AI-assisted preprocess, CLI-executed operations)
+### Utility Prepare Pipelines (AI-assisted preprocess, CLI-executed operations)
 
 ```bash
 xyte-cli utility list-actions --format text
@@ -177,6 +238,7 @@ xyte-cli space import-tree --tenant acme --input ./tmp/space-import-tree.csv --a
 - Getting started and setup: [`docs/getting-started.md`](docs/getting-started.md)
 - Command reference: [`docs/commands.md`](docs/commands.md)
 - Agent ops flow pack: [`docs/flows/agent-ops.md`](docs/flows/agent-ops.md)
+- Custom workflow authoring: [`docs/flows/custom-workflows.md`](docs/flows/custom-workflows.md)
 - Agent usage patterns: [`docs/agents.md`](docs/agents.md)
 - Development and test gates: [`docs/development.md`](docs/development.md)
 - Utility AI preprocess runbook: [`docs/ai-utility-preprocessing.md`](docs/ai-utility-preprocessing.md)

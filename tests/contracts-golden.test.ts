@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { buildCallEnvelope } from '../src/contracts/call-envelope';
+import { buildFlowRunSummary } from '../src/contracts/flow-run';
 import { buildStatusContract } from '../src/contracts/status';
 import { buildWatchFrame } from '../src/contracts/watch-frame';
 import { buildUpgradeCheck } from '../src/contracts/upgrade';
@@ -69,6 +70,14 @@ function normalizeWatchFrame(value: unknown) {
   frame.timestamp = '<ISO_TIMESTAMP>';
   frame.runId = '<RUN_ID>';
   return frame;
+}
+
+function normalizeFlowRunSummary(value: unknown) {
+  const summary = JSON.parse(JSON.stringify(value)) as Record<string, any>;
+  summary.generatedAtUtc = '<ISO_TIMESTAMP>';
+  summary.startedAtUtc = '<ISO_TIMESTAMP>';
+  summary.endedAtUtc = '<ISO_TIMESTAMP>';
+  return summary;
 }
 
 describe('golden contracts', () => {
@@ -291,5 +300,58 @@ describe('golden contracts', () => {
     });
 
     expect(normalizeWatchFrame(frame)).toEqual(readGolden('watch-frame.json'));
+  });
+
+  it('matches flow run summary contract', () => {
+    const summary = buildFlowRunSummary({
+      runId: 'run-1',
+      flowId: 'flow.setup-readiness-10m',
+      resolvedFlowId: 'flow.setup-readiness-10m',
+      mode: 'plan',
+      tenantId: 'acme',
+      bundleDir: '/tmp/flow-runs/flow.setup-readiness-10m/run-1',
+      manifestPath: '/tmp/flow-runs/flow.setup-readiness-10m/run-1/manifest.json',
+      inputsPath: '/tmp/flow-runs/flow.setup-readiness-10m/run-1/inputs.json',
+      decisionsPath: '/tmp/flow-runs/flow.setup-readiness-10m/run-1/decisions.ndjson',
+      errorsPath: '/tmp/flow-runs/flow.setup-readiness-10m/run-1/errors.ndjson',
+      watchFramesPath: '/tmp/flow-runs/flow.setup-readiness-10m/run-1/watch-frames.ndjson',
+      startedAtUtc: new Date().toISOString(),
+      endedAtUtc: new Date().toISOString(),
+      durationMs: 123,
+      outcome: 'pending_gate',
+      nextResumeStepId: 'gate_send_command',
+      resumeCommand: 'xyte-cli flow run flow.guided-remediation --tenant acme --apply --allow-write --resume run-1',
+      steps: [
+        {
+          stepId: 'watch_before',
+          title: 'Watch Before',
+          kind: 'task',
+          command: 'xyte-cli watch --tenant <tenant-id> --profile incidents-active --once --strict-json > /tmp/xyte-watch.before.ndjson',
+          status: 'completed'
+        },
+        {
+          stepId: 'gate_send_command',
+          title: 'Approve Send Command',
+          kind: 'gate',
+          command: 'Human decision gate before sendCommand',
+          status: 'gate_pending'
+        }
+      ],
+      decisions: {
+        pending: 1,
+        approved: 0,
+        blocked: 0
+      },
+      classifications: {
+        needs_data: 0,
+        bug: 0
+      },
+      cursor: {
+        nextStepIndex: 1,
+        nextStepId: 'gate_send_command'
+      }
+    });
+
+    expect(normalizeFlowRunSummary(summary)).toEqual(readGolden('flow-run.json'));
   });
 });
