@@ -902,30 +902,6 @@
     ]
   },
   {
-    "key": "organization.devices.updateDevice",
-    "namespace": "organization",
-    "group": "devices",
-    "action": "updateDevice",
-    "title": "Update Device",
-    "method": "PATCH",
-    "base": "hub",
-    "pathTemplate": "/core/v1/organization/:device_id",
-    "pathParams": [
-      "device_id"
-    ],
-    "queryParams": [],
-    "authScope": "organization",
-    "bodyType": "json",
-    "hasBody": true,
-    "sourceFile": "https://docs.xyte.io/reference/update-device",
-    "notes": [
-      "Docs page: https://docs.xyte.io/reference/update-device",
-      "Docs category: /branches/2.0/categories/reference/API Access",
-      "Docs parent: /branches/2.0/reference/devices-2",
-      "Docs raw path params: device_id"
-    ]
-  },
-  {
     "key": "organization.getOrganizationInfo",
     "namespace": "organization",
     "group": "general",
