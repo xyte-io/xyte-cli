@@ -50,6 +50,7 @@
     "mock:xyte:local": "node scripts/mock_xyte_local.mjs",
     "smoke:local:utilities": "node scripts/smoke_local_utilities.mjs",
     "smoke:external-live": "node scripts/smoke_external_user_live.mjs",
+    "smoke:upgrade:controlled": "node scripts/smoke_upgrade_controlled.mjs",
     "test:commit": "npm run typecheck && npm test && npm run smoke:external-live",
     "release:check": "bash scripts/release_check.sh",
     "tui": "tsx src/bin/xyte-cli.ts tui",

@@ -86,16 +86,6 @@ Use explicit integer Unix timestamps for `from` and `to`. In some environments, 
 
 ## Concrete Write/Delete Examples
 
-### `organization.devices.updateDevice` (write, guarded)
-
-```bash
-xyte-cli call organization.devices.updateDevice \
-  --tenant <tenant-id> \
-  --allow-write \
-  --path-json '{"device_id":"<device-id>"}' \
-  --body-json '{"name":"New name"}'
-```
-
 ### `organization.incidents.closeIncident` (destructive, guarded)
 
 ```bash

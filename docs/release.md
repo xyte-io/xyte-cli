@@ -19,11 +19,13 @@ This repository ships one npm package: `@xyteai/cli`.
 - `npm run build`
 - `npm pack --dry-run`
 - separate security job: `npm audit --audit-level=high`
+- controlled upgrade smoke job: `npm run smoke:upgrade:controlled` on `ubuntu-latest`
 
 Recommended branch protection:
 
 - require `CI / validate`
 - require `CI / security`
+- require `CI / upgrade-controlled-smoke`
 - require up-to-date branch before merge
 
 ## Local Pre-Release Check

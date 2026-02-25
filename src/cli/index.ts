@@ -10,6 +10,7 @@ import { createXyteClient } from '../client/create-client';
 import { getEndpoint, listEndpoints } from '../client/catalog';
 import { buildCallEnvelope } from '../contracts/call-envelope';
 import { toProblemDetails } from '../contracts/problem';
+import { buildStatusContract, type StatusMode } from '../contracts/status';
 import { evaluateReadiness, type ReadinessCheck } from '../config/readiness';
 import { createSecretStore, type SecretStore } from '../secure/secret-store';
 import { makeKeyFingerprint, matchesSlotRef } from '../secure/key-slots';
@@ -25,6 +26,7 @@ import {
   type SkillInstallOutcome,
   type SkillInstallScope
 } from '../utils/install-skills';
+import { applyUpgrade, checkForUpgrade, type UpgradeDependencies } from '../utils/upgrade';
 import { runTuiApp } from '../tui/app';
 import type { TuiScreenId } from '../tui/types';
 import {
@@ -44,6 +46,20 @@ type OutputStream = Pick<typeof process.stdout, 'write'>;
 type ErrorStream = Pick<typeof process.stderr, 'write'>;
 type OutputFormat = 'json' | 'text';
 type PromptValueFn = (args: { question: string; initial?: string; stdout: OutputStream }) => Promise<string>;
+type SetupConnectivityMode = 'auto' | 'always' | 'never';
+type SetupStepKey =
+  | 'tenant_upserted'
+  | 'tenant_activated'
+  | 'slot_written'
+  | 'slot_activated'
+  | 'connectivity_checked'
+  | 'readiness_evaluated';
+
+interface SetupStep {
+  key: SetupStepKey;
+  status: 'ok' | 'skipped';
+  detail?: string;
+}
 
 interface InstallDoctorResult {
   status: 'ok' | 'missing' | 'mismatch';
@@ -64,6 +80,7 @@ export interface CliRuntime {
   runTui?: typeof runTuiApp;
   promptValue?: PromptValueFn;
   isTTY?: boolean;
+  upgradeDependencies?: UpgradeDependencies;
 }
 
 interface SlotView {
@@ -82,6 +99,10 @@ const SIMPLE_SETUP_SLOT_NAME = 'primary';
 const SIMPLE_SETUP_DEFAULT_TENANT = 'default';
 const SKILL_AGENTS: SkillAgent[] = ['claude', 'copilot', 'codex'];
 const SKILL_SCOPES: SkillInstallScope[] = ['project', 'user', 'both'];
+
+function resolveSkillSourceDir(): string {
+  return path.resolve(__dirname, '../../skills/xyte-cli');
+}
 
 function printJson(stream: OutputStream, value: unknown, options: { strictJson?: boolean } = {}) {
   writeJsonLine(stream, value, { strictJson: options.strictJson });
@@ -193,6 +214,22 @@ function parseUtilityPreparePrimaryFormat(value: string | undefined): UtilityPre
     throw new Error(`Invalid primary format: ${value}. Use csv|jsonl.`);
   }
   return normalized as UtilityPreparePrimaryFormat;
+}
+
+function parseStatusMode(value: string | undefined): StatusMode {
+  const normalized = (value ?? 'fast').trim().toLowerCase();
+  if (normalized !== 'fast' && normalized !== 'full') {
+    throw new Error(`Invalid status mode: ${value}. Use fast|full.`);
+  }
+  return normalized as StatusMode;
+}
+
+function parseSetupConnectivityMode(value: string | undefined): SetupConnectivityMode {
+  const normalized = (value ?? 'auto').trim().toLowerCase();
+  if (normalized !== 'auto' && normalized !== 'always' && normalized !== 'never') {
+    throw new Error(`Invalid connectivity mode: ${value}. Use auto|always|never.`);
+  }
+  return normalized as SetupConnectivityMode;
 }
 
 function requiresWriteGuard(method: string): boolean {
@@ -476,12 +513,24 @@ export function createCli(runtime: CliRuntime = {}): Command {
     tenantName: string;
     keyValue: string;
     setActive?: boolean;
+    connectivityMode?: SetupConnectivityMode;
   }) => {
+    const steps: SetupStep[] = [];
     await profileStore.upsertTenant({
       id: args.tenantId,
       name: args.tenantName
     });
+    steps.push({
+      key: 'tenant_upserted',
+      status: 'ok',
+      detail: args.tenantId
+    });
     await profileStore.setActiveTenant(args.tenantId);
+    steps.push({
+      key: 'tenant_activated',
+      status: 'ok',
+      detail: args.tenantId
+    });
 
     const secretStore = await getSecretStore();
     const slots = await profileStore.listKeySlots(args.tenantId, SIMPLE_SETUP_PROVIDER);
@@ -498,24 +547,54 @@ export function createCli(runtime: CliRuntime = {}): Command {
         });
 
     await secretStore.setSlotSecret(args.tenantId, SIMPLE_SETUP_PROVIDER, slot.slotId, args.keyValue);
+    steps.push({
+      key: 'slot_written',
+      status: 'ok',
+      detail: slot.slotId
+    });
     if (args.setActive !== false) {
       await profileStore.setActiveKeySlot(args.tenantId, SIMPLE_SETUP_PROVIDER, slot.slotId);
+      steps.push({
+        key: 'slot_activated',
+        status: 'ok',
+        detail: slot.slotId
+      });
+    } else {
+      steps.push({
+        key: 'slot_activated',
+        status: 'skipped',
+        detail: 'setActive=false'
+      });
     }
 
-    const client = await withClient(args.tenantId);
+    const connectivityMode = args.connectivityMode ?? 'auto';
+    const checkConnectivity = connectivityMode !== 'never';
+    const client = checkConnectivity ? await withClient(args.tenantId) : undefined;
     const readiness = await evaluateReadiness({
       profileStore,
       secretStore,
       tenantId: args.tenantId,
       client,
-      checkConnectivity: true
+      checkConnectivity
+    });
+    steps.push({
+      key: 'connectivity_checked',
+      status: checkConnectivity ? 'ok' : 'skipped',
+      detail: checkConnectivity ? readiness.connectivity.message : 'Connectivity probe skipped by setup mode.'
+    });
+    steps.push({
+      key: 'readiness_evaluated',
+      status: 'ok',
+      detail: readiness.state
     });
 
     return {
       tenantId: args.tenantId,
       provider: SIMPLE_SETUP_PROVIDER,
       slot,
-      readiness
+      readiness,
+      connectivityMode,
+      steps
     };
   };
 
@@ -570,7 +649,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
         scope = scope ?? 'project';
         agents = agents ?? [...SKILL_AGENTS];
 
-        const skillSource = path.resolve(__dirname, '../../skills/xyte-cli');
+        const skillSource = resolveSkillSourceDir();
         const result = await installSkills({
           skillName: 'xyte-cli',
           sourceDir: skillSource,
@@ -620,7 +699,8 @@ export function createCli(runtime: CliRuntime = {}): Command {
           tenantId,
           tenantName: tenantLabel,
           keyValue,
-          setActive: true
+          setActive: true,
+          connectivityMode: 'auto'
         });
 
         if (setupResult.readiness.state !== 'ready') {
@@ -665,7 +745,8 @@ export function createCli(runtime: CliRuntime = {}): Command {
         tenantId,
         tenantName: tenantLabel,
         keyValue: apiKey.trim(),
-        setActive: true
+        setActive: true,
+        connectivityMode: 'auto'
       });
 
       if (setupResult.readiness.state !== 'ready') {
@@ -719,6 +800,129 @@ export function createCli(runtime: CliRuntime = {}): Command {
         return;
       }
       printJson(stdout, report);
+    });
+
+  program
+    .command('status')
+    .description('Fast readiness status for operators and agents')
+    .option('--tenant <tenantId>', 'Tenant id override')
+    .option('--mode <mode>', 'fast|full', 'fast')
+    .option('--format <format>', 'json|text', 'json')
+    .action(async (options: { tenant?: string; mode?: string; format?: OutputFormat }) => {
+      const format = (options.format ?? 'json').trim().toLowerCase();
+      if (format !== 'json' && format !== 'text') {
+        throw new Error(`Invalid format: ${options.format}. Use json|text.`);
+      }
+
+      const mode = parseStatusMode(options.mode);
+      const checkConnectivity = mode === 'full';
+      const secretStore = await getSecretStore();
+      const client = checkConnectivity ? await withClient(options.tenant) : undefined;
+      const readiness = await evaluateReadiness({
+        profileStore,
+        secretStore,
+        tenantId: options.tenant,
+        client,
+        checkConnectivity
+      });
+      const payload = buildStatusContract({
+        mode,
+        checkConnectivity,
+        readiness
+      });
+
+      if (format === 'text') {
+        stdout.write(`Status mode: ${payload.mode}\n`);
+        stdout.write(`Generated: ${payload.generatedAtUtc}\n`);
+        stdout.write(formatReadinessText(readiness));
+        return;
+      }
+
+      printJson(stdout, payload);
+    });
+
+  program
+    .command('upgrade')
+    .description('Update xyte-cli and refresh user-scope agent skills')
+    .option('--check', 'Check current and latest version without upgrading')
+    .option('--yes', 'Skip confirmation prompt')
+    .option('--format <format>', 'json|text', 'json')
+    .action(async (options: { check?: boolean; yes?: boolean; format?: OutputFormat }) => {
+      const format = (options.format ?? 'json').trim().toLowerCase();
+      if (format !== 'json' && format !== 'text') {
+        throw new Error(`Invalid format: ${options.format}. Use json|text.`);
+      }
+
+      const latestVersionOverride = process.env.XYTE_CLI_UPGRADE_TARGET_VERSION?.trim() || undefined;
+      const installSpec = process.env.XYTE_CLI_UPGRADE_SPEC?.trim() || undefined;
+      const check = await checkForUpgrade(
+        { packageName: '@xyteai/cli', latestVersionOverride },
+        runtime.upgradeDependencies
+      );
+      if (options.check) {
+        if (format === 'text') {
+          stdout.write(`Package: ${check.packageName}\n`);
+          stdout.write(`Current: ${check.currentVersion}\n`);
+          stdout.write(`Latest: ${check.latestVersion}\n`);
+          stdout.write(`Up to date: ${check.upToDate}\n`);
+          if (check.recommendedCommand) {
+            stdout.write(`Recommended: ${check.recommendedCommand}\n`);
+          }
+          return;
+        }
+        printJson(stdout, check);
+        return;
+      }
+
+      if (!options.yes) {
+        if (!isInteractive) {
+          throw new Error('Upgrade requires confirmation. Re-run with --yes or use --check.');
+        }
+        const answer = (
+          await prompt({
+            question: 'Proceed with global CLI update and user-scope skills refresh? (y/N)',
+            initial: 'N',
+            stdout
+          })
+        )
+          .trim()
+          .toLowerCase();
+        if (!['y', 'yes'].includes(answer)) {
+          if (format === 'text') {
+            stdout.write('Upgrade canceled.\n');
+          } else {
+            printJson(stdout, check);
+          }
+          return;
+        }
+      }
+
+      const result = await applyUpgrade(
+        {
+          packageName: check.packageName,
+          skillSourceDir: resolveSkillSourceDir(),
+          installSpec,
+          latestVersionOverride
+        },
+        runtime.upgradeDependencies
+      );
+
+      if (format === 'text') {
+        stdout.write(`Package: ${result.packageName}\n`);
+        stdout.write(`Current: ${result.currentVersion}\n`);
+        stdout.write(`Latest: ${result.latestVersion}\n`);
+        stdout.write(`Updated: ${result.updated}\n`);
+        stdout.write(`Verified version: ${result.verify.detectedVersion}\n`);
+        stdout.write('Skill refresh summary:\n');
+        result.skills.outcomes.forEach((outcome) => stdout.write(`${formatInstallOutcome(outcome)}\n`));
+        if (result.warnings.length > 0) {
+          stdout.write('Warnings:\n');
+          result.warnings.forEach((warning) => stdout.write(`- ${warning}\n`));
+        }
+        return;
+      }
+
+      printJson(stdout, result);
     });
 
   program
@@ -1340,6 +1544,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .option('--slot-name <name>', 'Key slot name', 'primary')
     .option('--key <value>', 'API key value')
     .option('--set-active', 'Set slot active (default true in setup flow)')
+    .option('--connectivity <mode>', 'auto|always|never', 'auto')
     .option('--non-interactive', 'Disable prompts and require needed options')
     .option('--format <format>', 'json|text', 'json')
     .action(
@@ -1351,6 +1556,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
         slotName?: string;
         key?: string;
         setActive?: boolean;
+        connectivity?: string;
         nonInteractive?: boolean;
         format?: OutputFormat;
       }) => {
@@ -1358,6 +1564,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
           throw new Error('Interactive setup requires a TTY. Use --non-interactive with explicit flags.');
         }
 
+        const connectivityMode = parseSetupConnectivityMode(options.connectivity);
         const advanced = options.advanced === true;
         if (!advanced) {
           let tenantLabel = (options.name ?? options.tenant ?? SIMPLE_SETUP_DEFAULT_TENANT).trim() || SIMPLE_SETUP_DEFAULT_TENANT;
@@ -1383,7 +1590,8 @@ export function createCli(runtime: CliRuntime = {}): Command {
             tenantId,
             tenantName,
             keyValue,
-            setActive: options.setActive !== false
+            setActive: options.setActive !== false,
+            connectivityMode
           });
 
           if ((options.format ?? 'json') === 'text') {
@@ -1400,6 +1608,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
         let provider = options.provider ? parseProvider(options.provider) : undefined;
         let slotName = options.slotName ?? 'primary';
         let keyValue = options.key ?? process.env.XYTE_CLI_KEY;
+        const steps: SetupStep[] = [];
 
         if (!options.nonInteractive) {
           tenantId = tenantId || (await prompt({ question: 'Tenant id', stdout }));
@@ -1424,7 +1633,17 @@ export function createCli(runtime: CliRuntime = {}): Command {
           id: tenantId,
           name: tenantName
         });
+        steps.push({
+          key: 'tenant_upserted',
+          status: 'ok',
+          detail: tenantId
+        });
         await profileStore.setActiveTenant(tenantId);
+        steps.push({
+          key: 'tenant_activated',
+          status: 'ok',
+          detail: tenantId
+        });
         const secretStore = await getSecretStore();
 
         let slot;
@@ -1445,18 +1664,45 @@ export function createCli(runtime: CliRuntime = {}): Command {
           });
         }
         await secretStore.setSlotSecret(tenantId, provider, slot.slotId, keyValue);
+        steps.push({
+          key: 'slot_written',
+          status: 'ok',
+          detail: slot.slotId
+        });
 
         if (options.setActive !== false) {
           await profileStore.setActiveKeySlot(tenantId, provider, slot.slotId);
+          steps.push({
+            key: 'slot_activated',
+            status: 'ok',
+            detail: slot.slotId
+          });
+        } else {
+          steps.push({
+            key: 'slot_activated',
+            status: 'skipped',
+            detail: 'setActive=false'
+          });
         }
 
-        const client = await withClient(tenantId);
+        const checkConnectivity = connectivityMode !== 'never';
+        const client = checkConnectivity ? await withClient(tenantId) : undefined;
         const readiness = await evaluateReadiness({
           profileStore,
           secretStore,
           tenantId,
           client,
-          checkConnectivity: true
+          checkConnectivity
+        });
+        steps.push({
+          key: 'connectivity_checked',
+          status: checkConnectivity ? 'ok' : 'skipped',
+          detail: checkConnectivity ? readiness.connectivity.message : 'Connectivity probe skipped by setup mode.'
+        });
+        steps.push({
+          key: 'readiness_evaluated',
+          status: 'ok',
+          detail: readiness.state
         });
 
         if ((options.format ?? 'json') === 'text') {
@@ -1468,7 +1714,9 @@ export function createCli(runtime: CliRuntime = {}): Command {
           tenantId,
           provider,
           slot,
-          readiness
+          readiness,
+          connectivityMode,
+          steps
         });
       }
     );
@@ -1576,7 +1824,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     });
 
   program.exitOverride((error) => {
-    if (error.code === 'commander.helpDisplayed') {
+    if (error.code === 'commander.helpDisplayed' || error.code === 'commander.version') {
       return;
     }
     throw error;

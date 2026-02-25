@@ -42,6 +42,14 @@ Terminal B:
 npm run smoke:local:utilities -- --base-url http://127.0.0.1:3001 --tenant local
 ```
 
+## Controlled Upgrade Docker Smoke
+
+```bash
+npm run smoke:upgrade:controlled
+```
+
+This builds tarball A/B from the current package, runs a clean Docker environment, installs A, upgrades to B via `xyte-cli upgrade`, refreshes user-scope skills, and validates guarded/dry endpoint behavior against the local mock server.
+
 ## Release
 
 See [`release.md`](release.md) for publish and release-asset workflows.

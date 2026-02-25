@@ -19,7 +19,8 @@ xyte-cli --help
 
 ```bash
 XYTE_CLI_KEY="<your-key>" \
-xyte-cli setup run --non-interactive --tenant acme
+xyte-cli setup run --non-interactive --tenant acme --connectivity auto
+xyte-cli status --tenant acme --mode fast --format json
 ```
 
 ### 2) Run read-only fleet checks
@@ -76,6 +77,9 @@ xyte-cli call organization.devices.getDevices --tenant acme --output-mode envelo
   - `xyte.report.v1`
   - `xyte.utility.batch.v1`
   - `xyte.utility.prepare.v1`
+  - `xyte.status.v1`
+  - `xyte.upgrade.check.v1`
+  - `xyte.upgrade.result.v1`
 - Schemas live in [`docs/schemas`](docs/schemas).
 
 ## Common Workflows
@@ -84,6 +88,13 @@ xyte-cli call organization.devices.getDevices --tenant acme --output-mode envelo
 
 ```bash
 xyte-cli install --skills
+```
+
+### Upgrade CLI + refresh user skills
+
+```bash
+xyte-cli upgrade --check --format json
+xyte-cli upgrade --yes --format json
 ```
 
 ### Endpoint discovery + call

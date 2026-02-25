@@ -10,7 +10,6 @@ export interface OrganizationNamespace {
   getDevice: NamespaceCall;
   getDevices: NamespaceCall;
   getHistories: NamespaceCall;
-  updateDevice: NamespaceCall;
   getOrganizationInfo: NamespaceCall;
   getIncidents: NamespaceCall;
   createSpace: NamespaceCall;
@@ -37,7 +36,6 @@ export function createOrganizationNamespace(call: (endpointKey: string, args?: X
     getDevice: (args) => call('organization.devices.getDevice', args),
     getDevices: (args) => call('organization.devices.getDevices', args),
     getHistories: (args) => call('organization.devices.getHistories', args),
-    updateDevice: (args) => call('organization.devices.updateDevice', args),
     getOrganizationInfo: (args) => call('organization.getOrganizationInfo', args),
     getIncidents: (args) => call('organization.incidents.getIncidents', args),
     createSpace: (args) => call('organization.spaces.createSpace', args),

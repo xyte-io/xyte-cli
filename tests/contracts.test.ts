@@ -6,7 +6,12 @@ import deepDiveSchema from '../docs/schemas/inspect-deep-dive.v1.schema.json';
 import fleetSchema from '../docs/schemas/inspect-fleet.v1.schema.json';
 import headlessSchema from '../docs/schemas/headless-frame.v1.schema.json';
 import reportSchema from '../docs/schemas/report.v1.schema.json';
+import statusSchema from '../docs/schemas/status.v1.schema.json';
+import upgradeCheckSchema from '../docs/schemas/upgrade-check.v1.schema.json';
+import upgradeResultSchema from '../docs/schemas/upgrade-result.v1.schema.json';
 import { buildCallEnvelope } from '../src/contracts/call-envelope';
+import { buildStatusContract } from '../src/contracts/status';
+import { buildUpgradeCheck } from '../src/contracts/upgrade';
 import { buildDeepDive, buildFleetInspect, generateFleetReport } from '../src/workflows/fleet-insights';
 import { runHeadlessRenderer } from '../src/tui/headless-renderer';
 import { MemorySecretStore } from '../src/secure/secret-store';
@@ -18,6 +23,9 @@ const validateHeadless = ajv.compile(headlessSchema);
 const validateFleet = ajv.compile(fleetSchema);
 const validateDeepDive = ajv.compile(deepDiveSchema);
 const validateReport = ajv.compile(reportSchema);
+const validateStatus = ajv.compile(statusSchema);
+const validateUpgradeCheck = ajv.compile(upgradeCheckSchema);
+const validateUpgradeResult = ajv.compile(upgradeResultSchema);
 
 describe('schema contracts', () => {
   it('validates call envelope payload', () => {
@@ -123,5 +131,74 @@ describe('schema contracts', () => {
       .find((frame) => !(frame.meta?.startup ?? false));
 
     expect(validateHeadless(runtimeFrame)).toBe(true);
+  });
+
+  it('validates status and upgrade payloads', () => {
+    const status = buildStatusContract({
+      mode: 'fast',
+      checkConnectivity: false,
+      readiness: {
+        state: 'needs_setup',
+        missingItems: ['No active tenant is configured.'],
+        recommendedActions: ['Run "xyte-cli setup run --non-interactive --tenant default --key <value>".'],
+        providers: [],
+        connectionState: 'not_checked',
+        connectivity: {
+          state: 'not_checked',
+          message: 'Connectivity not checked.',
+          retriable: false
+        }
+      }
+    });
+
+    const upgradeCheck = buildUpgradeCheck({
+      packageName: '@xyteai/cli',
+      currentVersion: '0.4.0',
+      latestVersion: '0.4.1'
+    });
+
+    const upgradeResult = {
+      schemaVersion: 'xyte.upgrade.result.v1',
+      generatedAtUtc: new Date().toISOString(),
+      packageName: '@xyteai/cli',
+      currentVersion: '0.4.0',
+      latestVersion: '0.4.1',
+      upToDateBefore: false,
+      updated: true,
+      updateCommand: {
+        command: 'npm',
+        args: ['install', '--global', '@xyteai/cli@latest']
+      },
+      verify: {
+        command: {
+          command: 'xyte-cli',
+          args: ['--version']
+        },
+        detectedVersion: '0.4.1',
+        expectedVersion: '0.4.1',
+        match: true
+      },
+      skills: {
+        scope: 'user',
+        agents: ['claude', 'copilot', 'codex'],
+        force: true,
+        sourceDir: '/tmp/skills/xyte-cli',
+        outcomes: [
+          {
+            scope: 'user',
+            agent: 'codex',
+            rootDir: '/tmp/.agents/skills',
+            targetDir: '/tmp/.agents/skills/xyte-cli',
+            status: 'installed'
+          }
+        ],
+        failedCount: 0
+      },
+      warnings: []
+    };
+
+    expect(validateStatus(status)).toBe(true);
+    expect(validateUpgradeCheck(upgradeCheck)).toBe(true);
+    expect(validateUpgradeResult(upgradeResult)).toBe(true);
   });
 });
