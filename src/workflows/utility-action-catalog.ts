@@ -36,7 +36,7 @@ function buildProfiles(): UtilityActionProfile[] {
 
 const ACTION_PROFILES = buildProfiles();
 
-export interface ListUtilityActionOptions {
+interface ListUtilityActionOptions {
   entity?: string;
   includeGeneric?: boolean;
 }

@@ -6,7 +6,7 @@ export type SkillAgent = 'claude' | 'copilot' | 'codex';
 export type SkillInstallScope = 'project' | 'user' | 'both';
 export type SkillInstallStatus = 'installed' | 'overwritten' | 'skipped' | 'failed';
 
-export interface SkillInstallDestination {
+interface SkillInstallDestination {
   agent: SkillAgent;
   scope: 'project' | 'user';
   rootDir: string;
@@ -18,7 +18,7 @@ export interface SkillInstallOutcome extends SkillInstallDestination {
   error?: string;
 }
 
-export interface InstallSkillsOptions {
+interface InstallSkillsOptions {
   skillName: string;
   sourceDir: string;
   scope: SkillInstallScope;
@@ -28,7 +28,7 @@ export interface InstallSkillsOptions {
   force?: boolean;
 }
 
-export interface InstallSkillsResult {
+interface InstallSkillsResult {
   workspaceRoot: string;
   homeRoot: string;
   sourceDir: string;

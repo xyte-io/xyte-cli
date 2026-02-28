@@ -179,7 +179,7 @@ function buildQuery(overrides: Record<string, QueryValue>, nowUnix: number): Rec
   };
 }
 
-export interface RunWatchOptions {
+interface RunWatchOptions {
   client: XyteClient;
   tenantId?: string;
   profile?: WatchProfile;

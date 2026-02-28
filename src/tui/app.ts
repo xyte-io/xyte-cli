@@ -25,7 +25,7 @@ import { ScreenRuntime, type ScreenRuntimeStatus } from './runtime';
 import { createTuiLogger } from './logger';
 import { nextTab } from './tabs';
 
-export interface TuiAppOptions {
+interface TuiAppOptions {
   client: XyteClient;
   profileStore?: ProfileStore;
   secretStore?: SecretStore;
@@ -76,7 +76,7 @@ function canOpenScreen(id: TuiScreenId, readiness: ReadinessCheck | undefined): 
   return readiness?.state === 'ready';
 }
 
-export interface ErrorStormState {
+interface ErrorStormState {
   message: string;
   count: number;
   startedAt: number;

@@ -1,4 +1,4 @@
-export type CliErrorFormat = 'text' | 'json';
+type CliErrorFormat = 'text' | 'json';
 
 function isCliErrorFormat(value: string | undefined): value is CliErrorFormat {
   return value === 'text' || value === 'json';

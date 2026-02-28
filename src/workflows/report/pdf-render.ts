@@ -73,7 +73,7 @@ function formatSpaceHierarchy(spacePath: string): string {
   return `${leaf} (${context.join(' / ')})`;
 }
 
-export interface DeepDiveReportSectionPlan {
+interface DeepDiveReportSectionPlan {
   includeOfflineSpaces: boolean;
   includeIncidentSections: boolean;
   includeTicketSection: boolean;
@@ -81,7 +81,7 @@ export interface DeepDiveReportSectionPlan {
   includeDataQualitySection: boolean;
 }
 
-export interface DeepDiveSummaryPlan {
+interface DeepDiveSummaryPlan {
   executiveSummary: string[];
   partnerHighlights: string[];
 }

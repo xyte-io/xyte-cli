@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { ReadinessCheck } from '../config/readiness';
 import { STATUS_SCHEMA_VERSION } from './versions';
 
-export const StatusModeSchema = z.enum(['fast', 'full']);
+const StatusModeSchema = z.enum(['fast', 'full']);
 
 const StatusProviderSchema = z.object({
   provider: z.string(),
@@ -33,7 +33,7 @@ const StatusReadinessSchema = z.object({
   connectivity: StatusConnectivitySchema
 });
 
-export const StatusContractSchema = z.object({
+const StatusContractSchema = z.object({
   schemaVersion: z.literal(STATUS_SCHEMA_VERSION),
   generatedAtUtc: z.string(),
   mode: StatusModeSchema,
@@ -42,7 +42,7 @@ export const StatusContractSchema = z.object({
 });
 
 export type StatusMode = z.infer<typeof StatusModeSchema>;
-export type StatusContractV1 = z.infer<typeof StatusContractSchema>;
+type StatusContractV1 = z.infer<typeof StatusContractSchema>;
 
 export function buildStatusContract(args: {
   mode: StatusMode;

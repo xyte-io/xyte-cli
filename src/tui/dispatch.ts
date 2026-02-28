@@ -3,7 +3,7 @@ import type { TuiArrowHandleResult, TuiArrowKey } from './types';
 
 const ARROW_KEYS: TuiArrowKey[] = ['up', 'down', 'left', 'right'];
 
-export interface KeyDispatchArgs {
+interface KeyDispatchArgs {
   ch: string | undefined;
   key: blessed.Widgets.Events.IKeyEventArg;
   handleScreen?: (ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg) => Promise<boolean>;

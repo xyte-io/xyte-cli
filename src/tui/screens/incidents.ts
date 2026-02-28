@@ -21,7 +21,7 @@ function incidentIdOf(incident: any): string {
   return String(incident?.id ?? incident?._id ?? incident?.uuid ?? '');
 }
 
-export interface CloseIncidentWithGuardArgs {
+interface CloseIncidentWithGuardArgs {
   incident: any;
   context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;
 }

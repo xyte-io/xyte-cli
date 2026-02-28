@@ -1,6 +1,6 @@
-import { accessSync, constants, existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { appendFile, readFile, readdir, writeFile } from 'node:fs/promises';
-import path, { delimiter } from 'node:path';
+import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import { buildCallEnvelope } from '../contracts/call-envelope';
@@ -20,6 +20,7 @@ import { evaluateReadiness } from '../config/readiness';
 import type { ProfileStore } from '../secure/profile-store';
 import type { SecretStore } from '../secure/secret-store';
 import type { XyteClient } from '../types/client';
+import { resolveCommandFromPath } from '../utils/resolve-command-path';
 import { runWatch } from './watch';
 import { buildUtilityPrepare } from './utility-prepare';
 import { runSpaceImportTree } from './utility-commands';
@@ -28,6 +29,7 @@ import {
   buildFleetInspect,
   collectFleetSnapshot,
   generateFleetReport,
+  parseDeepDiveForReport,
   type InspectProviderScope
 } from './fleet-insights';
 import type { BuiltInFlowDefinition, FlowStep, FlowTaskStep } from './flow-catalog';
@@ -66,7 +68,7 @@ interface FlowRunInputsPayload {
   inspectProviderScope?: unknown;
 }
 
-export interface RunDeterministicFlowArgs {
+interface RunDeterministicFlowArgs {
   flowId: string;
   resolvedFlowId: string;
   definition: BuiltInFlowDefinition;
@@ -163,34 +165,6 @@ function ensureContextKeys(step: FlowTaskStep, context: Record<string, string>):
   if (missing.length > 0) {
     throw new FlowNeedsInputError(`Step ${step.id} requires context keys: ${missing.join(', ')}`);
   }
-}
-
-function resolveCommandFromPath(command: string, envPath = process.env.PATH ?? ''): string | undefined {
-  const pathEntries = envPath.split(delimiter).filter(Boolean);
-  const extensions =
-    process.platform === 'win32'
-      ? (process.env.PATHEXT ?? '.EXE;.CMD;.BAT;.COM')
-          .split(';')
-          .filter(Boolean)
-          .map((ext) => ext.toLowerCase())
-      : [''];
-
-  for (const entry of pathEntries) {
-    for (const ext of extensions) {
-      const candidate = process.platform === 'win32' ? path.join(entry, `${command}${ext}`) : path.join(entry, command);
-      if (!existsSync(candidate)) {
-        continue;
-      }
-      try {
-        accessSync(candidate, constants.X_OK);
-      } catch {
-        continue;
-      }
-      return candidate;
-    }
-  }
-
-  return undefined;
 }
 
 function runInstallDoctorLite() {
@@ -371,14 +345,17 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
         throw new Error(`Flow step ${step.id} is missing report configuration.`);
       }
       const input = ctx.taskOutputs.get(step.report.inputFromStepId);
-      if (!isRecord(input) || input.schemaVersion !== 'xyte.inspect.deep-dive.v1') {
+      let deepDiveForReport;
+      try {
+        deepDiveForReport = parseDeepDiveForReport(input, ctx.args.tenantId);
+      } catch {
         throw new FlowNeedsInputError(
           `Step ${step.id} requires deep-dive output from ${step.report.inputFromStepId}.`
         );
       }
       const outPath = path.join(ctx.outputsDir, step.report.outFileName);
       const generated = await generateFleetReport({
-        deepDive: input as any,
+        deepDive: deepDiveForReport,
         format: step.report.format,
         outPath,
         includeSensitive: step.report.includeSensitive === true
@@ -621,11 +598,21 @@ async function readLinesAsJson<T>(filePath: string): Promise<T[]> {
     return [];
   }
   const raw = await readFile(filePath, 'utf8');
-  return raw
+  const items: T[] = [];
+  const lines = raw
     .split('\n')
     .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as T);
+    .filter(Boolean);
+
+  for (let index = 0; index < lines.length; index += 1) {
+    try {
+      items.push(JSON.parse(lines[index]) as T);
+    } catch {
+      throw new Error(`Invalid JSON line ${index + 1} in ${filePath}.`);
+    }
+  }
+
+  return items;
 }
 
 function isInspectProviderScopeValue(value: unknown): value is InspectProviderScope {
@@ -691,7 +678,12 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
 
   if (resumeBundle) {
     const manifestPath = path.join(resumeBundle, 'manifest.json');
-    const existingSummary = JSON.parse(await readFile(manifestPath, 'utf8')) as FlowRunSummary;
+    let existingSummary: FlowRunSummary;
+    try {
+      existingSummary = JSON.parse(await readFile(manifestPath, 'utf8')) as FlowRunSummary;
+    } catch {
+      throw new Error(`Resume bundle manifest is invalid JSON: ${manifestPath}`);
+    }
     runId = existingSummary.runId;
     bundleDir = resumeBundle;
     initialStartedAtUtc = existingSummary.startedAtUtc;

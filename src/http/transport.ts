@@ -4,13 +4,13 @@ import { XyteHttpError } from './errors';
 import { getLogger } from '../observability/logger';
 import { withSpan } from '../observability/tracing';
 
-export interface TransportOptions {
+interface TransportOptions {
   timeoutMs?: number;
   retryAttempts?: number;
   retryBackoffMs?: number;
 }
 
-export interface TransportRequest {
+interface TransportRequest {
   requestId?: string;
   endpointKey?: string;
   method: string;
@@ -21,13 +21,13 @@ export interface TransportRequest {
   timeoutMs?: number;
 }
 
-export interface TransportMeta {
+interface TransportMeta {
   durationMs: number;
   attempts: number;
   retryCount: number;
 }
 
-export interface TransportResponse<T = unknown> {
+interface TransportResponse<T = unknown> {
   status: number;
   headers: Record<string, string>;
   data: T;

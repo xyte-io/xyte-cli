@@ -6,15 +6,21 @@ export interface WindowFocus {
   panel: string;
 }
 
-export const XYTE_PALETTE = {
+const XYTE_PALETTE = {
   brandPrimary: '#3B82F6',
   brandPrimaryLight: '#EFF6FF',
   textPrimary: '#111827',
   textSecondary: '#6B7280',
   textTertiary: '#9CA3AF',
+  textWarning: '#92400E',
+  textDanger: '#991B1B',
   bgPage: '#FFFFFF',
   bgSubtle: '#F9FAFB',
+  bgWarning: '#FFF7ED',
+  bgDanger: '#FEF2F2',
   border: '#E5E7EB',
+  borderWarning: '#F59E0B',
+  borderDanger: '#DC2626',
   statusGreen: '#059669',
   statusRed: '#DC2626',
   statusAmber: '#D97706'
@@ -44,7 +50,7 @@ export const REPORT_THEME = {
   }
 } as const;
 
-export interface MetricTone {
+interface MetricTone {
   panel: string;
   border: string;
   label: string;
@@ -61,18 +67,18 @@ const METRIC_TONES: Record<'normal' | 'warn' | 'bad', MetricTone> = {
     accent: REPORT_THEME.accent.primary
   },
   warn: {
-    panel: REPORT_THEME.surface.subtle,
-    border: REPORT_THEME.border.default,
-    label: REPORT_THEME.text.secondary,
+    panel: XYTE_PALETTE.bgWarning,
+    border: XYTE_PALETTE.borderWarning,
+    label: XYTE_PALETTE.textWarning,
     value: REPORT_THEME.text.primary,
-    accent: REPORT_THEME.accent.primary
+    accent: REPORT_THEME.status.warning
   },
   bad: {
-    panel: REPORT_THEME.surface.subtle,
-    border: REPORT_THEME.border.default,
-    label: REPORT_THEME.text.secondary,
+    panel: XYTE_PALETTE.bgDanger,
+    border: XYTE_PALETTE.borderDanger,
+    label: XYTE_PALETTE.textDanger,
     value: REPORT_THEME.text.primary,
-    accent: REPORT_THEME.accent.primary
+    accent: REPORT_THEME.status.offline
   }
 };
 

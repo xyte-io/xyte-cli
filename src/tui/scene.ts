@@ -3,9 +3,9 @@ import { safePreviewLines } from './serialize';
 import { fitCell, formatBoolTag, sanitizePrintable, shortId } from './table-format';
 import { HEADLESS_FRAME_SCHEMA_VERSION } from '../contracts/versions';
 
-export type FrameInputState = 'idle' | 'modal' | 'busy';
-export type FrameTransitionState = 'idle' | 'switching';
-export type FrameRefreshState = 'idle' | 'loading' | 'retrying' | 'error';
+type FrameInputState = 'idle' | 'modal' | 'busy';
+type FrameTransitionState = 'idle' | 'switching';
+type FrameRefreshState = 'idle' | 'loading' | 'retrying' | 'error';
 
 export interface HeadlessFrameMeta {
   inputState: FrameInputState;
@@ -70,14 +70,14 @@ export interface HeadlessFrame {
   meta?: HeadlessFrameMeta;
 }
 
-export interface DashboardSceneState {
+interface DashboardSceneState {
   tenantId?: string;
   devices: any[];
   incidents: any[];
   tickets: any[];
 }
 
-export interface DevicesSceneState {
+interface DevicesSceneState {
   tenantId?: string;
   searchText: string;
   selectedIndex: number;
@@ -86,7 +86,7 @@ export interface DevicesSceneState {
   actionsHint?: string;
 }
 
-export interface IncidentsSceneState {
+interface IncidentsSceneState {
   tenantId?: string;
   severityFilter: string;
   selectedIndex: number;
@@ -98,7 +98,7 @@ export interface IncidentsSceneState {
   actionsHint?: string;
 }
 
-export interface TicketsSceneState {
+interface TicketsSceneState {
   tenantId?: string;
   mode: 'organization' | 'partner';
   searchText: string;
@@ -113,7 +113,7 @@ export interface TicketsSceneState {
   actionsHint?: string;
 }
 
-export interface SpacesSceneState {
+interface SpacesSceneState {
   tenantId?: string;
   searchText: string;
   selectedIndex: number;
@@ -126,7 +126,7 @@ export interface SpacesSceneState {
   actionsHint?: string;
 }
 
-export interface SetupSceneState {
+interface SetupSceneState {
   tenantId?: string;
   readinessState: 'ready' | 'needs_setup' | 'degraded';
   connectionState: string;
@@ -135,7 +135,7 @@ export interface SetupSceneState {
   providerRows: Array<{ provider: string; slotCount: number; activeSlot: string; hasSecret: string }>;
 }
 
-export interface ConfigSceneState {
+interface ConfigSceneState {
   tenantId?: string;
   providerRows: Array<{ provider: string; slotCount: number; activeSlot: string; hasSecret: string; lastValidatedAt?: string }>;
   selectedProvider?: string;

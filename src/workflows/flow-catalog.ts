@@ -19,7 +19,7 @@ export type FlowTaskType =
   | 'utility.prepare'
   | 'space.import-tree';
 
-export interface FlowStepBase {
+interface FlowStepBase {
   id: string;
   title: string;
   command: string;

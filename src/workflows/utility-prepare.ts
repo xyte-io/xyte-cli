@@ -5,9 +5,9 @@ import { UTILITY_PREPARE_SCHEMA_VERSION } from '../contracts/versions';
 import { getUtilityActionProfile, listUtilityActionProfiles } from './utility-action-catalog';
 import type { UtilityActionProfile, UtilityPreparePrimaryFormat } from './utility-action-profiles';
 
-export type UtilityPrepareInputKind = 'tabular' | 'document' | 'image' | 'unknown';
+type UtilityPrepareInputKind = 'tabular' | 'document' | 'image' | 'unknown';
 
-export interface UtilityPrepareResult {
+interface UtilityPrepareResult {
   schemaVersion: typeof UTILITY_PREPARE_SCHEMA_VERSION;
   generatedAtUtc: string;
   actionKey: string;

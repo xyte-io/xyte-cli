@@ -8,7 +8,7 @@ export interface SelectionSyncState {
   onLog?: (event: string, data?: Record<string, unknown>) => void;
 }
 
-export function withSelectionSyncGuard(state: SelectionSyncState | undefined, fn: () => void): void {
+function withSelectionSyncGuard(state: SelectionSyncState | undefined, fn: () => void): void {
   if (!state) {
     fn();
     return;

@@ -3,25 +3,25 @@ import { z } from 'zod';
 import { CALL_ENVELOPE_SCHEMA_VERSION } from './versions';
 import type { ProblemDetails } from './problem';
 
-export const CallGuardSchema = z.object({
+const CallGuardSchema = z.object({
   allowWrite: z.boolean(),
   confirm: z.string().optional()
 });
 
-export const CallEnvelopeResponseSchema = z.object({
+const CallEnvelopeResponseSchema = z.object({
   status: z.number().int().nonnegative(),
   durationMs: z.number().int().nonnegative(),
   retryCount: z.number().int().nonnegative(),
   data: z.unknown()
 });
 
-export const CallEnvelopeRequestSchema = z.object({
+const CallEnvelopeRequestSchema = z.object({
   path: z.record(z.string(), z.union([z.string(), z.number()])).default({}),
   query: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).default({}),
   body: z.unknown().optional()
 });
 
-export const CallEnvelopeSchema = z.object({
+const CallEnvelopeSchema = z.object({
   schemaVersion: z.literal(CALL_ENVELOPE_SCHEMA_VERSION),
   timestamp: z.string(),
   requestId: z.string(),
@@ -45,9 +45,9 @@ export const CallEnvelopeSchema = z.object({
     .optional()
 });
 
-export type CallEnvelopeV1 = z.infer<typeof CallEnvelopeSchema>;
+type CallEnvelopeV1 = z.infer<typeof CallEnvelopeSchema>;
 
-export interface BuildCallEnvelopeArgs {
+interface BuildCallEnvelopeArgs {
   requestId: string;
   tenantId?: string;
   endpointKey: string;

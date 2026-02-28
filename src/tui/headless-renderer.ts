@@ -34,7 +34,7 @@ import type { TuiScreenId } from './types';
 import { SCREEN_PANE_CONFIG } from './panes';
 import { TAB_ORDER } from './tabs';
 
-export interface HeadlessRenderOptions {
+interface HeadlessRenderOptions {
   client: XyteClient;
   profileStore: ProfileStore;
   secretStore: SecretStore;

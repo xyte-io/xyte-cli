@@ -2,7 +2,7 @@ import blessed from 'blessed';
 
 import { extractCommandPathFromLogEntry, type CliActionLogEntry } from './action-logger';
 
-export interface ActionLogViewerOptions {
+interface ActionLogViewerOptions {
   entries: CliActionLogEntry[];
   title?: string;
 }

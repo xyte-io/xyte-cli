@@ -1,4 +1,4 @@
-export interface SafeInspectOptions {
+interface SafeInspectOptions {
   maxDepth?: number;
   maxArrayItems?: number;
   maxObjectKeys?: number;
@@ -6,7 +6,7 @@ export interface SafeInspectOptions {
   compact?: boolean;
 }
 
-export interface SafeInspectResult {
+interface SafeInspectResult {
   text: string;
   truncated: boolean;
   approxSize: number;
@@ -153,7 +153,7 @@ export function payloadSummary(value: unknown): { kind: string; approxSize: numb
   };
 }
 
-export function summarizeObject(value: unknown): string[] {
+function summarizeObject(value: unknown): string[] {
   const record = asRecord(value);
   if (!record) {
     return [];
@@ -183,7 +183,7 @@ export function summarizeObject(value: unknown): string[] {
   return lines;
 }
 
-export function safeLines(value: unknown, options: SafeInspectOptions = {}): { lines: string[]; truncated: boolean } {
+function safeLines(value: unknown, options: SafeInspectOptions = {}): { lines: string[]; truncated: boolean } {
   const inspected = safeInspect(value, options);
   return {
     lines: inspected.text.split('\n'),

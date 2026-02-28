@@ -1,20 +1,4 @@
-import type { NamespaceCall, XyteCallArgs } from '../types/client';
-
-export interface PartnerNamespace {
-  deleteDevice: NamespaceCall;
-  getCommands: NamespaceCall;
-  getConfiguration: NamespaceCall;
-  getDeviceInfo: NamespaceCall;
-  getDevices: NamespaceCall;
-  getStateHistory: NamespaceCall;
-  getStateHistoryMultiDevices: NamespaceCall;
-  getTelemetries: NamespaceCall;
-  addComment: NamespaceCall;
-  closeTicket: NamespaceCall;
-  getTicket: NamespaceCall;
-  getTickets: NamespaceCall;
-  updateTicket: NamespaceCall;
-}
+import type { PartnerNamespace, XyteCallArgs } from '../types/client';
 
 export function createPartnerNamespace(call: (endpointKey: string, args?: XyteCallArgs) => Promise<unknown>): PartnerNamespace {
   return {

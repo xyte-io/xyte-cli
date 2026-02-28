@@ -3,14 +3,14 @@ import type PDFKit from 'pdfkit';
 import { PDF_LAYOUT, drawSectionTitle, ensurePageSpace, startReportPage, type PdfRenderContext } from './pdf-layout';
 import { REPORT_THEME } from './theme';
 
-export interface TableColumn {
+interface TableColumn {
   header: string;
   width: number;
   align?: 'left' | 'center' | 'right';
   wrap?: boolean;
 }
 
-export interface ShouldBreakBeforeTableRowArgs {
+interface ShouldBreakBeforeTableRowArgs {
   availableHeight: number;
   currentRowHeight: number;
   nextRowHeight: number;
@@ -31,7 +31,7 @@ export function shouldBreakBeforeTableRow(args: ShouldBreakBeforeTableRowArgs): 
   return args.currentRowHeight + args.nextRowHeight > args.availableHeight;
 }
 
-export interface PaginateTableRowsByHeightArgs {
+interface PaginateTableRowsByHeightArgs {
   rowHeights: number[];
   firstPageHeight: number;
   continuationPageHeight: number;

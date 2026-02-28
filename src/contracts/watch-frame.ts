@@ -4,7 +4,7 @@ import type { ProblemDetails } from './problem';
 import { WATCH_FRAME_SCHEMA_VERSION } from './versions';
 
 export const WatchProfileSchema = z.literal('incidents-active');
-export const WatchEventTypeSchema = z.enum(['snapshot', 'delta', 'heartbeat', 'error']);
+const WatchEventTypeSchema = z.enum(['snapshot', 'delta', 'heartbeat', 'error']);
 
 const WatchDeltaEntrySchema = z.object({
   id: z.string(),
@@ -20,7 +20,7 @@ export const WatchDeltaSchema = z.object({
   updated: z.array(WatchDeltaEntrySchema)
 });
 
-export const WatchSummarySchema = z.object({
+const WatchSummarySchema = z.object({
   total: z.number().int().nonnegative(),
   added: z.number().int().nonnegative(),
   removed: z.number().int().nonnegative(),
@@ -28,7 +28,7 @@ export const WatchSummarySchema = z.object({
   changed: z.boolean()
 });
 
-export const WatchErrorSchema = z.object({
+const WatchErrorSchema = z.object({
   type: z.string(),
   title: z.string(),
   status: z.number().int().optional(),
@@ -58,12 +58,12 @@ export const WatchFrameSchema = z.object({
 });
 
 export type WatchProfile = z.infer<typeof WatchProfileSchema>;
-export type WatchEventType = z.infer<typeof WatchEventTypeSchema>;
+type WatchEventType = z.infer<typeof WatchEventTypeSchema>;
 export type WatchDelta = z.infer<typeof WatchDeltaSchema>;
-export type WatchSummary = z.infer<typeof WatchSummarySchema>;
+type WatchSummary = z.infer<typeof WatchSummarySchema>;
 export type WatchFrameV1 = z.infer<typeof WatchFrameSchema>;
 
-export interface BuildWatchFrameArgs {
+interface BuildWatchFrameArgs {
   runId: string;
   sequence: number;
   pollIndex: number;

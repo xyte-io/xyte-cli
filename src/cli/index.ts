@@ -1,6 +1,5 @@
 import { createInterface } from 'node:readline/promises';
-import { accessSync, constants, existsSync, readFileSync, realpathSync } from 'node:fs';
-import { delimiter } from 'node:path';
+import { readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
@@ -32,6 +31,7 @@ import { SUPPORTED_SECRET_PROVIDERS, isSecretProvider } from '../types/profile';
 import { parseJsonObject } from '../utils/json';
 import { writeJsonLine } from '../utils/json-output';
 import type { UtilityInputFormat } from '../utils/input-parser';
+import { resolveCommandFromPath } from '../utils/resolve-command-path';
 import { getCliVersion } from '../utils/version';
 import {
   installSkills,
@@ -50,6 +50,7 @@ import {
   formatDeepDiveMarkdown,
   formatFleetInspectAscii,
   generateFleetReport,
+  parseDeepDiveForReport,
   type InspectProviderScope
 } from '../workflows/fleet-insights';
 import {
@@ -125,7 +126,7 @@ type CliProgramWithActionLogState = Command & {
   [CLI_ACTION_LOG_STATE]?: () => CliActionLogState;
 };
 
-export interface CliRuntime {
+interface CliRuntime {
   profileStore?: ProfileStore;
   secretStore?: SecretStore;
   stdout?: OutputStream;
@@ -147,7 +148,7 @@ interface SlotView {
   lastValidatedAt?: string;
 }
 
-const SIMPLE_SETUP_PROVIDER: SecretProvider = 'xyte-org';
+const SIMPLE_SETUP_AUTH_PROVIDER = 'xyte-org' as const;
 const SIMPLE_SETUP_SLOT_NAME = 'primary';
 const SIMPLE_SETUP_DEFAULT_TENANT = 'default';
 const SKILL_AGENTS: SkillAgent[] = ['claude', 'copilot', 'codex'];
@@ -492,7 +493,13 @@ function parseFlowContextJson(value: string | undefined): Record<string, string>
     return {};
   }
   const resolvedPath = path.resolve(value);
-  const raw = JSON.parse(readFileSync(resolvedPath, 'utf8')) as unknown;
+  const rawText = readFileSync(resolvedPath, 'utf8');
+  let raw: unknown;
+  try {
+    raw = JSON.parse(rawText) as unknown;
+  } catch {
+    throw new Error(`Invalid flow context file: ${resolvedPath}. Expected valid JSON.`);
+  }
   if (!isRecord(raw)) {
     throw new Error(`Invalid flow context file: ${resolvedPath}. Expected a JSON object.`);
   }
@@ -561,34 +568,6 @@ function formatSlotListText(slots: SlotView[]): string {
     );
   }
   return `${lines.join('\n')}\n`;
-}
-
-function resolveCommandFromPath(command: string, envPath = process.env.PATH ?? ''): string | undefined {
-  const pathEntries = envPath.split(delimiter).filter(Boolean);
-  const extensions =
-    process.platform === 'win32'
-      ? (process.env.PATHEXT ?? '.EXE;.CMD;.BAT;.COM')
-          .split(';')
-          .filter(Boolean)
-          .map((ext) => ext.toLowerCase())
-      : [''];
-
-  for (const entry of pathEntries) {
-    for (const ext of extensions) {
-      const candidate = process.platform === 'win32' ? path.join(entry, `${command}${ext}`) : path.join(entry, command);
-      if (!existsSync(candidate)) {
-        continue;
-      }
-      try {
-        accessSync(candidate, constants.X_OK);
-      } catch {
-        continue;
-      }
-      return candidate;
-    }
-  }
-
-  return undefined;
 }
 
 function getRealPath(value: string): string {
@@ -826,27 +805,27 @@ export function createCli(runtime: CliRuntime = {}): Command {
     });
 
     const secretStore = await getSecretStore();
-    const slots = await profileStore.listKeySlots(args.tenantId, SIMPLE_SETUP_PROVIDER);
+    const slots = await profileStore.listKeySlots(args.tenantId, SIMPLE_SETUP_AUTH_PROVIDER);
     const existing = slots.find((slot) => slot.name.toLowerCase() === SIMPLE_SETUP_SLOT_NAME);
 
     const slot = existing
-      ? await profileStore.updateKeySlot(args.tenantId, SIMPLE_SETUP_PROVIDER, existing.slotId, {
+      ? await profileStore.updateKeySlot(args.tenantId, SIMPLE_SETUP_AUTH_PROVIDER, existing.slotId, {
           fingerprint: makeKeyFingerprint(args.keyValue)
         })
       : await profileStore.addKeySlot(args.tenantId, {
-          provider: SIMPLE_SETUP_PROVIDER,
+          provider: SIMPLE_SETUP_AUTH_PROVIDER,
           name: SIMPLE_SETUP_SLOT_NAME,
           fingerprint: makeKeyFingerprint(args.keyValue)
         });
 
-    await secretStore.setSlotSecret(args.tenantId, SIMPLE_SETUP_PROVIDER, slot.slotId, args.keyValue);
+    await secretStore.setSlotSecret(args.tenantId, SIMPLE_SETUP_AUTH_PROVIDER, slot.slotId, args.keyValue);
     steps.push({
       key: 'slot_written',
       status: 'ok',
       detail: slot.slotId
     });
     if (args.setActive !== false) {
-      await profileStore.setActiveKeySlot(args.tenantId, SIMPLE_SETUP_PROVIDER, slot.slotId);
+      await profileStore.setActiveKeySlot(args.tenantId, SIMPLE_SETUP_AUTH_PROVIDER, slot.slotId);
       steps.push({
         key: 'slot_activated',
         status: 'ok',
@@ -883,7 +862,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
     return {
       tenantId: args.tenantId,
-      provider: SIMPLE_SETUP_PROVIDER,
+      provider: SIMPLE_SETUP_AUTH_PROVIDER,
       slot,
       readiness,
       connectivityMode,
@@ -1833,33 +1812,33 @@ export function createCli(runtime: CliRuntime = {}): Command {
         includeSensitive?: boolean;
         strictJson?: boolean;
       }) => {
-        const raw = JSON.parse(readFileSync(path.resolve(options.input), 'utf8')) as {
-          schemaVersion?: string;
-          tenantId?: string;
-          windowHours?: number;
-        };
+        const inputPath = path.resolve(options.input);
+        let raw: unknown;
+        try {
+          raw = JSON.parse(readFileSync(inputPath, 'utf8')) as unknown;
+        } catch {
+          throw new Error(`Input JSON is invalid at ${inputPath}.`);
+        }
+
         const format = options.format ?? 'pdf';
         if (!['markdown', 'pdf'].includes(format)) {
           throw new Error(`Invalid format: ${format}. Use markdown|pdf.`);
         }
 
-        if (raw.schemaVersion !== 'xyte.inspect.deep-dive.v1') {
-          throw new Error('Input JSON must be produced by `xyte-cli inspect deep-dive --format json`.');
-        }
+        let deepDive = parseDeepDiveForReport(raw, options.tenant);
 
-        if (raw.tenantId && raw.tenantId !== options.tenant) {
-          throw new Error(`Input tenant mismatch. Expected ${options.tenant}, got ${raw.tenantId}.`);
-        }
-
-        if (!('tenantName' in raw) || typeof (raw as { tenantName?: unknown }).tenantName !== 'string') {
+        if (!deepDive.tenantName) {
           const tenantProfile = await profileStore.getTenant(options.tenant);
           if (tenantProfile?.name) {
-            (raw as { tenantName?: string }).tenantName = tenantProfile.name;
+            deepDive = {
+              ...deepDive,
+              tenantName: tenantProfile.name
+            };
           }
         }
 
         const generated = await generateFleetReport({
-          deepDive: raw as any,
+          deepDive,
           format: format as 'markdown' | 'pdf',
           outPath: options.out,
           includeSensitive: options.includeSensitive === true
@@ -2187,7 +2166,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
             !explicitTenantName && tenantName === tenantId
               ? await resolveTenantNameFromKey({
                   tenantId,
-                  provider: SIMPLE_SETUP_PROVIDER,
+                  provider: SIMPLE_SETUP_AUTH_PROVIDER,
                   keyValue
                 })
               : undefined;

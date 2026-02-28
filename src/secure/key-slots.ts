@@ -8,7 +8,7 @@ export function makeKeyFingerprint(secret: string): string {
   return `sha256:${createHash('sha256').update(secret).digest('hex').slice(0, 12)}`;
 }
 
-export function slugifySlotName(name: string): string {
+function slugifySlotName(name: string): string {
   const slug = name
     .trim()
     .toLowerCase()
