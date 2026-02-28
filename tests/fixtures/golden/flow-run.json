@@ -17,7 +17,7 @@
   "durationMs": 123,
   "outcome": "pending_gate",
   "nextResumeStepId": "gate_send_command",
-  "resumeCommand": "xyte-cli flow run flow.guided-remediation --tenant acme --apply --allow-write --resume run-1",
+  "resumeCommand": "xyte-cli flow run flow.guided-remediation --tenant acme --apply --allow-write --inspect-provider-scope auto --resume run-1",
   "steps": [
     {
       "stepId": "watch_before",

@@ -27,7 +27,8 @@ import {
   buildDeepDive,
   buildFleetInspect,
   collectFleetSnapshot,
-  generateFleetReport
+  generateFleetReport,
+  type InspectProviderScope
 } from './fleet-insights';
 import type { BuiltInFlowDefinition, FlowStep, FlowTaskStep } from './flow-catalog';
 
@@ -61,6 +62,10 @@ interface TaskExecutionResult {
   contextUpdates?: Record<string, string>;
 }
 
+interface FlowRunInputsPayload {
+  inspectProviderScope?: unknown;
+}
+
 export interface RunDeterministicFlowArgs {
   flowId: string;
   resolvedFlowId: string;
@@ -68,6 +73,7 @@ export interface RunDeterministicFlowArgs {
   tenantId: string;
   mode: FlowRunMode;
   allowWrite: boolean;
+  inspectProviderScope?: InspectProviderScope;
   outDir: string;
   resume?: string;
   context: Record<string, string>;
@@ -76,6 +82,10 @@ export interface RunDeterministicFlowArgs {
   profileStore: ProfileStore;
   secretStore: SecretStore;
   client: XyteClient;
+}
+
+function isInspectProviderScopeError(error: unknown): boolean {
+  return error instanceof Error && /inspect provider scope/i.test(error.message);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -315,7 +325,20 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
     }
     case 'inspect.fleet': {
       const tenantProfile = await ctx.args.profileStore.getTenant(ctx.args.tenantId);
-      const snapshot = await collectFleetSnapshot(ctx.args.client, ctx.args.tenantId, tenantProfile?.name);
+      let snapshot;
+      try {
+        snapshot = await collectFleetSnapshot(
+          ctx.args.client,
+          ctx.args.tenantId,
+          tenantProfile?.name,
+          ctx.args.inspectProviderScope ?? 'auto'
+        );
+      } catch (error) {
+        if (isInspectProviderScopeError(error)) {
+          throw new FlowNeedsInputError((error as Error).message);
+        }
+        throw error;
+      }
       const inspect = buildFleetInspect(snapshot);
       return {
         output: inspect
@@ -324,7 +347,20 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
     case 'inspect.deep-dive': {
       const windowHours = step.inspect?.windowHours ?? 24;
       const tenantProfile = await ctx.args.profileStore.getTenant(ctx.args.tenantId);
-      const snapshot = await collectFleetSnapshot(ctx.args.client, ctx.args.tenantId, tenantProfile?.name);
+      let snapshot;
+      try {
+        snapshot = await collectFleetSnapshot(
+          ctx.args.client,
+          ctx.args.tenantId,
+          tenantProfile?.name,
+          ctx.args.inspectProviderScope ?? 'auto'
+        );
+      } catch (error) {
+        if (isInspectProviderScopeError(error)) {
+          throw new FlowNeedsInputError((error as Error).message);
+        }
+        throw error;
+      }
       const deepDive = buildDeepDive(snapshot, windowHours);
       return {
         output: deepDive
@@ -592,6 +628,50 @@ async function readLinesAsJson<T>(filePath: string): Promise<T[]> {
     .map((line) => JSON.parse(line) as T);
 }
 
+function isInspectProviderScopeValue(value: unknown): value is InspectProviderScope {
+  return value === 'auto' || value === 'organization' || value === 'partner';
+}
+
+async function readStoredInspectProviderScope(bundleDir: string): Promise<InspectProviderScope | undefined> {
+  const inputsPath = path.join(bundleDir, 'inputs.json');
+  if (!existsSync(inputsPath)) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(await readFile(inputsPath, 'utf8')) as FlowRunInputsPayload;
+    if (isInspectProviderScopeValue(parsed.inspectProviderScope)) {
+      return parsed.inspectProviderScope;
+    }
+  } catch {
+    // Ignore malformed resume inputs and use current invocation defaults.
+  }
+
+  return undefined;
+}
+
+async function restoreTaskOutputsFromSteps(steps: FlowRunStep[]): Promise<Map<string, unknown>> {
+  const taskOutputs = new Map<string, unknown>();
+  for (const step of steps) {
+    if (step.status !== 'completed') {
+      continue;
+    }
+    if (typeof step.artifactPath !== 'string' || !step.artifactPath.endsWith('.json')) {
+      continue;
+    }
+    if (!existsSync(step.artifactPath)) {
+      continue;
+    }
+    try {
+      const parsed = JSON.parse(await readFile(step.artifactPath, 'utf8')) as unknown;
+      taskOutputs.set(step.stepId, parsed);
+    } catch {
+      // Ignore malformed task artifacts during resume hydration.
+    }
+  }
+  return taskOutputs;
+}
+
 async function writeSummaryToManifest(summary: FlowRunSummary, manifestPath: string): Promise<void> {
   await writeFile(manifestPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
 }
@@ -607,6 +687,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
   let cursorIndex = 0;
   let priorDecisions: FlowRunDecision[] = [];
   let priorErrors: FlowRunErrorEntry[] = [];
+  let resumedInspectProviderScope: InspectProviderScope | undefined;
 
   if (resumeBundle) {
     const manifestPath = path.join(resumeBundle, 'manifest.json');
@@ -618,10 +699,16 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
     cursorIndex = existingSummary.cursor.nextStepIndex;
     priorDecisions = await readLinesAsJson<FlowRunDecision>(path.join(resumeBundle, 'decisions.ndjson'));
     priorErrors = await readLinesAsJson<FlowRunErrorEntry>(path.join(resumeBundle, 'errors.ndjson'));
+    resumedInspectProviderScope = await readStoredInspectProviderScope(resumeBundle);
   }
 
+  const effectiveInspectProviderScope = args.inspectProviderScope ?? resumedInspectProviderScope ?? 'auto';
+  const restoredTaskOutputs = resumeBundle ? await restoreTaskOutputsFromSteps(steps) : new Map<string, unknown>();
   const ctx: RunContext = {
-    args,
+    args: {
+      ...args,
+      inspectProviderScope: effectiveInspectProviderScope
+    },
     bundleDir,
     stepsDir: path.join(bundleDir, 'steps'),
     outputsDir: path.join(bundleDir, 'outputs'),
@@ -633,7 +720,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
     resolvedContext: {
       ...args.context
     },
-    taskOutputs: new Map<string, unknown>()
+    taskOutputs: restoredTaskOutputs
   };
 
   mkdirSync(ctx.stepsDir, { recursive: true });
@@ -657,6 +744,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
         tenantId: args.tenantId,
         mode: args.mode,
         allowWrite: args.allowWrite,
+        inspectProviderScope: effectiveInspectProviderScope,
         context: ctx.resolvedContext,
         resume: args.resume,
         strictJson: args.strictJson,
@@ -840,7 +928,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
     ...(nextStepIndex < args.definition.steps.length ? { nextResumeStepId: args.definition.steps[nextStepIndex].id } : {}),
     ...(nextStepIndex < args.definition.steps.length
       ? {
-          resumeCommand: `xyte-cli flow run ${args.flowId} --tenant ${args.tenantId} --apply --allow-write --resume ${runId}`
+          resumeCommand: `xyte-cli flow run ${args.flowId} --tenant ${args.tenantId} --apply --allow-write --inspect-provider-scope ${effectiveInspectProviderScope} --resume ${runId}`
         }
       : {}),
     steps,
