@@ -949,6 +949,449 @@ describe('cli integration', () => {
     expect(parsed.tenantId).toBe('acme');
   });
 
+  it('runs inspect fleet in partner-only auto scope without organization calls', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    const partnerSlot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-partner',
+      name: 'partner-primary',
+      fingerprint: 'sha256:partner'
+    });
+    await profileStore.setActiveKeySlot('acme', 'xyte-partner', partnerSlot.slotId);
+    await secretStore.setSlotSecret('acme', 'xyte-partner', partnerSlot.slotId, 'partner-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/partner/devices')) {
+        return new Response(JSON.stringify({ items: [{ id: 'pd1', status: 'offline' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/tickets')) {
+        return new Response(JSON.stringify({ items: [{ id: 'pt1', status: 'open', created_at: new Date().toISOString() }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'inspect',
+      'fleet',
+      '--tenant',
+      'acme',
+      '--provider-scope',
+      'auto',
+      '--format',
+      'json'
+    ]);
+
+    const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(parsed.schemaVersion).toBe('xyte.inspect.fleet.v1');
+    expect(parsed.totals.devices).toBe(1);
+    expect(parsed.totals.spaces).toBe(0);
+    expect(parsed.totals.incidents).toBe(0);
+    expect(parsed.totals.tickets).toBe(1);
+    const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.every((url) => url.includes('/partner/'))).toBe(true);
+    expect(calledUrls.some((url) => url.includes('/organization/'))).toBe(false);
+    expect(calledUrls.some((url) => url.includes('/partner/devices/histories'))).toBe(false);
+  });
+
+  it('runs inspect deep-dive in partner-only auto scope without organization calls', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-partner', 'partner-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/partner/devices/') && url.includes('/commands')) {
+        return new Response(JSON.stringify({ commands: [{ id: 'c1', status: 'sent' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/devices/') && url.includes('/telemetries')) {
+        return new Response(JSON.stringify({ telemetries: [{ id: 'tm1', timestamp: new Date().toISOString() }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/devices/') && url.includes('/history')) {
+        return new Response(JSON.stringify({ history: [{ id: 'h1', status: 'online' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/devices/')) {
+        return new Response(
+          JSON.stringify({ device: { id: 'pd1', model: 'Model-X', firmware_version: '1.0.0', last_seen_at: new Date().toISOString() } }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
+      }
+      if (url.includes('/partner/devices')) {
+        return new Response(JSON.stringify({ items: [{ id: 'pd1', status: 'offline', name: 'Partner Device' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/tickets')) {
+        return new Response(
+          JSON.stringify({ items: [{ id: 'pt1', status: 'open', title: 'Partner ticket', created_at: new Date().toISOString() }] }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
+      }
+      throw new Error(`Unexpected URL in test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'inspect',
+      'deep-dive',
+      '--tenant',
+      'acme',
+      '--provider-scope',
+      'auto',
+      '--window',
+      '24',
+      '--format',
+      'json'
+    ]);
+
+    const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(parsed.schemaVersion).toBe('xyte.inspect.deep-dive.v1');
+    expect(parsed.tenantId).toBe('acme');
+    expect(parsed.ticketPosture.openTickets).toBe(1);
+    expect(parsed.churn24h.incidents).toBe(0);
+    expect(parsed.summary.some((line: string) => line.startsWith('Partner model distribution:'))).toBe(true);
+    expect(parsed.summary.some((line: string) => line.startsWith('Partner telemetry coverage:'))).toBe(true);
+    const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.every((url) => url.includes('/partner/'))).toBe(true);
+    expect(calledUrls.some((url) => url.includes('/organization/'))).toBe(false);
+    expect(calledUrls.some((url) => url.includes('/partner/devices/histories'))).toBe(false);
+  });
+
+  it('keeps partner deep-dive and PDF report generation unblocked when optional enrichment endpoints fail', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-partner', 'partner-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const tmpRoot = mkdtempSync(join(tmpdir(), 'xyte-partner-report-'));
+    const inputPath = join(tmpRoot, 'deep-dive.json');
+    const outPath = join(tmpRoot, 'partner-report.pdf');
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/partner/devices/') && url.includes('/commands')) {
+        return new Response(JSON.stringify({ message: 'upstream error' }), {
+          status: 503,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/devices/') && url.includes('/telemetries')) {
+        return new Response(JSON.stringify({ message: 'upstream error' }), {
+          status: 503,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/devices/') && url.includes('/history')) {
+        return new Response(JSON.stringify({ history: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/devices/')) {
+        return new Response(JSON.stringify({ device: { id: 'pd1', model: 'Model-X', firmware_version: '1.0.0' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/devices')) {
+        return new Response(JSON.stringify({ items: [{ id: 'pd1', status: 'offline', name: 'Partner Device' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/tickets')) {
+        return new Response(
+          JSON.stringify({ items: [{ id: 'pt1', status: 'open', title: 'Partner ticket', created_at: new Date().toISOString() }] }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
+      }
+      throw new Error(`Unexpected URL in test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'inspect',
+      'deep-dive',
+      '--tenant',
+      'acme',
+      '--provider-scope',
+      'auto',
+      '--window',
+      '24',
+      '--format',
+      'json'
+    ]);
+
+    const inspectOutput = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    const deepDive = JSON.parse(inspectOutput);
+    expect(deepDive.schemaVersion).toBe('xyte.inspect.deep-dive.v1');
+    writeFileSync(inputPath, JSON.stringify(deepDive, null, 2), 'utf8');
+
+    stdout.write.mockClear();
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'report',
+      'generate',
+      '--tenant',
+      'acme',
+      '--input',
+      inputPath,
+      '--out',
+      outPath,
+      '--format',
+      'pdf'
+    ]);
+
+    const report = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(report.schemaVersion).toBe('xyte.report.v1');
+    expect(report.format).toBe('pdf');
+    const pdf = readFileSync(outPath);
+    expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+  });
+
+  it('fails inspect auto scope when both providers are configured', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    const orgSlot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-org',
+      name: 'org-primary',
+      fingerprint: 'sha256:org'
+    });
+    const partnerSlot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-partner',
+      name: 'partner-primary',
+      fingerprint: 'sha256:partner'
+    });
+    await profileStore.setActiveKeySlot('acme', 'xyte-org', orgSlot.slotId);
+    await profileStore.setActiveKeySlot('acme', 'xyte-partner', partnerSlot.slotId);
+    await secretStore.setSlotSecret('acme', 'xyte-org', orgSlot.slotId, 'org-key');
+    await secretStore.setSlotSecret('acme', 'xyte-partner', partnerSlot.slotId, 'partner-key');
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+
+    await expect(
+      program.parseAsync(['node', 'xyte-cli', 'inspect', 'fleet', '--tenant', 'acme', '--format', 'json'])
+    ).rejects.toThrow('both organization and partner credentials are configured');
+  });
+
+  it('fails inspect deep-dive auto scope when both providers are configured', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    const orgSlot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-org',
+      name: 'org-primary',
+      fingerprint: 'sha256:org'
+    });
+    const partnerSlot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-partner',
+      name: 'partner-primary',
+      fingerprint: 'sha256:partner'
+    });
+    await profileStore.setActiveKeySlot('acme', 'xyte-org', orgSlot.slotId);
+    await profileStore.setActiveKeySlot('acme', 'xyte-partner', partnerSlot.slotId);
+    await secretStore.setSlotSecret('acme', 'xyte-org', orgSlot.slotId, 'org-key');
+    await secretStore.setSlotSecret('acme', 'xyte-partner', partnerSlot.slotId, 'partner-key');
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+
+    await expect(
+      program.parseAsync(['node', 'xyte-cli', 'inspect', 'deep-dive', '--tenant', 'acme', '--window', '24', '--format', 'json'])
+    ).rejects.toThrow('both organization and partner credentials are configured');
+  });
+
+  it('reports organization inspect scope as unavailable when only partner credentials exist', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    const partnerSlot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-partner',
+      name: 'partner-primary',
+      fingerprint: 'sha256:partner'
+    });
+    await profileStore.setActiveKeySlot('acme', 'xyte-partner', partnerSlot.slotId);
+    await secretStore.setSlotSecret('acme', 'xyte-partner', partnerSlot.slotId, 'partner-key');
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+
+    await expect(
+      program.parseAsync([
+        'node',
+        'xyte-cli',
+        'inspect',
+        'fleet',
+        '--tenant',
+        'acme',
+        '--provider-scope',
+        'organization',
+        '--format',
+        'json'
+      ])
+    ).rejects.toThrow(
+      'Inspect provider scope "organization" is unavailable for tenant acme. Configure an xyte-org key or run with --provider-scope partner (inspect) or --inspect-provider-scope partner (flow run).'
+    );
+  });
+
+  it('reports partner inspect scope as unavailable when only organization credentials exist', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    const orgSlot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-org',
+      name: 'org-primary',
+      fingerprint: 'sha256:org'
+    });
+    await profileStore.setActiveKeySlot('acme', 'xyte-org', orgSlot.slotId);
+    await secretStore.setSlotSecret('acme', 'xyte-org', orgSlot.slotId, 'org-key');
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+
+    await expect(
+      program.parseAsync([
+        'node',
+        'xyte-cli',
+        'inspect',
+        'fleet',
+        '--tenant',
+        'acme',
+        '--provider-scope',
+        'partner',
+        '--format',
+        'json'
+      ])
+    ).rejects.toThrow(
+      'Inspect provider scope "partner" is unavailable for tenant acme. Configure an xyte-partner key or run with --provider-scope organization (inspect) or --inspect-provider-scope organization (flow run).'
+    );
+  });
+
+  it('runs inspect with explicit provider scope when both providers are configured', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    const orgSlot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-org',
+      name: 'org-primary',
+      fingerprint: 'sha256:org'
+    });
+    const partnerSlot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-partner',
+      name: 'partner-primary',
+      fingerprint: 'sha256:partner'
+    });
+    await profileStore.setActiveKeySlot('acme', 'xyte-org', orgSlot.slotId);
+    await profileStore.setActiveKeySlot('acme', 'xyte-partner', partnerSlot.slotId);
+    await secretStore.setSlotSecret('acme', 'xyte-org', orgSlot.slotId, 'org-key');
+    await secretStore.setSlotSecret('acme', 'xyte-partner', partnerSlot.slotId, 'partner-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/partner/devices')) {
+        return new Response(JSON.stringify({ items: [{ id: 'pd1', status: 'online' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/tickets')) {
+        return new Response(JSON.stringify({ items: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'inspect',
+      'fleet',
+      '--tenant',
+      'acme',
+      '--provider-scope',
+      'partner',
+      '--format',
+      'json'
+    ]);
+
+    const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(parsed.schemaVersion).toBe('xyte.inspect.fleet.v1');
+    expect(parsed.totals.devices).toBe(1);
+    expect(parsed.totals.spaces).toBe(0);
+    expect(parsed.totals.incidents).toBe(0);
+  });
+
+  it('rejects invalid inspect provider scope values', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+
+    await expect(
+      program.parseAsync([
+        'node',
+        'xyte-cli',
+        'inspect',
+        'fleet',
+        '--tenant',
+        'acme',
+        '--provider-scope',
+        'bogus',
+        '--format',
+        'json'
+      ])
+    ).rejects.toThrow('Invalid inspect provider scope');
+  });
+
   it('generates markdown report from deep-dive input', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();
@@ -1066,6 +1509,46 @@ describe('cli integration', () => {
     expect(parsed.provider).toBe('xyte-org');
     expect(parsed.slot.name.toLowerCase()).toBe('primary');
     expect(parsed.readiness.state).toBe('ready');
+  });
+
+  it('honors setup --provider xyte-partner in non-interactive mode without requiring --advanced', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ items: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+    );
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'setup',
+      'run',
+      '--non-interactive',
+      '--tenant',
+      'playground',
+      '--key',
+      'partner-key',
+      '--provider',
+      'xyte-partner'
+    ]);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    const parsed = JSON.parse(output);
+    expect(parsed.provider).toBe('xyte-partner');
+    expect(parsed.slot.provider).toBe('xyte-partner');
+
+    const active = await profileStore.getActiveKeySlot('playground', 'xyte-partner');
+    expect(active?.provider).toBe('xyte-partner');
   });
 
   it('runs setup with connectivity mode never and marks connectivity step as skipped', async () => {
@@ -1635,6 +2118,212 @@ describe('cli integration', () => {
     expect(existsSync(parsed.decisionsPath)).toBe(true);
     expect(existsSync(parsed.errorsPath)).toBe(true);
     expect(existsSync(parsed.watchFramesPath)).toBe(true);
+  });
+
+  it('rejects invalid flow --inspect-provider-scope values', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+
+    await expect(
+      program.parseAsync([
+        'node',
+        'xyte-cli',
+        'flow',
+        'run',
+        'flow.setup-readiness-10m',
+        '--tenant',
+        'acme',
+        '--inspect-provider-scope',
+        'bogus'
+      ])
+    ).rejects.toThrow('Invalid inspect provider scope');
+  });
+
+  it('runs flow.daily-deep-dive-report in partner-only mode with explicit inspect provider scope', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    const partnerSlot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-partner',
+      name: 'partner-primary',
+      fingerprint: 'sha256:partner'
+    });
+    await profileStore.setActiveKeySlot('acme', 'xyte-partner', partnerSlot.slotId);
+    await secretStore.setSlotSecret('acme', 'xyte-partner', partnerSlot.slotId, 'partner-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const outDir = mkdtempSync(join(tmpdir(), 'xyte-flow-run-daily-partner-'));
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/partner/devices')) {
+        return new Response(JSON.stringify({ items: [{ id: 'pd-1', status: 'online', name: 'Partner Device' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/tickets')) {
+        return new Response(JSON.stringify({ items: [{ id: 'pt-1', status: 'open', created_at: new Date().toISOString() }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'flow',
+      'run',
+      'flow.daily-deep-dive-report',
+      '--tenant',
+      'acme',
+      '--inspect-provider-scope',
+      'partner',
+      '--out-dir',
+      outDir
+    ]);
+
+    const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(parsed.outcome).toBe('pending_gate');
+    expect(parsed.resumeCommand).toContain('--inspect-provider-scope partner');
+    expect(parsed.steps.find((item: any) => item.stepId === 'inspect_deep_dive_daily')?.status).toBe('completed');
+    expect(parsed.steps.find((item: any) => item.stepId === 'report_daily')?.status).toBe('completed');
+    expect(parsed.steps.find((item: any) => item.stepId === 'inspect_fleet_daily')?.status).toBe('completed');
+    expect(parsed.classifications.needs_data).toBe(0);
+    expect(parsed.classifications.bug).toBe(0);
+    const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.every((url) => url.includes('/partner/'))).toBe(true);
+  });
+
+  it('returns needs_input when flow inspect scope is auto and both providers are configured', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    const orgSlot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-org',
+      name: 'org-primary',
+      fingerprint: 'sha256:org'
+    });
+    const partnerSlot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-partner',
+      name: 'partner-primary',
+      fingerprint: 'sha256:partner'
+    });
+    await profileStore.setActiveKeySlot('acme', 'xyte-org', orgSlot.slotId);
+    await profileStore.setActiveKeySlot('acme', 'xyte-partner', partnerSlot.slotId);
+    await secretStore.setSlotSecret('acme', 'xyte-org', orgSlot.slotId, 'org-key');
+    await secretStore.setSlotSecret('acme', 'xyte-partner', partnerSlot.slotId, 'partner-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const outDir = mkdtempSync(join(tmpdir(), 'xyte-flow-run-daily-ambiguous-'));
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/organization/info')) {
+        return new Response(JSON.stringify({ id: 'org-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'flow',
+      'run',
+      'flow.daily-deep-dive-report',
+      '--tenant',
+      'acme',
+      '--out-dir',
+      outDir
+    ]);
+
+    const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(parsed.outcome).toBe('needs_input');
+    expect(parsed.classifications.needs_data).toBe(1);
+    expect(parsed.classifications.bug).toBe(0);
+    const inspectStep = parsed.steps.find((item: any) => item.stepId === 'inspect_deep_dive_daily');
+    expect(inspectStep?.status).toBe('failed');
+    expect(String(inspectStep?.error?.detail ?? '')).toContain('both organization and partner credentials are configured');
+  });
+
+  it('unblocks flow.daily-deep-dive-report with explicit partner inspect scope when both providers are configured', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    const orgSlot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-org',
+      name: 'org-primary',
+      fingerprint: 'sha256:org'
+    });
+    const partnerSlot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-partner',
+      name: 'partner-primary',
+      fingerprint: 'sha256:partner'
+    });
+    await profileStore.setActiveKeySlot('acme', 'xyte-org', orgSlot.slotId);
+    await profileStore.setActiveKeySlot('acme', 'xyte-partner', partnerSlot.slotId);
+    await secretStore.setSlotSecret('acme', 'xyte-org', orgSlot.slotId, 'org-key');
+    await secretStore.setSlotSecret('acme', 'xyte-partner', partnerSlot.slotId, 'partner-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const outDir = mkdtempSync(join(tmpdir(), 'xyte-flow-run-daily-both-partner-'));
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/organization/info')) {
+        return new Response(JSON.stringify({ id: 'org-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/devices')) {
+        return new Response(JSON.stringify({ items: [{ id: 'pd-1', status: 'online', name: 'Partner Device' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/tickets')) {
+        return new Response(JSON.stringify({ items: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'flow',
+      'run',
+      'flow.daily-deep-dive-report',
+      '--tenant',
+      'acme',
+      '--inspect-provider-scope',
+      'partner',
+      '--out-dir',
+      outDir
+    ]);
+
+    const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(parsed.outcome).toBe('pending_gate');
+    expect(parsed.classifications.needs_data).toBe(0);
+    expect(parsed.classifications.bug).toBe(0);
+    expect(parsed.steps.find((item: any) => item.stepId === 'inspect_deep_dive_daily')?.status).toBe('completed');
+    expect(parsed.steps.find((item: any) => item.stepId === 'report_daily')?.status).toBe('completed');
+    expect(parsed.steps.find((item: any) => item.stepId === 'inspect_fleet_daily')?.status).toBe('completed');
   });
 
   it('stops write-capable flow at gate in --plan and advances one gate in --apply --resume', async () => {

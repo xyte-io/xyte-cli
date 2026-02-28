@@ -49,7 +49,8 @@ import {
   formatDeepDiveAscii,
   formatDeepDiveMarkdown,
   formatFleetInspectAscii,
-  generateFleetReport
+  generateFleetReport,
+  type InspectProviderScope
 } from '../workflows/fleet-insights';
 import {
   getBuiltInFlowDefinition,
@@ -439,6 +440,14 @@ function parseFlowMode(options: { plan?: boolean; apply?: boolean }): FlowRunMod
     return 'apply';
   }
   return 'plan';
+}
+
+function parseInspectProviderScope(value: string | undefined): InspectProviderScope {
+  const normalized = (value ?? 'auto').trim().toLowerCase();
+  if (normalized !== 'auto' && normalized !== 'organization' && normalized !== 'partner') {
+    throw new Error(`Invalid inspect provider scope: ${value}. Use organization|partner|auto.`);
+  }
+  return normalized as InspectProviderScope;
 }
 
 function parseFlowContextJson(value: string | undefined): Record<string, string> {
@@ -1493,6 +1502,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .option('--allow-write', 'Allow write steps after explicit gate approval')
     .option('--resume <runRef>', 'Resume from a previous run id or bundle path')
     .option('--out-dir <path>', 'Flow run bundle root directory', './tmp/flow-runs')
+    .option('--inspect-provider-scope <scope>', 'organization|partner|auto')
     .option('--context-json <path>', 'JSON object file for flow context')
     .option('--var <key=value>', 'Flow context override (repeatable)', (value: string, previous: string[]) => [...previous, value], [])
     .option('--once', 'Shorten long watch loops')
@@ -1507,6 +1517,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
           allowWrite?: boolean;
           resume?: string;
           outDir?: string;
+          inspectProviderScope?: string;
           contextJson?: string;
           var?: string[];
           once?: boolean;
@@ -1514,6 +1525,9 @@ export function createCli(runtime: CliRuntime = {}): Command {
         }
       ) => {
         const mode = parseFlowMode(options);
+        const inspectProviderScope = options.inspectProviderScope
+          ? parseInspectProviderScope(options.inspectProviderScope)
+          : undefined;
         const runtimeContext = {
           ...parseFlowContextJson(options.contextJson),
           ...parseFlowVarOptions(options.var)
@@ -1542,6 +1556,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
           mode,
           allowWrite: options.allowWrite === true,
           outDir: options.outDir ?? './tmp/flow-runs',
+          inspectProviderScope,
           resume: options.resume,
           context: {
             ...defaults,
@@ -1685,16 +1700,18 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .command('fleet')
     .description('Build a fleet summary snapshot')
     .requiredOption('--tenant <tenantId>', 'Tenant id')
+    .option('--provider-scope <scope>', 'organization|partner|auto', 'auto')
     .option('--format <format>', 'json|ascii', 'json')
     .option('--strict-json', 'Fail on non-serializable output')
-    .action(async (options: { tenant: string; format?: string; strictJson?: boolean }) => {
+    .action(async (options: { tenant: string; providerScope?: string; format?: string; strictJson?: boolean }) => {
       const format = options.format ?? 'json';
       if (!['json', 'ascii'].includes(format)) {
         throw new Error(`Invalid format: ${format}. Use json|ascii.`);
       }
+      const providerScope = parseInspectProviderScope(options.providerScope);
       const client = await withClient(options.tenant);
       const tenantProfile = await profileStore.getTenant(options.tenant);
-      const snapshot = await collectFleetSnapshot(client, options.tenant, tenantProfile?.name);
+      const snapshot = await collectFleetSnapshot(client, options.tenant, tenantProfile?.name, providerScope);
       const result = buildFleetInspect(snapshot);
 
       if (format === 'ascii') {
@@ -1709,18 +1726,20 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .command('deep-dive')
     .description('Build deep-dive operational analytics')
     .requiredOption('--tenant <tenantId>', 'Tenant id')
+    .option('--provider-scope <scope>', 'organization|partner|auto', 'auto')
     .option('--window <hours>', 'Window in hours', '24')
     .option('--format <format>', 'json|ascii|markdown', 'json')
     .option('--strict-json', 'Fail on non-serializable output')
-    .action(async (options: { tenant: string; window?: string; format?: string; strictJson?: boolean }) => {
+    .action(async (options: { tenant: string; providerScope?: string; window?: string; format?: string; strictJson?: boolean }) => {
       const format = options.format ?? 'json';
       if (!['json', 'ascii', 'markdown'].includes(format)) {
         throw new Error(`Invalid format: ${format}. Use json|ascii|markdown.`);
       }
       const windowHours = Number.parseInt(options.window ?? '24', 10);
+      const providerScope = parseInspectProviderScope(options.providerScope);
       const client = await withClient(options.tenant);
       const tenantProfile = await profileStore.getTenant(options.tenant);
-      const snapshot = await collectFleetSnapshot(client, options.tenant, tenantProfile?.name);
+      const snapshot = await collectFleetSnapshot(client, options.tenant, tenantProfile?.name, providerScope);
       const result = buildDeepDive(snapshot, Number.isFinite(windowHours) ? windowHours : 24);
 
       if (format === 'ascii') {
@@ -2081,7 +2100,8 @@ export function createCli(runtime: CliRuntime = {}): Command {
         }
 
         const connectivityMode = parseSetupConnectivityMode(options.connectivity);
-        const advanced = options.advanced === true;
+        // Provider selection only exists in advanced setup; honor explicit --provider by switching modes automatically.
+        const advanced = options.advanced === true || options.provider !== undefined;
         if (!advanced) {
           let tenantLabel = (options.name ?? options.tenant ?? SIMPLE_SETUP_DEFAULT_TENANT).trim() || SIMPLE_SETUP_DEFAULT_TENANT;
           let keyValue = options.key ?? process.env.XYTE_CLI_KEY;
