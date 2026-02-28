@@ -19,15 +19,20 @@ xyte-cli --help
 
 ```bash
 XYTE_CLI_KEY="<your-key>" \
-xyte-cli setup run --non-interactive --tenant acme --connectivity auto
+xyte-cli setup run --non-interactive --tenant acme --provider xyte-org --connectivity auto
 xyte-cli status --tenant acme --mode fast --format json
 ```
+
+Notes:
+- For partner-only onboarding, set `--provider xyte-partner`.
+- For organization onboarding, if `--name` is omitted, setup attempts to populate tenant display name from `organization.getOrganizationInfo`.
+- Explicit `--name` always overrides auto-detected tenant display name.
 
 ### 2) Run read-only fleet checks
 
 ```bash
-xyte-cli inspect fleet --tenant acme --format json
-xyte-cli inspect deep-dive --tenant acme --window 24 --format json > /tmp/deep-dive.json
+xyte-cli inspect fleet --tenant acme --provider-scope auto --format json
+xyte-cli inspect deep-dive --tenant acme --provider-scope auto --window 24 --format json > /tmp/deep-dive.json
 ```
 
 ### 3) Generate a report
@@ -35,6 +40,11 @@ xyte-cli inspect deep-dive --tenant acme --window 24 --format json > /tmp/deep-d
 ```bash
 xyte-cli report generate --tenant acme --input /tmp/deep-dive.json --out /tmp/xyte-report.pdf
 ```
+
+Report behavior:
+- Reports are data-driven (`data -> summary -> PDF`): only collected data is summarized and rendered.
+- Partner deep-dive/report enrichment is best-effort and uses partner read endpoints; optional enrichment failures do not block report generation.
+- Partner reports include a dedicated `Partner Highlights` block when partner enrichment data is available.
 
 ### 4) Run headless snapshots for agents
 
@@ -136,9 +146,9 @@ Use deterministic flow packs when an agent/operator needs repeatable incident an
 
 ```bash
 xyte-cli flow list
-xyte-cli flow run flow.setup-readiness-10m --tenant acme --plan
-xyte-cli flow run flow.guided-remediation --tenant acme --plan --context-json ./flow.ctx.json
-xyte-cli flow run flow.guided-remediation --tenant acme --apply --allow-write --resume <run-id-or-path>
+xyte-cli flow run flow.setup-readiness-10m --tenant acme --inspect-provider-scope auto --plan
+xyte-cli flow run flow.guided-remediation --tenant acme --inspect-provider-scope auto --plan --context-json ./flow.ctx.json
+xyte-cli flow run flow.guided-remediation --tenant acme --inspect-provider-scope organization --apply --allow-write --resume <run-id-or-path>
 ```
 
 Utilities prepare and normalize inputs; flows orchestrate deterministic multi-step execution.
@@ -149,6 +159,7 @@ Utilities prepare and normalize inputs; flows orchestrate deterministic multi-st
 - `--plan` is the default and runs safe/read steps until the first explicit human gate.
 - `--apply` only advances one gate per invocation and should be used with `--resume`.
 - Mutating gate steps require `--allow-write`; otherwise the run pauses with a structured pending decision.
+- `inspect`/`deep-dive` are provider-scope strict. `auto` selects the only configured scope, and fails if both `xyte-org` and `xyte-partner` are configured.
 
 </details>
 

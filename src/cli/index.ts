@@ -225,6 +225,43 @@ function parsePositiveNumberOption(value: string | undefined, fallback: number |
   return parsed;
 }
 
+function firstNonEmptyString(values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+  return undefined;
+}
+
+function extractTenantNameFromOrganizationInfo(payload: unknown): string | undefined {
+  if (!isRecord(payload)) {
+    return undefined;
+  }
+
+  const nameKeys = ['name', 'organization_name', 'display_name', 'tenant_name', 'company_name'] as const;
+  const readName = (record: Record<string, unknown>): string | undefined =>
+    firstNonEmptyString(nameKeys.map((key) => record[key]));
+
+  const candidates: Record<string, unknown>[] = [payload];
+  const directNested = [payload.organization, payload.data, payload.result, payload.payload].filter(isRecord) as Record<string, unknown>[];
+  candidates.push(...directNested);
+  for (const nested of directNested) {
+    if (isRecord(nested.organization)) {
+      candidates.push(nested.organization);
+    }
+  }
+
+  for (const candidate of candidates) {
+    const name = readName(candidate);
+    if (name) {
+      return name;
+    }
+  }
+
+  return undefined;
+}
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024) {
     return `${bytes} B`;
@@ -739,6 +776,29 @@ export function createCli(runtime: CliRuntime = {}): Command {
       retryAttempts: retry?.attempts,
       retryBackoffMs: retry?.backoffMs
     });
+  };
+
+  const resolveTenantNameFromKey = async (args: {
+    tenantId: string;
+    provider: SecretProvider;
+    keyValue: string;
+  }): Promise<string | undefined> => {
+    if (args.provider !== 'xyte-org') {
+      return undefined;
+    }
+
+    try {
+      const secretStore = await getSecretStore();
+      const client = createXyteClient({
+        profileStore,
+        secretStore,
+        auth: { organization: args.keyValue }
+      });
+      const info = await client.organization.getOrganizationInfo({ tenantId: args.tenantId });
+      return extractTenantNameFromOrganizationInfo(info);
+    } catch {
+      return undefined;
+    }
   };
 
   const runSimpleSetup = async (args: {
@@ -2099,6 +2159,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
           throw new Error('Interactive setup requires a TTY. Use --non-interactive with explicit flags.');
         }
 
+        const explicitTenantName = typeof options.name === 'string' && options.name.trim().length > 0;
         const connectivityMode = parseSetupConnectivityMode(options.connectivity);
         // Provider selection only exists in advanced setup; honor explicit --provider by switching modes automatically.
         const advanced = options.advanced === true || options.provider !== undefined;
@@ -2122,9 +2183,17 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
           const tenantId = normalizeTenantId(options.tenant?.trim() || tenantLabel);
           const tenantName = tenantLabel.trim() || tenantId;
+          const resolvedTenantName =
+            !explicitTenantName && tenantName === tenantId
+              ? await resolveTenantNameFromKey({
+                  tenantId,
+                  provider: SIMPLE_SETUP_PROVIDER,
+                  keyValue
+                })
+              : undefined;
           const setupResult = await runSimpleSetup({
             tenantId,
-            tenantName,
+            tenantName: resolvedTenantName ?? tenantName,
             keyValue,
             setActive: options.setActive !== false,
             connectivityMode
@@ -2164,6 +2233,17 @@ export function createCli(runtime: CliRuntime = {}): Command {
         if (!keyValue) {
           throw new Error('Missing API key. Provide --key/XYTE_CLI_KEY (or run interactive setup).');
         }
+
+        const candidateTenantName = (tenantName?.trim() || tenantId).trim() || tenantId;
+        const resolvedTenantName =
+          !explicitTenantName && candidateTenantName === tenantId
+            ? await resolveTenantNameFromKey({
+                tenantId,
+                provider,
+                keyValue
+              })
+            : undefined;
+        tenantName = resolvedTenantName ?? candidateTenantName;
 
         await profileStore.upsertTenant({
           id: tenantId,

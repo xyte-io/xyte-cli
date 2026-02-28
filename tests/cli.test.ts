@@ -1511,6 +1511,109 @@ describe('cli integration', () => {
     expect(parsed.readiness.state).toBe('ready');
   });
 
+  it('auto-populates tenant display name from organization key when name is not provided', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ name: 'Acme Organization' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+    );
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'setup',
+      'run',
+      '--non-interactive',
+      '--tenant',
+      'acme',
+      '--key',
+      'org-key'
+    ]);
+
+    const tenant = await profileStore.getTenant('acme');
+    expect(tenant?.name).toBe('Acme Organization');
+  });
+
+  it('keeps explicit tenant name even when organization key resolves a different name', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ name: 'Acme Organization' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+    );
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'setup',
+      'run',
+      '--non-interactive',
+      '--tenant',
+      'acme',
+      '--name',
+      'Custom Name',
+      '--key',
+      'org-key'
+    ]);
+
+    const tenant = await profileStore.getTenant('acme');
+    expect(tenant?.name).toBe('Custom Name');
+  });
+
+  it('auto-populates tenant display name in provider-selected organization setup', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ organization: { display_name: 'Acme Org (Advanced)' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+    );
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'setup',
+      'run',
+      '--non-interactive',
+      '--tenant',
+      'acme-advanced',
+      '--provider',
+      'xyte-org',
+      '--key',
+      'org-key'
+    ]);
+
+    const tenant = await profileStore.getTenant('acme-advanced');
+    expect(tenant?.name).toBe('Acme Org (Advanced)');
+  });
+
   it('honors setup --provider xyte-partner in non-interactive mode without requiring --advanced', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();
