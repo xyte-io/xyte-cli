@@ -25,7 +25,7 @@ export interface PublicEndpointSpec {
   notes?: string[];
 }
 
-export interface EndpointCallArgs {
+interface EndpointCallArgs {
   path?: Record<string, string | number>;
   query?: Record<string, string | number | boolean | null | undefined>;
   body?: unknown;

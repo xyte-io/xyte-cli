@@ -6,10 +6,10 @@ import { getCliVersion } from './version';
 import { buildUpgradeCheck, type UpgradeCheckV1, type UpgradeResultV1 } from '../contracts/upgrade';
 import { UPGRADE_RESULT_SCHEMA_VERSION } from '../contracts/versions';
 
-export const DEFAULT_CLI_PACKAGE = '@xyteai/cli';
-export const DEFAULT_SKILL_AGENTS: SkillAgent[] = ['claude', 'copilot', 'codex'];
+const DEFAULT_CLI_PACKAGE = '@xyteai/cli';
+const DEFAULT_SKILL_AGENTS: SkillAgent[] = ['claude', 'copilot', 'codex'];
 
-export interface CommandResult {
+interface CommandResult {
   code: number;
   stdout: string;
   stderr: string;
@@ -25,7 +25,7 @@ export interface UpgradeDependencies {
   npmCommand?: string;
 }
 
-export interface UpgradeSettings {
+interface UpgradeSettings {
   packageName?: string;
   skillSourceDir: string;
   installSpec?: string;
@@ -158,7 +158,7 @@ function parseVersionFromOutput(output: string): string | undefined {
   return match ? match[0] : undefined;
 }
 
-export async function fetchLatestVersion(packageName: string, fetchImpl: typeof fetch): Promise<string> {
+async function fetchLatestVersion(packageName: string, fetchImpl: typeof fetch): Promise<string> {
   const encodedName = encodeURIComponent(packageName);
   const response = await fetchImpl(`https://registry.npmjs.org/${encodedName}/latest`, {
     headers: {

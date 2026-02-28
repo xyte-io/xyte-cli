@@ -187,7 +187,6 @@ function drawHeaderLogo(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, x: numbe
 export function drawPdfHeader(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, mode: HeaderMode = 'full'): void {
   const left = textLeft(doc);
   const right = textRight(doc);
-  const width = textWidth(doc);
   const top = doc.page.margins.top;
 
   if (mode === 'minimal') {

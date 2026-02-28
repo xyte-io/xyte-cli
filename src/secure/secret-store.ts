@@ -166,14 +166,14 @@ export class FileSecretStore implements SecretStore {
     if (changed) {
       try {
         await this.writeData(normalized);
-      } catch (error) {
-        // Best-effort migration: log and continue returning normalized data even if we cannot write.
+      } catch (writeError) {
+        // Best-effort migration: continue returning normalized data even if we cannot write.
         // This avoids breaking reads when the secrets file is readable but not writable (e.g. read-only filesystem).
-        if (error instanceof Error) {
-          console.warn(`Failed to persist normalized secret store at ${this.filePath}: ${error.message}`);
-        } else {
-          console.warn(`Failed to persist normalized secret store at ${this.filePath}.`);
-        }
+        // eslint-disable-next-line no-console
+        console.warn(
+          `Failed to persist normalized secret data to ${this.filePath}:`,
+          writeError
+        );
       }
     }
     return normalized;

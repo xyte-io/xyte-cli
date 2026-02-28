@@ -3,33 +3,16 @@ export function parseJsonObject(value: string | undefined, fallback: Record<stri
     return fallback;
   }
 
-  const parsed = JSON.parse(value) as unknown;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value) as unknown;
+  } catch (error) {
+    const detail = error instanceof Error && error.message.trim().length > 0 ? `: ${error.message}` : '.';
+    throw new Error(`Invalid JSON${detail}`);
+  }
   if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
     throw new Error('Expected a JSON object.');
   }
 
   return parsed as Record<string, unknown>;
-}
-
-export function tryParseJson<T = unknown>(value: string): T | undefined {
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return undefined;
-  }
-}
-
-export function extractFirstJsonObject<T = unknown>(text: string): T | undefined {
-  const direct = tryParseJson<T>(text.trim());
-  if (direct !== undefined) {
-    return direct;
-  }
-
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) {
-    return undefined;
-  }
-
-  return tryParseJson<T>(text.slice(start, end + 1));
 }

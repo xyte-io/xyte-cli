@@ -1,25 +1,25 @@
 import type blessed from 'blessed';
 
-export interface InputEvent {
+interface InputEvent {
   ch: string | undefined;
   key: blessed.Widgets.Events.IKeyEventArg;
   timestamp: number;
 }
 
-export interface InputDispatchResult {
+interface InputDispatchResult {
   accepted: boolean;
   bypassed: boolean;
   queueDepth: number;
   droppedEvents: number;
 }
 
-export interface InputControllerState {
+interface InputControllerState {
   queueDepth: number;
   droppedEvents: number;
   inFlight: boolean;
 }
 
-export interface InputControllerOptions {
+interface InputControllerOptions {
   handle: (event: InputEvent) => Promise<void>;
   isCritical?: (event: InputEvent) => boolean;
   maxQueueSize?: number;

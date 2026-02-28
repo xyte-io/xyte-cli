@@ -6,14 +6,14 @@ import {
   type CliActionLogEntry
 } from './action-logger';
 
-export interface ReadCliActionLogOptions {
+interface ReadCliActionLogOptions {
   path?: string;
   limit?: number;
   event?: string;
   command?: string;
 }
 
-export interface ReadCliActionLogResult {
+interface ReadCliActionLogResult {
   path: string;
   entries: CliActionLogEntry[];
   parseErrors: number;

@@ -1,30 +1,4 @@
-import type { NamespaceCall, XyteCallArgs } from '../types/client';
-
-export interface OrganizationNamespace {
-  closeIncident: NamespaceCall;
-  cancelCommand: NamespaceCall;
-  getCommands: NamespaceCall;
-  sendCommand: NamespaceCall;
-  claimDevice: NamespaceCall;
-  updateDevice: NamespaceCall;
-  deleteDevice: NamespaceCall;
-  getDevice: NamespaceCall;
-  getDevices: NamespaceCall;
-  getHistories: NamespaceCall;
-  getOrganizationInfo: NamespaceCall;
-  getIncidents: NamespaceCall;
-  createSpace: NamespaceCall;
-  deleteSpace: NamespaceCall;
-  findOrCreateSpace: NamespaceCall;
-  getSpace: NamespaceCall;
-  getSpaces: NamespaceCall;
-  updateSpace: NamespaceCall;
-  getTicket: NamespaceCall;
-  getTickets: NamespaceCall;
-  markResolved: NamespaceCall;
-  sendMessage: NamespaceCall;
-  updateTicket: NamespaceCall;
-}
+import type { OrganizationNamespace, XyteCallArgs } from '../types/client';
 
 export function createOrganizationNamespace(call: (endpointKey: string, args?: XyteCallArgs) => Promise<unknown>): OrganizationNamespace {
   return {

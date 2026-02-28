@@ -1,4 +1,4 @@
-export interface JsonWriteOptions {
+interface JsonWriteOptions {
   strictJson?: boolean;
   compact?: boolean;
 }
@@ -25,7 +25,7 @@ function safeStringify(value: unknown, spacing: number): string {
   );
 }
 
-export function stringifyForOutput(value: unknown, options: JsonWriteOptions = {}): string {
+function stringifyForOutput(value: unknown, options: JsonWriteOptions = {}): string {
   const spacing = options.compact ? 0 : 2;
   if (options.strictJson) {
     return JSON.stringify(value, null, spacing);

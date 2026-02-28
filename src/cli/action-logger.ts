@@ -35,7 +35,7 @@ export interface CliActionLogger {
   close(): void;
 }
 
-export interface CreateCliActionLoggerOptions {
+interface CreateCliActionLoggerOptions {
   enabled?: boolean;
   path?: string;
   mirrorToStderr?: boolean;
@@ -46,7 +46,7 @@ export interface CreateCliActionLoggerOptions {
   maxFiles?: number;
 }
 
-export interface CliActionLogFileInfo {
+interface CliActionLogFileInfo {
   path: string;
   kind: 'active' | 'rotated';
   index: number;
@@ -55,14 +55,14 @@ export interface CliActionLogFileInfo {
   modifiedAtUtc: string;
 }
 
-export interface GcCliActionLogOptions {
+interface GcCliActionLogOptions {
   path?: string;
   maxFiles?: number;
   maxAgeMs?: number;
   dryRun?: boolean;
 }
 
-export interface GcCliActionLogResult {
+interface GcCliActionLogResult {
   path: string;
   removed: string[];
   kept: string[];
@@ -179,7 +179,11 @@ function sanitizeForJson(value: unknown): unknown {
   if (!serialized) {
     return undefined;
   }
-  return JSON.parse(serialized) as unknown;
+  try {
+    return JSON.parse(serialized) as unknown;
+  } catch {
+    return undefined;
+  }
 }
 
 function parseArgToken(token: string): { flag: string; hasInlineValue: boolean } {

@@ -22,7 +22,7 @@ function deviceIdOf(device: any): string {
   return String(device?.id ?? device?._id ?? device?.device_id ?? '');
 }
 
-export interface SendCommandWithGuardArgs {
+interface SendCommandWithGuardArgs {
   device: any;
   template: CommandTemplate;
   params: Record<string, unknown> | undefined;

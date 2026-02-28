@@ -4,7 +4,7 @@ import { pulseChar } from './animation';
 import type { TuiScreenId } from './types';
 import { TAB_ORDER } from './tabs';
 
-export interface TuiLayout {
+interface TuiLayout {
   header: blessed.Widgets.BoxElement;
   tabs: blessed.Widgets.BoxElement;
   body: blessed.Widgets.BoxElement;
@@ -14,7 +14,7 @@ export interface TuiLayout {
   setPulsePhase(phase: number): void;
 }
 
-export interface TuiLayoutOptions {
+interface TuiLayoutOptions {
   motionEnabled: boolean;
 }
 

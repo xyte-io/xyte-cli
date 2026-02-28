@@ -22,7 +22,7 @@ export interface ConnectivityResult {
   statusCode?: number;
 }
 
-export interface ConnectivityProbeOptions {
+interface ConnectivityProbeOptions {
   client: XyteClient;
   tenantId?: string;
 }
@@ -57,7 +57,7 @@ function isMissingKeyError(message: string): boolean {
   return /missing api key|requires .*api key|no active .*key/i.test(message);
 }
 
-export function isRetriableClass(kind: ConnectionErrorClass): boolean {
+function isRetriableClass(kind: ConnectionErrorClass): boolean {
   return !['auth', 'missing_key'].includes(kind);
 }
 

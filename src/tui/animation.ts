@@ -1,6 +1,6 @@
 import { xyteLogoRevealFrames } from './assets/logo';
 
-export interface StartupFrame {
+interface StartupFrame {
   banner: string;
   status: string;
   title: string;

@@ -4,20 +4,24 @@ type PromptContext = Pick<TuiContext, 'prompt' | 'setStatus'>;
 type GuardContext = Pick<TuiContext, 'confirmWrite' | 'setStatus'>;
 type ErrorContext = Pick<TuiContext, 'showError'>;
 
-export interface PaletteAction {
+interface PaletteAction {
   label: string;
   enabled?: boolean;
   disabledReason?: string;
   run: () => Promise<void | boolean>;
 }
 
-export interface PromptChoice {
+interface PromptChoice {
   label: string;
   value: string;
 }
 
 function parseOneBasedIndex(input: string, total: number): number | undefined {
-  const numeric = Number.parseInt(input.trim(), 10);
+  const trimmed = input.trim();
+  if (!/^(?:0|[1-9]\d*)$/.test(trimmed)) {
+    return undefined;
+  }
+  const numeric = Number(trimmed);
   if (!Number.isFinite(numeric) || numeric < 1 || numeric > total) {
     return undefined;
   }

@@ -3,9 +3,9 @@ import path from 'node:path';
 
 import { getXyteConfigDir } from '../utils/config-dir';
 
-export const FLOW_DEFINITION_SCHEMA_VERSION = 'xyte.flow.definition.v1';
+const FLOW_DEFINITION_SCHEMA_VERSION = 'xyte.flow.definition.v1';
 
-export interface FlowDefinitionV1 {
+interface FlowDefinitionV1 {
   schemaVersion: typeof FLOW_DEFINITION_SCHEMA_VERSION;
   id: string;
   title: string;
@@ -76,7 +76,7 @@ function validateFlowDefinition(value: unknown): FlowDefinitionV1 {
   };
 }
 
-export function getFlowDefinitionsDir(): string {
+function getFlowDefinitionsDir(): string {
   return path.join(getXyteConfigDir(), 'flows');
 }
 

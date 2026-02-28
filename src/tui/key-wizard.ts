@@ -8,14 +8,14 @@ const PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
 interface WizardContext
   extends Pick<TuiContext, 'prompt' | 'promptSecret' | 'confirmWrite' | 'setStatus' | 'profileStore' | 'secretStore'> {}
 
-export interface KeyWizardResult {
+interface KeyWizardResult {
   canceled: boolean;
   provider?: SecretProvider;
   slotId?: string;
   message: string;
 }
 
-export interface RunKeyCreateWizardArgs {
+interface RunKeyCreateWizardArgs {
   context: WizardContext;
   tenantId: string;
   defaultProvider?: SecretProvider;
@@ -23,7 +23,7 @@ export interface RunKeyCreateWizardArgs {
   setActiveDefault?: boolean;
 }
 
-export interface RunKeyUpdateWizardArgs {
+interface RunKeyUpdateWizardArgs {
   context: WizardContext;
   tenantId: string;
   provider: SecretProvider;

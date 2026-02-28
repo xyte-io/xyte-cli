@@ -3,7 +3,7 @@ import path from 'node:path';
 
 export type UtilityInputFormat = 'auto' | 'csv' | 'json' | 'jsonl';
 
-export interface LoadedUtilityInputRows {
+interface LoadedUtilityInputRows {
   format: Exclude<UtilityInputFormat, 'auto'>;
   rows: Array<Record<string, unknown>>;
 }
@@ -140,7 +140,12 @@ function parseCsv(raw: string): Array<Record<string, unknown>> {
 }
 
 function parseJsonArray(raw: string): Array<Record<string, unknown>> {
-  const parsed = JSON.parse(raw);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('JSON input is invalid.');
+  }
   if (!Array.isArray(parsed)) {
     throw new Error('JSON input must be an array of objects.');
   }
@@ -160,7 +165,12 @@ function parseJsonLines(raw: string): Array<Record<string, unknown>> {
     .filter(Boolean);
 
   return lines.map((line, index) => {
-    const parsed = JSON.parse(line);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      throw new Error(`JSONL row ${index + 1} is invalid JSON.`);
+    }
     if (!isRecord(parsed)) {
       throw new Error(`JSONL row ${index + 1} must be an object.`);
     }

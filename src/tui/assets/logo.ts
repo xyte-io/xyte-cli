@@ -1,4 +1,4 @@
-export const XYTE_LOGO_LINES = [
+const XYTE_LOGO_LINES = [
   '██   ██ ██    ██ ████████ ███████',
   ' ██ ██   ██  ██     ██    ██     ',
   '  ███     ████      ██    █████  ',

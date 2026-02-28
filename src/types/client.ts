@@ -2,8 +2,6 @@ import type { PublicEndpointSpec } from './endpoints';
 import type { HttpTransport } from '../http/transport';
 import type { SecretStore } from '../secure/secret-store';
 import type { ProfileStore } from '../secure/profile-store';
-import type { OrganizationNamespace } from '../namespaces/organization';
-import type { PartnerNamespace } from '../namespaces/partner';
 
 export interface XyteCallArgs {
   requestId?: string;
@@ -25,7 +23,49 @@ export interface XyteCallResult<T = unknown> {
 
 export type NamespaceCall = (args?: XyteCallArgs) => Promise<unknown>;
 
-export interface XyteNamespace {
+export interface OrganizationNamespace {
+  closeIncident: NamespaceCall;
+  cancelCommand: NamespaceCall;
+  getCommands: NamespaceCall;
+  sendCommand: NamespaceCall;
+  claimDevice: NamespaceCall;
+  updateDevice: NamespaceCall;
+  deleteDevice: NamespaceCall;
+  getDevice: NamespaceCall;
+  getDevices: NamespaceCall;
+  getHistories: NamespaceCall;
+  getOrganizationInfo: NamespaceCall;
+  getIncidents: NamespaceCall;
+  createSpace: NamespaceCall;
+  deleteSpace: NamespaceCall;
+  findOrCreateSpace: NamespaceCall;
+  getSpace: NamespaceCall;
+  getSpaces: NamespaceCall;
+  updateSpace: NamespaceCall;
+  getTicket: NamespaceCall;
+  getTickets: NamespaceCall;
+  markResolved: NamespaceCall;
+  sendMessage: NamespaceCall;
+  updateTicket: NamespaceCall;
+}
+
+export interface PartnerNamespace {
+  deleteDevice: NamespaceCall;
+  getCommands: NamespaceCall;
+  getConfiguration: NamespaceCall;
+  getDeviceInfo: NamespaceCall;
+  getDevices: NamespaceCall;
+  getStateHistory: NamespaceCall;
+  getStateHistoryMultiDevices: NamespaceCall;
+  getTelemetries: NamespaceCall;
+  addComment: NamespaceCall;
+  closeTicket: NamespaceCall;
+  getTicket: NamespaceCall;
+  getTickets: NamespaceCall;
+  updateTicket: NamespaceCall;
+}
+
+interface XyteNamespace {
   [method: string]: NamespaceCall;
 }
 

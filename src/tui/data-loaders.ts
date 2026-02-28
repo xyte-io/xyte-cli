@@ -62,7 +62,7 @@ function extractHasNextPage(value: unknown): boolean | undefined {
   return undefined;
 }
 
-export interface LoadOutcome<T> {
+interface LoadOutcome<T> {
   data: T;
   connectionState: ConnectionState;
   error?: ConnectivityResult;
@@ -186,7 +186,7 @@ function compactQuery(query: QueryShape | undefined): Record<string, string | nu
   return Object.fromEntries(entries) as Record<string, string | number | boolean>;
 }
 
-export interface DashboardLoadResult {
+interface DashboardLoadResult {
   devices: any[];
   incidents: any[];
   tickets: any[];
@@ -212,11 +212,11 @@ export async function loadDashboardData(client: XyteClient, tenantId?: string): 
   };
 }
 
-export interface DevicesQuery {
+interface DevicesQuery {
   space_id?: string;
 }
 
-export interface DevicesLoadOptions {
+interface DevicesLoadOptions {
   query?: DevicesQuery;
 }
 
@@ -243,7 +243,7 @@ export async function loadDevicesData(
   return result;
 }
 
-export interface IncidentsQuery {
+interface IncidentsQuery {
   from?: number;
   to?: number;
   status?: string;
@@ -255,7 +255,7 @@ export interface IncidentsQuery {
   per_page?: number;
 }
 
-export interface IncidentsLoadOptions {
+interface IncidentsLoadOptions {
   query?: IncidentsQuery;
   paginateAll?: boolean;
 }
@@ -344,7 +344,7 @@ export async function loadIncidentsData(
   );
 }
 
-export interface TicketsLoadResult {
+interface TicketsLoadResult {
   mode: 'organization' | 'partner';
   tickets: any[];
 }
@@ -390,7 +390,7 @@ export async function loadTicketsData(client: XyteClient, tenantId?: string): Pr
   };
 }
 
-export interface SpacesQuery {
+interface SpacesQuery {
   id?: string;
   name?: string;
   parent_id?: string | number;
@@ -400,7 +400,7 @@ export interface SpacesQuery {
   path_includes?: string;
 }
 
-export interface SpacesLoadOptions {
+interface SpacesLoadOptions {
   query?: SpacesQuery;
 }
 
@@ -479,7 +479,7 @@ export async function loadCommandTemplates(
   );
 }
 
-export interface SpaceDrilldownResult {
+interface SpaceDrilldownResult {
   spaceDetail?: unknown;
   devicesInSpace: any[];
   paneStatus: string;

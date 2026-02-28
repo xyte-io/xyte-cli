@@ -19,10 +19,6 @@ export function getEndpoint(key: string): PublicEndpointSpec {
   return endpoint;
 }
 
-export function hasEndpoint(key: string): boolean {
-  return endpointMap.has(key);
-}
-
 export function listEndpointKeys(): string[] {
   return endpoints.map((endpoint) => endpoint.key);
 }

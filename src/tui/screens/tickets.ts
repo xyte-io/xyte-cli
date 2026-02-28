@@ -29,7 +29,7 @@ function ticketPriorityOf(ticket: any): string {
   return String(ticket?.priority ?? '').trim().toLowerCase();
 }
 
-export interface ResolveTicketWithGuardArgs {
+interface ResolveTicketWithGuardArgs {
   ticket: any;
   mode: 'organization' | 'partner';
   context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;
@@ -65,7 +65,7 @@ export async function resolveTicketWithGuard(args: ResolveTicketWithGuardArgs): 
   }
 }
 
-export interface SendTicketMessageWithGuardArgs {
+interface SendTicketMessageWithGuardArgs {
   ticket: any;
   mode: 'organization' | 'partner';
   context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;

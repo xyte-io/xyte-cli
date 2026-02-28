@@ -1,4 +1,4 @@
-export class XyteError extends Error {
+class XyteError extends Error {
   readonly code: string;
 
   constructor(message: string, code = 'XYTE_ERROR') {

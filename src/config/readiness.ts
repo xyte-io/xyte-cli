@@ -26,7 +26,7 @@ export interface ReadinessCheck {
   connectivity: ConnectivityResult;
 }
 
-export interface ReadinessOptions {
+interface ReadinessOptions {
   profileStore: ProfileStore;
   secretStore: SecretStore;
   tenantId?: string;

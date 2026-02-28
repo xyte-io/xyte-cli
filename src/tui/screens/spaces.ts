@@ -25,7 +25,7 @@ import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput } from '
 
 const SPINNER_FRAMES = ['|', '/', '-', '\\'];
 
-export interface ClaimDeviceWithGuardArgs {
+interface ClaimDeviceWithGuardArgs {
   spaceId: string;
   name: string;
   sn?: string;
@@ -80,7 +80,7 @@ export async function claimDeviceWithGuard(args: ClaimDeviceWithGuardArgs): Prom
   }
 }
 
-export interface CreateChildSpaceWithGuardArgs {
+interface CreateChildSpaceWithGuardArgs {
   parentSpaceId: string;
   name: string;
   spaceType?: string;
@@ -127,7 +127,7 @@ export async function createChildSpaceWithGuard(args: CreateChildSpaceWithGuardA
   }
 }
 
-export interface RenameSpaceWithGuardArgs {
+interface RenameSpaceWithGuardArgs {
   spaceId: string;
   name: string;
   context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;

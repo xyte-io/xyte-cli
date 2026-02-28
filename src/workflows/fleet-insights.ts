@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { z } from 'zod';
 
 import { extractArray } from '../tui/data-loaders';
 import type { XyteClient } from '../types/client';
@@ -28,7 +29,7 @@ export interface FleetSnapshot {
   partnerEnrichment?: PartnerEnrichmentSnapshot;
 }
 
-export interface PartnerEndpointOutcome {
+interface PartnerEndpointOutcome {
   attempted: number;
   succeeded: number;
   failed: number;
@@ -57,7 +58,7 @@ export interface PartnerEnrichmentSnapshot {
   };
 }
 
-export interface FleetInspectResult {
+interface FleetInspectResult {
   schemaVersion: typeof INSPECT_FLEET_SCHEMA_VERSION;
   generatedAtUtc: string;
   tenantId: string;
@@ -109,7 +110,79 @@ export interface DeepDiveResult {
   };
 }
 
-export interface FleetReportResult {
+const DeepDiveTopOfflineSpaceSchema = z.object({
+  space: z.string(),
+  offlineDevices: z.number(),
+  shareOfOfflinePct: z.number()
+});
+
+const DeepDiveTopIncidentDeviceSchema = z.object({
+  device: z.string(),
+  incidentCount: z.number(),
+  activeIncidents: z.number()
+});
+
+const DeepDiveIncidentAgingSchema = z.object({
+  device: z.string(),
+  space: z.string(),
+  ageHours: z.number(),
+  createdAtUtc: z.string()
+});
+
+const DeepDiveChurnEntrySchema = z.object({
+  space: z.string(),
+  incidents: z.number()
+});
+
+const DeepDiveDeviceChurnEntrySchema = z.object({
+  device: z.string(),
+  incidents: z.number()
+});
+
+const DeepDiveOldestTicketSchema = z.object({
+  ticketId: z.string(),
+  title: z.string(),
+  ageHours: z.number(),
+  deviceId: z.string(),
+  createdAtUtc: z.string()
+});
+
+const DeepDiveStatusMismatchSchema = z.object({
+  device: z.string(),
+  status: z.string(),
+  stateStatus: z.string(),
+  lastSeen: z.string(),
+  space: z.string()
+});
+
+const DeepDiveResultSchema = z.object({
+  schemaVersion: z.literal(INSPECT_DEEP_DIVE_SCHEMA_VERSION),
+  generatedAtUtc: z.string(),
+  tenantId: z.string(),
+  tenantName: z.string().optional(),
+  windowHours: z.number(),
+  summary: z.array(z.string()),
+  topOfflineSpaces: z.array(DeepDiveTopOfflineSpaceSchema),
+  topIncidentDevices: z.array(DeepDiveTopIncidentDeviceSchema),
+  activeIncidentAging: z.array(DeepDiveIncidentAgingSchema),
+  churn24h: z.object({
+    incidents: z.number(),
+    devices: z.number(),
+    spaces: z.number(),
+    bySpace: z.array(DeepDiveChurnEntrySchema),
+    byDevice: z.array(DeepDiveDeviceChurnEntrySchema)
+  }),
+  ticketPosture: z.object({
+    openTickets: z.number(),
+    overlappingActiveIncidentDevices: z.number(),
+    oldestOpenTickets: z.array(DeepDiveOldestTicketSchema)
+  }),
+  dataQuality: z.object({
+    statusMismatches: z.array(DeepDiveStatusMismatchSchema)
+  })
+});
+
+interface FleetReportResult {
   schemaVersion: typeof REPORT_SCHEMA_VERSION;
   generatedAtUtc: string;
   tenantId: string;
@@ -193,10 +266,10 @@ function parseTimestamp(value: unknown): Date | undefined {
   return undefined;
 }
 
-function ageHours(createdAt: unknown): number {
+function ageHours(createdAt: unknown): number | undefined {
   const parsed = parseTimestamp(createdAt);
   if (!parsed) {
-    return 0;
+    return undefined;
   }
   const now = Date.now();
   return Math.max(0, Math.round((now - parsed.getTime()) / 3_600_000));
@@ -899,7 +972,11 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
   const incidentsByDevice = toCounter(snapshot.incidents.map((item) => safeDeviceName(item)));
   const activeByDevice = toCounter(activeIncidents.map((item) => safeDeviceName(item)));
 
-  const recentIncidents = snapshot.incidents.filter((item) => ageHours(item?.created_at) <= windowHours);
+  const incidentsWithAge = snapshot.incidents.map((item) => ({ item, age: ageHours(item?.created_at) }));
+  const recentIncidents = incidentsWithAge
+    .filter((entry): entry is { item: any; age: number } => entry.age !== undefined && entry.age <= windowHours)
+    .map((entry) => entry.item);
+  const unknownIncidentAgeCount = incidentsWithAge.filter((entry) => entry.age === undefined).length;
   const recentSpace = toCounter(recentIncidents.map((item) => safeSpacePath(item)));
   const recentDevice = toCounter(recentIncidents.map((item) => safeDeviceName(item)));
 
@@ -941,24 +1018,29 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
   }));
 
   const activeIncidentAging = activeIncidents
-    .map((item) => ({
-      device: safeDeviceName(item),
-      space: safeSpacePath(item),
-      ageHours: ageHours(item?.created_at),
-      createdAtUtc: identifier(item?.created_at)
+    .map((item) => ({ item, age: ageHours(item?.created_at) }))
+    .filter((entry): entry is { item: any; age: number } => entry.age !== undefined)
+    .map((entry) => ({
+      device: safeDeviceName(entry.item),
+      space: safeSpacePath(entry.item),
+      ageHours: entry.age,
+      createdAtUtc: identifier(entry.item?.created_at)
     }))
     .sort((a, b) => b.ageHours - a.ageHours);
 
-  const oldestOpenTickets = openTickets
-    .map((item) => ({
-      ticketId: identifier(item?.id),
-      title: identifier(item?.title ?? item?.subject),
-      ageHours: ageHours(item?.created_at),
-      deviceId: identifier(item?.device_id),
-      createdAtUtc: identifier(item?.created_at)
+  const ticketsWithAge = openTickets.map((item) => ({ item, age: ageHours(item?.created_at) }));
+  const oldestOpenTickets = ticketsWithAge
+    .filter((entry): entry is { item: any; age: number } => entry.age !== undefined)
+    .map((entry) => ({
+      ticketId: identifier(entry.item?.id),
+      title: identifier(entry.item?.title ?? entry.item?.subject),
+      ageHours: entry.age,
+      deviceId: identifier(entry.item?.device_id),
+      createdAtUtc: identifier(entry.item?.created_at)
     }))
     .sort((a, b) => b.ageHours - a.ageHours)
     .slice(0, 20);
+  const unknownOpenTicketAgeCount = ticketsWithAge.filter((entry) => entry.age === undefined).length;
 
   const includeIncidentAndSpaceSummary = snapshot.providerScope !== 'partner';
   const partnerSummaryLines = buildPartnerSummaryLines(snapshot);
@@ -972,6 +1054,11 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
     `Tickets: ${snapshot.tickets.length} total, ${openTickets.length} open.`,
     ...(includeIncidentAndSpaceSummary
       ? [`${windowHours}h churn: ${recentIncidents.length} incidents across ${Object.keys(recentDevice).length} devices and ${Object.keys(recentSpace).length} spaces.`]
+      : []),
+    ...(unknownIncidentAgeCount > 0 || unknownOpenTicketAgeCount > 0
+      ? [
+          `Timestamp quality: ${unknownIncidentAgeCount} incidents and ${unknownOpenTicketAgeCount} open tickets are missing valid created_at timestamps.`
+        ]
       : []),
     ...partnerSummaryLines,
     `Data quality: ${mismatches.length} status mismatches detected.`
@@ -1159,6 +1246,19 @@ function ensureDir(filePath: string): void {
 
 export const formatUtcForReport = formatUtcForReportFromLayout;
 export const getWindowFocus = getWindowFocusFromTheme;
+
+export function parseDeepDiveForReport(raw: unknown, expectedTenantId?: string): DeepDiveResult {
+  const parsed = DeepDiveResultSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error('Input JSON must be produced by `xyte-cli inspect deep-dive --format json`.');
+  }
+
+  if (expectedTenantId && parsed.data.tenantId !== expectedTenantId) {
+    throw new Error(`Input tenant mismatch. Expected ${expectedTenantId}, got ${parsed.data.tenantId}.`);
+  }
+
+  return parsed.data;
+}
 
 export async function generateFleetReport(args: {
   deepDive: DeepDiveResult;

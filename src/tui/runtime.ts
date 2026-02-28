@@ -10,7 +10,7 @@ export interface ScreenRuntimeStatus {
   reason?: RefreshReason;
 }
 
-export interface ScreenRuntimeOptions {
+interface ScreenRuntimeOptions {
   refresh: () => Promise<void>;
   onStatus?: (status: ScreenRuntimeStatus) => void;
   onError?: (error: unknown) => void;

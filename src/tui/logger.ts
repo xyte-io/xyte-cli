@@ -2,14 +2,14 @@ import { mkdirSync, appendFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { homedir } from 'node:os';
 
-export interface TuiLogger {
+interface TuiLogger {
   readonly enabled: boolean;
   readonly path?: string;
   log(event: string, data?: Record<string, unknown>): void;
   close(): void;
 }
 
-export interface CreateTuiLoggerOptions {
+interface CreateTuiLoggerOptions {
   enabled?: boolean;
   path?: string;
 }
