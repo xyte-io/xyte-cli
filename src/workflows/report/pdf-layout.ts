@@ -343,16 +343,21 @@ export function drawKpiGrid(
   ctx: PdfRenderContext,
   cards: Array<{ label: string; value: string; tone?: 'normal' | 'warn' | 'bad' }>
 ): void {
+  const visibleCards = cards.slice(0, 4);
+  if (visibleCards.length === 0) {
+    return;
+  }
   const width = textWidth(doc);
   const gap = 12;
-  const cardWidth = (width - gap * 3) / 4;
+  const cardCount = visibleCards.length;
+  const cardWidth = (width - gap * (cardCount - 1)) / cardCount;
   const cardHeight = 84;
   ensurePageSpace(doc, ctx, cardHeight + PDF_LAYOUT.sectionGap);
 
   const startX = textLeft(doc);
   const topY = doc.y;
 
-  cards.slice(0, 4).forEach((card, index) => {
+  visibleCards.forEach((card, index) => {
     const x = startX + index * (cardWidth + gap);
     const tone = getMetricTone(card.tone ?? 'normal');
     doc.save();
