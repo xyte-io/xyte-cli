@@ -5,7 +5,7 @@ description: "Use for @xyteai/cli operations: first-run setup, tenant/key auth, 
 
 # XYTE Skill Router (One-Stop, Agent-Native)
 
-Last updated: 2026-02-25
+Last updated: 2026-02-28
 
 This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
 
@@ -17,10 +17,12 @@ This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
 - Command option correctness:
   - `xyte-cli tenant list` has no `--format`.
   - `xyte-cli setup status` supports `--format json|text`.
+  - `xyte-cli inspect fleet|deep-dive` support `--provider-scope organization|partner|auto`.
+  - `xyte-cli flow run` supports `--inspect-provider-scope organization|partner|auto`.
 - For fresh users in a new environment, verify readiness with:
   - `xyte-cli doctor install --format json`
   - `xyte-cli install --skills --scope both --agents all --force` (or the agent-specific install target)
-  - `xyte-cli setup run --non-interactive --tenant <tenant-id> --key <value>`
+  - `xyte-cli setup run --non-interactive --tenant <tenant-id> --provider <xyte-org|xyte-partner> --key <value>`
 
 ## Purpose and Trigger Conditions
 
@@ -84,7 +86,7 @@ Rules:
 - `xyte-cli config doctor --tenant <tenant-id> --format json`
 
 2. Auth/tenant (if missing/incomplete):
-- `xyte-cli setup run --non-interactive --tenant <tenant-id> --key <value>`
+- `xyte-cli setup run --non-interactive --tenant <tenant-id> --provider <xyte-org|xyte-partner> --key <value>`
 - `xyte-cli tenant use <tenant-id>`
 - `xyte-cli auth key list --tenant <tenant-id> --format json`
 
@@ -94,9 +96,14 @@ Rules:
 - `xyte-cli call <endpoint-key> --tenant <tenant-id> ...`
 
 4. Insights/reports:
-- `xyte-cli inspect fleet --tenant <tenant-id> --format json`
-- `xyte-cli inspect deep-dive --tenant <tenant-id> --window <hours> --format json`
+- `xyte-cli inspect fleet --tenant <tenant-id> --provider-scope auto --format json`
+- `xyte-cli inspect deep-dive --tenant <tenant-id> --provider-scope auto --window <hours> --format json`
 - `xyte-cli report generate --tenant <tenant-id> --input <deep-dive.json> --out <report.pdf>`
+
+Provider/report behavior:
+- `inspect` pipelines are scope-strict; no cross-provider calls.
+- `--provider-scope auto` chooses the only configured scope and fails when both scopes are configured.
+- Partner deep-dive/report enrichment is best-effort; optional enrichment failures should not block report generation.
 
 5. Utility preprocessing (agent parses file, CLI scaffolds contract):
 - `xyte-cli utility list-actions [--format text|json]`
@@ -115,7 +122,7 @@ Rules:
 | --- | --- |
 | Deterministic multi-step ops | `xyte-cli flow run <flow-id> --tenant <tenant-id> --plan` |
 | First-time onboarding (interactive) | `xyte-cli` |
-| Setup non-interactive | `xyte-cli setup run --non-interactive --tenant <tenant-id> --key <value>` |
+| Setup non-interactive | `xyte-cli setup run --non-interactive --tenant <tenant-id> --provider <xyte-org\|xyte-partner> --key <value>` |
 | Readiness snapshot | `xyte-cli setup status --tenant <tenant-id> --format json` |
 | Connectivity diagnostics | `xyte-cli config doctor --tenant <tenant-id> --format json` |
 | Read endpoint call + envelope | `xyte-cli call <endpoint-key> --tenant <tenant-id> --output-mode envelope --strict-json` |

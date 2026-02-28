@@ -73,17 +73,61 @@ function formatSpaceHierarchy(spacePath: string): string {
   return `${leaf} (${context.join(' / ')})`;
 }
 
+export interface DeepDiveReportSectionPlan {
+  includeOfflineSpaces: boolean;
+  includeIncidentSections: boolean;
+  includeTicketSection: boolean;
+  includeTicketTable: boolean;
+  includeDataQualitySection: boolean;
+}
+
+export interface DeepDiveSummaryPlan {
+  executiveSummary: string[];
+  partnerHighlights: string[];
+}
+
+export function buildDeepDiveReportSectionPlan(deepDive: DeepDiveResult): DeepDiveReportSectionPlan {
+  const includeIncidentSections =
+    deepDive.topIncidentDevices.length > 0 ||
+    deepDive.activeIncidentAging.length > 0 ||
+    deepDive.churn24h.incidents > 0 ||
+    deepDive.churn24h.bySpace.length > 0 ||
+    deepDive.churn24h.byDevice.length > 0;
+
+  return {
+    includeOfflineSpaces: deepDive.topOfflineSpaces.length > 0,
+    includeIncidentSections,
+    includeTicketSection: deepDive.ticketPosture.openTickets > 0 || deepDive.ticketPosture.oldestOpenTickets.length > 0,
+    includeTicketTable: deepDive.ticketPosture.oldestOpenTickets.length > 0,
+    includeDataQualitySection: deepDive.dataQuality.statusMismatches.length > 0
+  };
+}
+
+export function buildDeepDiveSummaryPlan(deepDive: DeepDiveResult): DeepDiveSummaryPlan {
+  const windowLabel = formatWindowLabel(deepDive.windowHours);
+  const dedupedSummary = Array.from(
+    new Set(
+      deepDive.summary
+        .map((line) => line.replace(/^(\d+)h churn:/i, `${windowLabel} churn:`).trim())
+        .filter(Boolean)
+    )
+  );
+
+  const partnerHighlights = dedupedSummary.filter((line) => line.startsWith('Partner '));
+  const executiveSummary = dedupedSummary.filter((line) => !line.startsWith('Partner '));
+
+  return {
+    executiveSummary: executiveSummary.length > 0 ? executiveSummary : dedupedSummary,
+    partnerHighlights
+  };
+}
+
 export function renderBrandedPdfReport(deepDive: DeepDiveResult, outputPath: string, includeSensitive: boolean): Promise<void> {
   return new Promise((resolvePromise, rejectPromise) => {
     ensureDir(outputPath);
+    const sectionPlan = buildDeepDiveReportSectionPlan(deepDive);
     const windowLabel = formatWindowLabel(deepDive.windowHours);
-    const summaryLines = Array.from(
-      new Set(
-        deepDive.summary
-          .map((line) => line.replace(/^(\d+)h churn:/i, `${windowLabel} churn:`).trim())
-          .filter(Boolean)
-      )
-    );
+    const summaryPlan = buildDeepDiveSummaryPlan(deepDive);
 
     const doc = new PDFDocument({
       size: 'A4',
@@ -116,106 +160,125 @@ export function renderBrandedPdfReport(deepDive: DeepDiveResult, outputPath: str
     doc.x = doc.page.margins.left;
     doc.y = PDF_LAYOUT.contentTopFirstPage;
 
-    drawKpiGrid(doc, ctx, [
-      { label: 'Active incidents', value: String(deepDive.activeIncidentAging.length) },
-      { label: windowLabel, value: String(deepDive.churn24h.incidents) },
-      { label: 'Open tickets', value: String(deepDive.ticketPosture.openTickets) },
-      {
-        label: 'Data mismatches',
-        value: String(deepDive.dataQuality.statusMismatches.length)
-      }
-    ]);
+    const totalDevices = deepDive.summary.find((line) => line.startsWith('Devices:'))?.match(/^Devices:\s+(\d+)/)?.[1] ?? '0';
+    const kpiCards: Array<{ label: string; value: string; tone?: 'normal' | 'warn' | 'bad' }> = [{ label: 'Total devices', value: totalDevices }];
+    if (sectionPlan.includeIncidentSections) {
+      kpiCards.push({ label: 'Active incidents', value: String(deepDive.activeIncidentAging.length) });
+      kpiCards.push({ label: windowLabel, value: String(deepDive.churn24h.incidents) });
+    }
+    kpiCards.push({ label: 'Open tickets', value: String(deepDive.ticketPosture.openTickets) });
+    kpiCards.push({
+      label: 'Data mismatches',
+      value: String(deepDive.dataQuality.statusMismatches.length)
+    });
+    drawKpiGrid(doc, ctx, kpiCards);
 
     drawSectionTitle(doc, ctx, 'Executive Summary');
-    drawBullets(doc, ctx, summaryLines);
+    drawBullets(doc, ctx, summaryPlan.executiveSummary);
     doc.y += PDF_LAYOUT.sectionGap;
 
-    drawSpaceBars(
-      doc,
-      ctx,
-      deepDive.churn24h.bySpace.map((row) => ({
-        space: formatSpaceHierarchy(row.space),
-        incidents: row.incidents
-      }))
-    );
+    if (summaryPlan.partnerHighlights.length > 0) {
+      drawSectionTitle(doc, ctx, 'Partner Highlights');
+      drawBullets(doc, ctx, summaryPlan.partnerHighlights);
+    }
+    doc.y += PDF_LAYOUT.sectionGap;
 
-    drawTable(doc, ctx, {
-      title: 'Top Spaces by Offline Devices',
-      columns: [
-        { header: 'Space', width: 293, wrap: true },
-        { header: 'Offline', width: 80, align: 'right', wrap: false },
-        { header: 'Share', width: 80, align: 'right', wrap: false }
-      ],
-      rows: deepDive.topOfflineSpaces.map((row) => [
-        formatSpaceHierarchy(row.space),
-        String(row.offlineDevices),
-        `${row.shareOfOfflinePct}%`
-      ]),
-      emptyMessage: 'No offline spaces found.'
-    });
+    if (sectionPlan.includeIncidentSections) {
+      drawSpaceBars(
+        doc,
+        ctx,
+        deepDive.churn24h.bySpace.map((row) => ({
+          space: formatSpaceHierarchy(row.space),
+          incidents: row.incidents
+        }))
+      );
+    }
 
-    drawTable(doc, ctx, {
-      title: 'Top Devices by Incident Volume',
-      columns: [
-        { header: 'Device', width: 293, wrap: true },
-        { header: 'Incidents', width: 80, align: 'right', wrap: false },
-        { header: 'Active', width: 80, align: 'right', wrap: false }
-      ],
-      rows: deepDive.topIncidentDevices.map((row) => [
-        compactIdentifier(row.device),
-        String(row.incidentCount),
-        String(row.activeIncidents)
-      ]),
-      emptyMessage: 'No incident device concentration detected.'
-    });
+    if (sectionPlan.includeOfflineSpaces) {
+      drawTable(doc, ctx, {
+        title: 'Top Spaces by Offline Devices',
+        columns: [
+          { header: 'Space', width: 293, wrap: true },
+          { header: 'Offline', width: 80, align: 'right', wrap: false },
+          { header: 'Share', width: 80, align: 'right', wrap: false }
+        ],
+        rows: deepDive.topOfflineSpaces.map((row) => [
+          formatSpaceHierarchy(row.space),
+          String(row.offlineDevices),
+          `${row.shareOfOfflinePct}%`
+        ]),
+        emptyMessage: 'No offline spaces found.'
+      });
+    }
 
-    drawTable(doc, ctx, {
-      title: 'Active Incident Aging',
-      columns: [
-        { header: 'Device', width: 94, wrap: true },
-        { header: 'Space', width: 159, wrap: true },
-        { header: 'Age', width: 82, align: 'right', wrap: false },
-        { header: 'Created At (UTC)', width: 118, wrap: true }
-      ],
-      rows: deepDive.activeIncidentAging.map((row) => [
-        compactIdentifier(row.device),
-        formatSpaceHierarchy(row.space),
-        formatRelativeAgeFromHours(row.ageHours),
-        formatUtcForReport(row.createdAtUtc)
-      ]),
-      emptyMessage: 'No active incidents.'
-    });
+    if (sectionPlan.includeIncidentSections) {
+      drawTable(doc, ctx, {
+        title: 'Top Devices by Incident Volume',
+        columns: [
+          { header: 'Device', width: 293, wrap: true },
+          { header: 'Incidents', width: 80, align: 'right', wrap: false },
+          { header: 'Active', width: 80, align: 'right', wrap: false }
+        ],
+        rows: deepDive.topIncidentDevices.map((row) => [
+          compactIdentifier(row.device),
+          String(row.incidentCount),
+          String(row.activeIncidents)
+        ]),
+        emptyMessage: 'No incident device concentration detected.'
+      });
 
-    drawTable(doc, ctx, {
-      title: `${windowLabel} by Space`,
-      columns: [
-        { header: 'Space', width: 333, wrap: true },
-        { header: 'Incidents', width: 120, align: 'right', wrap: false }
-      ],
-      rows: deepDive.churn24h.bySpace.map((row) => [formatSpaceHierarchy(row.space), String(row.incidents)]),
-      emptyMessage: 'No churn events in this window.'
-    });
+      drawTable(doc, ctx, {
+        title: 'Active Incident Aging',
+        columns: [
+          { header: 'Device', width: 94, wrap: true },
+          { header: 'Space', width: 159, wrap: true },
+          { header: 'Age', width: 82, align: 'right', wrap: false },
+          { header: 'Created At (UTC)', width: 118, wrap: true }
+        ],
+        rows: deepDive.activeIncidentAging.map((row) => [
+          compactIdentifier(row.device),
+          formatSpaceHierarchy(row.space),
+          formatRelativeAgeFromHours(row.ageHours),
+          formatUtcForReport(row.createdAtUtc)
+        ]),
+        emptyMessage: 'No active incidents.'
+      });
 
-    drawTable(doc, ctx, {
-      title: 'Oldest Open Tickets',
-      columns: [
-        { header: 'Ticket', width: 78, wrap: false },
-        { header: 'Title', width: 108, wrap: true },
-        { header: 'Age', width: 82, align: 'right', wrap: false },
-        { header: 'Device', width: 84, wrap: false },
-        { header: 'Created At (UTC)', width: 101, wrap: true }
-      ],
-      rows: deepDive.ticketPosture.oldestOpenTickets.map((row) => [
-        compactIdentifier(redactSensitive(row.ticketId, includeSensitive)),
-        row.title,
-        formatRelativeAgeFromHours(row.ageHours),
-        compactIdentifier(redactSensitive(row.deviceId, includeSensitive)),
-        formatUtcForReport(row.createdAtUtc)
-      ]),
-      emptyMessage: 'No open tickets.'
-    });
+      if (deepDive.churn24h.bySpace.length > 0) {
+        drawTable(doc, ctx, {
+          title: `${windowLabel} by Space`,
+          columns: [
+            { header: 'Space', width: 333, wrap: true },
+            { header: 'Incidents', width: 120, align: 'right', wrap: false }
+          ],
+          rows: deepDive.churn24h.bySpace.map((row) => [formatSpaceHierarchy(row.space), String(row.incidents)]),
+          emptyMessage: 'No churn events in this window.'
+        });
+      }
+    }
 
-    if (deepDive.dataQuality.statusMismatches.length) {
+    if (sectionPlan.includeTicketTable) {
+      drawTable(doc, ctx, {
+        title: 'Oldest Open Tickets',
+        columns: [
+          { header: 'Ticket', width: 78, wrap: false },
+          { header: 'Title', width: 108, wrap: true },
+          { header: 'Age', width: 82, align: 'right', wrap: false },
+          { header: 'Device', width: 84, wrap: false },
+          { header: 'Created At (UTC)', width: 101, wrap: true }
+        ],
+        rows: deepDive.ticketPosture.oldestOpenTickets.map((row) => [
+          compactIdentifier(redactSensitive(row.ticketId, includeSensitive)),
+          row.title,
+          formatRelativeAgeFromHours(row.ageHours),
+          compactIdentifier(redactSensitive(row.deviceId, includeSensitive)),
+          formatUtcForReport(row.createdAtUtc)
+        ]),
+        emptyMessage: 'No open tickets.'
+      });
+    }
+
+    if (sectionPlan.includeDataQualitySection) {
       drawTable(doc, ctx, {
         title: 'Data Quality: Status Mismatches',
         columns: [

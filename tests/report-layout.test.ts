@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildDeepDive, formatDeepDiveMarkdown, formatUtcForReport, getWindowFocus } from '../src/workflows/fleet-insights';
+import { buildDeepDiveReportSectionPlan, buildDeepDiveSummaryPlan } from '../src/workflows/report/pdf-render';
 import { formatWindowLabel } from '../src/workflows/report/time-format';
 
 describe('report layout helpers', () => {
@@ -62,5 +63,124 @@ describe('report layout helpers', () => {
     });
 
     expect(result.activeIncidentAging.length).toBe(25);
+  });
+
+  it('omits incident and space summary lines for partner-scoped snapshots', () => {
+    const result = buildDeepDive({
+      generatedAtUtc: new Date().toISOString(),
+      tenantId: 'xyte-partners',
+      providerScope: 'partner',
+      devices: [{ id: 'd1', name: 'Partner Device', status: 'online' }],
+      spaces: [],
+      incidents: [],
+      tickets: [{ id: 't1', title: 'Need help', status: 'open', created_at: new Date().toISOString(), device_id: 'd1' }]
+    });
+
+    expect(result.summary.some((line) => line.startsWith('Incidents:'))).toBe(false);
+    expect(result.summary.some((line) => line.includes('churn:'))).toBe(false);
+    expect(result.summary.some((line) => line.startsWith('Tickets:'))).toBe(true);
+  });
+
+  it('renders markdown using only sections with available data', () => {
+    const result = buildDeepDive({
+      generatedAtUtc: new Date().toISOString(),
+      tenantId: 'xyte-partners',
+      providerScope: 'partner',
+      devices: [{ id: 'd1', name: 'Partner Device', status: 'online' }],
+      spaces: [],
+      incidents: [],
+      tickets: [{ id: 't1', title: 'Need help', status: 'open', created_at: new Date().toISOString(), device_id: 'd1' }]
+    });
+
+    const markdown = formatDeepDiveMarkdown(result, false);
+    expect(markdown).not.toContain('## Top Offline Spaces');
+    expect(markdown).not.toContain('## Top Devices by Incident Volume');
+    expect(markdown).not.toContain('Hour Churn');
+    expect(markdown).not.toContain('## Partner Highlights');
+    expect(markdown).toContain('## Ticket Posture');
+  });
+
+  it('renders partner highlights block when partner summary lines are present', () => {
+    const result = buildDeepDive({
+      generatedAtUtc: new Date().toISOString(),
+      tenantId: 'xyte-partners',
+      providerScope: 'partner',
+      devices: [{ id: 'd1', name: 'Partner Device', status: 'online' }],
+      spaces: [],
+      incidents: [],
+      tickets: [{ id: 't1', title: 'Need help', status: 'open', created_at: new Date().toISOString(), device_id: 'd1' }],
+      partnerEnrichment: {
+        sampledDeviceCount: 1,
+        totalDeviceCount: 1,
+        endpointAvailability: {
+          deviceInfo: { attempted: 1, succeeded: 1, failed: 0 },
+          commands: { attempted: 1, succeeded: 1, failed: 0 },
+          telemetries: { attempted: 1, succeeded: 1, failed: 0 },
+          stateHistory: { attempted: 1, succeeded: 1, failed: 0 }
+        },
+        modelDistribution: { 'Model-X': 1 },
+        firmwareDistribution: { '1.2.3': 1 },
+        lastSeenRecency: { '<=1h': 1 },
+        commandPosture: { sent: 1 },
+        telemetryCoverage: { withTelemetries: 1, freshWithin24Hours: 1 },
+        stateHistoryCoverage: { withHistory: 1, totalEntries: 3 }
+      }
+    });
+
+    const markdown = formatDeepDiveMarkdown(result, false);
+    expect(markdown).toContain('## Partner Highlights');
+    expect(markdown).toContain('Partner model distribution:');
+    expect(markdown).toContain('Partner telemetry coverage:');
+  });
+
+  it('builds PDF section plan from available deep-dive data only', () => {
+    const partnerOnly = buildDeepDive({
+      generatedAtUtc: new Date().toISOString(),
+      tenantId: 'xyte-partners',
+      providerScope: 'partner',
+      devices: [{ id: 'd1', name: 'Partner Device', status: 'online' }],
+      spaces: [],
+      incidents: [],
+      tickets: [{ id: 't1', title: 'Need help', status: 'open', created_at: new Date().toISOString(), device_id: 'd1' }]
+    });
+
+    const plan = buildDeepDiveReportSectionPlan(partnerOnly);
+    expect(plan.includeOfflineSpaces).toBe(false);
+    expect(plan.includeIncidentSections).toBe(false);
+    expect(plan.includeTicketSection).toBe(true);
+    expect(plan.includeTicketTable).toBe(true);
+  });
+
+  it('builds PDF summary plan with partner highlights sourced from partner-prefixed summary lines', () => {
+    const partner = buildDeepDive({
+      generatedAtUtc: new Date().toISOString(),
+      tenantId: 'xyte-partners',
+      providerScope: 'partner',
+      devices: [{ id: 'd1', name: 'Partner Device', status: 'online' }],
+      spaces: [],
+      incidents: [],
+      tickets: [{ id: 't1', title: 'Need help', status: 'open', created_at: new Date().toISOString(), device_id: 'd1' }],
+      partnerEnrichment: {
+        sampledDeviceCount: 1,
+        totalDeviceCount: 1,
+        endpointAvailability: {
+          deviceInfo: { attempted: 1, succeeded: 1, failed: 0 },
+          commands: { attempted: 1, succeeded: 1, failed: 0 },
+          telemetries: { attempted: 1, succeeded: 1, failed: 0 },
+          stateHistory: { attempted: 1, succeeded: 1, failed: 0 }
+        },
+        modelDistribution: { 'Model-X': 1 },
+        firmwareDistribution: { '1.2.3': 1 },
+        lastSeenRecency: { '<=1h': 1 },
+        commandPosture: { sent: 1 },
+        telemetryCoverage: { withTelemetries: 1, freshWithin24Hours: 1 },
+        stateHistoryCoverage: { withHistory: 1, totalEntries: 3 }
+      }
+    });
+
+    const plan = buildDeepDiveSummaryPlan(partner);
+    expect(plan.partnerHighlights.length).toBeGreaterThan(0);
+    expect(plan.partnerHighlights.every((line) => line.startsWith('Partner '))).toBe(true);
+    expect(plan.executiveSummary.some((line) => line.startsWith('Devices:'))).toBe(true);
   });
 });

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -22,6 +22,45 @@ async function makeClient() {
   });
   await profileStore.setActiveKeySlot('acme', 'xyte-org', slot.slotId);
   await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key');
+
+  const client = createXyteClient({
+    profileStore,
+    secretStore,
+    tenantId: 'acme'
+  });
+
+  return {
+    profileStore,
+    secretStore,
+    client
+  };
+}
+
+async function makeClientWithProviders(providers: Array<'xyte-org' | 'xyte-partner'>) {
+  const profileStore = new MemoryProfileStore();
+  const secretStore = new MemorySecretStore();
+  await profileStore.upsertTenant({ id: 'acme' });
+  await profileStore.setActiveTenant('acme');
+
+  if (providers.includes('xyte-org')) {
+    const slot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-org',
+      name: 'org-primary',
+      fingerprint: 'sha256:org'
+    });
+    await profileStore.setActiveKeySlot('acme', 'xyte-org', slot.slotId);
+    await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key');
+  }
+
+  if (providers.includes('xyte-partner')) {
+    const slot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-partner',
+      name: 'partner-primary',
+      fingerprint: 'sha256:partner'
+    });
+    await profileStore.setActiveKeySlot('acme', 'xyte-partner', slot.slotId);
+    await secretStore.setSlotSecret('acme', 'xyte-partner', slot.slotId, 'partner-key');
+  }
 
   const client = createXyteClient({
     profileStore,
@@ -281,5 +320,678 @@ describe('flow runner', () => {
     expect(result.outcome).toBe('needs_input');
     expect(result.classifications.needs_data).toBe(1);
     expect(result.classifications.bug).toBe(0);
+  });
+
+  it('runs inspect.deep-dive and report.generate with partner-only provider scope', async () => {
+    const { profileStore, secretStore, client } = await makeClientWithProviders(['xyte-partner']);
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/partner/devices')) {
+        return new Response(JSON.stringify({ items: [{ id: 'pd-1', status: 'online', name: 'Partner Device' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/tickets')) {
+        return new Response(JSON.stringify({ items: [{ id: 'pt-1', status: 'open', created_at: new Date().toISOString() }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.daily-deep-dive-report',
+      title: 'Deep dive and report',
+      intent: 'test provider-scoped inspect',
+      writeCapable: false,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'task',
+          id: 'inspect_deep_dive_daily',
+          title: 'Inspect Deep Dive',
+          command: 'xyte-cli inspect deep-dive --tenant <tenant-id>',
+          task: 'inspect.deep-dive',
+          mutating: false,
+          inspect: {
+            mode: 'deep-dive',
+            windowHours: 24
+          }
+        },
+        {
+          kind: 'task',
+          id: 'report_daily',
+          title: 'Generate Report',
+          command: 'xyte-cli report generate --tenant <tenant-id>',
+          task: 'report.generate',
+          mutating: false,
+          report: {
+            inputFromStepId: 'inspect_deep_dive_daily',
+            outFileName: 'daily.md',
+            format: 'markdown'
+          }
+        }
+      ]
+    };
+
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-provider-partner`);
+    const result = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'plan',
+      allowWrite: false,
+      inspectProviderScope: 'auto',
+      outDir,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(result.outcome).toBe('completed');
+    expect(result.steps.find((item) => item.stepId === 'inspect_deep_dive_daily')?.status).toBe('completed');
+    expect(result.steps.find((item) => item.stepId === 'report_daily')?.status).toBe('completed');
+    const reportArtifact = result.steps.find((item) => item.stepId === 'report_daily')?.artifactPath;
+    expect(reportArtifact).toBeDefined();
+    expect(existsSync(reportArtifact!)).toBe(true);
+  });
+
+  it('reuses persisted inspect provider scope when resuming without explicit scope', async () => {
+    const { profileStore, secretStore, client } = await makeClientWithProviders(['xyte-org', 'xyte-partner']);
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/partner/devices')) {
+        return new Response(JSON.stringify({ items: [{ id: 'pd-1', status: 'online', name: 'Partner Device' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/tickets')) {
+        return new Response(JSON.stringify({ items: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.daily-deep-dive-report',
+      title: 'Resume inspect scope',
+      intent: 'resume should preserve inspect scope',
+      writeCapable: true,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'gate',
+          id: 'gate_1',
+          title: 'Approval',
+          command: 'Human gate',
+          mutating: true,
+          detail: 'approve resume'
+        },
+        {
+          kind: 'task',
+          id: 'inspect_deep_dive_daily',
+          title: 'Inspect Deep Dive',
+          command: 'xyte-cli inspect deep-dive --tenant <tenant-id>',
+          task: 'inspect.deep-dive',
+          mutating: false,
+          inspect: {
+            mode: 'deep-dive',
+            windowHours: 24
+          }
+        }
+      ]
+    };
+
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-resume-inspect-scope`);
+    const first = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'plan',
+      allowWrite: false,
+      inspectProviderScope: 'partner',
+      outDir,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+    expect(first.outcome).toBe('pending_gate');
+    expect(first.resumeCommand).toContain('--inspect-provider-scope partner');
+
+    const second = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'apply',
+      allowWrite: true,
+      outDir,
+      resume: first.runId,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(second.outcome).toBe('completed');
+    expect(second.steps.find((item) => item.stepId === 'inspect_deep_dive_daily')?.status).toBe('completed');
+    const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.length).toBeGreaterThan(0);
+    expect(calledUrls.every((url) => url.includes('/partner/'))).toBe(true);
+  });
+
+  it('hydrates prior task outputs on resume so report.generate can use earlier deep-dive step', async () => {
+    const { profileStore, secretStore, client } = await makeClientWithProviders(['xyte-partner']);
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/partner/devices')) {
+        return new Response(JSON.stringify({ items: [{ id: 'pd-1', status: 'online', name: 'Partner Device' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/tickets')) {
+        return new Response(JSON.stringify({ items: [{ id: 'pt-1', status: 'open', created_at: new Date().toISOString() }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.daily-deep-dive-report',
+      title: 'Resume report from prior inspect',
+      intent: 'resume should rehydrate task outputs',
+      writeCapable: true,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'task',
+          id: 'inspect_deep_dive_daily',
+          title: 'Inspect Deep Dive',
+          command: 'xyte-cli inspect deep-dive --tenant <tenant-id>',
+          task: 'inspect.deep-dive',
+          mutating: false,
+          inspect: {
+            mode: 'deep-dive',
+            windowHours: 24
+          }
+        },
+        {
+          kind: 'gate',
+          id: 'gate_1',
+          title: 'Approval',
+          command: 'Human gate',
+          mutating: true,
+          detail: 'approve report'
+        },
+        {
+          kind: 'task',
+          id: 'report_daily',
+          title: 'Generate Report',
+          command: 'xyte-cli report generate --tenant <tenant-id>',
+          task: 'report.generate',
+          mutating: false,
+          report: {
+            inputFromStepId: 'inspect_deep_dive_daily',
+            outFileName: 'daily.md',
+            format: 'markdown'
+          }
+        }
+      ]
+    };
+
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-resume-report`);
+    const first = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'plan',
+      allowWrite: false,
+      inspectProviderScope: 'auto',
+      outDir,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+    expect(first.outcome).toBe('pending_gate');
+    expect(first.steps.find((item) => item.stepId === 'inspect_deep_dive_daily')?.status).toBe('completed');
+
+    const second = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'apply',
+      allowWrite: true,
+      outDir,
+      resume: first.runId,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(second.outcome).toBe('completed');
+    expect(second.steps.find((item) => item.stepId === 'report_daily')?.status).toBe('completed');
+    const reportArtifact = second.steps.find((item) => item.stepId === 'report_daily')?.artifactPath;
+    expect(reportArtifact).toBeDefined();
+    expect(existsSync(reportArtifact!)).toBe(true);
+  });
+
+  it('classifies ambiguous auto inspect scope as needs_input when both provider credentials exist', async () => {
+    const { profileStore, secretStore, client } = await makeClientWithProviders(['xyte-org', 'xyte-partner']);
+
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.daily-deep-dive-report',
+      title: 'Deep dive only',
+      intent: 'test ambiguous inspect scope',
+      writeCapable: false,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'task',
+          id: 'inspect_deep_dive_daily',
+          title: 'Inspect Deep Dive',
+          command: 'xyte-cli inspect deep-dive --tenant <tenant-id>',
+          task: 'inspect.deep-dive',
+          mutating: false,
+          inspect: {
+            mode: 'deep-dive',
+            windowHours: 24
+          }
+        }
+      ]
+    };
+
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-provider-ambiguous`);
+    const result = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'plan',
+      allowWrite: false,
+      inspectProviderScope: 'auto',
+      outDir,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(result.outcome).toBe('needs_input');
+    expect(result.classifications.needs_data).toBe(1);
+    expect(result.classifications.bug).toBe(0);
+    const failedStep = result.steps.find((item) => item.stepId === 'inspect_deep_dive_daily');
+    expect(failedStep?.status).toBe('failed');
+    expect(String(failedStep?.error?.detail ?? '')).toContain('both organization and partner credentials are configured');
+  });
+
+  it('classifies ambiguous auto inspect fleet scope as needs_input when both provider credentials exist', async () => {
+    const { profileStore, secretStore, client } = await makeClientWithProviders(['xyte-org', 'xyte-partner']);
+
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.daily-deep-dive-report',
+      title: 'Fleet inspect only',
+      intent: 'test ambiguous inspect fleet scope',
+      writeCapable: false,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'task',
+          id: 'inspect_fleet_daily',
+          title: 'Inspect Fleet',
+          command: 'xyte-cli inspect fleet --tenant <tenant-id>',
+          task: 'inspect.fleet',
+          mutating: false,
+          inspect: {
+            mode: 'fleet'
+          }
+        }
+      ]
+    };
+
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-provider-ambiguous-fleet`);
+    const result = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'plan',
+      allowWrite: false,
+      inspectProviderScope: 'auto',
+      outDir,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(result.outcome).toBe('needs_input');
+    expect(result.classifications.needs_data).toBe(1);
+    expect(result.classifications.bug).toBe(0);
+    const failedStep = result.steps.find((item) => item.stepId === 'inspect_fleet_daily');
+    expect(failedStep?.status).toBe('failed');
+    expect(String(failedStep?.error?.detail ?? '')).toContain('both organization and partner credentials are configured');
+  });
+
+  it('classifies explicit unavailable organization inspect scope as needs_input for inspect.deep-dive', async () => {
+    const { profileStore, secretStore, client } = await makeClientWithProviders(['xyte-partner']);
+
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.daily-deep-dive-report',
+      title: 'Deep dive unavailable organization scope',
+      intent: 'test explicit unavailable deep-dive scope',
+      writeCapable: false,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'task',
+          id: 'inspect_deep_dive_daily',
+          title: 'Inspect Deep Dive',
+          command: 'xyte-cli inspect deep-dive --tenant <tenant-id>',
+          task: 'inspect.deep-dive',
+          mutating: false,
+          inspect: {
+            mode: 'deep-dive',
+            windowHours: 24
+          }
+        }
+      ]
+    };
+
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-provider-explicit-unavailable-deep-dive`);
+    const result = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'plan',
+      allowWrite: false,
+      inspectProviderScope: 'organization',
+      outDir,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(result.outcome).toBe('needs_input');
+    expect(result.classifications.needs_data).toBe(1);
+    expect(result.classifications.bug).toBe(0);
+    const failedStep = result.steps.find((item) => item.stepId === 'inspect_deep_dive_daily');
+    expect(failedStep?.status).toBe('failed');
+    expect(failedStep?.classification).toBe('needs_data');
+    expect(String(failedStep?.error?.detail ?? '')).toContain('Inspect provider scope "organization" is unavailable');
+  });
+
+  it('classifies explicit unavailable partner inspect scope as needs_input for inspect.fleet', async () => {
+    const { profileStore, secretStore, client } = await makeClientWithProviders(['xyte-org']);
+
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.daily-deep-dive-report',
+      title: 'Fleet unavailable partner scope',
+      intent: 'test explicit unavailable fleet scope',
+      writeCapable: false,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'task',
+          id: 'inspect_fleet_daily',
+          title: 'Inspect Fleet',
+          command: 'xyte-cli inspect fleet --tenant <tenant-id>',
+          task: 'inspect.fleet',
+          mutating: false,
+          inspect: {
+            mode: 'fleet'
+          }
+        }
+      ]
+    };
+
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-provider-explicit-unavailable-fleet`);
+    const result = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'plan',
+      allowWrite: false,
+      inspectProviderScope: 'partner',
+      outDir,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(result.outcome).toBe('needs_input');
+    expect(result.classifications.needs_data).toBe(1);
+    expect(result.classifications.bug).toBe(0);
+    const failedStep = result.steps.find((item) => item.stepId === 'inspect_fleet_daily');
+    expect(failedStep?.status).toBe('failed');
+    expect(failedStep?.classification).toBe('needs_data');
+    expect(String(failedStep?.error?.detail ?? '')).toContain('Inspect provider scope "partner" is unavailable');
+  });
+
+  it('prefers explicit inspect provider scope over persisted resume scope', async () => {
+    const { profileStore, secretStore, client } = await makeClientWithProviders(['xyte-org', 'xyte-partner']);
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/organization/devices')) {
+        return new Response(JSON.stringify({ items: [{ id: 'od-1', status: 'online' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/spaces')) {
+        return new Response(JSON.stringify({ items: [{ id: 'os-1', name: 'HQ' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/incidents')) {
+        return new Response(JSON.stringify({ items: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/tickets')) {
+        return new Response(JSON.stringify({ items: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/')) {
+        throw new Error(`Partner endpoint should not be called when explicit organization scope is provided: ${url}`);
+      }
+      throw new Error(`Unexpected URL in test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.daily-deep-dive-report',
+      title: 'Resume explicit scope precedence',
+      intent: 'explicit inspect scope overrides persisted scope',
+      writeCapable: true,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'gate',
+          id: 'gate_1',
+          title: 'Approval',
+          command: 'Human gate',
+          mutating: true,
+          detail: 'approve run'
+        },
+        {
+          kind: 'task',
+          id: 'inspect_fleet_daily',
+          title: 'Inspect Fleet',
+          command: 'xyte-cli inspect fleet --tenant <tenant-id>',
+          task: 'inspect.fleet',
+          mutating: false,
+          inspect: {
+            mode: 'fleet'
+          }
+        }
+      ]
+    };
+
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-resume-explicit-scope-precedence`);
+    const first = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'plan',
+      allowWrite: false,
+      inspectProviderScope: 'partner',
+      outDir,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+    expect(first.outcome).toBe('pending_gate');
+    expect(first.resumeCommand).toContain('--inspect-provider-scope partner');
+
+    const second = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'apply',
+      allowWrite: true,
+      outDir,
+      resume: first.runId,
+      inspectProviderScope: 'organization',
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(second.outcome).toBe('completed');
+    const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.length).toBeGreaterThan(0);
+    expect(calledUrls.every((url) => url.includes('/organization/'))).toBe(true);
+  });
+
+  it('falls back to auto scope when persisted inspect scope payload is malformed', async () => {
+    const { profileStore, secretStore, client } = await makeClientWithProviders(['xyte-org', 'xyte-partner']);
+
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.daily-deep-dive-report',
+      title: 'Malformed persisted scope fallback',
+      intent: 'fallback to auto when resume inputs are malformed',
+      writeCapable: true,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'gate',
+          id: 'gate_1',
+          title: 'Approval',
+          command: 'Human gate',
+          mutating: true,
+          detail: 'approve run'
+        },
+        {
+          kind: 'task',
+          id: 'inspect_deep_dive_daily',
+          title: 'Inspect Deep Dive',
+          command: 'xyte-cli inspect deep-dive --tenant <tenant-id>',
+          task: 'inspect.deep-dive',
+          mutating: false,
+          inspect: {
+            mode: 'deep-dive',
+            windowHours: 24
+          }
+        }
+      ]
+    };
+
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-resume-malformed-scope`);
+    const first = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'plan',
+      allowWrite: false,
+      inspectProviderScope: 'partner',
+      outDir,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+    expect(first.outcome).toBe('pending_gate');
+
+    writeFileSync(first.inputsPath, '{malformed-json', 'utf8');
+
+    const second = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'apply',
+      allowWrite: true,
+      outDir,
+      resume: first.runId,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(second.outcome).toBe('needs_input');
+    expect(second.classifications.needs_data).toBe(1);
+    expect(second.classifications.bug).toBe(0);
+    const failedStep = second.steps.find((item) => item.stepId === 'inspect_deep_dive_daily');
+    expect(failedStep?.status).toBe('failed');
+    expect(String(failedStep?.error?.detail ?? '')).toContain('both organization and partner credentials are configured');
   });
 });

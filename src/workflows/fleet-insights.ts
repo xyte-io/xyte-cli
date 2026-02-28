@@ -13,14 +13,48 @@ interface StatusCounts {
   [key: string]: number;
 }
 
+export type InspectProviderScope = 'organization' | 'partner' | 'auto';
+type ResolvedInspectProviderScope = Exclude<InspectProviderScope, 'auto'>;
+
 export interface FleetSnapshot {
   generatedAtUtc: string;
   tenantId: string;
   tenantName?: string;
+  providerScope?: ResolvedInspectProviderScope;
   devices: any[];
   spaces: any[];
   incidents: any[];
   tickets: any[];
+  partnerEnrichment?: PartnerEnrichmentSnapshot;
+}
+
+export interface PartnerEndpointOutcome {
+  attempted: number;
+  succeeded: number;
+  failed: number;
+}
+
+export interface PartnerEnrichmentSnapshot {
+  sampledDeviceCount: number;
+  totalDeviceCount: number;
+  endpointAvailability: {
+    deviceInfo: PartnerEndpointOutcome;
+    commands: PartnerEndpointOutcome;
+    telemetries: PartnerEndpointOutcome;
+    stateHistory: PartnerEndpointOutcome;
+  };
+  modelDistribution: StatusCounts;
+  firmwareDistribution: StatusCounts;
+  lastSeenRecency: StatusCounts;
+  commandPosture: StatusCounts;
+  telemetryCoverage: {
+    withTelemetries: number;
+    freshWithin24Hours: number;
+  };
+  stateHistoryCoverage: {
+    withHistory: number;
+    totalEntries: number;
+  };
 }
 
 export interface FleetInspectResult {
@@ -204,32 +238,209 @@ function redactSensitive(value: string, includeSensitive: boolean): string {
   return `${value.slice(0, 4)}...${value.slice(-4)}`;
 }
 
-async function loadAllDevices(client: XyteClient, tenantId: string): Promise<any[]> {
-  const perPage = 100;
+const PARTNER_ENRICHMENT_SAMPLE_SIZE = 25;
+const PARTNER_ENRICHMENT_CONCURRENCY = 5;
+const PARTNER_ENRICHMENT_TIMEOUT_MS = 3_000;
+const PARTNER_FRESH_TELEMETRY_WINDOW_HOURS = 24;
 
-  async function fetchAll(fetcher: (query: Record<string, any>) => Promise<any>): Promise<any[]> {
-    const all: any[] = [];
-    for (let page = 1; page <= 50; page += 1) {
-      const raw = await fetcher({ page, per_page: perPage });
-      const pageItems = extractArray(raw, ['devices', 'data', 'items']);
-      if (!pageItems.length) break;
-      all.push(...pageItems);
-      if (pageItems.length < perPage) break;
+function firstText(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
     }
+  }
+  return undefined;
+}
+
+function countValue(counter: StatusCounts, key: string): void {
+  counter[key] = (counter[key] ?? 0) + 1;
+}
+
+function endpointOutcome(): PartnerEndpointOutcome {
+  return {
+    attempted: 0,
+    succeeded: 0,
+    failed: 0
+  };
+}
+
+function totalCount(counter: StatusCounts): number {
+  return Object.values(counter).reduce((sum, value) => sum + value, 0);
+}
+
+function withTimeout<T>(operation: () => Promise<T>, timeoutMs: number): Promise<T> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+
+  return Promise.race([operation(), timeout]).finally(() => {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+  });
+}
+
+function asObject(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
+}
+
+function extractObject(value: unknown, preferredKeys: string[]): Record<string, unknown> {
+  const record = asObject(value);
+  if (!record) {
+    return {};
+  }
+  for (const key of preferredKeys) {
+    const candidate = asObject(record[key]);
+    if (candidate) {
+      return candidate;
+    }
+  }
+  return record;
+}
+
+function deviceId(value: any): string | undefined {
+  const raw = value?.id ?? value?.device_id ?? value?.device?.id;
+  if (raw === undefined || raw === null || String(raw).trim() === '') {
+    return undefined;
+  }
+  return String(raw);
+}
+
+function recencyBucket(timestamp: unknown): string {
+  const parsed = parseTimestamp(timestamp);
+  if (!parsed) {
+    return 'unknown';
+  }
+  const ageMs = Math.max(0, Date.now() - parsed.getTime());
+  if (ageMs <= 3_600_000) {
+    return '<=1h';
+  }
+  if (ageMs <= 86_400_000) {
+    return '1h-24h';
+  }
+  if (ageMs <= 604_800_000) {
+    return '1d-7d';
+  }
+  return '>7d';
+}
+
+function latestTimestamp(items: any[]): Date | undefined {
+  let latest: Date | undefined;
+  for (const item of items) {
+    const parsed = parseTimestamp(item?.timestamp ?? item?.created_at ?? item?.updated_at ?? item?.time ?? item?.recorded_at);
+    if (!parsed) {
+      continue;
+    }
+    if (!latest || parsed.getTime() > latest.getTime()) {
+      latest = parsed;
+    }
+  }
+  return latest;
+}
+
+function formatDistribution(counter: StatusCounts, sampleSize: number, maxEntries = 4): string | undefined {
+  const entries = topEntries(counter, maxEntries);
+  if (!entries.length) {
+    return undefined;
+  }
+  const visible = entries.map(([label, count]) => `${label}=${count}`);
+  const shownTotal = entries.reduce((sum, [, count]) => sum + count, 0);
+  const remaining = totalCount(counter) - shownTotal;
+  if (remaining > 0) {
+    visible.push(`other=${remaining}`);
+  }
+  return `${visible.join(', ')} (sampled ${sampleSize})`;
+}
+
+function formatCommandPosture(counter: StatusCounts, sampleSize: number): string | undefined {
+  const entries = topEntries(counter, 6);
+  if (!entries.length) {
+    return undefined;
+  }
+  return `${entries.map(([status, count]) => `${status}=${count}`).join(', ')} (sampled ${sampleSize})`;
+}
+
+function formatRecency(counter: StatusCounts, sampleSize: number): string | undefined {
+  if (totalCount(counter) === 0) {
+    return undefined;
+  }
+  const ordered = ['<=1h', '1h-24h', '1d-7d', '>7d', 'unknown'].map((bucket) => `${bucket}=${counter[bucket] ?? 0}`);
+  return `${ordered.join(', ')} (sampled ${sampleSize})`;
+}
+
+async function mapWithConcurrency<T>(items: T[], concurrency: number, operation: (item: T) => Promise<void>): Promise<void> {
+  let index = 0;
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (true) {
+        const current = index;
+        index += 1;
+        if (current >= items.length) {
+          return;
+        }
+        await operation(items[current]);
+      }
+    })
+  );
+}
+
+async function loadAllOrganizationDevices(client: XyteClient, tenantId: string): Promise<any[]> {
+  const perPage = 100;
+  const all: any[] = [];
+
+  for (let page = 1; page <= 50; page += 1) {
+    const raw = await client.organization.getDevices({
+      tenantId,
+      query: { page, per_page: perPage }
+    });
+    const pageItems = extractArray(raw, ['devices', 'data', 'items']);
+    if (!pageItems.length) {
+      break;
+    }
+    all.push(...pageItems);
+    if (pageItems.length < perPage) {
+      break;
+    }
+  }
+
+  if (all.length > 0) {
     return all;
   }
 
-  try {
-    const devices = await fetchAll((q) => client.organization.getDevices({ tenantId, query: q }));
-    if (devices.length > 0) return devices;
-  } catch { /* fall through to partner */ }
+  const single = await client.organization.getDevices({ tenantId });
+  return extractArray(single, ['devices', 'data', 'items']);
+}
 
-  try {
-    const devices = await fetchAll((q) => client.partner.getDevices({ tenantId, query: q }));
-    if (devices.length > 0) return devices;
-  } catch { /* fall through to unpaginated */ }
+async function loadAllPartnerDevices(client: XyteClient, tenantId: string): Promise<any[]> {
+  const perPage = 100;
+  const all: any[] = [];
 
-  const single = await client.organization.getDevices({ tenantId }).catch(() => client.partner.getDevices({ tenantId }));
+  for (let page = 1; page <= 50; page += 1) {
+    const raw = await client.partner.getDevices({
+      tenantId,
+      query: { page, per_page: perPage }
+    });
+    const pageItems = extractArray(raw, ['devices', 'data', 'items']);
+    if (!pageItems.length) {
+      break;
+    }
+    all.push(...pageItems);
+    if (pageItems.length < perPage) {
+      break;
+    }
+  }
+
+  if (all.length > 0) {
+    return all;
+  }
+
+  const single = await client.partner.getDevices({ tenantId });
   return extractArray(single, ['devices', 'data', 'items']);
 }
 
@@ -325,18 +536,278 @@ async function loadAllOrganizationIncidents(client: XyteClient, tenantId: string
   return extractArray(single, ['incidents', 'data', 'items']);
 }
 
-export async function collectFleetSnapshot(client: XyteClient, tenantId: string, tenantName?: string): Promise<FleetSnapshot> {
+async function loadOrganizationTickets(client: XyteClient, tenantId: string): Promise<any[]> {
+  const raw = await client.organization.getTickets({ tenantId });
+  return extractArray(raw, ['tickets', 'data', 'items']);
+}
+
+async function loadPartnerTickets(client: XyteClient, tenantId: string): Promise<any[]> {
+  const raw = await client.partner.getTickets({ tenantId });
+  return extractArray(raw, ['tickets', 'data', 'items']);
+}
+
+async function collectPartnerEnrichment(
+  client: XyteClient,
+  tenantId: string,
+  devices: any[]
+): Promise<PartnerEnrichmentSnapshot> {
+  const sampledDeviceIds = Array.from(new Set(devices.map((device) => deviceId(device)).filter((id): id is string => Boolean(id))))
+    .sort((a, b) => a.localeCompare(b))
+    .slice(0, PARTNER_ENRICHMENT_SAMPLE_SIZE);
+
+  const snapshot: PartnerEnrichmentSnapshot = {
+    sampledDeviceCount: sampledDeviceIds.length,
+    totalDeviceCount: devices.length,
+    endpointAvailability: {
+      deviceInfo: endpointOutcome(),
+      commands: endpointOutcome(),
+      telemetries: endpointOutcome(),
+      stateHistory: endpointOutcome()
+    },
+    modelDistribution: {},
+    firmwareDistribution: {},
+    lastSeenRecency: {},
+    commandPosture: {},
+    telemetryCoverage: {
+      withTelemetries: 0,
+      freshWithin24Hours: 0
+    },
+    stateHistoryCoverage: {
+      withHistory: 0,
+      totalEntries: 0
+    }
+  };
+
+  if (!sampledDeviceIds.length) {
+    return snapshot;
+  }
+
+  const baseDevicesById = new Map<string, any>();
+  for (const item of devices) {
+    const id = deviceId(item);
+    if (id && !baseDevicesById.has(id)) {
+      baseDevicesById.set(id, item);
+    }
+  }
+
+  async function safeCall(outcome: PartnerEndpointOutcome, operation: () => Promise<unknown>): Promise<unknown | undefined> {
+    outcome.attempted += 1;
+    try {
+      const value = await withTimeout(operation, PARTNER_ENRICHMENT_TIMEOUT_MS);
+      outcome.succeeded += 1;
+      return value;
+    } catch {
+      outcome.failed += 1;
+      return undefined;
+    }
+  }
+
+  await mapWithConcurrency(sampledDeviceIds, PARTNER_ENRICHMENT_CONCURRENCY, async (id) => {
+    const base = baseDevicesById.get(id);
+
+    const infoRaw = await safeCall(snapshot.endpointAvailability.deviceInfo, () =>
+      client.partner.getDeviceInfo({
+        tenantId,
+        path: { device_id: id }
+      })
+    );
+    const info = extractObject(infoRaw, ['device', 'data', 'item']);
+
+    const model = firstText(
+      info.model_name,
+      info.model,
+      info.device_model,
+      info.product_model,
+      base?.model_name,
+      base?.model,
+      base?.device_model,
+      base?.product_model
+    );
+    countValue(snapshot.modelDistribution, model ?? 'unknown');
+
+    const firmware = firstText(
+      info.firmware_version,
+      info.firmware,
+      info.software_version,
+      info.version,
+      base?.firmware_version,
+      base?.firmware,
+      base?.software_version,
+      base?.version
+    );
+    countValue(snapshot.firmwareDistribution, firmware ?? 'unknown');
+
+    const lastSeen = firstText(
+      info.last_seen_at,
+      info.last_seen,
+      info.updated_at,
+      base?.last_seen_at,
+      base?.last_seen,
+      base?.state?.last_seen_at
+    );
+    countValue(snapshot.lastSeenRecency, recencyBucket(lastSeen));
+
+    const commandsRaw = await safeCall(snapshot.endpointAvailability.commands, () =>
+      client.partner.getCommands({
+        tenantId,
+        path: { device_id: id }
+      })
+    );
+    const commands = extractArray(commandsRaw, ['commands', 'data', 'items']);
+    for (const command of commands) {
+      const status = firstText(command?.status, command?.state, command?.result);
+      countValue(snapshot.commandPosture, status ? status.toLowerCase() : 'unknown');
+    }
+
+    const telemetriesRaw = await safeCall(snapshot.endpointAvailability.telemetries, () =>
+      client.partner.getTelemetries({
+        tenantId,
+        path: { device_id: id }
+      })
+    );
+    const telemetries = extractArray(telemetriesRaw, ['telemetries', 'data', 'items']);
+    if (telemetries.length > 0) {
+      snapshot.telemetryCoverage.withTelemetries += 1;
+      const latest = latestTimestamp(telemetries);
+      if (latest) {
+        const age = Math.max(0, Date.now() - latest.getTime());
+        if (age <= PARTNER_FRESH_TELEMETRY_WINDOW_HOURS * 3_600_000) {
+          snapshot.telemetryCoverage.freshWithin24Hours += 1;
+        }
+      }
+    }
+
+    const historyRaw = await safeCall(snapshot.endpointAvailability.stateHistory, () =>
+      client.partner.getStateHistory({
+        tenantId,
+        path: { device_id: id }
+      })
+    );
+    const history = extractArray(historyRaw, ['history', 'state_history', 'states', 'data', 'items']);
+    if (history.length > 0) {
+      snapshot.stateHistoryCoverage.withHistory += 1;
+      snapshot.stateHistoryCoverage.totalEntries += history.length;
+    }
+  });
+
+  return snapshot;
+}
+
+function buildPartnerSummaryLines(snapshot: FleetSnapshot): string[] {
+  if (snapshot.providerScope !== 'partner' || !snapshot.partnerEnrichment || snapshot.partnerEnrichment.sampledDeviceCount === 0) {
+    return [];
+  }
+
+  const enrichment = snapshot.partnerEnrichment;
+  const sampled = enrichment.sampledDeviceCount;
+  const lines: string[] = [];
+
+  const modelDistribution = formatDistribution(enrichment.modelDistribution, sampled);
+  if (modelDistribution) {
+    lines.push(`Partner model distribution: ${modelDistribution}.`);
+  }
+
+  const firmwareDistribution = formatDistribution(enrichment.firmwareDistribution, sampled);
+  if (firmwareDistribution) {
+    lines.push(`Partner firmware distribution: ${firmwareDistribution}.`);
+  }
+
+  const recency = formatRecency(enrichment.lastSeenRecency, sampled);
+  if (recency) {
+    lines.push(`Partner last-seen recency: ${recency}.`);
+  }
+
+  const commandPosture = formatCommandPosture(enrichment.commandPosture, sampled);
+  if (commandPosture) {
+    lines.push(`Partner command posture: ${commandPosture}.`);
+  }
+
+  if (enrichment.endpointAvailability.telemetries.succeeded > 0) {
+    lines.push(
+      `Partner telemetry coverage: ${enrichment.telemetryCoverage.withTelemetries}/${sampled} devices with telemetries, ${enrichment.telemetryCoverage.freshWithin24Hours}/${sampled} fresh <=24h.`
+    );
+  }
+
+  if (enrichment.endpointAvailability.stateHistory.succeeded > 0) {
+    lines.push(
+      `Partner state history coverage: ${enrichment.stateHistoryCoverage.withHistory}/${sampled} devices with history, ${enrichment.stateHistoryCoverage.totalEntries} entries.`
+    );
+  }
+
+  return lines;
+}
+
+async function resolveInspectProviderScope(
+  client: XyteClient,
+  tenantId: string,
+  providerScope: InspectProviderScope
+): Promise<ResolvedInspectProviderScope> {
+  const endpoints = await client.listTenantEndpoints(tenantId);
+  const hasOrganization = endpoints.some((endpoint) => endpoint.authScope === 'organization');
+  const hasPartner = endpoints.some((endpoint) => endpoint.authScope === 'partner');
+
+  if (providerScope === 'organization') {
+    if (!hasOrganization) {
+      throw new Error(
+        `Inspect provider scope "organization" is unavailable for tenant ${tenantId}. Configure an xyte-org key or run with --provider-scope partner (inspect) or --inspect-provider-scope partner (flow run).`
+      );
+    }
+    return 'organization';
+  }
+
+  if (providerScope === 'partner') {
+    if (!hasPartner) {
+      throw new Error(
+        `Inspect provider scope "partner" is unavailable for tenant ${tenantId}. Configure an xyte-partner key or run with --provider-scope organization (inspect) or --inspect-provider-scope organization (flow run).`
+      );
+    }
+    return 'partner';
+  }
+
+  if (hasOrganization && hasPartner) {
+    throw new Error(
+      `Inspect provider scope is ambiguous for tenant ${tenantId}: both organization and partner credentials are configured. Re-run with --provider-scope organization|partner (or --inspect-provider-scope for flow run).`
+    );
+  }
+
+  if (hasPartner) {
+    return 'partner';
+  }
+
+  // Preserve prior missing-key behavior when no provider is configured.
+  return 'organization';
+}
+
+export async function collectFleetSnapshot(
+  client: XyteClient,
+  tenantId: string,
+  tenantName?: string,
+  providerScope: InspectProviderScope = 'auto'
+): Promise<FleetSnapshot> {
   return withSpan('xyte.inspect.collect_snapshot', { 'xyte.tenant.id': tenantId }, async () => {
-    const [devices, spaces, incidents, orgTicketsRaw, partnerTicketsRaw] = await Promise.all([
-      loadAllDevices(client, tenantId),
-      loadAllSpaces(client, tenantId),
-      loadAllOrganizationIncidents(client, tenantId),
-      client.organization.getTickets({ tenantId }).catch(() => ({ items: [] })),
-      client.partner.getTickets({ tenantId }).catch(() => ({ items: [] }))
-    ]);
-    const orgTickets = extractArray(orgTicketsRaw, ['tickets', 'data', 'items']);
-    const partnerTickets = extractArray(partnerTicketsRaw, ['tickets', 'data', 'items']);
-    const tickets = [...orgTickets, ...partnerTickets];
+    const resolvedScope = await resolveInspectProviderScope(client, tenantId, providerScope);
+    let devices: any[];
+    let spaces: any[];
+    let incidents: any[];
+    let tickets: any[];
+    let partnerEnrichment: PartnerEnrichmentSnapshot | undefined;
+
+    if (resolvedScope === 'organization') {
+      [devices, spaces, incidents, tickets] = await Promise.all([
+        loadAllOrganizationDevices(client, tenantId),
+        loadAllSpaces(client, tenantId),
+        loadAllOrganizationIncidents(client, tenantId),
+        loadOrganizationTickets(client, tenantId)
+      ]);
+    } else {
+      [devices, tickets] = await Promise.all([
+        loadAllPartnerDevices(client, tenantId),
+        loadPartnerTickets(client, tenantId)
+      ]);
+      spaces = [];
+      incidents = [];
+      partnerEnrichment = await collectPartnerEnrichment(client, tenantId, devices);
+    }
 
     const stableSort = (items: any[]) =>
       items.slice().sort((a, b) => identifier(a?.id ?? a?.name ?? a?.title).localeCompare(identifier(b?.id ?? b?.name ?? b?.title)));
@@ -345,10 +816,12 @@ export async function collectFleetSnapshot(client: XyteClient, tenantId: string,
       generatedAtUtc: new Date().toISOString(),
       tenantId,
       tenantName,
+      providerScope: resolvedScope,
       devices: stableSort(devices),
       spaces: stableSort(spaces),
       incidents: stableSort(incidents),
-      tickets: stableSort(tickets)
+      tickets: stableSort(tickets),
+      partnerEnrichment
     };
   });
 }
@@ -487,11 +960,20 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
     .sort((a, b) => b.ageHours - a.ageHours)
     .slice(0, 20);
 
+  const includeIncidentAndSpaceSummary = snapshot.providerScope !== 'partner';
+  const partnerSummaryLines = buildPartnerSummaryLines(snapshot);
   const summary = [
     `Devices: ${snapshot.devices.length} total, ${offlineDevices.length} offline (${pct(offlineDevices.length, snapshot.devices.length)}%).`,
-    `Incidents: ${snapshot.incidents.length} total, ${activeIncidents.length} active (${pct(activeIncidents.length, snapshot.incidents.length)}%).`,
+    ...(includeIncidentAndSpaceSummary
+      ? [
+          `Incidents: ${snapshot.incidents.length} total, ${activeIncidents.length} active (${pct(activeIncidents.length, snapshot.incidents.length)}%).`
+        ]
+      : []),
     `Tickets: ${snapshot.tickets.length} total, ${openTickets.length} open.`,
-    `${windowHours}h churn: ${recentIncidents.length} incidents across ${Object.keys(recentDevice).length} devices and ${Object.keys(recentSpace).length} spaces.`,
+    ...(includeIncidentAndSpaceSummary
+      ? [`${windowHours}h churn: ${recentIncidents.length} incidents across ${Object.keys(recentDevice).length} devices and ${Object.keys(recentSpace).length} spaces.`]
+      : []),
+    ...partnerSummaryLines,
     `Data quality: ${mismatches.length} status mismatches detected.`
   ];
 
@@ -524,30 +1006,62 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
 }
 
 export function formatDeepDiveAscii(result: DeepDiveResult): string {
+  const hasOfflineSpaceData = result.topOfflineSpaces.length > 0;
+  const hasIncidentData =
+    result.topIncidentDevices.length > 0 ||
+    result.activeIncidentAging.length > 0 ||
+    result.churn24h.incidents > 0 ||
+    result.churn24h.bySpace.length > 0 ||
+    result.churn24h.byDevice.length > 0;
+  const hasTicketData = result.ticketPosture.openTickets > 0 || result.ticketPosture.oldestOpenTickets.length > 0;
+
   const lines: string[] = [];
   lines.push(`Deep Dive (${result.tenantId})`);
   lines.push(`Generated: ${result.generatedAtUtc}`);
   lines.push('');
   lines.push('SUMMARY');
   result.summary.forEach((line) => lines.push(`- ${line}`));
-  lines.push('');
-  lines.push('TOP OFFLINE SPACES');
-  result.topOfflineSpaces.forEach((row) => lines.push(`${row.space} | offline=${row.offlineDevices} | share=${row.shareOfOfflinePct}%`));
-  lines.push('');
-  lines.push('TOP INCIDENT DEVICES');
-  result.topIncidentDevices.forEach((row) =>
-    lines.push(`${row.device} | incidents=${row.incidentCount} | active=${row.activeIncidents}`)
-  );
-  lines.push('');
-  lines.push(`24H CHURN: incidents=${result.churn24h.incidents} devices=${result.churn24h.devices} spaces=${result.churn24h.spaces}`);
-  result.churn24h.bySpace.forEach((row) => lines.push(`space: ${row.space} -> ${row.incidents}`));
-  lines.push('');
-  lines.push(`OPEN TICKETS: ${result.ticketPosture.openTickets}`);
-  lines.push(`OVERLAP DEVICES: ${result.ticketPosture.overlappingActiveIncidentDevices}`);
+
+  if (hasOfflineSpaceData) {
+    lines.push('');
+    lines.push('TOP OFFLINE SPACES');
+    result.topOfflineSpaces.forEach((row) => lines.push(`${row.space} | offline=${row.offlineDevices} | share=${row.shareOfOfflinePct}%`));
+  }
+
+  if (hasIncidentData) {
+    lines.push('');
+    lines.push('TOP INCIDENT DEVICES');
+    result.topIncidentDevices.forEach((row) =>
+      lines.push(`${row.device} | incidents=${row.incidentCount} | active=${row.activeIncidents}`)
+    );
+    lines.push('');
+    lines.push(`24H CHURN: incidents=${result.churn24h.incidents} devices=${result.churn24h.devices} spaces=${result.churn24h.spaces}`);
+    result.churn24h.bySpace.forEach((row) => lines.push(`space: ${row.space} -> ${row.incidents}`));
+  }
+
+  if (hasTicketData) {
+    lines.push('');
+    lines.push(`OPEN TICKETS: ${result.ticketPosture.openTickets}`);
+    if (hasIncidentData) {
+      lines.push(`OVERLAP DEVICES: ${result.ticketPosture.overlappingActiveIncidentDevices}`);
+    }
+  }
+
   return lines.join('\n');
 }
 
 export function formatDeepDiveMarkdown(result: DeepDiveResult, includeSensitive = false): string {
+  const hasOfflineSpaceData = result.topOfflineSpaces.length > 0;
+  const hasIncidentData =
+    result.topIncidentDevices.length > 0 ||
+    result.activeIncidentAging.length > 0 ||
+    result.churn24h.incidents > 0 ||
+    result.churn24h.bySpace.length > 0 ||
+    result.churn24h.byDevice.length > 0;
+  const hasTicketData = result.ticketPosture.openTickets > 0 || result.ticketPosture.oldestOpenTickets.length > 0;
+  const hasDataQualityIssues = result.dataQuality.statusMismatches.length > 0;
+  const partnerHighlights = result.summary.filter((line) => line.startsWith('Partner '));
+
   const markdown: string[] = [];
   markdown.push('# Xyte Fleet Deep Dive');
   markdown.push('');
@@ -558,54 +1072,77 @@ export function formatDeepDiveMarkdown(result: DeepDiveResult, includeSensitive 
   markdown.push('## Summary');
   markdown.push('');
   result.summary.forEach((line) => markdown.push(`- ${line}`));
-  markdown.push('');
-  markdown.push('## Top Offline Spaces');
-  markdown.push('');
-  markdown.push('| Space | Offline Devices | Share |');
-  markdown.push('| --- | ---: | ---: |');
-  result.topOfflineSpaces.forEach((row) => markdown.push(`| ${row.space} | ${row.offlineDevices} | ${row.shareOfOfflinePct}% |`));
-  markdown.push('');
-  markdown.push('## Top Devices by Incident Volume');
-  markdown.push('');
-  markdown.push('| Device | Incidents | Active |');
-  markdown.push('| --- | ---: | ---: |');
-  result.topIncidentDevices.forEach((row) => markdown.push(`| ${row.device} | ${row.incidentCount} | ${row.activeIncidents} |`));
-  markdown.push('');
-  markdown.push(`## ${result.windowHours}-Hour Churn`);
-  markdown.push('');
-  markdown.push(
-    `Incidents: **${result.churn24h.incidents}**, devices: **${result.churn24h.devices}**, spaces: **${result.churn24h.spaces}**.`
-  );
-  markdown.push('');
-  markdown.push('| Space | Incidents |');
-  markdown.push('| --- | ---: |');
-  result.churn24h.bySpace.forEach((row) => markdown.push(`| ${row.space} | ${row.incidents} |`));
-  markdown.push('');
-  markdown.push('| Device | Incidents |');
-  markdown.push('| --- | ---: |');
-  result.churn24h.byDevice.forEach((row) => markdown.push(`| ${row.device} | ${row.incidents} |`));
-  markdown.push('');
-  markdown.push('## Ticket Posture');
-  markdown.push('');
-  markdown.push(`- Open tickets: **${result.ticketPosture.openTickets}**`);
-  markdown.push(`- Overlapping active-incident devices: **${result.ticketPosture.overlappingActiveIncidentDevices}**`);
-  markdown.push('');
-  markdown.push('| Ticket ID | Title | Age (h) | Device ID | Created At |');
-  markdown.push('| --- | --- | ---: | --- | --- |');
-  result.ticketPosture.oldestOpenTickets.slice(0, 10).forEach((row) => {
+
+  if (partnerHighlights.length > 0) {
+    markdown.push('');
+    markdown.push('## Partner Highlights');
+    markdown.push('');
+    partnerHighlights.forEach((line) => markdown.push(`- ${line}`));
+  }
+
+  if (hasOfflineSpaceData) {
+    markdown.push('');
+    markdown.push('## Top Offline Spaces');
+    markdown.push('');
+    markdown.push('| Space | Offline Devices | Share |');
+    markdown.push('| --- | ---: | ---: |');
+    result.topOfflineSpaces.forEach((row) => markdown.push(`| ${row.space} | ${row.offlineDevices} | ${row.shareOfOfflinePct}% |`));
+  }
+
+  if (hasIncidentData) {
+    markdown.push('');
+    markdown.push('## Top Devices by Incident Volume');
+    markdown.push('');
+    markdown.push('| Device | Incidents | Active |');
+    markdown.push('| --- | ---: | ---: |');
+    result.topIncidentDevices.forEach((row) => markdown.push(`| ${row.device} | ${row.incidentCount} | ${row.activeIncidents} |`));
+    markdown.push('');
+    markdown.push(`## ${result.windowHours}-Hour Churn`);
+    markdown.push('');
     markdown.push(
-      `| ${redactSensitive(row.ticketId, includeSensitive)} | ${row.title} | ${row.ageHours} | ${redactSensitive(
-        row.deviceId,
-        includeSensitive
-      )} | ${row.createdAtUtc} |`
+      `Incidents: **${result.churn24h.incidents}**, devices: **${result.churn24h.devices}**, spaces: **${result.churn24h.spaces}**.`
     );
-  });
-  markdown.push('');
-  markdown.push('## Data Quality');
-  markdown.push('');
-  if (!result.dataQuality.statusMismatches.length) {
-    markdown.push('No status mismatches detected.');
-  } else {
+    if (result.churn24h.bySpace.length > 0) {
+      markdown.push('');
+      markdown.push('| Space | Incidents |');
+      markdown.push('| --- | ---: |');
+      result.churn24h.bySpace.forEach((row) => markdown.push(`| ${row.space} | ${row.incidents} |`));
+    }
+    if (result.churn24h.byDevice.length > 0) {
+      markdown.push('');
+      markdown.push('| Device | Incidents |');
+      markdown.push('| --- | ---: |');
+      result.churn24h.byDevice.forEach((row) => markdown.push(`| ${row.device} | ${row.incidents} |`));
+    }
+  }
+
+  if (hasTicketData) {
+    markdown.push('');
+    markdown.push('## Ticket Posture');
+    markdown.push('');
+    markdown.push(`- Open tickets: **${result.ticketPosture.openTickets}**`);
+    if (hasIncidentData) {
+      markdown.push(`- Overlapping active-incident devices: **${result.ticketPosture.overlappingActiveIncidentDevices}**`);
+    }
+    if (result.ticketPosture.oldestOpenTickets.length > 0) {
+      markdown.push('');
+      markdown.push('| Ticket ID | Title | Age (h) | Device ID | Created At |');
+      markdown.push('| --- | --- | ---: | --- | --- |');
+      result.ticketPosture.oldestOpenTickets.slice(0, 10).forEach((row) => {
+        markdown.push(
+          `| ${redactSensitive(row.ticketId, includeSensitive)} | ${row.title} | ${row.ageHours} | ${redactSensitive(
+            row.deviceId,
+            includeSensitive
+          )} | ${row.createdAtUtc} |`
+        );
+      });
+    }
+  }
+
+  if (hasDataQualityIssues) {
+    markdown.push('');
+    markdown.push('## Data Quality');
+    markdown.push('');
     markdown.push('| Device | Status | state.status | Last Seen | Space |');
     markdown.push('| --- | --- | --- | --- | --- |');
     result.dataQuality.statusMismatches.forEach((row) =>

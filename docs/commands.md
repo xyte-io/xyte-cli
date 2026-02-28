@@ -16,7 +16,7 @@ Use it as a unified map for flow runner execution, utility pipelines, and endpoi
 
 ```bash
 xyte-cli flow list
-xyte-cli flow run <flow-id> --tenant <tenant-id> [--plan|--apply] [--allow-write] [--resume <run-id-or-path>] [--out-dir <path>] [--context-json <path>] [--var key=value ...] [--once] [--strict-json]
+xyte-cli flow run <flow-id> --tenant <tenant-id> [--plan|--apply] [--allow-write] [--resume <run-id-or-path>] [--out-dir <path>] [--inspect-provider-scope organization|partner|auto] [--context-json <path>] [--var key=value ...] [--once] [--strict-json]
 ```
 
 Notes:
@@ -42,7 +42,7 @@ xyte-cli install --skills [--scope project|user|both] [--agents all|claude|copil
 xyte-cli doctor install --format json
 xyte-cli status [--tenant <tenant-id>] [--mode fast|full] [--format json|text]
 xyte-cli setup status --tenant <tenant-id> --format json
-xyte-cli setup run [--non-interactive] [--tenant <tenant-id>] [--key <value>] [--connectivity auto|always|never]
+xyte-cli setup run [--non-interactive] [--tenant <tenant-id>] [--name <display-name>] [--provider xyte-org|xyte-partner] [--key <value>] [--connectivity auto|always|never]
 xyte-cli config doctor --tenant <tenant-id> --format json
 xyte-cli upgrade --check --format json
 xyte-cli upgrade --yes --format json
@@ -52,6 +52,11 @@ xyte-cli logs stats [--path <path>] [--format text|json]
 xyte-cli logs gc [--path <path>] [--max-files <n>] [--max-age-days <days>] [--dry-run] [--format text|json]
 xyte-cli logs view [--path <path>] [--limit <n>]
 ```
+
+Setup notes:
+- Use `--provider xyte-partner` for partner-only tenants.
+- For `xyte-org`, when `--name` is omitted, setup attempts to populate tenant display name from `organization.getOrganizationInfo`.
+- Explicit `--name` always takes precedence over auto-detected names.
 
 ## Tenant And Auth Slots
 
@@ -146,10 +151,17 @@ xyte-cli space import-tree --tenant <tenant-id> --input ./tmp/space-import-tree.
 ## Insights And Reports
 
 ```bash
-xyte-cli inspect fleet --tenant <tenant-id> --format json
-xyte-cli inspect deep-dive --tenant <tenant-id> --window 24 --format json > /tmp/deep-dive.json
+xyte-cli inspect fleet --tenant <tenant-id> --provider-scope auto --format json
+xyte-cli inspect deep-dive --tenant <tenant-id> --provider-scope auto --window 24 --format json > /tmp/deep-dive.json
 xyte-cli report generate --tenant <tenant-id> --input /tmp/deep-dive.json --out /tmp/xyte-report.pdf
 ```
+
+Provider scope behavior:
+- `--provider-scope auto` selects the only configured credential scope.
+- If both `xyte-org` and `xyte-partner` are configured, `auto` fails and requires explicit `organization` or `partner`.
+- Inspect pipelines are scope-strict: organization mode does not call partner endpoints, and partner mode does not call organization endpoints.
+- Partner deep-dive/report enrichment is best-effort; optional partner enrichment endpoint failures do not block report generation.
+- Partner reports include `Partner Highlights` when partner enrichment data is available.
 
 ## TUI And Headless
 
