@@ -844,7 +844,7 @@ describe('flow runner', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const definition: BuiltInFlowDefinition = {
-      id: 'flow.daily-fleet-inspect',
+      id: 'flow.daily-deep-dive-report',
       title: 'Resume explicit scope precedence',
       intent: 'explicit inspect scope overrides persisted scope',
       writeCapable: true,
