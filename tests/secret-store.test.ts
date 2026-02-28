@@ -75,6 +75,44 @@ describe('secret store backends', () => {
     expect(raw.records['acme:xyte-device:edge']).toBeUndefined();
   });
 
+  it('logs a warning when normalized migration cannot be persisted', async () => {
+    const { FileSecretStore } = await loadSecretStoreModule();
+    const root = mkdtempSync(join(tmpdir(), 'xyte-secret-store-migration-write-fail-'));
+    const filePath = join(root, 'secrets.v1.json');
+    writeFileSync(
+      filePath,
+      JSON.stringify(
+        {
+          version: 1,
+          records: {
+            'acme:xyte-org:primary': 'org-key',
+            'acme:xyte-device:edge': 'device-key'
+          }
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const writeError = new Error('read-only file system') as NodeJS.ErrnoException;
+    writeError.code = 'EROFS';
+    const writeFileSpy = vi.spyOn(nodeFs.promises, 'writeFile').mockRejectedValue(writeError);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      const store = new FileSecretStore(filePath);
+      expect(await store.getSlotSecret('acme', 'xyte-org', 'primary')).toBe('org-key');
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      const [message] = warnSpy.mock.calls[0] ?? [];
+      expect(String(message)).toContain('Failed to persist normalized secret data');
+      expect(String(message)).toContain(filePath);
+    } finally {
+      writeFileSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+
   it('raises explicit error when persisted file is corrupt', async () => {
     const { FileSecretStore } = await loadSecretStoreModule();
     const root = mkdtempSync(join(tmpdir(), 'xyte-secret-store-corrupt-'));

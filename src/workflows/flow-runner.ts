@@ -221,6 +221,14 @@ function requiresDestructiveGuard(method: string): boolean {
   return method.toUpperCase() === 'DELETE';
 }
 
+function buildReportInputNeedsDataMessage(stepId: string, inputStepId: string, cause: unknown): string {
+  const base = `Step ${stepId} requires deep-dive output from ${inputStepId}.`;
+  if (!(cause instanceof Error) || cause.message.trim().length === 0) {
+    return base;
+  }
+  return `${base} ${cause.message}`;
+}
+
 function extractPrimaryOutputPath(value: unknown): string | undefined {
   if (!isRecord(value)) {
     return undefined;
@@ -348,10 +356,8 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
       let deepDiveForReport;
       try {
         deepDiveForReport = parseDeepDiveForReport(input, ctx.args.tenantId);
-      } catch {
-        throw new FlowNeedsInputError(
-          `Step ${step.id} requires deep-dive output from ${step.report.inputFromStepId}.`
-        );
+      } catch (error) {
+        throw new FlowNeedsInputError(buildReportInputNeedsDataMessage(step.id, step.report.inputFromStepId, error));
       }
       const outPath = path.join(ctx.outputsDir, step.report.outFileName);
       const generated = await generateFleetReport({

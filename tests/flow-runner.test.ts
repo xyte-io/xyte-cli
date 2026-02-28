@@ -604,6 +604,69 @@ describe('flow runner', () => {
     expect(existsSync(reportArtifact!)).toBe(true);
   });
 
+  it('preserves deep-dive parse failure reason in report.generate needs_input errors', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.daily-deep-dive-report',
+      title: 'Report parse failure context',
+      intent: 'surface report input parse details',
+      writeCapable: false,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'task',
+          id: 'status_fast',
+          title: 'Status Fast',
+          command: 'xyte-cli status --mode fast',
+          task: 'status.fast',
+          mutating: false
+        },
+        {
+          kind: 'task',
+          id: 'report_daily',
+          title: 'Generate Report',
+          command: 'xyte-cli report generate --tenant <tenant-id>',
+          task: 'report.generate',
+          mutating: false,
+          report: {
+            inputFromStepId: 'status_fast',
+            outFileName: 'daily.md',
+            format: 'markdown'
+          }
+        }
+      ]
+    };
+
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-report-parse-context`);
+    const result = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'plan',
+      allowWrite: false,
+      outDir,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(result.outcome).toBe('needs_input');
+    expect(result.classifications.needs_data).toBe(1);
+    expect(result.classifications.bug).toBe(0);
+    const failedStep = result.steps.find((item) => item.stepId === 'report_daily');
+    expect(failedStep?.status).toBe('failed');
+    expect(failedStep?.classification).toBe('needs_data');
+    expect(String(failedStep?.error?.detail ?? '')).toContain('Step report_daily requires deep-dive output from status_fast.');
+    expect(String(failedStep?.error?.detail ?? '')).toContain(
+      'Input JSON must be produced by `xyte-cli inspect deep-dive --format json`.'
+    );
+  });
+
   it('classifies ambiguous auto inspect scope as needs_input when both provider credentials exist', async () => {
     const { profileStore, secretStore, client } = await makeClientWithProviders(['xyte-org', 'xyte-partner']);
 

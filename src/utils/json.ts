@@ -6,8 +6,9 @@ export function parseJsonObject(value: string | undefined, fallback: Record<stri
   let parsed: unknown;
   try {
     parsed = JSON.parse(value) as unknown;
-  } catch {
-    throw new Error('Expected a JSON object.');
+  } catch (error) {
+    const detail = error instanceof Error && error.message.trim().length > 0 ? `: ${error.message}` : '.';
+    throw new Error(`Invalid JSON${detail}`);
   }
   if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
     throw new Error('Expected a JSON object.');
