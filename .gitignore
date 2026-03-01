@@ -15,8 +15,17 @@ tmp/poc-incident-watch/
 tmp/poc-incident-watch-recordings/
 artifacts/
 **/artifacts/
+demo/
 marketing/
 .desloppify/
+
+# Local tooling scratch files
+AGENTS.md
+apply
+approve
+review
+scorecard.png
+video/
 
 # POC / Remotion generated artifacts
 demo/remotion/src/timeline.generated.json

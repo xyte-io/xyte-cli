@@ -1,262 +1,244 @@
 # xyte-cli
 
-Deterministic Xyte operations for agents and operators: CLI, full TUI, and headless JSON snapshots.
+Deterministic Xyte operations for humans and AI agents.
 
-- Changelog: [`CHANGELOG.md`](CHANGELOG.md)
-- Security policy: [`SECURITY.md`](SECURITY.md)
-- Release guide: [`docs/release.md`](docs/release.md)
+- npm: [@xyteai/cli](https://www.npmjs.com/package/@xyteai/cli)
+- GitHub Page: [docs/index.html](./docs/index.html)
+- Command reference: [docs/commands.md](./docs/commands.md)
+- Flows: [docs/flows/agent-ops.md](./docs/flows/agent-ops.md)
+- Schemas: [docs/schemas](./docs/schemas)
 
-## Install
+## AI Agent Prompt (Copy/Paste)
+
+```text
+Use @xyteai/cli in this workspace. Keep it concise and safe.
+
+Rules:
+- Never print secrets.
+- Do not use --allow-write.
+- Do not invent IDs or outputs.
+
+Run:
+npm install -g @xyteai/cli@latest
+xyte-cli install --skills
+
+Then ask me for XYTE_CLI_KEY and run:
+XYTE_CLI_KEY="<key>" xyte-cli setup run --non-interactive --connectivity auto
+xyte-cli setup status --format json
+
+Read tenantId from setup status and continue:
+xyte-cli watch --tenant <tenant-id> --profile incidents-active --once
+xyte-cli inspect deep-dive --tenant <tenant-id> --window 24 --format json > deep-dive.json
+xyte-cli report generate --tenant <tenant-id> --input deep-dive.json --out fleet-report.pdf
+
+Finish with:
+- concise success/failure summary
+- exact failing command (if any)
+```
+
+---
+
+## Install Flow
+
+### 1) Install CLI
 
 ```bash
 npm install -g @xyteai/cli@latest
-xyte-cli --help
+xyte-cli --version
 ```
 
-## Quick Start
-
-### 1) Configure a tenant + key
-
-```bash
-XYTE_CLI_KEY="<your-key>" \
-xyte-cli setup run --non-interactive --tenant acme --provider xyte-org --connectivity auto
-xyte-cli status --tenant acme --mode fast --format json
-```
-
-Notes:
-- For partner-only onboarding, set `--provider xyte-partner`.
-- For organization onboarding, if `--name` is omitted, setup attempts to populate tenant display name from `organization.getOrganizationInfo`.
-- Explicit `--name` always overrides auto-detected tenant display name.
-
-### 2) Run read-only fleet checks
-
-```bash
-xyte-cli inspect fleet --tenant acme --provider-scope auto --format json
-xyte-cli inspect deep-dive --tenant acme --provider-scope auto --window 24 --format json > /tmp/deep-dive.json
-```
-
-### 3) Generate a report
-
-```bash
-xyte-cli report generate --tenant acme --input /tmp/deep-dive.json --out /tmp/xyte-report.pdf
-```
-
-Report behavior:
-- Reports are data-driven (`data -> summary -> PDF`): only collected data is summarized and rendered.
-- Partner deep-dive/report enrichment is best-effort and uses partner read endpoints; optional enrichment failures do not block report generation.
-- Partner reports include a dedicated `Partner Highlights` block when partner enrichment data is available.
-
-### 4) Run headless snapshots for agents
-
-```bash
-xyte-cli tui --headless --screen dashboard --once --format json --tenant acme
-```
-
-## Safety Model
-
-- Write endpoints require `--allow-write`.
-- Destructive endpoints require `--allow-write` and `--confirm <endpoint-key>`.
-- `tui --headless` is read-only snapshot mode.
-- `space import-tree` is dry-run by default; writes require `--apply`.
-
-Example guarded write:
-
-```bash
-xyte-cli call organization.commands.sendCommand \
-  --tenant acme \
-  --allow-write \
-  --path-json '{"device_id":"DEVICE_ID"}' \
-  --body-json '{"command":"reboot"}'
-```
-
-## Output Modes And Contracts
-
-- Human-readable and JSON-first workflows are both supported.
-- Endpoint calls can emit envelope contracts:
-
-```bash
-xyte-cli call organization.devices.getDevices --tenant acme --output-mode envelope --strict-json
-```
-
-- Incident delta watch can emit NDJSON watch frames:
-
-```bash
-xyte-cli watch --tenant acme --profile incidents-active --interval-ms 2000 --max-polls 2 --strict-json
-```
-
-- Watch guardrails are enforced to protect API capacity:
-  - `--interval-ms` minimum is `1000`.
-  - default polling is bounded when `--max-polls` is omitted.
-  - `--max-polls` hard cap is `3600`.
-
-- CLI error output can be forced to machine-readable JSON with `--error-format json` (or `XYTE_ERROR_FORMAT=json`).
-- Stable schema IDs:
-  - `xyte.headless.frame.v1`
-  - `xyte.call.envelope.v1`
-  - `xyte.watch.frame.v1`
-  - `xyte.inspect.fleet.v1`
-  - `xyte.inspect.deep-dive.v1`
-  - `xyte.report.v1`
-  - `xyte.utility.batch.v1`
-  - `xyte.utility.prepare.v1`
-  - `xyte.status.v1`
-  - `xyte.upgrade.check.v1`
-  - `xyte.upgrade.result.v1`
-  - `xyte.flow.run.v1`
-- Schemas live in [`docs/schemas`](docs/schemas).
-
-## Action Logging
-
-- Enable real command lifecycle logging with `--log-actions` (writes NDJSON logs and mirrors action events to stderr for that invocation).
-- Override the log file path with `--log-actions-path <path>`.
-- Default payload is minimal (`commandPath`, lifecycle event, duration/exit status). Use `--log-actions-verbose` only when you need args/options detail.
-- Rotation defaults: `10MB` per file, `5` files total (active + rotated).
-- Set `XYTE_LOG_ACTIONS_MAX_FILES=1` to keep only the active file (no rotated history).
-- Environment toggles (logging and stderr mirroring are separate when set via env):
-  - `XYTE_LOG_ACTIONS=1`
-  - `XYTE_LOG_ACTIONS_PATH=/abs/path/cli-actions.ndjson`
-  - `XYTE_LOG_ACTIONS_STDERR=1`
-  - `XYTE_LOG_ACTIONS_VERBOSE=1`
-  - `XYTE_LOG_ACTIONS_MAX_FILE_BYTES=10485760`
-  - `XYTE_LOG_ACTIONS_MAX_FILES=5`
-
-Examples:
-
-```bash
-xyte-cli --log-actions --log-actions-path /tmp/xyte-cli.actions.ndjson status --tenant acme
-xyte-cli --log-actions --log-actions-verbose call organization.devices.getDevices --tenant acme
-xyte-cli logs list --path /tmp/xyte-cli.actions.ndjson --limit 200
-xyte-cli logs stats --path /tmp/xyte-cli.actions.ndjson
-xyte-cli logs gc --path /tmp/xyte-cli.actions.ndjson --max-files 3 --max-age-days 14 --dry-run
-xyte-cli logs view --path /tmp/xyte-cli.actions.ndjson
-```
-
-## Common Workflows And Utilities
-
-### Deterministic Flow Runner
-
-Use deterministic flow packs when an agent/operator needs repeatable incident and remediation loops:
-
-- [`flow.setup-readiness-10m`](docs/flows/agent-ops.md#flowsetup-readiness-10m): readiness and connectivity baseline.
-- [`flow.incidents-delta-watch`](docs/flows/agent-ops.md#flowincidents-delta-watch): incident NDJSON delta streaming.
-- [`flow.watch-to-triage`](docs/flows/agent-ops.md#flowwatch-to-triage): convert watch output into triage artifacts.
-- [`flow.guided-remediation`](docs/flows/agent-ops.md#flowguided-remediation): guarded command/ticket/incident writes.
-- [`flow.bulk-claim-and-space-import`](docs/flows/agent-ops.md#flowbulk-claim-and-space-import): preprocess + dry-run + apply for claim/import operations.
-- [`flow.daily-deep-dive-report`](docs/flows/agent-ops.md#flowdaily-deep-dive-report): daily deep-dive and markdown reporting.
-
-```bash
-xyte-cli flow list
-xyte-cli flow run flow.setup-readiness-10m --tenant acme --inspect-provider-scope auto --plan
-xyte-cli flow run flow.guided-remediation --tenant acme --inspect-provider-scope auto --plan --context-json ./flow.ctx.json
-xyte-cli flow run flow.guided-remediation --tenant acme --inspect-provider-scope organization --apply --allow-write --resume <run-id-or-path>
-```
-
-Utilities prepare and normalize inputs; flows orchestrate deterministic multi-step execution.
-
-<details>
-<summary>Toggle: flow run modes and gates</summary>
-
-- `--plan` is the default and runs safe/read steps until the first explicit human gate.
-- `--apply` only advances one gate per invocation and should be used with `--resume`.
-- Mutating gate steps require `--allow-write`; otherwise the run pauses with a structured pending decision.
-- `inspect`/`deep-dive` are provider-scope strict. `auto` selects the only configured scope, and fails if both `xyte-org` and `xyte-partner` are configured.
-
-</details>
-
-Each run writes a deterministic bundle under `./tmp/flow-runs/<flow-id>/<timestamp>-<run-id>/`:
-- `manifest.json` (run summary, resume pointer, classifications)
-- `inputs.json` (resolved inputs/context)
-- `steps/*` and `outputs/*` (per-step artifacts)
-- `watch-frames.ndjson`, `decisions.ndjson`, `errors.ndjson`
-
-Custom flow authoring guide:
-- [`docs/flows/custom-workflows.md`](docs/flows/custom-workflows.md)
-
-Custom flows are shareable aliases over built-ins:
-
-```bash
-xyte-cli flow create flow.noc-guided-remediation --based-on flow.guided-remediation --title "NOC Guided Remediation" --var device_id=DEVICE_ID --var ticket_id=TICKET_ID --var incident_id=INCIDENT_ID
-xyte-cli flow edit flow.noc-guided-remediation --description "Pinned context defaults for NOC shift handoff"
-xyte-cli flow share flow.noc-guided-remediation --out ./tmp/flow.noc-guided-remediation.json
-xyte-cli flow import --file ./tmp/flow.noc-guided-remediation.json
-```
-
-<details>
-<summary>Toggle: custom workflow lifecycle details</summary>
-
-Create:
-`xyte-cli flow create <custom-flow-id> --based-on <built-in-flow-id> [--title ...] [--description ...] [--context-json ...] [--var key=value ...]`
-
-Edit:
-`xyte-cli flow edit <custom-flow-id> [--based-on ...] [--title ...] [--description ...] [--context-json ...] [--var key=value ...] [--replace-defaults]`
-
-Share/import:
-`xyte-cli flow share <custom-flow-id> --out <path>`
-`xyte-cli flow import --file <path> [--force]`
-
-</details>
-
-GitHub docs for authoring and examples:
-- [`docs/flows/custom-workflows.md`](https://github.com/xyte-io/xyte-cli/blob/main/docs/flows/custom-workflows.md)
-- [`docs/flows/agent-ops.md`](https://github.com/xyte-io/xyte-cli/blob/main/docs/flows/agent-ops.md)
-
-### Skills install for coding agents
+### 2) Install agent skills
 
 ```bash
 xyte-cli install --skills
 ```
 
-### Upgrade CLI + refresh user skills
+### 3) Connect with tenant-bound API key
+
+```bash
+XYTE_CLI_KEY="<key>" xyte-cli setup run --non-interactive --connectivity auto
+xyte-cli setup status --format json
+```
+
+### 4) Extract active tenant id from setup status (optional helper)
+
+```bash
+xyte-cli setup status --format json | jq -r '.tenantId'
+```
+
+Use that value as `<tenant-id>` in the examples below.
+
+---
+
+## Examples (Feature Catalog)
+
+### 1) Endpoint discovery
+
+```bash
+xyte-cli list-endpoints
+xyte-cli describe-endpoint organization.devices.getDevices
+```
+
+Key params:
+- `describe-endpoint <endpoint-key>`
+
+### 2) Read endpoint call (safe)
+
+```bash
+xyte-cli call organization.devices.getDevices --tenant <tenant-id>
+```
+
+Key params:
+- `--tenant <tenant-id>`
+- `--output-mode envelope` for contract output
+- `--strict-json` for machine parsing
+
+### 3) Incident watch (active incidents)
+
+```bash
+xyte-cli watch --tenant <tenant-id> --profile incidents-active --once
+xyte-cli watch --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 10
+```
+
+Key params:
+- `--once` one snapshot frame
+- `--interval-ms` minimum `1000`
+- `--max-polls` bounded polling
+
+### 4) Guided remediation plan (no writes)
+
+```bash
+xyte-cli flow run flow.guided-remediation \
+  --tenant <tenant-id> \
+  --var incident_id=<incident-id> \
+  --var device_id=<device-id> \
+  --var command=reboot \
+  --var updated_device_name=<device-name>
+```
+
+Key params:
+- `flow run` defaults to plan mode
+- `--var key=value` for runtime context
+- `--resume <run-id-or-path>` for follow-up runs
+
+### 5) Write safety guardrail
+
+```bash
+xyte-cli call organization.commands.sendCommand \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}' \
+  --body-json '{"command":"reboot"}'
+```
+
+Behavior:
+- blocked without `--allow-write`
+
+### 6) Fleet insights and deep-dive data
+
+```bash
+xyte-cli inspect fleet --tenant <tenant-id> --provider-scope auto --format json
+xyte-cli inspect deep-dive --tenant <tenant-id> --provider-scope auto --window 24 --format json > deep-dive.json
+```
+
+Key params:
+- `--provider-scope organization|partner|auto`
+- `--window <hours>` for deep-dive
+- `--format json` for pipelines
+
+### 7) Generate PDF report
+
+```bash
+xyte-cli report generate --tenant <tenant-id> --input deep-dive.json --out fleet-report.pdf
+```
+
+Key params:
+- `--input` deep-dive JSON
+- `--out` target PDF path
+
+### 8) Headless TUI snapshots (for agents/automation)
+
+```bash
+xyte-cli tui --headless --screen dashboard --once --tenant <tenant-id> --format json
+xyte-cli tui --headless --screen spaces --follow --interval-ms 2000 --tenant <tenant-id> --format json
+```
+
+Key params:
+- `--screen dashboard|spaces|...`
+- `--once` snapshot mode
+- `--follow` stream mode
+
+### 9) Utility preprocessing + import-tree
+
+```bash
+xyte-cli utility list-actions --format text
+
+xyte-cli utility prepare \
+  --action space.import-tree \
+  --input ./raw-hierarchy.xlsx \
+  --output-dir ./prepared
+
+xyte-cli space import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv
+xyte-cli space import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv --apply --report ./space-import.apply.ndjson
+```
+
+Key params:
+- `utility prepare --action ... --input ... --output-dir ...`
+- `space import-tree` is dry-run unless `--apply`
+- `--report` writes apply NDJSON report
+
+### 10) Upgrade flow
 
 ```bash
 xyte-cli upgrade --check --format json
 xyte-cli upgrade --yes --format json
 ```
 
-### Endpoint discovery + call
+Key params:
+- `--check` dry check
+- `--yes` non-interactive upgrade
+
+### 11) Action logs and diagnostics
 
 ```bash
-xyte-cli list-endpoints
-xyte-cli describe-endpoint organization.devices.getDevices
-xyte-cli call organization.devices.getDevices --tenant acme
+xyte-cli --log-actions --log-actions-path /tmp/xyte-cli.actions.ndjson status --tenant <tenant-id>
+xyte-cli logs list --path /tmp/xyte-cli.actions.ndjson --limit 200
+xyte-cli logs stats --path /tmp/xyte-cli.actions.ndjson
 ```
 
-### Incident delta watch
+Key params:
+- `--log-actions` lifecycle NDJSON
+- `logs list|stats|gc|view` for operations logs
 
-```bash
-xyte-cli watch --tenant acme --profile incidents-active --once
-xyte-cli watch --tenant acme --profile incidents-active --interval-ms 2000 --max-polls 10
-```
+---
 
-### Utility Prepare Pipelines (AI-assisted preprocess, CLI-executed operations)
+## Video Stories
 
-```bash
-xyte-cli utility list-actions --format text
-xyte-cli utility prepare --action organization.devices.claimDevice --input ./raw-source.xlsx --output-dir ./tmp
-```
+### Install CLI
 
-`xyte-cli` does not embed AI; external AI may preprocess files, then execution remains explicit via CLI commands.
+[![Install CLI](./docs/media/remotion/01-install-cli.gif)](./docs/media/remotion/01-install-cli.mp4)
 
-### Space tree import
+### Install Skills
 
-```bash
-xyte-cli space import-tree --tenant acme --input ./tmp/space-import-tree.csv
-xyte-cli space import-tree --tenant acme --input ./tmp/space-import-tree.csv --apply --report ./space-import.apply.ndjson
-```
+[![Install Skills](./docs/media/remotion/02-install-skills.gif)](./docs/media/remotion/02-install-skills.mp4)
 
-## Documentation Map
+### Connect API Key
 
-- Getting started and setup: [`docs/getting-started.md`](docs/getting-started.md)
-- Command reference: [`docs/commands.md`](docs/commands.md)
-- Agent ops flow pack: [`docs/flows/agent-ops.md`](docs/flows/agent-ops.md)
-- Custom workflow authoring: [`docs/flows/custom-workflows.md`](docs/flows/custom-workflows.md)
-- Agent usage patterns: [`docs/agents.md`](docs/agents.md)
-- Development and test gates: [`docs/development.md`](docs/development.md)
-- Utility AI preprocess runbook: [`docs/ai-utility-preprocessing.md`](docs/ai-utility-preprocessing.md)
-- Release process: [`docs/release.md`](docs/release.md)
+[![Connect API Key](./docs/media/remotion/03-connect-api-key.gif)](./docs/media/remotion/03-connect-api-key.mp4)
 
-## Compatibility Policy
+### Watch Incidents
 
-- Stable automation boundary: schema-versioned JSON outputs in `docs/schemas/*`.
-- Breaking command/contract changes are documented in `CHANGELOG.md`.
-- During `0.x`, breaking changes may still occur and are called out in release notes.
+[![Watch Incidents](./docs/media/remotion/06-watch-incidents.gif)](./docs/media/remotion/06-watch-incidents.mp4)
+
+### Export PDF Report
+
+[![Export PDF Report](./docs/media/remotion/09-weekly-pdf-report.gif)](./docs/media/remotion/09-weekly-pdf-report.mp4)
+
+---
+
+## Deep Docs
+
+- [Getting started](./docs/getting-started.md)
+- [Commands reference](./docs/commands.md)
+- [Agent guidance](./docs/agents.md)
+- [Flow authoring](./docs/flows/custom-workflows.md)
+- [Schema contracts](./docs/schemas)
