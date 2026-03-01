@@ -8,6 +8,17 @@ coverage/
 .idea/
 
 *.tgz
+# Generated artifacts
 tmp/
+tmp/flow-runs/
+tmp/poc-incident-watch/
+tmp/poc-incident-watch-recordings/
+artifacts/
+**/artifacts/
 marketing/
 .desloppify/
+
+# POC / Remotion generated artifacts
+demo/remotion/src/timeline.generated.json
+demo/remotion/src/captions.json
+demo/remotion/src/*.generated.json
