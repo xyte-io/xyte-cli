@@ -215,23 +215,23 @@ Key params:
 
 ### Install CLI
 
-[![Install CLI](./docs/media/remotion/01-install-cli.gif)](./docs/media/remotion/01-install-cli.mp4)
+[![Install CLI](./docs/assets/videos/01-install-cli.gif)](./docs/assets/videos/01-install-cli.mp4)
 
 ### Install Skills
 
-[![Install Skills](./docs/media/remotion/02-install-skills.gif)](./docs/media/remotion/02-install-skills.mp4)
+[![Install Skills](./docs/assets/videos/02-install-skills.gif)](./docs/assets/videos/02-install-skills.mp4)
 
 ### Connect API Key
 
-[![Connect API Key](./docs/media/remotion/03-connect-api-key.gif)](./docs/media/remotion/03-connect-api-key.mp4)
+[![Connect API Key](./docs/assets/videos/03-connect-api-key.gif)](./docs/assets/videos/03-connect-api-key.mp4)
 
 ### Watch Incidents
 
-[![Watch Incidents](./docs/media/remotion/06-watch-incidents.gif)](./docs/media/remotion/06-watch-incidents.mp4)
+[![Watch Incidents](./docs/assets/videos/06-watch-incidents.gif)](./docs/assets/videos/06-watch-incidents.mp4)
 
 ### Export PDF Report
 
-[![Export PDF Report](./docs/media/remotion/09-weekly-pdf-report.gif)](./docs/media/remotion/09-weekly-pdf-report.mp4)
+[![Export PDF Report](./docs/assets/videos/09-weekly-pdf-report.gif)](./docs/assets/videos/09-weekly-pdf-report.mp4)
 
 ---
 

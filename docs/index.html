@@ -1017,8 +1017,8 @@ xyte-cli --version</code></pre>
             title: 'Install XYTE CLI',
             prompt: 'Hey, install @xyteai/cli and make sure it runs.',
             command: 'npm install -g @xyteai/cli@latest && xyte-cli --version',
-            gif: './media/remotion/01-install-cli.gif',
-            mp4: './media/remotion/01-install-cli.mp4',
+            gif: './assets/videos/01-install-cli.gif',
+            mp4: './assets/videos/01-install-cli.mp4',
             focus: 'Get the CLI available globally in one command.'
           },
           {
@@ -1027,8 +1027,8 @@ xyte-cli --version</code></pre>
             title: 'Install Agent Skills',
             prompt: 'Set this workspace up for AI agents.',
             command: 'xyte-cli install --skills',
-            gif: './media/remotion/02-install-skills.gif',
-            mp4: './media/remotion/02-install-skills.mp4',
+            gif: './assets/videos/02-install-skills.gif',
+            mp4: './assets/videos/02-install-skills.mp4',
             focus: 'Install Codex/Claude/Copilot skill scaffolding.'
           },
           {
@@ -1037,8 +1037,8 @@ xyte-cli --version</code></pre>
             title: 'Connect with API Key',
             prompt: 'Connect to my account using this API key.',
             command: 'XYTE_CLI_KEY=<key> xyte-cli setup run --non-interactive && xyte-cli setup status --format json',
-            gif: './media/remotion/03-connect-api-key.gif',
-            mp4: './media/remotion/03-connect-api-key.mp4',
+            gif: './assets/videos/03-connect-api-key.gif',
+            mp4: './assets/videos/03-connect-api-key.mp4',
             focus: 'Use tenant-bound key setup and confirm readiness.'
           },
           {
@@ -1047,8 +1047,8 @@ xyte-cli --version</code></pre>
             title: 'Incident Snapshot Watch',
             prompt: 'Watch active incidents now.',
             command: 'xyte-cli watch --tenant <tenant-id> --profile incidents-active --once',
-            gif: './media/remotion/06-watch-incidents.gif',
-            mp4: './media/remotion/06-watch-incidents.mp4',
+            gif: './assets/videos/06-watch-incidents.gif',
+            mp4: './assets/videos/06-watch-incidents.mp4',
             focus: 'Capture one active-incident snapshot safely.'
           },
           {
@@ -1058,8 +1058,8 @@ xyte-cli --version</code></pre>
             prompt: 'Generate a fleet PDF report I can share with leadership.',
             command:
               'xyte-cli inspect deep-dive --tenant <tenant-id> --window 24 --format json > deep-dive.json && xyte-cli report generate --tenant <tenant-id> --input deep-dive.json --out fleet-report.pdf',
-            gif: './media/remotion/09-weekly-pdf-report.gif',
-            mp4: './media/remotion/09-weekly-pdf-report.mp4',
+            gif: './assets/videos/09-weekly-pdf-report.gif',
+            mp4: './assets/videos/09-weekly-pdf-report.mp4',
             focus: 'Turn captured fleet/incident data into a shareable PDF handoff.'
           }
         ];
@@ -1150,7 +1150,7 @@ xyte-cli --version</code></pre>
             return inlineFeaturedVideos;
           }
 
-          const candidates = ['./media/remotion/featured-videos.json', 'media/remotion/featured-videos.json'];
+          const candidates = ['./assets/videos/featured-videos.json', 'assets/videos/featured-videos.json'];
           for (const url of candidates) {
             try {
               const response = await fetch(url, { cache: 'no-store' });
