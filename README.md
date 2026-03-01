@@ -211,7 +211,9 @@ Key params:
 
 ---
 
-## Video Stories
+## Video Stories (Active Set)
+
+Only the current user-facing clips are kept in-repo.
 
 ### Install CLI
 
