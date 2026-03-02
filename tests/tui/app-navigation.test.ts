@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { ScreenRuntime } from '../../src/tui/runtime';
-import { updateErrorStormState } from '../../src/tui/app';
+import { updateErrorStormState, parseScreenShortcut } from '../../src/tui/app';
 
 function deferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -86,5 +86,61 @@ describe('tui app navigation runtime', () => {
     expect(third.count).toBe(3);
     expect(reset.count).toBe(1);
     expect(afterWindow.count).toBe(1);
+  });
+});
+
+describe('parseScreenShortcut', () => {
+  it('parses numeric shortcuts', () => {
+    expect(parseScreenShortcut('1')).toBe('setup');
+    expect(parseScreenShortcut('2')).toBe('config');
+    expect(parseScreenShortcut('3')).toBe('dashboard');
+    expect(parseScreenShortcut('4')).toBe('spaces');
+    expect(parseScreenShortcut('5')).toBe('devices');
+    expect(parseScreenShortcut('6')).toBe('incidents');
+    expect(parseScreenShortcut('7')).toBe('tickets');
+  });
+
+  it('parses exact screen name matches', () => {
+    expect(parseScreenShortcut('setup')).toBe('setup');
+    expect(parseScreenShortcut('config')).toBe('config');
+    expect(parseScreenShortcut('dashboard')).toBe('dashboard');
+    expect(parseScreenShortcut('spaces')).toBe('spaces');
+    expect(parseScreenShortcut('devices')).toBe('devices');
+    expect(parseScreenShortcut('incidents')).toBe('incidents');
+    expect(parseScreenShortcut('tickets')).toBe('tickets');
+  });
+
+  it('parses prefix matches', () => {
+    expect(parseScreenShortcut('set')).toBe('setup');
+    expect(parseScreenShortcut('con')).toBe('config');
+    expect(parseScreenShortcut('dash')).toBe('dashboard');
+    expect(parseScreenShortcut('spa')).toBe('spaces');
+    expect(parseScreenShortcut('dev')).toBe('devices');
+    expect(parseScreenShortcut('inc')).toBe('incidents');
+    expect(parseScreenShortcut('tick')).toBe('tickets');
+  });
+
+  it('handles case insensitivity', () => {
+    expect(parseScreenShortcut('SETUP')).toBe('setup');
+    expect(parseScreenShortcut('DashBoard')).toBe('dashboard');
+    expect(parseScreenShortcut('DEV')).toBe('devices');
+  });
+
+  it('handles whitespace', () => {
+    expect(parseScreenShortcut('  setup  ')).toBe('setup');
+    expect(parseScreenShortcut('  1  ')).toBe('setup');
+  });
+
+  it('returns undefined for empty or invalid input', () => {
+    expect(parseScreenShortcut('')).toBeUndefined();
+    expect(parseScreenShortcut('   ')).toBeUndefined();
+    expect(parseScreenShortcut('invalid')).toBeUndefined();
+    expect(parseScreenShortcut('xyz')).toBeUndefined();
+  });
+
+  it('returns first prefix match when ambiguous', () => {
+    // If there were screens with overlapping prefixes, this would test that behavior
+    // Currently all screen names have unique prefixes
+    expect(parseScreenShortcut('s')).toBe('setup');
   });
 });

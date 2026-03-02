@@ -62,7 +62,7 @@ function escapeTagMarkup(text: string): string {
   return text.replaceAll('{', '\\{').replaceAll('}', '\\}');
 }
 
-function parseScreenShortcut(value: string): TuiScreenId | undefined {
+export function parseScreenShortcut(value: string): TuiScreenId | undefined {
   const needle = value.trim().toLowerCase();
   if (!needle) {
     return undefined;
