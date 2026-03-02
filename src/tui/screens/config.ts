@@ -299,7 +299,7 @@ export function createConfigScreen(): TuiScreen {
         'a add slot',
         'n rename slot',
         'u use slot',
-        'o not available here'
+        'o no entity selected'
       ];
     },
     async handleArrow(key: TuiArrowKey) {

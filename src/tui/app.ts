@@ -182,7 +182,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
     const screen = blessed.screen({
       smartCSR: true,
       fullUnicode: true,
-      title: 'XYTE SDK TUI'
+      title: 'XYTE OPS CONSOLE'
     });
 
     const layout = createLayout(screen, { motionEnabled });

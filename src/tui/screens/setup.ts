@@ -175,7 +175,7 @@ export function createSetupScreen(): TuiScreen {
         'a add tenant',
         'u set active tenant',
         'k key wizard',
-        'o not available here'
+        'o no entity selected'
       ];
     },
     async handleArrow(key: TuiArrowKey) {

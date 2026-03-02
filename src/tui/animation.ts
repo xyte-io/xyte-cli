@@ -21,7 +21,7 @@ export function startupFrames(): StartupFrame[] {
     frames.push({
       banner: logoFrames[Math.min(i, logoFrames.length - 1)],
       status: BOOT_STATUS[Math.min(i, BOOT_STATUS.length - 1)],
-      title: 'XYTE SDK TUI'
+      title: 'XYTE OPS CONSOLE'
     });
   }
 
