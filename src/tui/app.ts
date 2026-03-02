@@ -1,9 +1,9 @@
-import blessed from 'blessed';
+import blessed, { type Widgets } from 'blessed';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { createLayout } from './layout';
 import { GLOBAL_KEYMAP, SCREEN_ACTION_KEYMAP } from './keymap';
-import type { TuiContext, TuiScreen, TuiScreenId } from './types';
+import type { TuiContext, TuiEntityDetails, TuiScreen, TuiScreenId } from './types';
 import { createSetupScreen } from './screens/setup';
 import { createConfigScreen } from './screens/config';
 import { createDashboardScreen } from './screens/dashboard';
@@ -23,7 +23,7 @@ import { evaluateReadiness, type ReadinessCheck } from '../config/readiness';
 import { createInputController } from './input-controller';
 import { ScreenRuntime, type ScreenRuntimeStatus } from './runtime';
 import { createTuiLogger } from './logger';
-import { nextTab } from './tabs';
+import { TAB_ORDER, nextTab } from './tabs';
 
 interface TuiAppOptions {
   client: XyteClient;
@@ -41,6 +41,16 @@ interface TuiAppOptions {
   debugLogPath?: string;
 }
 
+const SCREEN_SHORTCUTS: Array<{ key: string; screen: TuiScreenId; label: string }> = [
+  { key: '1', screen: 'setup', label: 'Setup' },
+  { key: '2', screen: 'config', label: 'Config' },
+  { key: '3', screen: 'dashboard', label: 'Dashboard' },
+  { key: '4', screen: 'spaces', label: 'Spaces' },
+  { key: '5', screen: 'devices', label: 'Devices' },
+  { key: '6', screen: 'incidents', label: 'Incidents' },
+  { key: '7', screen: 'tickets', label: 'Tickets' }
+];
+
 function toErrorText(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -48,9 +58,29 @@ function toErrorText(error: unknown): string {
   return String(error);
 }
 
+function escapeTagMarkup(text: string): string {
+  return text.replaceAll('{', '\\{').replaceAll('}', '\\}');
+}
+
+function parseScreenShortcut(value: string): TuiScreenId | undefined {
+  const needle = value.trim().toLowerCase();
+  if (!needle) {
+    return undefined;
+  }
+  const numeric = SCREEN_SHORTCUTS.find((shortcut) => shortcut.key === needle);
+  if (numeric) {
+    return numeric.screen;
+  }
+  const exact = TAB_ORDER.find((screen) => screen === needle);
+  if (exact) {
+    return exact;
+  }
+  return TAB_ORDER.find((screen) => screen.startsWith(needle));
+}
+
 async function renderStartupSequence(
-  screen: blessed.Widgets.Screen,
-  messageBox: blessed.Widgets.MessageElement,
+  screen: Widgets.Screen,
+  messageBox: Widgets.MessageElement,
   motionEnabled: boolean
 ): Promise<void> {
   const frames = startupFrames();
@@ -187,6 +217,19 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
       motionEnabled
     });
 
+    let mounted: TuiScreen | undefined;
+
+    const renderHelpBar = () => {
+      const base = ' 1-7 tabs | m jump | Ctrl+←/→ panes | ↑/↓ move | Enter drill | o deep view | ? help | q quit ';
+      const ctas = mounted?.getCtaHints?.() ?? [];
+      if (!ctas.length) {
+        layout.help.setContent(base);
+        return;
+      }
+      const contextual = ctas.slice(0, 2).join(' | ');
+      layout.help.setContent(` ${base.trim()} | ${contextual} `);
+    };
+
     const renderFooter = (statusText?: string) => {
       if (statusText !== undefined) {
         footerStatusText = statusText;
@@ -199,6 +242,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
       const runtime = `refresh=${runtimeStatus.state}${runtimeStatus.refreshQueued ? '+queued' : ''} stale=${runtimeStatus.staleDiscarded} in=${inputState.queueDepth} drop=${inputState.droppedEvents} tx=${transitionState}`;
       const detail = runtimeStatus.lastError ? `${footerStatusText} | err=${runtimeStatus.lastError}` : footerStatusText;
       layout.footer.setContent(` @ ${readiness} | ${runtime} | ${detail}`);
+      renderHelpBar();
       screen.render();
     };
 
@@ -415,8 +459,6 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
       tickets: createTicketsScreen()
     };
 
-    let mounted: TuiScreen | undefined;
-
     const mountScreen = async (id: TuiScreenId) => {
       const token = ++mountTransitionToken;
       transitionState = 'switching';
@@ -495,7 +537,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
       runtimeStatus = mountedRuntime.getStatus();
 
       layout.setActiveTab(nextId);
-      layout.header.setContent(` XYTE SDK TUI | ${next.title.toUpperCase()} `);
+      layout.header.setContent(` XYTE OPS CONSOLE | ${next.title.toUpperCase()} `);
       transitionState = 'idle';
       next.focus?.();
       logger.log('screen.mount.active', {
@@ -521,23 +563,57 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
         });
     };
 
-    const showHelp = () => {
-      const content = [
-        '{bold}Global shortcuts{/bold}',
-        ...GLOBAL_KEYMAP.map((item) => `- ${item.keys}: ${item.description}`),
-        '',
-        '{bold}Screen actions{/bold}',
-        ...SCREEN_ACTION_KEYMAP.map((item) => `- ${item.keys}: ${item.description}`)
-      ].join('\n');
-
+    const showModal = (content: string, timeout = 0) => {
       setMessageModalState(true);
-      message.display(content, 0, () => {
+      message.display(content, timeout, () => {
         setMessageModalState(false);
         screen.render();
       });
     };
 
-    const handleGlobalKey = async (ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg) => {
+    const showEntityDetails = (details: TuiEntityDetails) => {
+      const lines: string[] = [
+        `{bold}${escapeTagMarkup(details.title)}{/bold}`,
+        '',
+        escapeTagMarkup(details.content)
+      ];
+      if (details.hint?.trim()) {
+        lines.push('', `{cyan-fg}${escapeTagMarkup(details.hint)}{/cyan-fg}`);
+      }
+      showModal(lines.join('\n'));
+    };
+
+    const showHelp = () => {
+      const currentCtas = mounted?.getCtaHints?.() ?? [];
+      const content = [
+        '{bold}Global shortcuts{/bold}',
+        ...GLOBAL_KEYMAP.map((item) => `- ${item.keys}: ${item.description}`),
+        '',
+        '{bold}Screen actions{/bold}',
+        ...SCREEN_ACTION_KEYMAP.map((item) => `- ${item.keys}: ${item.description}`),
+        ...(currentCtas.length
+          ? ['', '{bold}Current screen CTAs{/bold}', ...currentCtas.map((item) => `- ${item}`)]
+          : [])
+      ].join('\n');
+      showModal(content);
+    };
+
+    const openScreenSwitcher = async () => {
+      const menu = SCREEN_SHORTCUTS.map((item) => `${item.key}. ${item.label} (${item.screen})`).join('\n');
+      const value = await context.prompt(`Jump to screen\n${menu}\n\nType number or screen id:`, '');
+      if (value === undefined) {
+        renderFooter('Screen jump canceled.');
+        return;
+      }
+      const target = parseScreenShortcut(value);
+      if (!target) {
+        renderFooter(`Unknown screen: ${value.trim() || '(empty)'}`);
+        return;
+      }
+      await mountScreen(target);
+    };
+
+    const handleGlobalKey = async (ch: string | undefined, key: Widgets.Events.IKeyEventArg) => {
       logger.log('input.global', {
         key: key.name ?? key.full,
         ch,
@@ -546,6 +622,26 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
       if (key.name === 'left' || key.name === 'right') {
         const target = nextTab(activeScreenId, key.name);
         await mountScreen(target);
+        return;
+      }
+      if (ch && /^[1-7]$/.test(ch)) {
+        const target = parseScreenShortcut(ch);
+        if (target) {
+          await mountScreen(target);
+        }
+        return;
+      }
+      if (ch === 'm') {
+        await openScreenSwitcher();
+        return;
+      }
+      if (ch === 'o') {
+        const details = mounted?.getEntityDetails?.();
+        if (!details) {
+          renderFooter('No selected entity details available on this screen.');
+          return;
+        }
+        showEntityDetails(details);
         return;
       }
       if (ch === 'u') {
@@ -604,6 +700,14 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
       if (ch === '?') {
         showHelp();
         return;
+      }
+
+      if (key.name === 'enter') {
+        const target = mounted?.getEnterTargetScreen?.();
+        if (target) {
+          await mountScreen(target);
+          return;
+        }
       }
 
       if (key.name === 'escape') {
@@ -733,7 +837,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
     process.on('unhandledRejection', onUnhandledRejection);
     process.on('uncaughtException', onUncaughtException);
 
-    screen.on('keypress', (ch, key) => {
+    screen.on('keypress', (ch: string | undefined, key: Widgets.Events.IKeyEventArg) => {
       const dispatchResult = inputController.dispatch({
         ch,
         key,
@@ -760,7 +864,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
     void (async () => {
       await renderStartupSequence(screen, message, motionEnabled);
       message.hide();
-      layout.header.setContent(` XYTE SDK TUI | ${xyteLogoText().split('\n')[0]} `);
+      layout.header.setContent(` XYTE OPS CONSOLE | ${xyteLogoText().split('\n')[0]} `);
       const readiness = await context.refreshReadiness(true);
       if (readiness.state !== 'ready') {
         activeScreenId = 'setup';

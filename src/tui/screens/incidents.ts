@@ -1,4 +1,4 @@
-import blessed from 'blessed';
+import blessed, { type Widgets } from 'blessed';
 
 import {
   clampIndex,
@@ -14,7 +14,7 @@ import { SCREEN_PANE_CONFIG } from '../panes';
 import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
 import { loadIncidentsData } from '../data-loaders';
 import { sceneFromIncidentsState } from '../scene';
-import { payloadSummary } from '../serialize';
+import { payloadSummary, safeInspect } from '../serialize';
 import { confirmWriteWithToken, openActionPalette } from '../actions';
 
 function incidentIdOf(incident: any): string {
@@ -63,9 +63,9 @@ export function normalizeIncidents(items: unknown): any[] {
 }
 
 export function createIncidentsScreen(): TuiScreen {
-  let root: blessed.Widgets.BoxElement | undefined;
-  let list: blessed.Widgets.ListTableElement | undefined;
-  let detailBox: blessed.Widgets.BoxElement | undefined;
+  let root: Widgets.BoxElement | undefined;
+  let list: Widgets.ListTableElement | undefined;
+  let detailBox: Widgets.BoxElement | undefined;
   let context: TuiContext;
   let incidents: any[] = [];
   let filtered: any[] = [];
@@ -301,7 +301,7 @@ export function createIncidentsScreen(): TuiScreen {
         widgets: ['incidents-table', 'detail-box']
       });
 
-      list.on('select item', (_item, index) => {
+      list.on('select item', (_item: unknown, index: number) => {
         if (shouldIgnoreSelectEvent(selectionSync)) {
           return;
         }
@@ -326,6 +326,31 @@ export function createIncidentsScreen(): TuiScreen {
     },
     getAvailablePanes() {
       return paneConfig.panes;
+    },
+    getCtaHints() {
+      return [
+        'a close incident',
+        'f endpoint filters',
+        '[ ] page',
+        'o deep details'
+      ];
+    },
+    getEntityDetails() {
+      const incident = selectedIncident();
+      if (!incident) {
+        return undefined;
+      }
+      const inspected = safeInspect(incident, {
+        maxDepth: 6,
+        maxArrayItems: 60,
+        maxObjectKeys: 120,
+        maxOutputChars: 8_000
+      });
+      return {
+        title: `Incident ${incidentIdOf(incident) || '(unknown)'}`,
+        content: inspected.text,
+        hint: 'Use a to close the selected incident.'
+      };
     },
     async handleArrow(key: TuiArrowKey) {
       if (key === 'left' || key === 'right') {

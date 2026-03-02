@@ -1,8 +1,11 @@
 export const GLOBAL_KEYMAP: Array<{ keys: string; description: string }> = [
   { keys: '←/→', description: 'Switch tabs' },
+  { keys: '1..7', description: 'Jump directly to tab by number' },
+  { keys: 'm', description: 'Open quick screen switcher' },
   { keys: 'Ctrl+←/→ (or Shift+←/→)', description: 'Move pane focus; at pane edge, switch tab' },
   { keys: '↑/↓', description: 'Move selection or scroll in active pane' },
   { keys: 'Enter', description: 'Primary action in active pane (screen-dependent)' },
+  { keys: 'o', description: 'Open deep entity details for selected item' },
   { keys: 'a', description: 'Open action palette (ops screens)' },
   { keys: 'f', description: 'Open structured filter editor (ops screens)' },
   { keys: '[ / ]', description: 'Previous/next page (where supported)' },

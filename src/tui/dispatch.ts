@@ -1,17 +1,17 @@
-import type blessed from 'blessed';
+import type { Widgets } from 'blessed';
 import type { TuiArrowHandleResult, TuiArrowKey } from './types';
 
 const ARROW_KEYS: TuiArrowKey[] = ['up', 'down', 'left', 'right'];
 
 interface KeyDispatchArgs {
   ch: string | undefined;
-  key: blessed.Widgets.Events.IKeyEventArg;
-  handleScreen?: (ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg) => Promise<boolean>;
+  key: Widgets.Events.IKeyEventArg;
+  handleScreen?: (ch: string | undefined, key: Widgets.Events.IKeyEventArg) => Promise<boolean>;
   handleArrow?: (key: TuiArrowKey) => Promise<TuiArrowHandleResult>;
   shouldBypassHorizontalGlobal?: () => boolean;
   isModalActive?: boolean;
-  handleModal?: (ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg) => Promise<boolean | void>;
-  handleGlobal: (ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg) => Promise<void>;
+  handleModal?: (ch: string | undefined, key: Widgets.Events.IKeyEventArg) => Promise<boolean | void>;
+  handleGlobal: (ch: string | undefined, key: Widgets.Events.IKeyEventArg) => Promise<void>;
 }
 
 export async function dispatchKeypress(args: KeyDispatchArgs): Promise<'screen' | 'arrow' | 'global' | 'modal' | 'blocked'> {

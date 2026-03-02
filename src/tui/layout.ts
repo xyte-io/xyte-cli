@@ -1,15 +1,15 @@
-import blessed from 'blessed';
+import blessed, { type Widgets } from 'blessed';
 
 import { pulseChar } from './animation';
 import type { TuiScreenId } from './types';
 import { TAB_ORDER } from './tabs';
 
 interface TuiLayout {
-  header: blessed.Widgets.BoxElement;
-  tabs: blessed.Widgets.BoxElement;
-  body: blessed.Widgets.BoxElement;
-  footer: blessed.Widgets.BoxElement;
-  help: blessed.Widgets.BoxElement;
+  header: Widgets.BoxElement;
+  tabs: Widgets.BoxElement;
+  body: Widgets.BoxElement;
+  footer: Widgets.BoxElement;
+  help: Widgets.BoxElement;
   setActiveTab(tab: TuiScreenId): void;
   setPulsePhase(phase: number): void;
 }
@@ -18,17 +18,17 @@ interface TuiLayoutOptions {
   motionEnabled: boolean;
 }
 
-export function createLayout(screen: blessed.Widgets.Screen, options: TuiLayoutOptions): TuiLayout {
+export function createLayout(screen: Widgets.Screen, options: TuiLayoutOptions): TuiLayout {
   const header = blessed.box({
     parent: screen,
     top: 0,
     left: 0,
     width: '100%',
     height: 1,
-    content: ' XYTE SDK TUI // RETRO-CONSOLE ',
+    content: ' XYTE OPS CONSOLE ',
     style: {
-      fg: 'black',
-      bg: 'yellow',
+      fg: 'white',
+      bg: 'blue',
       bold: true
     }
   });
@@ -42,7 +42,7 @@ export function createLayout(screen: blessed.Widgets.Screen, options: TuiLayoutO
     tags: true,
     content: ' ',
     style: {
-      fg: 'yellow',
+      fg: 'cyan',
       bg: 'black'
     }
   });
@@ -67,10 +67,10 @@ export function createLayout(screen: blessed.Widgets.Screen, options: TuiLayoutO
     left: 0,
     width: '100%',
     height: 1,
-    content: ' @ Ready ',
+    content: ' • Ready ',
     style: {
-      fg: 'yellow',
-      bg: 'black'
+      fg: 'white',
+      bg: 'blue'
     }
   });
 
@@ -80,27 +80,42 @@ export function createLayout(screen: blessed.Widgets.Screen, options: TuiLayoutO
     left: 0,
     width: '100%',
     height: 1,
-    content: ' u/g/d/s/v/i/t screens | r refresh | a actions | f filters | [ ] pages | p per-page | / search | ? help | q quit ',
+    content: ' 1-7 tabs | m jump | Ctrl+←/→ panes | ↑/↓ move | Enter drill | o deep view | ? help | q quit ',
     style: {
-      fg: 'white',
-      bg: 'black'
+      fg: 'black',
+      bg: 'cyan',
+      bold: true
     }
   });
+
+  const tabLabelById: Record<TuiScreenId, string> = {
+    setup: '1 Setup',
+    config: '2 Config',
+    dashboard: '3 Dashboard',
+    spaces: '4 Spaces',
+    devices: '5 Devices',
+    incidents: '6 Incidents',
+    tickets: '7 Tickets'
+  };
+
+  const inactiveTabStyle = '{cyan-fg}';
+  const activeTabStyle = '{black-fg}{cyan-bg}';
+  const styleReset = '{/cyan-bg}{/black-fg}{/cyan-fg}';
 
   const setActiveTab = (tab: TuiScreenId) => {
     tabs.setContent(
       TAB_ORDER.map((id) => {
-        const label = ` ${id.toUpperCase()} `;
+        const label = ` ${tabLabelById[id]} `;
         if (id === tab) {
-          return `{black-fg}{yellow-bg}${label}{/yellow-bg}{/black-fg}`;
+          return `${activeTabStyle}${label}${styleReset}`;
         }
-        return `{yellow-fg}${label}{/yellow-fg}`;
+        return `${inactiveTabStyle}${label}${styleReset}`;
       }).join(' ')
     );
   };
 
   const setPulsePhase = (phase: number) => {
-    const pulse = options.motionEnabled ? pulseChar(phase) : '@';
+    const pulse = options.motionEnabled ? pulseChar(phase) : '•';
     const content = footer.getContent();
     footer.setContent(` ${pulse}${content.slice(2)}`);
   };

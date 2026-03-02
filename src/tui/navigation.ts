@@ -1,4 +1,4 @@
-import type blessed from 'blessed';
+import type { Widgets } from 'blessed';
 
 import type { TuiArrowKey, TuiPaneId } from './types';
 
@@ -30,7 +30,7 @@ function withSelectionSyncGuard(state: SelectionSyncState | undefined, fn: () =>
 }
 
 export function setListTableData(
-  list: blessed.Widgets.ListTableElement | undefined,
+  list: Widgets.ListTableElement | undefined,
   rows: Array<Array<string | number>>,
   state?: SelectionSyncState
 ): void {
@@ -43,7 +43,7 @@ export function setListTableData(
 }
 
 export function syncListSelection(
-  list: blessed.Widgets.ListTableElement | undefined,
+  list: Widgets.ListTableElement | undefined,
   rowIndex: number,
   state: SelectionSyncState
 ): void {
@@ -123,7 +123,7 @@ export function movePaneWithBoundary(
 }
 
 export function moveTableSelection(args: {
-  table?: blessed.Widgets.ListTableElement;
+  table?: Widgets.ListTableElement;
   index: number;
   delta: number;
   totalRows: number;
@@ -142,7 +142,7 @@ export function moveTableSelection(args: {
   return next;
 }
 
-export function scrollBox(box: blessed.Widgets.BoxElement | undefined, delta: number): void {
+export function scrollBox(box: Widgets.BoxElement | undefined, delta: number): void {
   if (!box || delta === 0) {
     return;
   }

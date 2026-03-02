@@ -1,4 +1,4 @@
-import blessed from 'blessed';
+import blessed, { type Widgets } from 'blessed';
 
 import {
   clampIndex,
@@ -20,7 +20,7 @@ import {
   loadSpacesData
 } from '../data-loaders';
 import { sceneFromSpacesState } from '../scene';
-import { safeSearchText } from '../serialize';
+import { safeInspect, safeSearchText } from '../serialize';
 import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput } from '../actions';
 
 const SPINNER_FRAMES = ['|', '/', '-', '\\'];
@@ -185,11 +185,11 @@ export function createStaleSafeSelectionLoader<TInput, TResult>(args: {
 }
 
 export function createSpacesScreen(): TuiScreen {
-  let root: blessed.Widgets.BoxElement | undefined;
-  let spaceTable: blessed.Widgets.ListTableElement | undefined;
-  let detailBox: blessed.Widgets.BoxElement | undefined;
-  let devicesTable: blessed.Widgets.ListTableElement | undefined;
-  let statusBox: blessed.Widgets.BoxElement | undefined;
+  let root: Widgets.BoxElement | undefined;
+  let spaceTable: Widgets.ListTableElement | undefined;
+  let detailBox: Widgets.BoxElement | undefined;
+  let devicesTable: Widgets.ListTableElement | undefined;
+  let statusBox: Widgets.BoxElement | undefined;
   let context: TuiContext;
 
   let spaces: any[] = [];
@@ -547,7 +547,7 @@ export function createSpacesScreen(): TuiScreen {
         }
       });
 
-      spaceTable.on('select item', (_item, index) => {
+      spaceTable.on('select item', (_item: unknown, index: number) => {
         if (shouldIgnoreSelectEvent(spaceSelectionSync)) {
           return;
         }
@@ -573,6 +573,39 @@ export function createSpacesScreen(): TuiScreen {
     },
     getAvailablePanes() {
       return paneConfig.panes;
+    },
+    getCtaHints() {
+      return [
+        'a claim/create/rename',
+        'f endpoint filters',
+        '/ search spaces',
+        'o deep details'
+      ];
+    },
+    getEntityDetails() {
+      const space = selectedSpace();
+      if (!space) {
+        return undefined;
+      }
+      const selectedDevice =
+        activePane === 'devices-table'
+          ? devicesInSpace[clampIndex(selectedDeviceIndex, devicesInSpace.length)]
+          : undefined;
+      const inspected = safeInspect({
+        space,
+        spaceDetail: selectedSpaceDetail,
+        selectedDevice
+      }, {
+        maxDepth: 6,
+        maxArrayItems: 80,
+        maxObjectKeys: 140,
+        maxOutputChars: 10_000
+      });
+      return {
+        title: `Space ${getSpaceName(space)} (${getSpaceId(space)})`,
+        content: inspected.text,
+        hint: 'Use Enter to refresh drilldown and a for space actions.'
+      };
     },
     async handleArrow(key: TuiArrowKey) {
       if (key === 'left' || key === 'right') {

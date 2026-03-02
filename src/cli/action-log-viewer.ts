@@ -122,7 +122,7 @@ export async function runActionLogViewer(options: ActionLogViewerOptions): Promi
       screen.render();
     });
 
-    list.on('select item', (_item, index) => {
+    list.on('select item', (_item: unknown, index: number) => {
       selectedIndex = Math.max(0, index);
       renderDetails();
     });

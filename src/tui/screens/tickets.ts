@@ -1,4 +1,4 @@
-import blessed from 'blessed';
+import blessed, { type Widgets } from 'blessed';
 
 import {
   clampIndex,
@@ -14,7 +14,7 @@ import { SCREEN_PANE_CONFIG } from '../panes';
 import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
 import { loadTicketsData } from '../data-loaders';
 import { sceneFromTicketsState } from '../scene';
-import { payloadSummary, safePreviewLines, safeSearchText } from '../serialize';
+import { payloadSummary, safeInspect, safePreviewLines, safeSearchText } from '../serialize';
 import { confirmWriteWithToken, openActionPalette } from '../actions';
 
 function ticketIdOf(ticket: any): string {
@@ -113,9 +113,9 @@ export async function sendTicketMessageWithGuard(args: SendTicketMessageWithGuar
 }
 
 export function createTicketsScreen(): TuiScreen {
-  let root: blessed.Widgets.BoxElement | undefined;
-  let list: blessed.Widgets.ListTableElement | undefined;
-  let detail: blessed.Widgets.BoxElement | undefined;
+  let root: Widgets.BoxElement | undefined;
+  let list: Widgets.ListTableElement | undefined;
+  let detail: Widgets.BoxElement | undefined;
   let context: TuiContext;
   let tickets: any[] = [];
   let filteredAll: any[] = [];
@@ -390,7 +390,7 @@ export function createTicketsScreen(): TuiScreen {
         widgets: ['tickets-table', 'detail-box']
       });
 
-      list.on('select item', (_item, index) => {
+      list.on('select item', (_item: unknown, index: number) => {
         if (shouldIgnoreSelectEvent(selectionSync)) {
           return;
         }
@@ -453,6 +453,38 @@ export function createTicketsScreen(): TuiScreen {
     },
     getAvailablePanes() {
       return paneConfig.panes;
+    },
+    getCtaHints() {
+      return [
+        ticketWritesEnabled() ? 'a resolve or message' : 'a actions (writes disabled in partner mode)',
+        'f status/priority filters',
+        '[ ] page',
+        'o deep details'
+      ];
+    },
+    getEntityDetails() {
+      const ticket = selectedTicket();
+      if (!ticket) {
+        return undefined;
+      }
+      const ticketId = ticketIdOf(ticket) || '(unknown)';
+      const inspected = safeInspect({
+        ticket,
+        mode,
+        detailPreview: detailText
+      }, {
+        maxDepth: 6,
+        maxArrayItems: 60,
+        maxObjectKeys: 140,
+        maxOutputChars: 8_000
+      });
+      return {
+        title: `Ticket ${ticketId}`,
+        content: inspected.text,
+        hint: ticketWritesEnabled()
+          ? 'Use a to resolve or send message.'
+          : 'Partner mode is read-only for ticket write actions.'
+      };
     },
     async handleArrow(key: TuiArrowKey) {
       if (key === 'left' || key === 'right') {

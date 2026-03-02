@@ -1,4 +1,4 @@
-import type blessed from 'blessed';
+import type { Widgets } from 'blessed';
 
 import type { XyteClient } from '../types/client';
 import type { ProfileStore } from '../secure/profile-store';
@@ -10,8 +10,14 @@ export type TuiPaneId = string;
 export type TuiArrowKey = 'up' | 'down' | 'left' | 'right';
 export type TuiArrowHandleResult = 'handled' | 'boundary' | 'unhandled';
 
+export interface TuiEntityDetails {
+  title: string;
+  content: string;
+  hint?: string;
+}
+
 export interface TuiContext {
-  screen: blessed.Widgets.Screen;
+  screen: Widgets.Screen;
   client: XyteClient;
   profileStore: ProfileStore;
   secretStore: SecretStore;
@@ -29,12 +35,15 @@ export interface TuiContext {
 export interface TuiScreen {
   readonly id: TuiScreenId;
   readonly title: string;
-  mount(parent: blessed.Widgets.Node, context: TuiContext): void;
+  mount(parent: Widgets.Node, context: TuiContext): void;
   unmount(): void;
   refresh(): Promise<void>;
   focus?(): void;
   getActivePane?(): TuiPaneId;
   getAvailablePanes?(): TuiPaneId[];
   handleArrow?(key: TuiArrowKey): Promise<TuiArrowHandleResult>;
-  handleKey?(ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg): Promise<boolean>;
+  handleKey?(ch: string | undefined, key: Widgets.Events.IKeyEventArg): Promise<boolean>;
+  getCtaHints?(): string[];
+  getEntityDetails?(): TuiEntityDetails | undefined;
+  getEnterTargetScreen?(): TuiScreenId | undefined;
 }

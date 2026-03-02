@@ -1,4 +1,4 @@
-import blessed from 'blessed';
+import blessed, { type Widgets } from 'blessed';
 
 import { createXyteClient } from '../../client/create-client';
 import {
@@ -61,10 +61,10 @@ async function runSlotConnectivityProbe(args: {
 }
 
 export function createConfigScreen(): TuiScreen {
-  let root: blessed.Widgets.BoxElement | undefined;
-  let providerTable: blessed.Widgets.ListTableElement | undefined;
-  let slotTable: blessed.Widgets.ListTableElement | undefined;
-  let actionBox: blessed.Widgets.BoxElement | undefined;
+  let root: Widgets.BoxElement | undefined;
+  let providerTable: Widgets.ListTableElement | undefined;
+  let slotTable: Widgets.ListTableElement | undefined;
+  let actionBox: Widgets.BoxElement | undefined;
   let context: TuiContext;
   let doctorStatus = 'not run';
   let selectedProviderIndex = 0;
@@ -293,6 +293,14 @@ export function createConfigScreen(): TuiScreen {
     },
     getAvailablePanes() {
       return paneConfig.panes;
+    },
+    getCtaHints() {
+      return [
+        'a add slot',
+        'n rename slot',
+        'u use slot',
+        'o not available here'
+      ];
     },
     async handleArrow(key: TuiArrowKey) {
       if (key === 'left' || key === 'right') {

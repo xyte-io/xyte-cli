@@ -1,4 +1,4 @@
-import blessed from 'blessed';
+import blessed, { type Widgets } from 'blessed';
 
 import {
   clampIndex,
@@ -15,7 +15,7 @@ import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
 import type { CommandTemplate } from '../data-loaders';
 import { loadCommandTemplates, loadDevicesData } from '../data-loaders';
 import { sceneFromDevicesState } from '../scene';
-import { payloadSummary, safeSearchText } from '../serialize';
+import { payloadSummary, safeInspect, safeSearchText } from '../serialize';
 import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, promptChoice } from '../actions';
 
 function deviceIdOf(device: any): string {
@@ -65,9 +65,9 @@ export async function sendCommandWithGuard(args: SendCommandWithGuardArgs): Prom
 }
 
 export function createDevicesScreen(): TuiScreen {
-  let root: blessed.Widgets.BoxElement | undefined;
-  let table: blessed.Widgets.ListTableElement | undefined;
-  let detail: blessed.Widgets.BoxElement | undefined;
+  let root: Widgets.BoxElement | undefined;
+  let table: Widgets.ListTableElement | undefined;
+  let detail: Widgets.BoxElement | undefined;
   let context: TuiContext;
   let devices: any[] = [];
   let filtered: any[] = [];
@@ -298,7 +298,7 @@ export function createDevicesScreen(): TuiScreen {
         widgets: ['devices-table', 'detail-box']
       });
 
-      table.on('select item', (_item, index) => {
+      table.on('select item', (_item: unknown, index: number) => {
         if (shouldIgnoreSelectEvent(selectionSync)) {
           return;
         }
@@ -322,6 +322,31 @@ export function createDevicesScreen(): TuiScreen {
     },
     getAvailablePanes() {
       return paneConfig.panes;
+    },
+    getCtaHints() {
+      return [
+        'a send command',
+        'f space filter',
+        '/ search devices',
+        'o deep details'
+      ];
+    },
+    getEntityDetails() {
+      const device = selectedDevice();
+      if (!device) {
+        return undefined;
+      }
+      const inspected = safeInspect(device, {
+        maxDepth: 6,
+        maxArrayItems: 60,
+        maxObjectKeys: 120,
+        maxOutputChars: 8_000
+      });
+      return {
+        title: `Device ${deviceIdOf(device) || '(unknown)'}`,
+        content: inspected.text,
+        hint: 'Use a to execute commands for this device.'
+      };
     },
     async handleArrow(key: TuiArrowKey) {
       if (key === 'left' || key === 'right') {

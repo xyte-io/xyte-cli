@@ -1,4 +1,4 @@
-import blessed from 'blessed';
+import blessed, { type Widgets } from 'blessed';
 
 import {
   clampIndex,
@@ -27,10 +27,10 @@ function parseProvider(value: string): SecretProvider {
 }
 
 export function createSetupScreen(): TuiScreen {
-  let root: blessed.Widgets.BoxElement | undefined;
-  let statsBox: blessed.Widgets.BoxElement | undefined;
-  let providerTable: blessed.Widgets.ListTableElement | undefined;
-  let checklistBox: blessed.Widgets.BoxElement | undefined;
+  let root: Widgets.BoxElement | undefined;
+  let statsBox: Widgets.BoxElement | undefined;
+  let providerTable: Widgets.ListTableElement | undefined;
+  let checklistBox: Widgets.BoxElement | undefined;
   let context: TuiContext;
   let selectedProviderIndex = 0;
   let providerSelectionSync: SelectionSyncState = {
@@ -169,6 +169,14 @@ export function createSetupScreen(): TuiScreen {
     },
     getAvailablePanes() {
       return paneConfig.panes;
+    },
+    getCtaHints() {
+      return [
+        'a add tenant',
+        'u set active tenant',
+        'k key wizard',
+        'o not available here'
+      ];
     },
     async handleArrow(key: TuiArrowKey) {
       if (key === 'left' || key === 'right') {

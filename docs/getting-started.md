@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 22+
 - A valid Xyte API key
 - Writable local config directory (override with `XYTE_CLI_CONFIG_DIR` if needed)
 

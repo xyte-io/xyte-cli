@@ -1,8 +1,8 @@
-import type blessed from 'blessed';
+import type { Widgets } from 'blessed';
 
 interface InputEvent {
   ch: string | undefined;
-  key: blessed.Widgets.Events.IKeyEventArg;
+  key: Widgets.Events.IKeyEventArg;
   timestamp: number;
 }
 

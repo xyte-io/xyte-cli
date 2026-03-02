@@ -8,6 +8,10 @@ Deterministic Xyte operations for humans and AI agents.
 - Flows: [docs/flows/agent-ops.md](./docs/flows/agent-ops.md)
 - Schemas: [docs/schemas](./docs/schemas)
 
+## Requirements
+
+- Node.js 22+
+
 ## AI Agent Prompt (Copy/Paste)
 
 ```text

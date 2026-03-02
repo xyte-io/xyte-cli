@@ -20,7 +20,7 @@
   ],
   "type": "commonjs",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "publishConfig": {
     "access": "public",
@@ -64,14 +64,13 @@
     "@opentelemetry/sdk-node": "^0.211.0",
     "@types/pdfkit": "^0.17.4",
     "ajv": "^8.18.0",
-    "blessed": "^0.1.81",
+    "blessed": "npm:@unblessed/blessed@1.0.0-alpha.23",
     "commander": "^14.0.3",
     "pdfkit": "^0.17.2",
     "pino": "^10.3.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/blessed": "^0.1.25",
     "@types/node": "^22.13.4",
     "tsx": "^4.19.3",
     "typescript": "^5.7.3",

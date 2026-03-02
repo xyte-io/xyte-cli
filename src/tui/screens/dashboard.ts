@@ -1,10 +1,11 @@
-import blessed from 'blessed';
+import blessed, { type Widgets } from 'blessed';
 
 import { movePaneWithBoundary, scrollBox } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
 import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
 import { loadDashboardData } from '../data-loaders';
 import { sceneFromDashboardState } from '../scene';
+import { safeInspect } from '../serialize';
 
 function linesFromStats(stats: Array<{ label: string; value: string | number }> = []): string {
   return stats.map((item) => `${item.label}: ${item.value}`).join('\n');
@@ -18,14 +19,17 @@ function linesFromTableRows(rows: Array<Array<string | number>> = [], fallback: 
 }
 
 export function createDashboardScreen(): TuiScreen {
-  let root: blessed.Widgets.BoxElement | undefined;
-  let kpis: blessed.Widgets.BoxElement | undefined;
-  let incidentsBox: blessed.Widgets.BoxElement | undefined;
-  let ticketsBox: blessed.Widgets.BoxElement | undefined;
-  let providerBox: blessed.Widgets.BoxElement | undefined;
+  let root: Widgets.BoxElement | undefined;
+  let kpis: Widgets.BoxElement | undefined;
+  let incidentsBox: Widgets.BoxElement | undefined;
+  let ticketsBox: Widgets.BoxElement | undefined;
+  let providerBox: Widgets.BoxElement | undefined;
   let context: TuiContext;
   const paneConfig = SCREEN_PANE_CONFIG.dashboard;
   let activePane: TuiPaneId = paneConfig.defaultPane;
+  let lastIncidents: any[] = [];
+  let lastTickets: any[] = [];
+  let lastDevicesCount = 0;
 
   const focusActivePane = () => {
     if (activePane === 'kpi') {
@@ -125,6 +129,9 @@ export function createDashboardScreen(): TuiScreen {
 
       const tenantId = await context.getActiveTenantId();
       const loaded = await loadDashboardData(context.client, tenantId);
+      lastIncidents = loaded.data.incidents ?? [];
+      lastTickets = loaded.data.tickets ?? [];
+      lastDevicesCount = loaded.data.devices.length;
 
       const panels = sceneFromDashboardState({
         tenantId,
@@ -155,6 +162,69 @@ export function createDashboardScreen(): TuiScreen {
     },
     getAvailablePanes() {
       return paneConfig.panes;
+    },
+    getCtaHints() {
+      return [
+        'Enter drills into incidents or tickets pane',
+        'Ctrl+←/→ moves pane focus',
+        'o deep details'
+      ];
+    },
+    getEntityDetails() {
+      if (activePane === 'incidents' && lastIncidents.length) {
+        const inspected = safeInspect(lastIncidents[0], {
+          maxDepth: 6,
+          maxArrayItems: 60,
+          maxObjectKeys: 120,
+          maxOutputChars: 8_000
+        });
+        return {
+          title: 'Top incident from dashboard',
+          content: inspected.text,
+          hint: 'Press Enter to open full incidents screen.'
+        };
+      }
+      if (activePane === 'tickets' && lastTickets.length) {
+        const inspected = safeInspect(lastTickets[0], {
+          maxDepth: 6,
+          maxArrayItems: 60,
+          maxObjectKeys: 120,
+          maxOutputChars: 8_000
+        });
+        return {
+          title: 'Top ticket from dashboard',
+          content: inspected.text,
+          hint: 'Press Enter to open full tickets screen.'
+        };
+      }
+      const inspected = safeInspect(
+        {
+          activePane,
+          devices: lastDevicesCount,
+          incidents: lastIncidents.length,
+          tickets: lastTickets.length
+        },
+        {
+          maxDepth: 4,
+          maxArrayItems: 20,
+          maxObjectKeys: 40,
+          maxOutputChars: 3_000
+        }
+      );
+      return {
+        title: 'Dashboard summary',
+        content: inspected.text,
+        hint: 'Move to incidents or tickets pane for entity-level details.'
+      };
+    },
+    getEnterTargetScreen() {
+      if (activePane === 'incidents') {
+        return 'incidents';
+      }
+      if (activePane === 'tickets') {
+        return 'tickets';
+      }
+      return undefined;
     },
     async handleArrow(key: TuiArrowKey) {
       if (key === 'left' || key === 'right') {
