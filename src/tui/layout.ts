@@ -2,7 +2,7 @@ import blessed, { type Widgets } from 'blessed';
 
 import { pulseChar } from './animation';
 import type { TuiScreenId } from './types';
-import { TAB_ORDER } from './tabs';
+import { TAB_ORDER, SCREEN_SHORTCUTS } from './tabs';
 
 interface TuiLayout {
   header: Widgets.BoxElement;
@@ -88,15 +88,9 @@ export function createLayout(screen: Widgets.Screen, options: TuiLayoutOptions):
     }
   });
 
-  const tabLabelById: Record<TuiScreenId, string> = {
-    setup: '1 Setup',
-    config: '2 Config',
-    dashboard: '3 Dashboard',
-    spaces: '4 Spaces',
-    devices: '5 Devices',
-    incidents: '6 Incidents',
-    tickets: '7 Tickets'
-  };
+  const tabLabelById = Object.fromEntries(
+    SCREEN_SHORTCUTS.map((shortcut) => [shortcut.screen, `${shortcut.key} ${shortcut.label}`])
+  ) as Record<TuiScreenId, string>;
 
   const inactiveTabStyle = '{cyan-fg}';
   const activeTabStyle = '{black-fg}{cyan-bg}';

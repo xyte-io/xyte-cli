@@ -23,7 +23,7 @@ import { evaluateReadiness, type ReadinessCheck } from '../config/readiness';
 import { createInputController } from './input-controller';
 import { ScreenRuntime, type ScreenRuntimeStatus } from './runtime';
 import { createTuiLogger } from './logger';
-import { TAB_ORDER, nextTab } from './tabs';
+import { TAB_ORDER, SCREEN_SHORTCUTS, nextTab } from './tabs';
 
 interface TuiAppOptions {
   client: XyteClient;
@@ -40,16 +40,6 @@ interface TuiAppOptions {
   debug?: boolean;
   debugLogPath?: string;
 }
-
-const SCREEN_SHORTCUTS: Array<{ key: string; screen: TuiScreenId; label: string }> = [
-  { key: '1', screen: 'setup', label: 'Setup' },
-  { key: '2', screen: 'config', label: 'Config' },
-  { key: '3', screen: 'dashboard', label: 'Dashboard' },
-  { key: '4', screen: 'spaces', label: 'Spaces' },
-  { key: '5', screen: 'devices', label: 'Devices' },
-  { key: '6', screen: 'incidents', label: 'Incidents' },
-  { key: '7', screen: 'tickets', label: 'Tickets' }
-];
 
 function toErrorText(error: unknown): string {
   if (error instanceof Error) {
