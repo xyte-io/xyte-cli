@@ -3,38 +3,41 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>xyte-cli — AI-ready operations in minutes</title>
+    <title>xyte-cli | Deterministic Xyte operations for teams and AI agents</title>
     <meta
       name="description"
-      content="Install xyte-cli, install agent skills, connect your tenant key, watch active incidents, and plan remediation with safety guardrails."
+      content="Install xyte-cli, add agent skills, connect a tenant key, watch incidents, and export shareable reports with explicit command guardrails."
     />
+    <link rel="icon" href="./media/xyte-logo.jpg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@10..48,500;10..48,700;10..48,800&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Public+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <style>
       :root {
-        --bg: #070b12;
-        --bg-soft: #0d1420;
-        --bg-card: #101b2a;
-        --bg-card-strong: #13233a;
-        --line: rgba(155, 195, 232, 0.23);
-        --line-strong: rgba(155, 195, 232, 0.42);
-        --text: #edf6ff;
-        --muted: #9ab4cf;
-        --accent: #5de2ff;
-        --accent-2: #ffd174;
-        --ok: #7bf1b0;
-        --danger: #ff9d97;
-        --radius-s: 10px;
-        --radius-m: 18px;
-        --radius-l: 26px;
-        --shadow-soft: 0 16px 42px rgba(0, 0, 0, 0.34);
-        --shadow-glow: 0 0 95px rgba(93, 226, 255, 0.16);
-        --font-display: "Bricolage Grotesque", "Segoe UI", sans-serif;
-        --font-body: "Manrope", "Segoe UI", sans-serif;
+        --paper: #f2ede5;
+        --paper-strong: #fbf8f2;
+        --surface: rgba(255, 251, 245, 0.94);
+        --surface-strong: rgba(255, 252, 247, 0.99);
+        --surface-muted: rgba(241, 235, 225, 0.96);
+        --ink: #152338;
+        --ink-soft: #405169;
+        --ink-faint: #66788f;
+        --accent: #4f74a8;
+        --accent-strong: #244f88;
+        --accent-soft: #dfe8f5;
+        --line: rgba(24, 38, 58, 0.12);
+        --line-strong: rgba(36, 79, 136, 0.22);
+        --shadow-soft: 0 28px 60px rgba(26, 39, 56, 0.08);
+        --shadow-card: 0 16px 34px rgba(22, 34, 50, 0.06);
+        --radius-s: 14px;
+        --radius-m: 24px;
+        --radius-l: 34px;
+        --wrap: min(1180px, calc(100% - 40px));
+        --font-display: "Instrument Serif", Georgia, serif;
+        --font-body: "Public Sans", "Segoe UI", sans-serif;
         --font-mono: "IBM Plex Mono", Menlo, monospace;
       }
 
@@ -49,12 +52,12 @@
       body {
         margin: 0;
         font-family: var(--font-body);
-        color: var(--text);
+        color: var(--ink);
         background:
-          radial-gradient(circle at 14% -10%, rgba(93, 226, 255, 0.26), transparent 35%),
-          radial-gradient(circle at 88% 6%, rgba(255, 209, 116, 0.2), transparent 30%),
-          linear-gradient(180deg, #05080f 0%, #070b12 30%, #08101a 100%);
-        line-height: 1.58;
+          radial-gradient(circle at top left, rgba(91, 125, 170, 0.16), transparent 34%),
+          radial-gradient(circle at 88% 10%, rgba(226, 209, 172, 0.3), transparent 28%),
+          linear-gradient(180deg, #f8f4ed 0%, #f5f0e8 100%);
+        line-height: 1.6;
       }
 
       body::before {
@@ -63,49 +66,79 @@
         inset: 0;
         pointer-events: none;
         background-image:
-          linear-gradient(rgba(138, 183, 224, 0.045) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(138, 183, 224, 0.045) 1px, transparent 1px);
-        background-size: 26px 26px;
-        mask-image: radial-gradient(circle at center, black 10%, transparent 90%);
+          linear-gradient(rgba(24, 38, 58, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(24, 38, 58, 0.03) 1px, transparent 1px);
+        background-size: 28px 28px;
+        mask-image: radial-gradient(circle at center, black 25%, transparent 88%);
         z-index: -2;
+      }
+
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(transparent, rgba(255, 255, 255, 0.22)),
+          repeating-linear-gradient(
+            0deg,
+            rgba(255, 255, 255, 0.02) 0,
+            rgba(255, 255, 255, 0.02) 2px,
+            transparent 2px,
+            transparent 4px
+          );
+        opacity: 0.14;
+        z-index: -1;
       }
 
       a {
         color: inherit;
       }
 
+      img {
+        max-width: 100%;
+        display: block;
+      }
+
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
+      }
+
       .skip-link {
         position: absolute;
-        left: -1000px;
+        left: -999px;
         top: 0;
         padding: 10px 14px;
-        background: var(--accent);
-        color: #03202a;
+        background: var(--ink);
+        color: #fff;
         border-radius: 0 0 var(--radius-s) var(--radius-s);
         font-weight: 700;
       }
 
       .skip-link:focus {
-        left: 14px;
+        left: 18px;
         z-index: 100;
       }
 
       .wrap {
-        width: min(1140px, 100% - 40px);
+        width: var(--wrap);
         margin: 0 auto;
       }
 
       .site-nav {
         position: sticky;
         top: 0;
-        z-index: 50;
-        background: rgba(6, 11, 18, 0.75);
-        backdrop-filter: blur(14px) saturate(150%);
+        z-index: 40;
+        backdrop-filter: blur(16px) saturate(120%);
+        background: rgba(248, 244, 237, 0.78);
         border-bottom: 1px solid var(--line);
       }
 
       .nav-row {
-        min-height: 70px;
+        min-height: 74px;
         display: flex;
         align-items: center;
         gap: 14px;
@@ -116,29 +149,40 @@
         margin-right: auto;
         display: inline-flex;
         align-items: center;
-        gap: 10px;
+        gap: 12px;
         text-decoration: none;
       }
 
-      .brand img {
-        width: 34px;
-        height: 34px;
-        border-radius: 9px;
-        background: white;
-        padding: 4px;
+      .brand-mark {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(24, 38, 58, 0.08);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        display: grid;
+        place-items: center;
+        overflow: hidden;
       }
 
-      .brand strong {
-        font-family: var(--font-display);
-        font-size: 21px;
-        letter-spacing: 0.01em;
+      .brand-mark img {
+        width: 26px;
+        height: 26px;
+        object-fit: cover;
       }
 
-      .brand span {
+      .brand-copy strong {
         display: block;
+        font-size: 18px;
+        letter-spacing: -0.02em;
+      }
+
+      .brand-copy span {
+        display: block;
+        color: var(--ink-soft);
         font-size: 11px;
-        font-family: var(--font-mono);
-        color: var(--muted);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
       }
 
       .nav-links {
@@ -148,340 +192,389 @@
         flex-wrap: wrap;
       }
 
-      .nav-links a {
-        font-family: var(--font-mono);
-        font-size: 12px;
-        color: var(--muted);
+      .nav-links a,
+      .nav-link-button {
         text-decoration: none;
-        padding: 7px 10px;
+        font-size: 13px;
+        color: var(--ink-soft);
+        padding: 8px 12px;
         border-radius: 999px;
         border: 1px solid transparent;
+        transition:
+          color 180ms ease,
+          background 180ms ease,
+          border-color 180ms ease;
       }
 
-      .nav-links a:hover {
-        color: var(--text);
+      .nav-links a:hover,
+      .nav-link-button:hover {
+        color: var(--ink);
+        background: rgba(255, 255, 255, 0.58);
         border-color: var(--line);
-        background: rgba(255, 255, 255, 0.03);
       }
 
       .nav-cta {
-        margin-left: 8px;
         text-decoration: none;
-        font-weight: 700;
-        font-size: 13px;
-        color: #031826;
-        background: linear-gradient(135deg, var(--accent), #a2efff);
-        border: 1px solid rgba(255, 255, 255, 0.14);
         border-radius: 999px;
         padding: 10px 14px;
+        background: var(--ink);
+        color: #fff;
+        font-size: 13px;
+        font-weight: 700;
+        box-shadow: 0 12px 24px rgba(24, 38, 58, 0.14);
       }
 
       .hero {
-        padding: 86px 0 34px;
+        padding: 56px 0 32px;
       }
 
-      .hero-grid {
+      .hero-layout {
         display: grid;
-        grid-template-columns: minmax(0, 58%) minmax(0, 42%);
-        grid-template-areas:
-          "title title"
-          "desc hero";
-        column-gap: 40px;
-        row-gap: 20px;
+        grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+        gap: 28px;
         align-items: start;
       }
 
-      .hero-title-block {
-        grid-area: title;
-        max-width: min(100%, 1040px);
+      .hero-copy,
+      .hero-panel,
+      .section-card,
+      .workflow-card,
+      .docs-card,
+      .video-shell,
+      .install-shell,
+      .disclosure,
+      .final-card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow-card);
+        backdrop-filter: blur(8px);
       }
 
-      .hero-title-block h1 {
-        margin-bottom: 0;
-        font-size: clamp(30px, 4.2vw, 54px);
-        line-height: 1.02;
-        max-width: none;
-        white-space: nowrap;
+      .hero-copy {
+        border-radius: var(--radius-l);
+        padding: 36px;
+        position: relative;
+        overflow: hidden;
       }
 
-      .hero-title-block .eyebrow {
-        white-space: nowrap;
-      }
-
-      .hero-desc-block {
-        grid-area: desc;
-        padding-top: 2px;
-      }
-
-      .hero-desc-block p {
-        max-width: 40ch;
+      .hero-copy::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(140deg, rgba(79, 116, 168, 0.12), transparent 48%),
+          radial-gradient(circle at 88% 14%, rgba(255, 255, 255, 0.65), transparent 28%);
+        pointer-events: none;
       }
 
       .eyebrow {
-        margin: 0 0 10px;
+        margin: 0 0 14px;
         font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
-        letter-spacing: 0.1em;
-        color: var(--accent-2);
-        font-size: 12px;
+        color: var(--accent-strong);
       }
 
       h1,
       h2,
       h3 {
         margin: 0;
-        font-family: var(--font-display);
         line-height: 1.05;
       }
 
       h1 {
-        font-size: clamp(38px, 6vw, 66px);
-        margin-bottom: 20px;
-        max-width: 13.5ch;
+        font-family: var(--font-display);
+        font-size: clamp(3rem, 6vw, 5.5rem);
+        letter-spacing: -0.05em;
+        max-width: 10ch;
       }
 
       h1 em {
-        color: var(--accent);
-        font-style: normal;
+        font-style: italic;
+        color: var(--accent-strong);
       }
 
-      .hero-title-line {
-        display: block;
-      }
-
-      .hero-title-line + .hero-title-line {
-        margin-top: 6px;
-      }
-
-      .hero p {
-        margin: 0;
-        color: #bdd3e7;
-        font-size: clamp(17px, 2vw, 21px);
-        max-width: 54ch;
+      .hero-lead {
+        margin: 18px 0 0;
+        max-width: 58ch;
+        font-size: 18px;
+        color: var(--ink-soft);
       }
 
       .hero-actions {
-        margin-top: 24px;
+        margin-top: 28px;
         display: flex;
         flex-wrap: wrap;
         gap: 12px;
       }
 
       .btn {
-        text-decoration: none;
-        border-radius: 999px;
-        padding: 11px 16px;
-        font-weight: 700;
-        font-size: 13px;
-        border: 1px solid transparent;
-      }
-
-      .btn-primary {
-        color: #041624;
-        background: linear-gradient(135deg, var(--accent), #aceeff);
-      }
-
-      .btn-ghost {
-        color: var(--text);
-        border-color: var(--line);
-      }
-
-      .hero-chat {
-        grid-area: hero;
-        align-self: start;
-        background: linear-gradient(160deg, rgba(19, 35, 58, 0.95), rgba(10, 20, 35, 0.95));
-        border: 1px solid var(--line-strong);
-        border-radius: var(--radius-l);
-        box-shadow: var(--shadow-soft), var(--shadow-glow);
-        padding: 16px;
-      }
-
-      .hero-mock {
-        border-radius: 16px;
-        border: 1px solid var(--line);
-        overflow: hidden;
-        background: #0d0f12;
-      }
-
-      .hero-mock-header {
-        height: 32px;
-        border-bottom: 1px solid var(--line);
-        background: #0f1115;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 10px;
-      }
-
-      .hero-mock-left {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        color: #d1d5db;
-      }
-
-      .hero-mock-left strong {
-        font-family: var(--font-body);
-        font-size: 11px;
-        font-weight: 700;
-      }
-
-      .hero-mock-main {
-        padding: 12px 12px 10px;
-        background:
-          radial-gradient(circle at 45% -20%, rgba(59, 130, 246, 0.18), transparent 44%),
-          #0d0f12;
-      }
-
-      .hero-mock-user {
-        margin-left: 52px;
-        max-width: 82%;
-        border-radius: 12px;
-        border-top-right-radius: 4px;
-        background: #1d2128;
-        border: 1px solid #2b3342;
-        padding: 9px 11px;
-        color: #e5e7eb;
-        font-size: 12px;
-        line-height: 1.35;
-      }
-
-      .hero-mock-assistant-row {
-        margin-top: 8px;
-        display: flex;
-        gap: 8px;
-        align-items: flex-start;
-      }
-
-      .hero-mock-ai-dot {
-        width: 24px;
-        height: 24px;
-        border-radius: 999px;
-        background: linear-gradient(135deg, #4f46e5, #3b82f6);
-        color: #ffffff;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        font-size: 10px;
-        font-weight: 700;
-        flex: 0 0 auto;
-      }
-
-      .hero-mock-assistant-wrap {
-        width: 100%;
-      }
-
-      .hero-mock-assistant-label {
-        font-family: var(--font-mono);
-        font-size: 9px;
-        color: #9ca3af;
-        margin-bottom: 4px;
-      }
-
-      .hero-mock-assistant {
-        border-radius: 10px;
-        background: #14161b;
-        border: 1px solid #262c38;
-        padding: 8px 10px;
-        color: #e5e7eb;
-        font-size: 11px;
-        line-height: 1.32;
-      }
-
-      .hero-mock-tool {
-        margin-top: 7px;
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        border: 1px solid #2b3342;
-        background: #111214;
-        border-radius: 8px;
-        color: #c5d1df;
-        padding: 3px 7px;
-        font-size: 9px;
-        font-family: var(--font-mono);
-      }
-
-      .hero-mock-terminal {
-        margin-top: 7px;
-        border-radius: 10px;
-        overflow: hidden;
-        border: 1px solid #262c38;
-        background: #0a0a0a;
-      }
-
-      .hero-mock-terminal-head {
-        height: 24px;
-        background: #121212;
-        border-bottom: 1px solid #262c38;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 9px;
-      }
-
-      .hero-mock-dots {
-        display: inline-flex;
-        gap: 4px;
-      }
-
-      .hero-mock-dots span {
-        width: 6px;
-        height: 6px;
+        gap: 8px;
+        text-decoration: none;
+        padding: 12px 18px;
         border-radius: 999px;
+        border: 1px solid transparent;
+        font-size: 14px;
+        font-weight: 700;
+        transition:
+          transform 180ms ease,
+          background 180ms ease,
+          border-color 180ms ease;
+      }
+
+      .btn:hover {
+        transform: translateY(-1px);
+      }
+
+      .btn-primary {
+        background: var(--ink);
+        color: #fff;
+        box-shadow: 0 16px 28px rgba(24, 38, 58, 0.12);
+      }
+
+      .btn-secondary {
+        color: var(--ink);
+        background: rgba(255, 255, 255, 0.52);
+        border-color: var(--line);
+      }
+
+      .proof-strip {
+        margin-top: 28px;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .proof-item {
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.74);
+        border: 1px solid rgba(24, 38, 58, 0.08);
+        padding: 14px;
+      }
+
+      .proof-label {
         display: block;
-      }
-
-      .hero-mock-dots span:nth-child(1) {
-        background: #ef4444;
-      }
-
-      .hero-mock-dots span:nth-child(2) {
-        background: #f59e0b;
-      }
-
-      .hero-mock-dots span:nth-child(3) {
-        background: #10b981;
-      }
-
-      .hero-mock-term-label {
-        font-family: var(--font-mono);
-        font-size: 8px;
-        letter-spacing: 0.08em;
-        color: #6b7280;
-      }
-
-      .hero-mock-terminal-body {
-        padding: 10px;
+        margin-bottom: 8px;
         font-family: var(--font-mono);
         font-size: 10px;
-        line-height: 1.45;
-        color: #d1d5db;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink-faint);
       }
 
-      .hero-mock-cmd {
-        color: #4ade80;
+      .proof-item strong {
+        display: block;
+        font-size: 15px;
+      }
+
+      .proof-item span:last-child {
+        display: block;
+        margin-top: 6px;
+        color: var(--ink-soft);
+        font-size: 13px;
+      }
+
+      .hero-panel {
+        border-radius: var(--radius-l);
+        padding: 26px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .hero-panel::before {
+        content: "";
+        position: absolute;
+        inset: auto -80px -80px auto;
+        width: 220px;
+        height: 220px;
+        border-radius: 50%;
+        background: rgba(79, 116, 168, 0.1);
+        filter: blur(10px);
+      }
+
+      .panel-topline {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .panel-kicker {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-faint);
+      }
+
+      .panel-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent-strong);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .panel-title {
+        margin-top: 18px;
+        font-size: 28px;
+        letter-spacing: -0.04em;
+      }
+
+      .panel-lead {
+        margin: 12px 0 0;
+        color: var(--ink-soft);
+      }
+
+      .path-list {
+        margin: 22px 0 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 12px;
+      }
+
+      .path-list li {
+        display: grid;
+        grid-template-columns: 44px 1fr;
+        gap: 12px;
+        align-items: start;
+        padding: 12px 0;
+        border-top: 1px solid rgba(24, 38, 58, 0.08);
+      }
+
+      .path-list li:first-child {
+        border-top: 0;
+        padding-top: 0;
+      }
+
+      .path-step {
+        width: 44px;
+        height: 44px;
+        border-radius: 16px;
+        display: grid;
+        place-items: center;
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(24, 38, 58, 0.08);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--accent-strong);
+      }
+
+      .path-copy strong {
+        display: block;
+        font-size: 16px;
+      }
+
+      .path-copy span {
+        display: block;
+        margin-top: 4px;
+        color: var(--ink-soft);
+        font-size: 14px;
+      }
+
+      .meta-grid {
+        margin-top: 24px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .meta-grid div {
+        padding: 14px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.78);
+        border: 1px solid rgba(24, 38, 58, 0.08);
+      }
+
+      .meta-grid dt {
+        margin: 0;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink-faint);
+      }
+
+      .meta-grid dd {
+        margin: 8px 0 0;
+        font-size: 15px;
+        color: var(--ink);
       }
 
       .section {
-        padding: 68px 0;
+        padding: 34px 0;
       }
 
-      .section + .section {
-        border-top: 1px solid var(--line);
+      .section-shell {
+        display: grid;
+        gap: 20px;
       }
 
-      .section p.lead {
-        margin: 12px 0 0;
-        color: #b8d0e5;
-        max-width: 74ch;
+      .section-head {
+        display: grid;
+        gap: 10px;
+        max-width: 66ch;
       }
 
-      .card {
-        background: linear-gradient(160deg, rgba(16, 27, 42, 0.9), rgba(10, 18, 30, 0.9));
-        border: 1px solid var(--line);
+      .section-head h2 {
+        font-size: clamp(2.1rem, 3vw, 3.2rem);
+        letter-spacing: -0.05em;
+      }
+
+      .section-head p {
+        margin: 0;
+        color: var(--ink-soft);
+      }
+
+      .install-shell {
+        border-radius: var(--radius-l);
+        padding: 28px;
+        display: grid;
+        grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+        gap: 22px;
+      }
+
+      .install-block,
+      .install-notes {
+        display: grid;
+        gap: 16px;
+      }
+
+      .section-card {
         border-radius: var(--radius-m);
-        box-shadow: var(--shadow-soft);
+        padding: 22px;
+      }
+
+      .card-label {
+        margin: 0;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink-faint);
+      }
+
+      .command-shell {
+        margin-top: 12px;
+        padding: 18px;
+        border-radius: 20px;
+        background: rgba(24, 38, 58, 0.96);
+        color: #edf3fb;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      }
+
+      pre,
+      code {
+        font-family: var(--font-mono);
       }
 
       pre {
@@ -489,270 +582,549 @@
         white-space: pre-wrap;
       }
 
-      code,
-      pre {
-        font-family: var(--font-mono);
+      .command-shell pre {
+        font-size: 13px;
+        line-height: 1.65;
       }
 
-      .install-card,
-      .prompt-card {
-        padding: 22px;
-      }
-
-      .install-card pre,
-      .prompt-card pre {
+      .action-row {
         margin-top: 14px;
-        background: rgba(6, 12, 20, 0.92);
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        padding: 14px;
-        overflow-x: auto;
-      }
-
-      .prompt-actions {
-        margin-top: 12px;
         display: flex;
-        gap: 10px;
         align-items: center;
+        gap: 12px;
         flex-wrap: wrap;
       }
 
-      .copy-btn {
-        border: 1px solid var(--line-strong);
+      .copy-btn,
+      .inline-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
         border-radius: 999px;
-        background: rgba(93, 226, 255, 0.14);
-        color: var(--text);
+        padding: 10px 14px;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.7);
+        color: var(--ink);
+        font-size: 13px;
         font-weight: 700;
-        font-size: 12px;
-        padding: 8px 12px;
         cursor: pointer;
+        text-decoration: none;
       }
 
-      .copy-btn:hover {
-        background: rgba(93, 226, 255, 0.24);
-      }
-
-      .copy-btn:focus-visible {
-        outline: 2px solid var(--accent);
-        outline-offset: 2px;
+      .copy-btn:hover,
+      .inline-link:hover {
+        border-color: var(--line-strong);
+        background: #fff;
       }
 
       .toast {
-        font-size: 12px;
-        color: var(--ok);
+        min-height: 20px;
+        font-size: 13px;
+        color: var(--accent-strong);
       }
 
-      .video-grid {
-        margin: 20px auto 0;
+      .mini-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
         display: grid;
-        grid-template-columns: 1fr;
-        gap: 20px;
-        max-width: 980px;
-      }
-
-      .video-card {
-        position: relative;
-        display: grid;
-        grid-template-rows: auto 1fr;
         gap: 12px;
-        padding: 16px 16px 16px 26px;
       }
 
-      .video-card::before {
-        content: "";
-        position: absolute;
-        left: -12px;
-        top: -16px;
-        bottom: -16px;
-        width: 2px;
-        background: linear-gradient(180deg, rgba(93, 226, 255, 0.6), rgba(93, 226, 255, 0.15));
+      .mini-list li {
+        padding: 14px 0 0;
+        border-top: 1px solid rgba(24, 38, 58, 0.08);
       }
 
-      .video-card::after {
-        content: "";
-        position: absolute;
-        left: -16px;
-        top: 22px;
-        width: 10px;
-        height: 10px;
-        border-radius: 999px;
-        background: var(--accent);
-        box-shadow: 0 0 0 3px rgba(93, 226, 255, 0.2);
+      .mini-list li:first-child {
+        border-top: 0;
+        padding-top: 0;
       }
 
-      .video-card.is-last::before {
-        bottom: 50%;
+      .mini-list strong {
+        display: block;
+        font-size: 15px;
       }
 
-      .video-meta h3 {
-        font-size: 20px;
-      }
-
-      .video-meta p {
-        margin: 9px 0 0;
-        color: #b7d0e7;
+      .mini-list span {
+        display: block;
+        margin-top: 4px;
+        color: var(--ink-soft);
         font-size: 14px;
       }
 
-      .video-meta small {
-        display: block;
+      .detail-code {
         margin-top: 8px;
-        color: var(--muted);
-        font-family: var(--font-mono);
-        font-size: 11px;
-      }
-
-      .video-card video {
-        width: 100%;
-        border-radius: 12px;
-        border: 1px solid var(--line);
-        background: #05080d;
-      }
-
-      .story-step {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        margin-top: 8px;
-        font-family: var(--font-mono);
-        font-size: 11px;
-        color: var(--accent-2);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        border: 1px solid rgba(255, 209, 116, 0.3);
+        display: inline-block;
+        padding: 6px 10px;
         border-radius: 999px;
-        padding: 4px 9px;
-        width: fit-content;
+        background: var(--accent-soft);
+        color: var(--accent-strong);
+        font-family: var(--font-mono);
+        font-size: 11px;
       }
 
-      .step-grid {
-        margin-top: 20px;
+      .disclosure {
+        border-radius: var(--radius-l);
+        padding: 0;
+        overflow: hidden;
+      }
+
+      .disclosure summary {
+        list-style: none;
+        cursor: pointer;
+        padding: 22px 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .disclosure summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .disclosure-title strong {
+        display: block;
+        font-size: 20px;
+        letter-spacing: -0.03em;
+      }
+
+      .disclosure-title span {
+        display: block;
+        margin-top: 4px;
+        color: var(--ink-soft);
+        font-size: 14px;
+      }
+
+      .summary-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 14px;
+        place-items: center;
+        background: rgba(255, 255, 255, 0.8);
+        border: 1px solid var(--line);
+        color: var(--accent-strong);
+        font-size: 20px;
+        transition: transform 180ms ease;
       }
 
-      .step-card {
-        padding: 18px;
+      details[open] .summary-icon {
+        transform: rotate(45deg);
       }
 
-      .step-num {
+      .disclosure-body {
+        border-top: 1px solid var(--line);
+        padding: 24px;
+        background: rgba(255, 255, 255, 0.62);
+      }
+
+      .workflow-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .workflow-card {
+        border-radius: 24px;
+        padding: 22px;
+        min-height: 220px;
+      }
+
+      .workflow-step {
         display: inline-flex;
-        width: 28px;
-        height: 28px;
         align-items: center;
         justify-content: center;
-        border-radius: 999px;
-        border: 1px solid var(--line-strong);
-        background: rgba(93, 226, 255, 0.13);
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        background: rgba(79, 116, 168, 0.12);
+        color: var(--accent-strong);
         font-family: var(--font-mono);
         font-size: 12px;
-        margin-bottom: 10px;
       }
 
-      .step-card p {
-        margin-top: 10px;
-        color: #b7d0e7;
-      }
-
-      .more-grid {
+      .workflow-card h3 {
         margin-top: 18px;
+        font-size: 23px;
+        letter-spacing: -0.04em;
+      }
+
+      .workflow-card p {
+        margin: 10px 0 0;
+        color: var(--ink-soft);
+      }
+
+      .workflow-card code {
+        display: inline-block;
+        margin-top: 16px;
+        padding: 7px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.78);
+        color: var(--accent-strong);
+        font-size: 11px;
+      }
+
+      .video-shell {
+        border-radius: var(--radius-l);
+        padding: 26px;
+      }
+
+      .video-layout {
+        display: grid;
+        grid-template-columns: minmax(280px, 0.75fr) minmax(0, 1.25fr);
+        gap: 20px;
+      }
+
+      .video-rail {
+        display: grid;
+        gap: 10px;
+        align-content: start;
+      }
+
+      .video-step {
+        width: 100%;
+        text-align: left;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.76);
+        border-radius: 22px;
+        padding: 16px;
+        cursor: pointer;
+        transition:
+          transform 180ms ease,
+          border-color 180ms ease,
+          background 180ms ease,
+          box-shadow 180ms ease;
+      }
+
+      .video-step:hover {
+        transform: translateY(-1px);
+        border-color: var(--line-strong);
+        background: rgba(255, 255, 255, 0.78);
+      }
+
+      .video-step.is-active {
+        background: linear-gradient(180deg, rgba(79, 116, 168, 0.12), rgba(255, 255, 255, 0.86));
+        border-color: rgba(79, 116, 168, 0.32);
+        box-shadow: 0 14px 28px rgba(79, 116, 168, 0.08);
+      }
+
+      .video-step-number {
+        display: inline-flex;
+        margin-bottom: 10px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink-faint);
+      }
+
+      .video-step strong {
+        display: block;
+        font-size: 16px;
+      }
+
+      .video-step span:last-child {
+        display: block;
+        margin-top: 6px;
+        color: var(--ink-soft);
+        font-size: 14px;
+      }
+
+      .video-stage {
+        border: 1px solid rgba(24, 38, 58, 0.08);
+        border-radius: 28px;
+        background: rgba(255, 255, 255, 0.78);
+        padding: 18px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .video-stage-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        align-items: start;
+      }
+
+      .video-stage-copy h3 {
+        font-size: 30px;
+        letter-spacing: -0.05em;
+      }
+
+      .video-stage-copy p {
+        margin: 10px 0 0;
+        color: var(--ink-soft);
+      }
+
+      .video-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 62px;
+        padding: 10px 12px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.76);
+        border: 1px solid var(--line);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--accent-strong);
+      }
+
+      .video-stage-meta {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 12px;
       }
 
-      .more-grid a {
-        text-decoration: none;
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        padding: 12px;
-        background: rgba(16, 27, 42, 0.75);
-        color: #cbe2f6;
-        font-family: var(--font-mono);
-        font-size: 12px;
+      .video-stage-meta div {
+        padding: 14px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.82);
+        border: 1px solid rgba(24, 38, 58, 0.08);
       }
 
-      .advanced details {
-        margin-top: 14px;
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        background: rgba(11, 18, 28, 0.84);
-      }
-
-      .advanced summary {
-        cursor: pointer;
-        padding: 12px 14px;
-        font-weight: 700;
-      }
-
-      .advanced .body {
-        border-top: 1px solid var(--line);
-        padding: 12px 14px 14px;
-      }
-
-      .advanced ul {
+      .video-stage-meta dt {
         margin: 0;
-        padding-left: 18px;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink-faint);
       }
 
-      .advanced li + li {
-        margin-top: 8px;
+      .video-stage-meta dd {
+        margin: 8px 0 0;
+        color: var(--ink);
+        font-size: 14px;
+      }
+
+      .video-player-shell {
+        position: relative;
+        border-radius: 24px;
+        overflow: hidden;
+        background: #0f1b2b;
+        border: 1px solid rgba(24, 38, 58, 0.08);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      }
+
+      .video-player-shell::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          radial-gradient(circle at top left, rgba(125, 161, 212, 0.28), transparent 32%),
+          linear-gradient(180deg, transparent, rgba(12, 20, 34, 0.08));
+      }
+
+      .video-player-shell video {
+        width: 100%;
+        display: block;
+        aspect-ratio: 16 / 10;
+        background: #101927;
+      }
+
+      .docs-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .docs-card {
+        border-radius: 24px;
+        padding: 22px;
+        text-decoration: none;
+        transition:
+          transform 180ms ease,
+          border-color 180ms ease,
+          background 180ms ease;
+      }
+
+      .docs-card:hover {
+        transform: translateY(-1px);
+        border-color: var(--line-strong);
+        background: rgba(255, 255, 255, 0.92);
+      }
+
+      .docs-card strong {
+        display: block;
+        font-size: 18px;
+        letter-spacing: -0.03em;
+      }
+
+      .docs-card p {
+        margin: 10px 0 0;
+        color: var(--ink-soft);
+        font-size: 14px;
+      }
+
+      .docs-card span {
+        display: inline-flex;
+        margin-top: 18px;
+        color: var(--accent-strong);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .final-card {
+        border-radius: var(--radius-l);
+        padding: 26px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+
+      .final-copy h2 {
+        font-size: clamp(2rem, 3vw, 2.8rem);
+        letter-spacing: -0.05em;
+      }
+
+      .final-copy p {
+        margin: 10px 0 0;
+        color: var(--ink-soft);
+        max-width: 56ch;
+      }
+
+      .final-actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
       }
 
       .footer {
-        border-top: 1px solid var(--line);
-        padding: 28px 0 42px;
-        color: var(--muted);
+        padding: 18px 0 40px;
+        color: var(--ink-faint);
         font-size: 13px;
       }
 
-      @media (max-width: 900px) {
-        .hero-grid {
+      .footer-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        flex-wrap: wrap;
+        border-top: 1px solid var(--line);
+        padding-top: 18px;
+      }
+
+      .footer-row a {
+        color: var(--accent-strong);
+        text-decoration: none;
+      }
+
+      .reveal {
+        animation: rise-in 700ms ease both;
+      }
+
+      .reveal:nth-child(2) {
+        animation-delay: 80ms;
+      }
+
+      .reveal:nth-child(3) {
+        animation-delay: 140ms;
+      }
+
+      @keyframes rise-in {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--accent-strong);
+        outline-offset: 3px;
+      }
+
+      @media (max-width: 1100px) {
+        .hero-layout,
+        .install-shell,
+        .video-layout {
           grid-template-columns: 1fr;
-          grid-template-areas:
-            "title"
-            "desc"
-            "hero";
-          row-gap: 20px;
         }
 
-        .hero-title-block h1,
-        .hero-title-block .eyebrow {
-          white-space: normal;
-        }
-
-        .step-grid,
-        .more-grid {
-          grid-template-columns: 1fr;
+        .proof-strip,
+        .workflow-grid,
+        .docs-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
       }
 
       @media (max-width: 760px) {
-        .wrap {
-          width: min(1140px, 100% - 28px);
+        :root {
+          --wrap: min(100% - 24px, 1180px);
         }
 
-        .section {
-          padding: 52px 0;
+        .nav-row {
+          padding: 12px 0;
+        }
+
+        .hero {
+          padding-top: 34px;
+        }
+
+        .hero-copy,
+        .hero-panel,
+        .video-shell,
+        .install-shell,
+        .final-card {
+          padding: 22px;
         }
 
         h1 {
           max-width: none;
+          font-size: clamp(2.6rem, 13vw, 4.5rem);
         }
 
-        .nav-row {
-          padding: 10px 0;
+        .hero-lead {
+          font-size: 16px;
         }
 
-        .nav-cta {
-          margin-left: 0;
+        .proof-strip,
+        .workflow-grid,
+        .docs-grid,
+        .meta-grid,
+        .video-stage-meta {
+          grid-template-columns: 1fr;
+        }
+
+        .section {
+          padding: 24px 0;
+        }
+
+        .section-head h2,
+        .final-copy h2,
+        .video-stage-copy h3 {
+          font-size: clamp(1.9rem, 8vw, 2.6rem);
+        }
+
+        .video-stage-top {
+          flex-direction: column;
         }
       }
 
       @media (prefers-reduced-motion: reduce) {
         html {
           scroll-behavior: auto;
+        }
+
+        *,
+        *::before,
+        *::after {
+          animation: none !important;
+          transition: none !important;
         }
       }
     </style>
@@ -763,94 +1135,224 @@
     <header class="site-nav">
       <div class="wrap nav-row">
         <a class="brand" href="#top" aria-label="xyte-cli home">
-          <img src="./media/xyte-logo.jpg" alt="XYTE" />
-          <span>
+          <span class="brand-mark">
+            <img src="./media/xyte-logo.jpg" alt="XYTE" />
+          </span>
+          <span class="brand-copy">
             <strong>xyte-cli</strong>
-            <span>AI-ready operator tooling</span>
+            <span>deterministic operator tooling</span>
           </span>
         </a>
+
         <nav class="nav-links" aria-label="Primary">
           <a href="#install">Install</a>
-          <a href="#prompt">Prompt</a>
-          <a href="#videos">Videos</a>
-          <a href="#how-it-works">How it works</a>
+          <a href="#how-it-works">Workflow</a>
+          <a href="#videos">Clips</a>
           <a href="#docs">Docs</a>
         </nav>
-        <a class="nav-cta" href="https://www.npmjs.com/package/@xyteai/cli">@xyteai/cli</a>
+
+        <a class="nav-cta" href="https://www.npmjs.com/package/@xyteai/cli">npm package</a>
       </div>
     </header>
 
     <main id="main">
       <section class="hero">
-        <div class="wrap hero-grid">
-          <div class="hero-title-block">
-            <p class="eyebrow">Install → Skills → Connect → Incidents Watch → PDF Report</p>
-            <h1>Operate Xyte with your AI agent.</h1>
-          </div>
-
-          <div class="hero-desc-block">
-            <p>
-              The fastest path from fresh install to real incident handling: short videos, copy-paste prompt, and
-              deterministic CLI behavior with write guardrails.
+        <div class="wrap hero-layout">
+          <article class="hero-copy reveal">
+            <p class="eyebrow">Xyte operations for teams and AI agents</p>
+            <h1>Install once. Operate with <em>guardrails</em>.</h1>
+            <p class="hero-lead">
+              <code>@xyteai/cli</code> gives evaluators a direct path from npm install to incident watch, deep-dive
+              export, and PDF handoff, without hiding the actual commands behind a black box.
             </p>
+
             <div class="hero-actions">
-              <a class="btn btn-primary" href="#videos">Watch the story clips</a>
-              <a class="btn btn-ghost" href="#prompt">Copy AI prompt</a>
+              <a class="btn btn-primary" href="#install">Install now</a>
+              <a class="btn btn-secondary" href="#docs">Browse docs</a>
             </div>
-          </div>
 
-          <aside class="hero-chat card" aria-label="Install flow preview">
-            <div class="hero-mock" aria-hidden="true">
-              <div class="hero-mock-header">
-                <div class="hero-mock-left">
-                  <span>≡</span>
-                  <strong>xyte-cli</strong>
-                </div>
-                <div style="color: #6b7280">⋯</div>
+            <div class="proof-strip" aria-label="Product proof points">
+              <div class="proof-item">
+                <span class="proof-label">Agent setup</span>
+                <strong>Installs Codex, Claude, and Copilot skill scaffolding.</strong>
+                <span>Built for human operators and agent-assisted workflows.</span>
               </div>
-
-              <div class="hero-mock-main">
-                <div class="hero-mock-user">
-                  Get the <code>@xyteai/cli</code> npm package fully working in this environment.
-                </div>
-
-                <div class="hero-mock-assistant-row">
-                  <div class="hero-mock-ai-dot">AI</div>
-                  <div class="hero-mock-assistant-wrap">
-                    <div class="hero-mock-assistant-label">GPT-5.2</div>
-                    <div class="hero-mock-assistant">Perfect. I’ll start with install, then confirm the version.</div>
-                    <div class="hero-mock-tool">⌘ xyte-cli</div>
-
-                    <div class="hero-mock-terminal">
-                      <div class="hero-mock-terminal-head">
-                        <div class="hero-mock-dots"><span></span><span></span><span></span></div>
-                        <div class="hero-mock-term-label">TERMINAL OUTPUT</div>
-                      </div>
-                      <div class="hero-mock-terminal-body">
-                        <div class="hero-mock-cmd">➜ npm install -g @xyteai/cli@latest</div>
-                        <div>&nbsp;&nbsp;+ @xyteai/cli@latest</div>
-                        <div>&nbsp;&nbsp;added 412 packages in 3s</div>
-                        <div>&nbsp;&nbsp;xyte-cli is ready.</div>
-                        <div class="hero-mock-cmd" style="margin-top: 4px">➜ xyte-cli --version</div>
-                        <div>&nbsp;&nbsp;&lt;current-version&gt;</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              <div class="proof-item">
+                <span class="proof-label">Safety</span>
+                <strong>Read flows stay easy. Writes stay explicit.</strong>
+                <span>Write endpoints require extra flags instead of silent mutation.</span>
+              </div>
+              <div class="proof-item">
+                <span class="proof-label">Contracts</span>
+                <strong>Schema-backed JSON outputs ship in <code>docs/schemas</code>.</strong>
+                <span>Useful for automation, validation, and downstream tooling.</span>
+              </div>
+              <div class="proof-item">
+                <span class="proof-label">Operator flow</span>
+                <strong>Watch incidents, inspect deeply, and export a report.</strong>
+                <span>One install path, one operational story, reusable artifacts.</span>
               </div>
             </div>
+          </article>
+
+          <aside class="hero-panel reveal" aria-label="Evaluation path">
+            <div class="panel-topline">
+              <span class="panel-kicker">Evaluation path</span>
+              <span class="panel-pill">Install-first</span>
+            </div>
+
+            <h2 class="panel-title">Reach a real first run in four moves.</h2>
+            <p class="panel-lead">
+              The homepage stays focused on the fast evaluator path. Deep docs remain available, but the first screen
+              shows what happens before and after the install.
+            </p>
+
+            <ol class="path-list">
+              <li>
+                <span class="path-step">01</span>
+                <span class="path-copy">
+                  <strong>Install the CLI</strong>
+                  <span>Start with the published npm package and confirm the binary is ready.</span>
+                </span>
+              </li>
+              <li>
+                <span class="path-step">02</span>
+                <span class="path-copy">
+                  <strong>Add agent skills</strong>
+                  <span>Prepare Codex, Claude, or Copilot for guided Xyte workflows.</span>
+                </span>
+              </li>
+              <li>
+                <span class="path-step">03</span>
+                <span class="path-copy">
+                  <strong>Connect one tenant key</strong>
+                  <span>Use setup status to verify readiness and surface the active tenant context.</span>
+                </span>
+              </li>
+              <li>
+                <span class="path-step">04</span>
+                <span class="path-copy">
+                  <strong>Run watch plus report</strong>
+                  <span>Capture incidents, export deep-dive JSON, and produce a shareable PDF handoff.</span>
+                </span>
+              </li>
+            </ol>
+
+            <dl class="meta-grid">
+              <div>
+                <dt>Package</dt>
+                <dd><code>@xyteai/cli</code></dd>
+              </div>
+              <div>
+                <dt>Runtime</dt>
+                <dd>Node 18+</dd>
+              </div>
+              <div>
+                <dt>Outputs</dt>
+                <dd>CLI text, JSON contracts, PDF reports</dd>
+              </div>
+              <div>
+                <dt>Deploy</dt>
+                <dd>Static GitHub Pages from <code>docs/</code></dd>
+              </div>
+            </dl>
           </aside>
         </div>
       </section>
 
       <section class="section" id="install" aria-labelledby="install-title">
-        <div class="wrap">
-          <p class="eyebrow">Prompt</p>
-          <h2 id="install-title">Copy this into your AI agent</h2>
-          <p class="lead">Use the prompt, or run the install command directly.</p>
+        <div class="wrap section-shell">
+          <header class="section-head reveal">
+            <p class="eyebrow">Install</p>
+            <h2 id="install-title">Start with a short, credible path to value.</h2>
+            <p>
+              Lead with the core install commands, then connect the tenant key, verify readiness, and move into watch
+              or reporting flows. The commands stay visible so evaluators can judge what the tool is actually doing.
+            </p>
+          </header>
+
+          <div class="install-shell reveal">
+            <div class="install-block">
+              <article class="section-card">
+                <p class="card-label">Core install</p>
+                <div class="command-shell">
+                  <pre id="install-snippet"><code>npm install -g @xyteai/cli@latest
+xyte-cli install --skills
+xyte-cli --version</code></pre>
+                </div>
+                <div class="action-row">
+                  <button
+                    type="button"
+                    class="copy-btn"
+                    data-copy-target="install-snippet"
+                    data-copy-feedback="install-toast"
+                  >
+                    Copy install commands
+                  </button>
+                  <a class="inline-link" href="https://www.npmjs.com/package/@xyteai/cli">Open npm package</a>
+                  <span class="toast" id="install-toast" role="status" aria-live="polite"></span>
+                </div>
+              </article>
+
+              <article class="section-card">
+                <p class="card-label">Then connect and verify</p>
+                <ul class="mini-list">
+                  <li>
+                    <strong>Connect the tenant key once.</strong>
+                    <span>Use the current non-interactive setup path so the environment is ready for future runs.</span>
+                    <span class="detail-code">XYTE_CLI_KEY="&lt;key&gt;" xyte-cli setup run --non-interactive --connectivity auto</span>
+                  </li>
+                  <li>
+                    <strong>Check readiness in JSON.</strong>
+                    <span>Read the tenant context back out before moving into watch or reporting commands.</span>
+                    <span class="detail-code">xyte-cli setup status --format json</span>
+                  </li>
+                </ul>
+              </article>
+            </div>
+
+            <div class="install-notes">
+              <article class="section-card">
+                <p class="card-label">What evaluators should see</p>
+                <ul class="mini-list">
+                  <li>
+                    <strong>Install does not hide the real commands.</strong>
+                    <span>The homepage makes the executable path obvious instead of burying it in prose.</span>
+                  </li>
+                  <li>
+                    <strong>Read-oriented workflows are the first experience.</strong>
+                    <span>Incident watch, deep-dive export, and PDF reporting are the lead use cases.</span>
+                  </li>
+                  <li>
+                    <strong>Advanced reference still exists.</strong>
+                    <span>Commands, flows, and schemas are linked out instead of taking over the landing page.</span>
+                  </li>
+                </ul>
+              </article>
+
+              <article class="section-card">
+                <p class="card-label">Next commands</p>
+                <div class="command-shell">
+                  <pre><code>xyte-cli watch --tenant &lt;tenant-id&gt; --profile incidents-active --once
+xyte-cli inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --format json &gt; deep-dive.json
+xyte-cli report generate --tenant &lt;tenant-id&gt; --input deep-dive.json --out fleet-report.pdf</code></pre>
+                </div>
+              </article>
+            </div>
+          </div>
+
           <div id="prompt"></div>
-          <article class="card prompt-card">
-            <pre id="agent-prompt"><code>Use @xyteai/cli to set this workspace up and verify it is working.
+          <details class="disclosure reveal" aria-labelledby="prompt-title">
+            <summary>
+              <span class="disclosure-title">
+                <strong id="prompt-title">Use with AI agents</strong>
+                <span>The prompt stays available, but it no longer dominates the page.</span>
+              </span>
+              <span class="summary-icon" aria-hidden="true">+</span>
+            </summary>
+            <div class="disclosure-body">
+              <div class="command-shell">
+                <pre id="agent-prompt"><code>Use @xyteai/cli in this workspace. Keep it concise and safe.
 
 Rules:
 - Never print secrets.
@@ -858,147 +1360,172 @@ Rules:
 - Do not invent IDs or outputs.
 
 Run:
-
 npm install -g @xyteai/cli@latest
 xyte-cli install --skills
 
 Then ask me for XYTE_CLI_KEY and run:
-
 XYTE_CLI_KEY="&lt;key&gt;" xyte-cli setup run --non-interactive --connectivity auto
 xyte-cli setup status --format json
 
 Read tenantId from setup status and continue:
-
 xyte-cli watch --tenant &lt;tenant-id&gt; --profile incidents-active --once
 xyte-cli inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --format json &gt; deep-dive.json
 xyte-cli report generate --tenant &lt;tenant-id&gt; --input deep-dive.json --out fleet-report.pdf
 
-Expect:
-- one-shot active-incident snapshot
-- deep-dive data saved to JSON
-- PDF report generated successfully
-
-Finish with a concise success/failure summary and exact failing command if any.</code></pre>
-            <div class="prompt-actions">
-              <button type="button" class="copy-btn" id="copy-prompt">Copy prompt</button>
-              <span class="toast" id="copy-toast" role="status" aria-live="polite"></span>
+Finish with:
+- concise success/failure summary
+- exact failing command (if any)</code></pre>
+              </div>
+              <div class="action-row">
+                <button
+                  type="button"
+                  class="copy-btn"
+                  data-copy-target="agent-prompt"
+                  data-copy-feedback="prompt-toast"
+                >
+                  Copy AI prompt
+                </button>
+                <a class="inline-link" href="./agents.md">Open agent guidance</a>
+                <span class="toast" id="prompt-toast" role="status" aria-live="polite"></span>
+              </div>
             </div>
-          </article>
-          <p class="eyebrow" style="margin-top: 16px;">OR</p>
-          <article class="card install-card">
-            <pre><code>npm install -g @xyteai/cli@latest
-xyte-cli --version</code></pre>
-          </article>
-        </div>
-      </section>
-
-      <section class="section" id="videos" aria-labelledby="videos-title">
-        <div class="wrap">
-          <h2 id="videos-title">Story: from install to incident PDF</h2>
-          <p class="lead">One continuous flow: install, skills, API key setup, incident watch, then export a PDF handoff.</p>
-          <div id="featured-videos" class="video-grid" aria-live="polite"></div>
+          </details>
         </div>
       </section>
 
       <section class="section" id="how-it-works" aria-labelledby="how-title">
-        <div class="wrap">
-          <p class="eyebrow">Operator flow</p>
-          <h2 id="how-title">How it works</h2>
-          <p class="lead">Keep execution deterministic and auditable while still moving fast with AI.</p>
-          <div class="step-grid">
-            <article class="card step-card">
-              <span class="step-num">1</span>
-              <h3>Connect data</h3>
-              <p>Use your tenant-bound API key once. Setup/status resolves active profile state.</p>
+        <div class="wrap section-shell">
+          <header class="section-head reveal">
+            <p class="eyebrow">How it works</p>
+            <h2 id="how-title">Keep the operator path explicit from start to handoff.</h2>
+            <p>
+              The product story is not just “there is a CLI.” It is a repeatable path: install, prepare the agent
+              environment, connect safely, then move into incident visibility and reportable artifacts.
+            </p>
+          </header>
+
+          <div class="workflow-grid reveal">
+            <article class="workflow-card">
+              <span class="workflow-step">01</span>
+              <h3>Install for people and agents</h3>
+              <p>Use the npm package directly, then install skills for Codex, Claude, and Copilot in the same workspace.</p>
+              <code>xyte-cli install --skills</code>
             </article>
-            <article class="card step-card">
-              <span class="step-num">2</span>
-              <h3>Watch incidents</h3>
-              <p>Run a safe one-shot incident snapshot or poll loop for active incidents.</p>
+            <article class="workflow-card">
+              <span class="workflow-step">02</span>
+              <h3>Connect tenant context once</h3>
+              <p>Use setup status as the explicit contract for readiness instead of assuming hidden local state.</p>
+              <code>xyte-cli setup status --format json</code>
             </article>
-            <article class="card step-card">
-              <span class="step-num">3</span>
-              <h3>Generate report</h3>
-              <p>Create a shareable PDF handoff from deep-dive output using deterministic report contracts.</p>
+            <article class="workflow-card">
+              <span class="workflow-step">03</span>
+              <h3>Inspect incidents without surprise writes</h3>
+              <p>Start with watch and inspection flows so evaluators understand the read-first posture before any mutation.</p>
+              <code>xyte-cli watch --profile incidents-active --once</code>
+            </article>
+            <article class="workflow-card">
+              <span class="workflow-step">04</span>
+              <h3>Produce artifacts other teams can consume</h3>
+              <p>Deep-dive JSON and PDF reports make the workflow useful outside the terminal, not just inside it.</p>
+              <code>xyte-cli report generate ...</code>
             </article>
           </div>
         </div>
       </section>
 
-      <section class="section" id="more-workflows" aria-labelledby="more-title">
-        <div class="wrap">
-          <p class="eyebrow">More references</p>
-          <h2 id="more-title">Go deeper in docs</h2>
-          <p class="lead">Detailed runbooks, flow packs, and schema contracts for implementation and ops handoff.</p>
-          <div class="more-grid">
-            <a href="./commands.md">commands.md · exact command behavior</a>
-            <a href="./getting-started.md">getting-started.md · setup details</a>
-            <a href="./flows/agent-ops.md">flows/agent-ops.md · built-in flow pack</a>
-            <a href="./flows/custom-workflows.md">flows/custom-workflows.md · author custom flows</a>
-            <a href="./schemas/flow-run.v1.schema.json">flow-run.v1 schema</a>
-            <a href="./schemas/watch-frame.v1.schema.json">watch-frame.v1 schema</a>
+      <section class="section" id="videos" aria-labelledby="videos-title">
+        <div class="wrap section-shell">
+          <header class="section-head reveal">
+            <p class="eyebrow">Workflow clips</p>
+            <h2 id="videos-title">See the evaluator flow without turning the page into a video wall.</h2>
+            <p>
+              The story clips stay in the site, but the presentation is tighter: one active stage, lightweight step
+              selection, and lazy-loaded media only when the section is actually in view.
+            </p>
+          </header>
+
+          <div id="featured-videos" class="video-shell reveal" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="section" id="docs" aria-labelledby="docs-title">
+        <div class="wrap section-shell">
+          <header class="section-head reveal">
+            <p class="eyebrow">Docs and contracts</p>
+            <h2 id="docs-title">Reference without the clutter.</h2>
+            <p>
+              Keep the landing page lean. Use the docs grid for setup detail, command behavior, flow authoring, and
+              schema contracts once the evaluator wants depth.
+            </p>
+          </header>
+
+          <div class="docs-grid reveal">
+            <a class="docs-card" href="./getting-started.md">
+              <strong>Getting started</strong>
+              <p>First-run setup details, prerequisites, and the recommended onboarding sequence.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="docs-card" href="./commands.md">
+              <strong>Commands reference</strong>
+              <p>Exact command behavior, guardrails, flags, and operator-facing examples.</p>
+              <span>Open commands</span>
+            </a>
+            <a class="docs-card" href="./agents.md">
+              <strong>Agent guidance</strong>
+              <p>Recommended patterns for using xyte-cli from Codex, Claude, or other agent workflows.</p>
+              <span>Open agent docs</span>
+            </a>
+            <a class="docs-card" href="./flows/agent-ops.md">
+              <strong>Built-in flows</strong>
+              <p>Deterministic workflow packs for ongoing operator and incident-response scenarios.</p>
+              <span>Open flows</span>
+            </a>
+            <a class="docs-card" href="./flows/custom-workflows.md">
+              <strong>Custom workflows</strong>
+              <p>Create, edit, share, and import reusable flow definitions for your own environment.</p>
+              <span>Open workflow authoring</span>
+            </a>
+            <a class="docs-card" href="./schemas/flow-run.v1.schema.json">
+              <strong>Schema contracts</strong>
+              <p>Machine-readable JSON contracts in <code>docs/schemas</code> for validation and automation.</p>
+              <span>Open schemas</span>
+            </a>
           </div>
         </div>
       </section>
 
-      <section class="section advanced" id="docs" aria-labelledby="docs-title">
+      <section class="section">
         <div class="wrap">
-          <p class="eyebrow">Advanced reference</p>
-          <h2 id="docs-title">Deep docs and contracts</h2>
-          <p class="lead">Detailed technical content is preserved below the fold.</p>
-
-          <details>
-            <summary>Commands and runbooks</summary>
-            <div class="body">
-              <ul>
-                <li><a href="./commands.md">commands.md</a> — full command options and guardrails.</li>
-                <li><a href="./getting-started.md">getting-started.md</a> — first-run setup details.</li>
-                <li><a href="./ai-utility-preprocessing.md">ai-utility-preprocessing.md</a> — utility prepare runbook.</li>
-              </ul>
+          <div class="final-card reveal">
+            <div class="final-copy">
+              <h2>Evaluate the CLI quickly. Keep the deeper material close.</h2>
+              <p>
+                The homepage now leads with install and operational credibility, while the docs remain one click away
+                for teams that need exact command semantics, flow definitions, or contract schemas.
+              </p>
             </div>
-          </details>
-
-          <details>
-            <summary>Flow docs</summary>
-            <div class="body">
-              <ul>
-                <li><a href="./flows/agent-ops.md">flows/agent-ops.md</a> — built-in deterministic flows.</li>
-                <li><a href="./flows/custom-workflows.md">flows/custom-workflows.md</a> — create/edit/share/import custom flows.</li>
-              </ul>
+            <div class="final-actions">
+              <a class="btn btn-primary" href="#install">Install now</a>
+              <a class="btn btn-secondary" href="https://github.com/xyte-io/xyte-cli">View on GitHub</a>
             </div>
-          </details>
-
-          <details>
-            <summary>Schema contracts</summary>
-            <div class="body">
-              <ul>
-                <li><a href="./schemas/status.v1.schema.json">xyte.status.v1</a></li>
-                <li><a href="./schemas/watch-frame.v1.schema.json">xyte.watch.frame.v1</a></li>
-                <li><a href="./schemas/flow-run.v1.schema.json">xyte.flow.run.v1</a></li>
-                <li><a href="./schemas/utility-prepare.v1.schema.json">xyte.utility.prepare.v1</a></li>
-                <li><a href="./schemas/utility-batch.v1.schema.json">xyte.utility.batch.v1</a></li>
-              </ul>
-            </div>
-          </details>
+          </div>
         </div>
       </section>
     </main>
 
     <footer class="footer">
-      <div class="wrap">
-        <p>
-          xyte-cli · deterministic ops tooling for teams and agents ·
+      <div class="wrap footer-row">
+        <span>xyte-cli · deterministic Xyte operations for humans and AI agents</span>
+        <span>
           <a href="https://github.com/xyte-io/xyte-cli">GitHub</a>
-        </p>
+          ·
+          <a href="https://www.npmjs.com/package/@xyteai/cli">npm</a>
+        </span>
       </div>
     </footer>
 
     <script>
       (function () {
-        const copyButton = document.getElementById('copy-prompt');
-        const promptElement = document.getElementById('agent-prompt');
-        const copyToast = document.getElementById('copy-toast');
-        const videosRoot = document.getElementById('featured-videos');
         const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         const inlineFeaturedVideos = [
           {
@@ -1019,7 +1546,7 @@ xyte-cli --version</code></pre>
             command: 'xyte-cli install --skills',
             gif: './assets/videos/02-install-skills.gif',
             mp4: './assets/videos/02-install-skills.mp4',
-            focus: 'Install Codex/Claude/Copilot skill scaffolding.'
+            focus: 'Install Codex, Claude, and Copilot skill scaffolding.'
           },
           {
             id: 'Codex03ConnectApiKey',
@@ -1029,7 +1556,7 @@ xyte-cli --version</code></pre>
             command: 'XYTE_CLI_KEY=<key> xyte-cli setup run --non-interactive && xyte-cli setup status --format json',
             gif: './assets/videos/03-connect-api-key.gif',
             mp4: './assets/videos/03-connect-api-key.mp4',
-            focus: 'Use tenant-bound key setup and confirm readiness.'
+            focus: 'Use tenant-bound setup, then confirm readiness in JSON.'
           },
           {
             id: 'Codex06WatchIncidents',
@@ -1039,7 +1566,7 @@ xyte-cli --version</code></pre>
             command: 'xyte-cli watch --tenant <tenant-id> --profile incidents-active --once',
             gif: './assets/videos/06-watch-incidents.gif',
             mp4: './assets/videos/06-watch-incidents.mp4',
-            focus: 'Capture one active-incident snapshot safely.'
+            focus: 'Capture a deterministic incident snapshot without opening the write path.'
           },
           {
             id: 'Codex09WeeklyPdfReport',
@@ -1050,89 +1577,32 @@ xyte-cli --version</code></pre>
               'xyte-cli inspect deep-dive --tenant <tenant-id> --window 24 --format json > deep-dive.json && xyte-cli report generate --tenant <tenant-id> --input deep-dive.json --out fleet-report.pdf',
             gif: './assets/videos/09-weekly-pdf-report.gif',
             mp4: './assets/videos/09-weekly-pdf-report.mp4',
-            focus: 'Turn captured fleet/incident data into a shareable PDF handoff.'
+            focus: 'Turn captured fleet and incident data into a shareable PDF handoff.'
           }
         ];
 
-        if (copyButton && promptElement && copyToast) {
-          copyButton.addEventListener('click', async () => {
-            const text = promptElement.innerText || '';
-            try {
-              await navigator.clipboard.writeText(text);
-              copyToast.textContent = 'Prompt copied.';
-            } catch (error) {
-              copyToast.textContent = 'Copy failed. Select and copy manually.';
-            }
-            window.setTimeout(() => {
-              copyToast.textContent = '';
-            }, 2200);
+        function wireCopyButtons() {
+          const buttons = document.querySelectorAll('[data-copy-target]');
+          buttons.forEach((button) => {
+            button.addEventListener('click', async () => {
+              const targetId = button.getAttribute('data-copy-target');
+              const feedbackId = button.getAttribute('data-copy-feedback');
+              const target = targetId ? document.getElementById(targetId) : null;
+              const feedback = feedbackId ? document.getElementById(feedbackId) : null;
+              if (!target || !feedback) return;
+
+              try {
+                await navigator.clipboard.writeText(target.innerText || '');
+                feedback.textContent = 'Copied.';
+              } catch (error) {
+                feedback.textContent = 'Copy failed. Select and copy manually.';
+              }
+
+              window.setTimeout(() => {
+                feedback.textContent = '';
+              }, 2200);
+            });
           });
-        }
-
-        function createVideoCard(item, stepNumber) {
-          const article = document.createElement('article');
-          article.className = 'card video-card';
-
-          const meta = document.createElement('div');
-          meta.className = 'video-meta';
-
-          const h3 = document.createElement('h3');
-          h3.textContent = item.title;
-
-          const p = document.createElement('p');
-          p.textContent = item.focus;
-
-          const prompt = document.createElement('small');
-          prompt.textContent = `Prompt: ${item.prompt}`;
-
-          const command = document.createElement('small');
-          command.textContent = `Command: ${item.command}`;
-
-          const stage = document.createElement('div');
-          stage.className = 'story-step';
-          stage.textContent = `Story step ${stepNumber}`;
-
-          meta.append(h3, p, prompt, command, stage);
-
-          const video = document.createElement('video');
-          video.setAttribute('playsinline', '');
-          video.setAttribute('muted', '');
-          video.muted = true;
-          video.loop = true;
-          video.controls = true;
-          video.preload = 'none';
-          video.dataset.src = item.mp4;
-          video.poster = item.gif;
-
-          article.append(meta, video);
-          return article;
-        }
-
-        function applyVideoObserver(videos) {
-          const observer = new IntersectionObserver(
-            (entries) => {
-              entries.forEach((entry) => {
-                const video = entry.target;
-                if (!(video instanceof HTMLVideoElement)) return;
-
-                if (!video.src && video.dataset.src) {
-                  video.src = video.dataset.src;
-                }
-
-                if (!entry.isIntersecting) {
-                  video.pause();
-                  return;
-                }
-
-                if (!reducedMotion) {
-                  video.play().catch(() => {});
-                }
-              });
-            },
-            { threshold: 0.42 }
-          );
-
-          videos.forEach((video) => observer.observe(video));
         }
 
         async function loadFeaturedVideos() {
@@ -1144,39 +1614,135 @@ xyte-cli --version</code></pre>
           for (const url of candidates) {
             try {
               const response = await fetch(url, { cache: 'no-store' });
-              if (!response.ok) {
-                continue;
-              }
+              if (!response.ok) continue;
               const json = await response.json();
               if (Array.isArray(json) && json.length > 0) {
                 return json;
               }
             } catch (error) {
-              // Keep trying fallbacks.
+              // Try the next path.
             }
           }
 
           return inlineFeaturedVideos;
         }
 
-        async function renderFeaturedVideos() {
-          if (!videosRoot) return;
-          const items = await loadFeaturedVideos();
-          videosRoot.innerHTML = '';
+        function renderVideoShowcase(items) {
+          const root = document.getElementById('featured-videos');
+          if (!root || !Array.isArray(items) || items.length === 0) return;
 
-          const videos = [];
-          for (let i = 0; i < items.length; i += 1) {
-            const item = items[i];
-            const card = createVideoCard(item, i + 1);
-            const video = card.querySelector('video');
-            if (video) videos.push(video);
-            videosRoot.appendChild(card);
+          root.innerHTML = [
+            '<div class="video-layout">',
+            '  <div class="video-rail" id="video-rail"></div>',
+            '  <article class="video-stage">',
+            '    <div class="video-stage-top">',
+            '      <div class="video-stage-copy">',
+            '        <h3 id="video-title"></h3>',
+            '        <p id="video-focus"></p>',
+            '      </div>',
+            '      <div class="video-badge" id="video-badge">Step 01</div>',
+            '    </div>',
+            '    <dl class="video-stage-meta">',
+            '      <div><dt>Prompt</dt><dd id="video-prompt"></dd></div>',
+            '      <div><dt>Command</dt><dd id="video-command"></dd></div>',
+            '    </dl>',
+            '    <div class="video-player-shell">',
+            '      <video id="video-player" controls muted loop playsinline preload="none"></video>',
+            '    </div>',
+            '  </article>',
+            '</div>'
+          ].join('');
+
+          const rail = document.getElementById('video-rail');
+          const title = document.getElementById('video-title');
+          const focus = document.getElementById('video-focus');
+          const prompt = document.getElementById('video-prompt');
+          const command = document.getElementById('video-command');
+          const badge = document.getElementById('video-badge');
+          const player = document.getElementById('video-player');
+          if (!rail || !title || !focus || !prompt || !command || !badge || !player) return;
+
+          let activeIndex = 0;
+          let stageLoaded = false;
+
+          const buttons = items.map((item, index) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'video-step';
+            button.innerHTML =
+              '<span class="video-step-number">Step ' +
+              String(index + 1).padStart(2, '0') +
+              '</span>' +
+              '<strong>' +
+              item.title +
+              '</strong>' +
+              '<span>' +
+              item.focus +
+              '</span>';
+            button.addEventListener('click', () => {
+              activeIndex = index;
+              updateActiveState();
+              syncStage();
+            });
+            rail.appendChild(button);
+            return button;
+          });
+
+          function setVideoSource(item) {
+            player.poster = item.gif;
+            if (!stageLoaded) {
+              player.removeAttribute('src');
+              player.load();
+              return;
+            }
+
+            if (player.getAttribute('src') !== item.mp4) {
+              player.pause();
+              player.setAttribute('src', item.mp4);
+              player.load();
+            }
+
+            if (!reducedMotion) {
+              player.play().catch(() => {});
+            }
           }
 
-          applyVideoObserver(videos);
+          function updateActiveState() {
+            buttons.forEach((button, index) => {
+              const active = index === activeIndex;
+              button.classList.toggle('is-active', active);
+              button.setAttribute('aria-pressed', active ? 'true' : 'false');
+            });
+          }
+
+          function syncStage() {
+            const item = items[activeIndex];
+            title.textContent = item.title;
+            focus.textContent = item.focus;
+            prompt.textContent = item.prompt;
+            command.textContent = item.command;
+            badge.textContent = 'Step ' + String(activeIndex + 1).padStart(2, '0');
+            setVideoSource(item);
+          }
+
+          const observer = new IntersectionObserver(
+            (entries) => {
+              entries.forEach((entry) => {
+                if (!entry.isIntersecting || stageLoaded) return;
+                stageLoaded = true;
+                syncStage();
+              });
+            },
+            { threshold: 0.35 }
+          );
+
+          observer.observe(root);
+          updateActiveState();
+          syncStage();
         }
 
-        renderFeaturedVideos();
+        wireCopyButtons();
+        loadFeaturedVideos().then(renderVideoShowcase);
       })();
     </script>
   </body>
