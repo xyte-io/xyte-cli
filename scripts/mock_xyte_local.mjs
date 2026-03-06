@@ -510,6 +510,26 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  const cancelCommandMatch = pathname.match(/^\/core\/v1\/organization\/devices\/([^/]+)\/commands\/([^/]+)$/);
+  if (cancelCommandMatch && method === 'DELETE') {
+    const deviceId = decodeURIComponent(cancelCommandMatch[1]);
+    const commandId = decodeURIComponent(cancelCommandMatch[2]);
+    if (!state.devices.has(deviceId)) {
+      writeJson(response, 404, { error: `Unknown device ${deviceId}` });
+      return;
+    }
+    const commands = state.commandsByDevice.get(deviceId) ?? [];
+    const target = commands.find((command) => command.id === commandId);
+    if (!target) {
+      writeJson(response, 404, { error: `Unknown command ${commandId}` });
+      return;
+    }
+    target.status = 'cancelled';
+    state.commandsByDevice.set(deviceId, commands);
+    writeJson(response, 200, { ok: true, id: target.id, status: target.status });
+    return;
+  }
+
   const deviceMatch = pathname.match(/^\/core\/v1\/organization\/devices\/([^/]+)$/);
   if (deviceMatch && method === 'GET') {
     const deviceId = decodeURIComponent(deviceMatch[1]);

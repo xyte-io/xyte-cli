@@ -226,4 +226,27 @@ describe('report layout helpers', () => {
     expect(plan.insights[1].eyebrow).toBe('Space hotspot');
     expect(plan.insights[2].body).toContain('overlap');
   });
+
+  it('strips only trailing parenthetical suffixes from spotlight titles', () => {
+    const result = buildDeepDive({
+      generatedAtUtc: new Date().toISOString(),
+      tenantId: 'acme',
+      devices: [{ id: 'd1', name: 'Room One', status: 'offline', space: { full_path: 'Overview/Xyte Office (NY)' } }],
+      spaces: [{ id: 's1', name: 'Room 1', space_type: 'room' }],
+      incidents: [
+        {
+          id: 'i1',
+          device_id: 'd1',
+          device_name: 'Room One',
+          status: 'active',
+          space_tree_path_name: 'Overview/Xyte Office (NY)',
+          created_at: new Date().toISOString()
+        }
+      ],
+      tickets: []
+    });
+
+    const plan = buildDeepDiveOverviewPlan(result);
+    expect(plan.insights[1].title).toBe('Xyte Office');
+  });
 });

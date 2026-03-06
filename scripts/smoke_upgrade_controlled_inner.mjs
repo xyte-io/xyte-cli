@@ -8,6 +8,7 @@ import { join } from 'node:path';
 const XYTE_COMMAND = process.platform === 'win32' ? 'xyte-cli.cmd' : 'xyte-cli';
 const NPM_COMMAND = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const NODE_COMMAND = process.platform === 'win32' ? 'node.exe' : 'node';
+const REPO_ROOT = process.env.XYTE_SMOKE_REPO_ROOT?.trim() || '/repo';
 
 function assertDefined(value, message) {
   if (!value || !String(value).trim()) {
@@ -159,7 +160,7 @@ async function main() {
 
   const mockServer = spawn(
     NODE_COMMAND,
-    ['/repo/scripts/mock_xyte_local.mjs', '--host', '127.0.0.1', '--port', '3001', '--strict-auth'],
+    [join(REPO_ROOT, 'scripts', 'mock_xyte_local.mjs'), '--host', '127.0.0.1', '--port', '3001', '--strict-auth'],
     {
       env: {
         ...runtimeEnv,
@@ -267,6 +268,11 @@ async function main() {
       XYTE_COMMAND,
       ['api', 'call', 'organization.commands.sendCommand', '--tenant', 'local', '--path-json', '{"device_id":"d1"}', '--body-json', '{"command":"reboot"}']
     );
+    const sendCommandPayload = parseJsonOutput(sendCommandWrite.stdout);
+    const commandId = typeof sendCommandPayload?.id === 'string' && sendCommandPayload.id.trim() ? sendCommandPayload.id.trim() : undefined;
+    if (!commandId) {
+      throw new Error(`Expected sendCommand response to include an id, got: ${sendCommandWrite.stdout.trim()}`);
+    }
 
     const cancelCommandDelete = await run(
       XYTE_COMMAND,
@@ -277,7 +283,7 @@ async function main() {
         '--tenant',
         'local',
         '--path-json',
-        '{"device_id":"d1","command_id":"cmd-1"}'
+        JSON.stringify({ device_id: 'd1', command_id: commandId })
       ],
       runtimeEnv
     );
@@ -285,7 +291,7 @@ async function main() {
       cancelCommandDelete,
       'cancelCommand without legacy confirm flag',
       XYTE_COMMAND,
-      ['api', 'call', 'organization.commands.cancelCommand', '--tenant', 'local', '--path-json', '{"device_id":"d1","command_id":"cmd-1"}']
+      ['api', 'call', 'organization.commands.cancelCommand', '--tenant', 'local', '--path-json', JSON.stringify({ device_id: 'd1', command_id: commandId })]
     );
 
     const dryRun = await run(

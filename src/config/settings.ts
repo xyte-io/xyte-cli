@@ -169,6 +169,8 @@ type SourceValue = {
   source: 'default' | 'profile' | 'user' | 'workspace' | 'env' | 'flag';
 };
 
+const BLOCKED_PATH_SEGMENTS = new Set(['__proto__', 'prototype', 'constructor']);
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -210,8 +212,18 @@ function getPathValue(record: unknown, keyPath: string): unknown {
   return current;
 }
 
-function setPathValue(record: Record<string, unknown>, keyPath: SettingPath, value: unknown): void {
+function parseSettingPath(keyPath: string): string[] {
   const segments = keyPath.split('.');
+  for (const segment of segments) {
+    if (BLOCKED_PATH_SEGMENTS.has(segment)) {
+      throw new Error(`Blocked config key segment: ${segment}.`);
+    }
+  }
+  return segments;
+}
+
+function setPathValue(record: Record<string, unknown>, keyPath: SettingPath, value: unknown): void {
+  const segments = parseSettingPath(keyPath);
   let current: Record<string, unknown> = record;
   segments.forEach((segment, index) => {
     if (index === segments.length - 1) {
@@ -221,14 +233,14 @@ function setPathValue(record: Record<string, unknown>, keyPath: SettingPath, val
 
     const next = current[segment];
     if (!isRecord(next)) {
-      current[segment] = {};
+      current[segment] = Object.create(null) as Record<string, unknown>;
     }
     current = current[segment] as Record<string, unknown>;
   });
 }
 
 function unsetPathValue(record: Record<string, unknown>, keyPath: SettingPath): void {
-  const segments = keyPath.split('.');
+  const segments = parseSettingPath(keyPath);
   let current: Record<string, unknown> | undefined = record;
   for (let index = 0; index < segments.length - 1; index += 1) {
     const next: unknown = current?.[segments[index]];

@@ -62,8 +62,11 @@ function formatSpaceHierarchy(spacePath: string): string {
   }
 
   const parts = value.split('/').filter(Boolean);
-  if (parts.length <= 2) {
+  if (parts.length <= 1) {
     return value;
+  }
+  if (parts.length === 2) {
+    return parts[1] ?? value;
   }
 
   const leaf = parts.at(-1) ?? value;
@@ -118,6 +121,30 @@ interface DeepDiveSummaryMetrics {
   mismatches: number;
 }
 
+function splitOnce(value: string, delimiter: string): [string, string] | undefined {
+  const index = value.indexOf(delimiter);
+  if (index < 0) {
+    return undefined;
+  }
+  return [value.slice(0, index), value.slice(index + delimiter.length)];
+}
+
+function parseIntegerToken(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    return undefined;
+  }
+  return Number.parseInt(trimmed, 10);
+}
+
+function parsePercentToken(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!/^\d+(?:\.\d+)?$/.test(trimmed)) {
+    return undefined;
+  }
+  return Number.parseFloat(trimmed);
+}
+
 function parseDeepDiveSummaryMetrics(summary: string[]): DeepDiveSummaryMetrics {
   const metrics: DeepDiveSummaryMetrics = {
     totalDevices: 0,
@@ -132,32 +159,56 @@ function parseDeepDiveSummaryMetrics(summary: string[]): DeepDiveSummaryMetrics 
   };
 
   for (const line of summary) {
-    const deviceMatch = line.match(/^Devices:\s+(\d+)\s+total,\s+(\d+)\s+offline\s+\(([\d.]+)%\)\./i);
-    if (deviceMatch) {
-      metrics.totalDevices = Number.parseInt(deviceMatch[1], 10);
-      metrics.offlineDevices = Number.parseInt(deviceMatch[2], 10);
-      metrics.offlinePct = Number.parseFloat(deviceMatch[3]);
-      continue;
+    if (line.startsWith('Devices: ')) {
+      const parts = splitOnce(line.slice('Devices: '.length), ' total, ');
+      const offlineParts = parts ? splitOnce(parts[1], ' offline (') : undefined;
+      const offlinePctText = offlineParts?.[1]?.endsWith('%).') ? offlineParts[1].slice(0, -3) : undefined;
+      const totalDevices = parts ? parseIntegerToken(parts[0]) : undefined;
+      const offlineDevices = offlineParts ? parseIntegerToken(offlineParts[0]) : undefined;
+      const offlinePct = offlinePctText ? parsePercentToken(offlinePctText) : undefined;
+      if (totalDevices !== undefined && offlineDevices !== undefined && offlinePct !== undefined) {
+        metrics.totalDevices = totalDevices;
+        metrics.offlineDevices = offlineDevices;
+        metrics.offlinePct = offlinePct;
+        continue;
+      }
     }
 
-    const incidentMatch = line.match(/^Incidents:\s+(\d+)\s+total,\s+(\d+)\s+active\s+\(([\d.]+)%\)\./i);
-    if (incidentMatch) {
-      metrics.totalIncidents = Number.parseInt(incidentMatch[1], 10);
-      metrics.activeIncidents = Number.parseInt(incidentMatch[2], 10);
-      metrics.activeIncidentPct = Number.parseFloat(incidentMatch[3]);
-      continue;
+    if (line.startsWith('Incidents: ')) {
+      const parts = splitOnce(line.slice('Incidents: '.length), ' total, ');
+      const activeParts = parts ? splitOnce(parts[1], ' active (') : undefined;
+      const activePctText = activeParts?.[1]?.endsWith('%).') ? activeParts[1].slice(0, -3) : undefined;
+      const totalIncidents = parts ? parseIntegerToken(parts[0]) : undefined;
+      const activeIncidents = activeParts ? parseIntegerToken(activeParts[0]) : undefined;
+      const activeIncidentPct = activePctText ? parsePercentToken(activePctText) : undefined;
+      if (totalIncidents !== undefined && activeIncidents !== undefined && activeIncidentPct !== undefined) {
+        metrics.totalIncidents = totalIncidents;
+        metrics.activeIncidents = activeIncidents;
+        metrics.activeIncidentPct = activeIncidentPct;
+        continue;
+      }
     }
 
-    const ticketMatch = line.match(/^Tickets:\s+(\d+)\s+total,\s+(\d+)\s+open\./i);
-    if (ticketMatch) {
-      metrics.totalTickets = Number.parseInt(ticketMatch[1], 10);
-      metrics.openTickets = Number.parseInt(ticketMatch[2], 10);
-      continue;
+    if (line.startsWith('Tickets: ')) {
+      const parts = splitOnce(line.slice('Tickets: '.length), ' total, ');
+      const openTicketsText = parts?.[1]?.endsWith(' open.') ? parts[1].slice(0, -6) : undefined;
+      const totalTickets = parts ? parseIntegerToken(parts[0]) : undefined;
+      const openTickets = openTicketsText ? parseIntegerToken(openTicketsText) : undefined;
+      if (totalTickets !== undefined && openTickets !== undefined) {
+        metrics.totalTickets = totalTickets;
+        metrics.openTickets = openTickets;
+        continue;
+      }
     }
 
-    const mismatchMatch = line.match(/^Data quality:\s+(\d+)\s+status mismatches detected\./i);
-    if (mismatchMatch) {
-      metrics.mismatches = Number.parseInt(mismatchMatch[1], 10);
+    if (line.startsWith('Data quality: ') && line.endsWith(' status mismatches detected.')) {
+      const mismatchText = line
+        .slice('Data quality: '.length, line.length - ' status mismatches detected.'.length)
+        .trim();
+      const mismatches = parseIntegerToken(mismatchText);
+      if (mismatches !== undefined) {
+        metrics.mismatches = mismatches;
+      }
     }
   }
 
@@ -174,7 +225,25 @@ function shortenSpotlightTitle(value: string): string {
   if (!trimmed) {
     return 'n/a';
   }
-  return trimmed.replace(/\s+\(.+\)$/, '');
+  const slashIndex = trimmed.lastIndexOf('/');
+  const fallbackLeaf = slashIndex >= 0 ? trimmed.slice(slashIndex + 1).trim() : trimmed;
+  if (!trimmed.endsWith(')')) {
+    return fallbackLeaf || trimmed;
+  }
+  const suffixStart = trimmed.lastIndexOf(' (');
+  if (suffixStart <= 0) {
+    return fallbackLeaf || trimmed;
+  }
+  const suffix = trimmed.slice(suffixStart + 2, -1).trim();
+  if (!suffix) {
+    return fallbackLeaf || trimmed;
+  }
+  const base = trimmed.slice(0, suffixStart).trim();
+  const baseSlashIndex = base.lastIndexOf('/');
+  if (baseSlashIndex >= 0) {
+    return base.slice(baseSlashIndex + 1).trim() || base;
+  }
+  return base;
 }
 
 export function buildDeepDiveOverviewPlan(deepDive: DeepDiveResult): DeepDiveOverviewPlan {
