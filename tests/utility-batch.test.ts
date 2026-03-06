@@ -81,6 +81,16 @@ describe('space import workflow', () => {
       callWithMeta: vi.fn(async (endpointKey: string, args: any) => {
         calls.push({ endpointKey, args });
         if (endpointKey === 'organization.spaces.getSpaces') {
+          if (args?.query?.space_type === 'root') {
+            return {
+              status: 200,
+              durationMs: 1,
+              retryCount: 0,
+              data: { items: [{ id: 36047, name: 'Overview', parent_id: null, space_type: 'root' }], next_page: null },
+              headers: {},
+              attempts: 1
+            };
+          }
           return {
             status: 200,
             durationMs: 1,
@@ -122,7 +132,7 @@ describe('space import workflow', () => {
     expect(findOrCreateCalls).toHaveLength(2);
     expect(findOrCreateCalls[0].args.body).toEqual({
       name: 'HQ',
-      parent_id: 1
+      parent_id: 36047
     });
     expect(findOrCreateCalls[1].args.body).toEqual({
       name: 'Floor-1',
@@ -132,6 +142,36 @@ describe('space import workflow', () => {
     });
     const report = readFileSync(reportPath, 'utf8').trim().split('\n');
     expect(report.length).toBe(1);
+  });
+
+  it('fails apply when no root space can be resolved', async () => {
+    const inputPath = writeFixture(tempPath('space-import.csv'), 'path,space_type\nHQ,site\n');
+    const client = {
+      callWithMeta: vi.fn(async (endpointKey: string) => {
+        if (endpointKey === 'organization.spaces.getSpaces') {
+          return {
+            status: 200,
+            durationMs: 1,
+            retryCount: 0,
+            data: { items: [], next_page: null },
+            headers: {},
+            attempts: 1
+          };
+        }
+        throw new Error(`Unexpected endpoint ${endpointKey}`);
+      })
+    } as unknown as XyteClient;
+
+    const result = await runSpaceImportTree({
+      client,
+      tenantId: 'acme',
+      inputPath,
+      apply: true,
+      continueOnError: false
+    });
+
+    expect(result.totals.failed).toBe(1);
+    expect(result.firstError?.message).toContain('Unable to resolve root space');
   });
 
   it('emits summary matching utility-batch schema', async () => {

@@ -3,7 +3,7 @@
 This contract is for agent parsers consuming:
 
 ```bash
-xyte-cli tui --headless --screen <screen> --format json --once --tenant <tenant-id>
+xyte-cli ops console --headless --screen <screen> --output json --once --tenant <tenant-id>
 ```
 
 ## Frame Model
@@ -26,14 +26,14 @@ Required top-level fields:
 - `panels` (array)
 - `meta` (object)
 
-## Startup vs Runtime Frames
+## Startup Vs Runtime Frames
 
 Startup frames:
 - `meta.startup == true`
 - typically no operational panels
 
 Runtime frame selection rule:
-- parse the **last** frame where `meta.startup` is missing or `false`
+- parse the last frame where `meta.startup` is missing or `false`
 
 ## Required `meta` Keys (Runtime)
 
@@ -63,14 +63,14 @@ Common optional keys:
 
 ## Setup Gate Rule
 
-If operational screen is blocked by readiness:
+If an operational screen is blocked by readiness:
 - emitted `screen` is `setup`
-- `meta.redirectedFrom` contains requested screen
+- `meta.redirectedFrom` contains the requested screen
 
 Agent behavior:
 1. detect redirect
 2. run setup/config remediation via CLI
-3. retry original requested screen
+3. retry the original requested screen
 
 ## Panel Parsing
 

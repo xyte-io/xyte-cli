@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createXyteClient } from '../src/client/create-client';
-import type { BuiltInFlowDefinition } from '../src/workflows/flow-catalog';
+import { getBuiltInFlowDefinition, type BuiltInFlowDefinition } from '../src/workflows/flow-catalog';
 import { runDeterministicFlow } from '../src/workflows/flow-runner';
 import { MemorySecretStore } from '../src/secure/secret-store';
 import { MemoryProfileStore } from './support/memory-profile-store';
@@ -107,7 +107,7 @@ describe('flow runner', () => {
           kind: 'task',
           id: 'watch_once',
           title: 'Watch Once',
-          command: 'xyte-cli watch --once',
+          command: 'xyte-cli ops watch incidents --once',
           task: 'watch',
           mutating: false,
           watch: {
@@ -129,7 +129,7 @@ describe('flow runner', () => {
           kind: 'task',
           id: 'send_command',
           title: 'Send Command',
-          command: 'xyte-cli call organization.commands.sendCommand',
+          command: 'xyte-cli api call organization.commands.sendCommand',
           task: 'call',
           mutating: true,
           requiresContext: ['device_id', 'command'],
@@ -158,7 +158,6 @@ describe('flow runner', () => {
       definition,
       tenantId: 'acme',
       mode: 'plan',
-      allowWrite: false,
       outDir,
       context: {
         device_id: 'dev-1',
@@ -180,7 +179,6 @@ describe('flow runner', () => {
       definition,
       tenantId: 'acme',
       mode: 'apply',
-      allowWrite: true,
       outDir,
       resume: first.runId,
       context: {
@@ -198,6 +196,99 @@ describe('flow runner', () => {
     expect(second.cursor.nextStepId).toBe('gate_2');
     expect(second.decisions.approved).toBeGreaterThanOrEqual(1);
     expect(second.steps.find((item) => item.stepId === 'send_command')?.status).toBe('completed');
+  });
+
+  it('persists derived guided remediation context across resume boundaries', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/organization/incidents')) {
+        return new Response(JSON.stringify({ items: [{ id: 'inc-1', uuid: 'inc-1', device_id: 'dev-1', status: 'active' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ items: [{ command: 'restart' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const definition = getBuiltInFlowDefinition('flow.guided-remediation');
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-guided-defaults`);
+
+    const first = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: {
+        ticket_id: 't-1'
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(first.outcome).toBe('pending_gate');
+    expect(first.cursor.nextStepId).toBe('gate_send_command');
+    const persistedInputs = JSON.parse(readFileSync(first.inputsPath, 'utf8'));
+    expect(persistedInputs.context.device_id).toBe('dev-1');
+    expect(persistedInputs.context.incident_id).toBe('inc-1');
+    expect(persistedInputs.context.command).toBe('restart');
+    expect(persistedInputs.context.ticket_id).toBe('t-1');
+
+    const second = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: first.runId,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(second.outcome).toBe('pending_gate');
+    expect(second.cursor.nextStepId).toBe('gate_update_device');
+    expect(second.steps.find((item) => item.stepId === 'commands_send')?.status).toBe('completed');
+
+    const third = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: first.runId,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(third.outcome).toBe('pending_gate');
+    expect(third.cursor.nextStepId).toBe('gate_ticket_message');
+    expect(third.steps.find((item) => item.stepId === 'device_update')?.status).toBe('completed');
+    expect(third.steps.find((item) => item.stepId === 'device_get_verify')?.status).toBe('completed');
   });
 
   it('reduces watch loops to one poll when --once is enabled', async () => {
@@ -222,7 +313,7 @@ describe('flow runner', () => {
           kind: 'task',
           id: 'watch_loop',
           title: 'Watch Loop',
-          command: 'xyte-cli watch --interval-ms 250 --max-polls 3',
+          command: 'xyte-cli ops watch incidents --interval-ms 250 --max-polls 3',
           task: 'watch',
           mutating: false,
           watch: {
@@ -242,7 +333,6 @@ describe('flow runner', () => {
       definition,
       tenantId: 'acme',
       mode: 'plan',
-      allowWrite: false,
       outDir,
       context: {},
       once: true,
@@ -283,7 +373,7 @@ describe('flow runner', () => {
           kind: 'task',
           id: 'send_command',
           title: 'Send Command',
-          command: 'xyte-cli call organization.commands.sendCommand',
+          command: 'xyte-cli api call organization.commands.sendCommand',
           task: 'call',
           mutating: true,
           requiresContext: ['device_id', 'command'],
@@ -304,7 +394,6 @@ describe('flow runner', () => {
       definition,
       tenantId: 'acme',
       mode: 'apply',
-      allowWrite: true,
       outDir,
       context: {
         device_id: 'dev-1',
@@ -353,7 +442,7 @@ describe('flow runner', () => {
           kind: 'task',
           id: 'inspect_deep_dive_daily',
           title: 'Inspect Deep Dive',
-          command: 'xyte-cli inspect deep-dive --tenant <tenant-id>',
+          command: 'xyte-cli ops inspect deep-dive --tenant <tenant-id>',
           task: 'inspect.deep-dive',
           mutating: false,
           inspect: {
@@ -365,7 +454,7 @@ describe('flow runner', () => {
           kind: 'task',
           id: 'report_daily',
           title: 'Generate Report',
-          command: 'xyte-cli report generate --tenant <tenant-id>',
+          command: 'xyte-cli ops report generate --tenant <tenant-id>',
           task: 'report.generate',
           mutating: false,
           report: {
@@ -384,7 +473,6 @@ describe('flow runner', () => {
       definition,
       tenantId: 'acme',
       mode: 'plan',
-      allowWrite: false,
       inspectProviderScope: 'auto',
       outDir,
       context: {},
@@ -442,7 +530,7 @@ describe('flow runner', () => {
           kind: 'task',
           id: 'inspect_deep_dive_daily',
           title: 'Inspect Deep Dive',
-          command: 'xyte-cli inspect deep-dive --tenant <tenant-id>',
+          command: 'xyte-cli ops inspect deep-dive --tenant <tenant-id>',
           task: 'inspect.deep-dive',
           mutating: false,
           inspect: {
@@ -460,7 +548,6 @@ describe('flow runner', () => {
       definition,
       tenantId: 'acme',
       mode: 'plan',
-      allowWrite: false,
       inspectProviderScope: 'partner',
       outDir,
       context: {},
@@ -479,7 +566,6 @@ describe('flow runner', () => {
       definition,
       tenantId: 'acme',
       mode: 'apply',
-      allowWrite: true,
       outDir,
       resume: first.runId,
       context: {},
@@ -528,7 +614,7 @@ describe('flow runner', () => {
           kind: 'task',
           id: 'inspect_deep_dive_daily',
           title: 'Inspect Deep Dive',
-          command: 'xyte-cli inspect deep-dive --tenant <tenant-id>',
+          command: 'xyte-cli ops inspect deep-dive --tenant <tenant-id>',
           task: 'inspect.deep-dive',
           mutating: false,
           inspect: {
@@ -548,7 +634,7 @@ describe('flow runner', () => {
           kind: 'task',
           id: 'report_daily',
           title: 'Generate Report',
-          command: 'xyte-cli report generate --tenant <tenant-id>',
+          command: 'xyte-cli ops report generate --tenant <tenant-id>',
           task: 'report.generate',
           mutating: false,
           report: {
@@ -567,7 +653,6 @@ describe('flow runner', () => {
       definition,
       tenantId: 'acme',
       mode: 'plan',
-      allowWrite: false,
       inspectProviderScope: 'auto',
       outDir,
       context: {},
@@ -586,7 +671,6 @@ describe('flow runner', () => {
       definition,
       tenantId: 'acme',
       mode: 'apply',
-      allowWrite: true,
       outDir,
       resume: first.runId,
       context: {},
@@ -626,7 +710,7 @@ describe('flow runner', () => {
           kind: 'task',
           id: 'report_daily',
           title: 'Generate Report',
-          command: 'xyte-cli report generate --tenant <tenant-id>',
+          command: 'xyte-cli ops report generate --tenant <tenant-id>',
           task: 'report.generate',
           mutating: false,
           report: {
@@ -645,7 +729,6 @@ describe('flow runner', () => {
       definition,
       tenantId: 'acme',
       mode: 'plan',
-      allowWrite: false,
       outDir,
       context: {},
       once: true,
@@ -663,7 +746,7 @@ describe('flow runner', () => {
     expect(failedStep?.classification).toBe('needs_data');
     expect(String(failedStep?.error?.detail ?? '')).toContain('Step report_daily requires deep-dive output from status_fast.');
     expect(String(failedStep?.error?.detail ?? '')).toContain(
-      'Input JSON must be produced by `xyte-cli inspect deep-dive --format json`.'
+      'Input JSON must be produced by `xyte-cli ops inspect deep-dive --output json`.'
     );
   });
 
@@ -681,7 +764,7 @@ describe('flow runner', () => {
           kind: 'task',
           id: 'inspect_deep_dive_daily',
           title: 'Inspect Deep Dive',
-          command: 'xyte-cli inspect deep-dive --tenant <tenant-id>',
+          command: 'xyte-cli ops inspect deep-dive --tenant <tenant-id>',
           task: 'inspect.deep-dive',
           mutating: false,
           inspect: {
@@ -699,7 +782,6 @@ describe('flow runner', () => {
       definition,
       tenantId: 'acme',
       mode: 'plan',
-      allowWrite: false,
       inspectProviderScope: 'auto',
       outDir,
       context: {},
@@ -732,7 +814,7 @@ describe('flow runner', () => {
           kind: 'task',
           id: 'inspect_fleet_daily',
           title: 'Inspect Fleet',
-          command: 'xyte-cli inspect fleet --tenant <tenant-id>',
+          command: 'xyte-cli ops inspect fleet --tenant <tenant-id>',
           task: 'inspect.fleet',
           mutating: false,
           inspect: {
@@ -749,7 +831,6 @@ describe('flow runner', () => {
       definition,
       tenantId: 'acme',
       mode: 'plan',
-      allowWrite: false,
       inspectProviderScope: 'auto',
       outDir,
       context: {},
@@ -782,7 +863,7 @@ describe('flow runner', () => {
           kind: 'task',
           id: 'inspect_deep_dive_daily',
           title: 'Inspect Deep Dive',
-          command: 'xyte-cli inspect deep-dive --tenant <tenant-id>',
+          command: 'xyte-cli ops inspect deep-dive --tenant <tenant-id>',
           task: 'inspect.deep-dive',
           mutating: false,
           inspect: {
@@ -800,7 +881,6 @@ describe('flow runner', () => {
       definition,
       tenantId: 'acme',
       mode: 'plan',
-      allowWrite: false,
       inspectProviderScope: 'organization',
       outDir,
       context: {},
@@ -834,7 +914,7 @@ describe('flow runner', () => {
           kind: 'task',
           id: 'inspect_fleet_daily',
           title: 'Inspect Fleet',
-          command: 'xyte-cli inspect fleet --tenant <tenant-id>',
+          command: 'xyte-cli ops inspect fleet --tenant <tenant-id>',
           task: 'inspect.fleet',
           mutating: false,
           inspect: {
@@ -851,7 +931,6 @@ describe('flow runner', () => {
       definition,
       tenantId: 'acme',
       mode: 'plan',
-      allowWrite: false,
       inspectProviderScope: 'partner',
       outDir,
       context: {},
@@ -925,7 +1004,7 @@ describe('flow runner', () => {
           kind: 'task',
           id: 'inspect_fleet_daily',
           title: 'Inspect Fleet',
-          command: 'xyte-cli inspect fleet --tenant <tenant-id>',
+          command: 'xyte-cli ops inspect fleet --tenant <tenant-id>',
           task: 'inspect.fleet',
           mutating: false,
           inspect: {
@@ -942,7 +1021,6 @@ describe('flow runner', () => {
       definition,
       tenantId: 'acme',
       mode: 'plan',
-      allowWrite: false,
       inspectProviderScope: 'partner',
       outDir,
       context: {},
@@ -961,7 +1039,6 @@ describe('flow runner', () => {
       definition,
       tenantId: 'acme',
       mode: 'apply',
-      allowWrite: true,
       outDir,
       resume: first.runId,
       inspectProviderScope: 'organization',
@@ -1001,7 +1078,7 @@ describe('flow runner', () => {
           kind: 'task',
           id: 'inspect_deep_dive_daily',
           title: 'Inspect Deep Dive',
-          command: 'xyte-cli inspect deep-dive --tenant <tenant-id>',
+          command: 'xyte-cli ops inspect deep-dive --tenant <tenant-id>',
           task: 'inspect.deep-dive',
           mutating: false,
           inspect: {
@@ -1019,7 +1096,6 @@ describe('flow runner', () => {
       definition,
       tenantId: 'acme',
       mode: 'plan',
-      allowWrite: false,
       inspectProviderScope: 'partner',
       outDir,
       context: {},
@@ -1039,7 +1115,6 @@ describe('flow runner', () => {
       definition,
       tenantId: 'acme',
       mode: 'apply',
-      allowWrite: true,
       outDir,
       resume: first.runId,
       context: {},

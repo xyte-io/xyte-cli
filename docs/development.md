@@ -45,7 +45,7 @@ npm run smoke:local:utilities -- --base-url http://127.0.0.1:3001 --tenant local
 ## Local Flow-Pack Smoke
 
 Runs build/test + flow-pack command coverage against a local tenant and emits a readable per-step summary.
-Expected guard rejections (`--allow-write`, `--confirm`) are treated as pass conditions.
+Expected write and destructive calls are treated as direct execution paths in smoke coverage.
 
 ```bash
 npm run smoke:local:flow-pack -- --tenant local3000
@@ -57,7 +57,7 @@ npm run smoke:local:flow-pack -- --tenant local3000
 npm run smoke:upgrade:controlled
 ```
 
-This builds tarball A/B from the current package, runs a clean Docker environment, installs A, upgrades to B via `xyte-cli upgrade`, refreshes user-scope skills, and validates guarded/dry endpoint behavior against the local mock server.
+This builds tarball A/B from the current package, runs a clean Docker environment, installs A, upgrades to B via `xyte-cli upgrade`, refreshes user-scope skills, and validates direct write/dry endpoint behavior against the local mock server.
 
 ## Release
 

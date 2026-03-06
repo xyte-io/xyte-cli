@@ -187,14 +187,14 @@ async function main() {
 
     const installSkills = await run(
       XYTE_COMMAND,
-      ['install', '--skills', '--scope', 'user', '--agents', 'all', '--force', '--no-setup'],
+      ['init', '--scope', 'user', '--agents', 'all', '--force', '--no-setup'],
       runtimeEnv
     );
     assertSuccess(
       installSkills,
-      'xyte-cli install --skills',
+      'xyte-cli init',
       XYTE_COMMAND,
-      ['install', '--skills', '--scope', 'user', '--agents', 'all', '--force', '--no-setup']
+      ['init', '--scope', 'user', '--agents', 'all', '--force', '--no-setup']
     );
 
     const userSkillFiles = [
@@ -208,47 +208,48 @@ async function main() {
 
     const tenantAdd = await run(
       XYTE_COMMAND,
-      ['tenant', 'add', 'local', '--hub-url', 'http://127.0.0.1:3001', '--entry-url', 'http://127.0.0.1:3001'],
+      ['config', 'tenant', 'add', 'local', '--hub-url', 'http://127.0.0.1:3001', '--entry-url', 'http://127.0.0.1:3001'],
       runtimeEnv
     );
     assertSuccess(
       tenantAdd,
       'tenant add',
       XYTE_COMMAND,
-      ['tenant', 'add', 'local', '--hub-url', 'http://127.0.0.1:3001', '--entry-url', 'http://127.0.0.1:3001']
+      ['config', 'tenant', 'add', 'local', '--hub-url', 'http://127.0.0.1:3001', '--entry-url', 'http://127.0.0.1:3001']
     );
 
     const authAdd = await run(
       XYTE_COMMAND,
-      ['auth', 'key', 'add', '--tenant', 'local', '--provider', 'xyte-org', '--name', 'local', '--key', 'local-key', '--set-active'],
+      ['config', 'key', 'add', '--tenant', 'local', '--provider', 'xyte-org', '--name', 'local', '--key', 'local-key', '--set-active'],
       runtimeEnv
     );
     assertSuccess(
       authAdd,
       'auth key add',
       XYTE_COMMAND,
-      ['auth', 'key', 'add', '--tenant', 'local', '--provider', 'xyte-org', '--name', 'local', '--key', '<redacted>', '--set-active']
+      ['config', 'key', 'add', '--tenant', 'local', '--provider', 'xyte-org', '--name', 'local', '--key', '<redacted>', '--set-active']
     );
 
     const readCall = await run(
       XYTE_COMMAND,
-      ['call', 'organization.devices.getDevices', '--tenant', 'local', '--output-mode', 'envelope', '--strict-json'],
+      ['api', 'call', 'organization.devices.getDevices', '--tenant', 'local', '--output-mode', 'envelope', '--strict-json'],
       runtimeEnv
     );
     assertSuccess(
       readCall,
       'read endpoint call',
       XYTE_COMMAND,
-      ['call', 'organization.devices.getDevices', '--tenant', 'local', '--output-mode', 'envelope', '--strict-json']
+      ['api', 'call', 'organization.devices.getDevices', '--tenant', 'local', '--output-mode', 'envelope', '--strict-json']
     );
     const readPayload = parseJsonOutput(readCall.stdout);
     if (readPayload.schemaVersion !== 'xyte.call.envelope.v1' || readPayload.response?.status !== 200) {
       throw new Error(`Unexpected read endpoint payload: ${JSON.stringify(readPayload)}`);
     }
 
-    const blockedWrite = await run(
+    const sendCommandWrite = await run(
       XYTE_COMMAND,
       [
+        'api',
         'call',
         'organization.commands.sendCommand',
         '--tenant',
@@ -260,29 +261,39 @@ async function main() {
       ],
       runtimeEnv
     );
-    assertFailure(blockedWrite, 'guarded write without --allow-write', '--allow-write');
+    assertSuccess(
+      sendCommandWrite,
+      'sendCommand without legacy write flag',
+      XYTE_COMMAND,
+      ['api', 'call', 'organization.commands.sendCommand', '--tenant', 'local', '--path-json', '{"device_id":"d1"}', '--body-json', '{"command":"reboot"}']
+    );
 
-    const blockedDelete = await run(
+    const cancelCommandDelete = await run(
       XYTE_COMMAND,
       [
+        'api',
         'call',
         'organization.commands.cancelCommand',
         '--tenant',
         'local',
-        '--allow-write',
         '--path-json',
         '{"device_id":"d1","command_id":"cmd-1"}'
       ],
       runtimeEnv
     );
-    assertFailure(blockedDelete, 'destructive call without --confirm', '--confirm');
+    assertSuccess(
+      cancelCommandDelete,
+      'cancelCommand without legacy confirm flag',
+      XYTE_COMMAND,
+      ['api', 'call', 'organization.commands.cancelCommand', '--tenant', 'local', '--path-json', '{"device_id":"d1","command_id":"cmd-1"}']
+    );
 
     const dryRun = await run(
       XYTE_COMMAND,
-      ['space', 'import-tree', '--tenant', 'local', '--input', csvPath],
+      ['util', 'import-tree', '--tenant', 'local', '--input', csvPath],
       runtimeEnv
     );
-    assertSuccess(dryRun, 'space import-tree dry-run', XYTE_COMMAND, ['space', 'import-tree', '--tenant', 'local', '--input', csvPath]);
+    assertSuccess(dryRun, 'util import-tree dry-run', XYTE_COMMAND, ['util', 'import-tree', '--tenant', 'local', '--input', csvPath]);
     const dryRunPayload = parseJsonOutput(dryRun.stdout);
     if (dryRunPayload.schemaVersion !== 'xyte.utility.batch.v1' || dryRunPayload.mode !== 'dry-run') {
       throw new Error(`Unexpected dry-run payload: ${JSON.stringify(dryRunPayload)}`);
@@ -290,14 +301,14 @@ async function main() {
 
     const upgrade = await run(
       XYTE_COMMAND,
-      ['upgrade', '--yes', '--format', 'json'],
+      ['upgrade', '--yes', '--output', 'json'],
       {
         ...runtimeEnv,
         XYTE_CLI_UPGRADE_SPEC: tarballB,
         XYTE_CLI_UPGRADE_TARGET_VERSION: versionB
       }
     );
-    assertSuccess(upgrade, 'xyte-cli upgrade', XYTE_COMMAND, ['upgrade', '--yes', '--format', 'json']);
+    assertSuccess(upgrade, 'xyte-cli upgrade', XYTE_COMMAND, ['upgrade', '--yes', '--output', 'json']);
     const upgradePayload = parseJsonOutput(upgrade.stdout);
     if (upgradePayload.schemaVersion !== 'xyte.upgrade.result.v1') {
       throw new Error(`Unexpected upgrade payload schema: ${upgradePayload.schemaVersion}`);

@@ -1,26 +1,26 @@
 # AI-Assisted Utility Preprocessing (Prepare-First, CLI stays AI-free)
 
-This runbook defines utility preprocessing with `xyte-cli utility prepare`.
+This runbook defines utility preprocessing with `xyte-cli util prepare`.
 
 ## Scope
 
 1. Preprocess all write-capable endpoint actions into canonical files.
-2. Keep `space import-tree` as the only utility execution command in this surface.
+2. Keep `util import-tree` as the only utility execution command in this surface.
 3. Keep CLI AI-free: no OCR/model calls inside `xyte-cli`.
 
 ## Core model
 
-1. Run `xyte-cli utility list-actions` to discover supported actions.
-2. Run `xyte-cli utility prepare --action <action-key> --input <source>`.
+1. Run `xyte-cli util list-actions` to discover supported actions.
+2. Run `xyte-cli util prepare --action <action-key> --input <source>`.
 3. CLI emits `xyte.utility.prepare.v1` and scaffolds canonical files.
 4. External AI fills primary/rejected/notes using the contract.
 5. Ask user what to do next. Never auto-apply.
 6. For `space.import-tree`, run dry-run then apply with explicit user approval.
-7. For other actions, use controlled `xyte-cli call` loops outside utility execution.
+7. For other actions, use controlled `xyte-cli api call` loops outside utility execution.
 
 ## Canonical outputs
 
-`utility prepare` always creates:
+`util prepare` always creates:
 1. primary artifact
 2. rejected artifact with `reject_reason`
 3. notes artifact
@@ -47,13 +47,13 @@ Generic profiles:
 Discover actions:
 
 ```bash
-xyte-cli utility list-actions --format text
+xyte-cli util list-actions --output text
 ```
 
 Prepare claim action:
 
 ```bash
-xyte-cli utility prepare \
+xyte-cli util prepare \
   --action organization.devices.claimDevice \
   --input /path/to/raw-source.xlsx \
   --tenant <tenant-id> \
@@ -63,7 +63,7 @@ xyte-cli utility prepare \
 Prepare space import action:
 
 ```bash
-xyte-cli utility prepare \
+xyte-cli util prepare \
   --action space.import-tree \
   --input /path/to/raw-hierarchy.pdf \
   --tenant <tenant-id> \
@@ -73,11 +73,11 @@ xyte-cli utility prepare \
 Execute prepared space import (dry-run then apply):
 
 ```bash
-xyte-cli space import-tree \
+xyte-cli util import-tree \
   --tenant <tenant-id> \
   --input ./tmp/space-import-tree.csv
 
-xyte-cli space import-tree \
+xyte-cli util import-tree \
   --tenant <tenant-id> \
   --input ./tmp/space-import-tree.csv \
   --apply

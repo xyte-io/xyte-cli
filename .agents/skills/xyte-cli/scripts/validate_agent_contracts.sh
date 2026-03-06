@@ -27,7 +27,7 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 echo "Validating call envelope contract..."
 set +e
-CALL_OUTPUT="$("$RUN_CLI" call organization.devices.getDevices --tenant "$TENANT_ID" --output-mode envelope 2>/dev/null)"
+CALL_OUTPUT="$("$RUN_CLI" api call organization.devices.getDevices --tenant "$TENANT_ID" --output-mode envelope 2>/dev/null)"
 CALL_EXIT=$?
 set -e
 
@@ -43,7 +43,7 @@ printf '%s\n' "$CALL_OUTPUT" > "$CALL_PATH"
 echo "PASS call envelope (exit=$CALL_EXIT)"
 
 echo "Validating inspect fleet contract..."
-FLEET_OUTPUT="$("$RUN_CLI" inspect fleet --tenant "$TENANT_ID" --format json)"
+FLEET_OUTPUT="$("$RUN_CLI" ops inspect fleet --tenant "$TENANT_ID" --output json)"
 printf '%s\n' "$FLEET_OUTPUT" | jq -e '.schemaVersion == "xyte.inspect.fleet.v1"' >/dev/null
 FLEET_PATH="$TMP_DIR/fleet.json"
 printf '%s\n' "$FLEET_OUTPUT" > "$FLEET_PATH"
@@ -51,14 +51,14 @@ printf '%s\n' "$FLEET_OUTPUT" > "$FLEET_PATH"
 echo "PASS inspect fleet"
 
 echo "Validating inspect deep-dive + report contracts..."
-DEEP_OUTPUT="$("$RUN_CLI" inspect deep-dive --tenant "$TENANT_ID" --format json)"
+DEEP_OUTPUT="$("$RUN_CLI" ops inspect deep-dive --tenant "$TENANT_ID" --output json)"
 printf '%s\n' "$DEEP_OUTPUT" | jq -e '.schemaVersion == "xyte.inspect.deep-dive.v1"' >/dev/null
 DEEP_PATH="$TMP_DIR/deep-dive.json"
 REPORT_PATH="$TMP_DIR/report.md"
 printf '%s\n' "$DEEP_OUTPUT" > "$DEEP_PATH"
 "$VALIDATE_SCHEMA" "$REPO_ROOT/docs/schemas/inspect-deep-dive.v1.schema.json" "$DEEP_PATH"
 
-REPORT_OUTPUT="$("$RUN_CLI" report generate --tenant "$TENANT_ID" --input "$DEEP_PATH" --out "$REPORT_PATH" --format markdown)"
+REPORT_OUTPUT="$("$RUN_CLI" ops report generate --tenant "$TENANT_ID" --input "$DEEP_PATH" --out "$REPORT_PATH" --render markdown)"
 printf '%s\n' "$REPORT_OUTPUT" | jq -e '.schemaVersion == "xyte.report.v1"' >/dev/null
 REPORT_META_PATH="$TMP_DIR/report-meta.json"
 printf '%s\n' "$REPORT_OUTPUT" > "$REPORT_META_PATH"

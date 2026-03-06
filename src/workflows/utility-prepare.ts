@@ -86,8 +86,8 @@ function buildSuggestedCommands(
         'Preflight gate: for each device_id, run organization.commands.getCommands first and pick only valid command/friendly_name values.',
         'If no valid command/friendly_name is known for a device, skip writes for that row.'
       ].join(' '),
-      apply: `xyte-cli call organization.commands.sendCommand --tenant ${tenant} --allow-write --path-json '{"device_id":"<device_id>"}' --body-json '{"command":"<valid-command>"}'`,
-      verify: `xyte-cli call organization.commands.getCommands --tenant ${tenant} --path-json '{"device_id":"<device_id>"}' --query-json '{"page":1,"per_page":20}'`
+      apply: `xyte-cli api call organization.commands.sendCommand --tenant ${tenant} --path-json '{"device_id":"<device_id>"}' --body-json '{"command":"<valid-command>"}'`,
+      verify: `xyte-cli api call organization.commands.getCommands --tenant ${tenant} --path-json '{"device_id":"<device_id>"}' --query-json '{"page":1,"per_page":20}'`
     };
   }
 
@@ -98,8 +98,8 @@ function buildSuggestedCommands(
         'Preflight gate: validate target space_id rows with organization.spaces.getSpace before write loops.',
         'Run one envelope probe row first; if upstream returns "No device found", skip bulk claim writes and collect claimable identifiers.'
       ].join(' '),
-      apply: `xyte-cli call organization.devices.claimDevice --tenant ${tenant} --allow-write --output-mode envelope --body-json '{"name":"<name>","space_id":<space_id>,"sn":"<sn>","mac":"<mac>","cloud_id":"<cloud_id>"}'`,
-      verify: `xyte-cli call organization.devices.getDevices --tenant ${tenant} --query-json '{"space_id":"<space_id>"}'`
+      apply: `xyte-cli api call organization.devices.claimDevice --tenant ${tenant} --output-mode envelope --body-json '{"name":"<name>","space_id":<space_id>,"sn":"<sn>","mac":"<mac>","cloud_id":"<cloud_id>"}'`,
+      verify: `xyte-cli api call organization.devices.getDevices --tenant ${tenant} --query-json '{"space_id":"<space_id>"}'`
     };
   }
 
@@ -110,16 +110,16 @@ function buildSuggestedCommands(
         'Preflight gate: capture baseline values with organization.devices.getDevice before write loops.',
         'After each update, read back the device and verify the targeted fields changed as expected.'
       ].join(' '),
-      apply: `xyte-cli call organization.devices.updateDevice --tenant ${tenant} --allow-write --path-json '{"device_id":"<device_id>"}' --body-json '{"name":"<updated-name>"}'`,
-      verify: `xyte-cli call organization.devices.getDevice --tenant ${tenant} --path-json '{"device_id":"<device_id>"}'`
+      apply: `xyte-cli api call organization.devices.updateDevice --tenant ${tenant} --path-json '{"device_id":"<device_id>"}' --body-json '{"name":"<updated-name>"}'`,
+      verify: `xyte-cli api call organization.devices.getDevice --tenant ${tenant} --path-json '{"device_id":"<device_id>"}'`
     };
   }
 
   if (profile.executionSupport === 'space.import-tree') {
     return {
-      next: `xyte-cli space import-tree --tenant ${tenant} --input ${primaryPath}`,
-      apply: `xyte-cli space import-tree --tenant ${tenant} --input ${primaryPath} --apply --report ${path.join(outputDir, 'space-import.apply.ndjson')}`,
-      verify: `xyte-cli call organization.spaces.getSpaces --tenant ${tenant} --query-json '{"path_includes":"<sample-path>"}'`
+      next: `xyte-cli util import-tree --tenant ${tenant} --input ${primaryPath}`,
+      apply: `xyte-cli util import-tree --tenant ${tenant} --input ${primaryPath} --apply --report ${path.join(outputDir, 'space-import.apply.ndjson')}`,
+      verify: `xyte-cli api call organization.spaces.getSpaces --tenant ${tenant} --query-json '{"path_includes":"<sample-path>"}'`
     };
   }
 
@@ -131,9 +131,9 @@ function buildSuggestedCommands(
     }, {});
 
   return {
-    next: `Review ${primaryPath}, then decide whether to execute ${profile.actionKey} via xyte-cli call loop.`,
-    apply: `xyte-cli call ${profile.actionKey} --tenant ${tenant} --allow-write --path-json '${JSON.stringify(samplePathObject)}' --query-json '{"...":"..."}' --body-json '{"...":"..."}'`,
-    verify: `xyte-cli describe-endpoint ${profile.actionKey}`
+    next: `Review ${primaryPath}, then decide whether to execute ${profile.actionKey} via xyte-cli api call loop.`,
+    apply: `xyte-cli api call ${profile.actionKey} --tenant ${tenant} --path-json '${JSON.stringify(samplePathObject)}' --query-json '{"...":"..."}' --body-json '{"...":"..."}'`,
+    verify: `xyte-cli api endpoints describe ${profile.actionKey}`
   };
 }
 

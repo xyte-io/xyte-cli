@@ -65,7 +65,16 @@ interface TaskExecutionResult {
 }
 
 interface FlowRunInputsPayload {
+  flowId?: unknown;
+  resolvedFlowId?: unknown;
+  tenantId?: unknown;
+  mode?: unknown;
   inspectProviderScope?: unknown;
+  context?: unknown;
+  resume?: unknown;
+  strictJson?: unknown;
+  once?: unknown;
+  generatedAtUtc?: unknown;
 }
 
 interface RunDeterministicFlowArgs {
@@ -74,7 +83,7 @@ interface RunDeterministicFlowArgs {
   definition: BuiltInFlowDefinition;
   tenantId: string;
   mode: FlowRunMode;
-  allowWrite: boolean;
+  allowWrite?: boolean;
   inspectProviderScope?: InspectProviderScope;
   outDir: string;
   resume?: string;
@@ -92,6 +101,20 @@ function isInspectProviderScopeError(error: unknown): boolean {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function toStringRecord(value: unknown): Record<string, string> {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  const out: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof entry === 'string') {
+      out[key] = entry;
+    }
+  }
+  return out;
 }
 
 function nowIso(): string {
@@ -167,6 +190,29 @@ function ensureContextKeys(step: FlowTaskStep, context: Record<string, string>):
   }
 }
 
+function buildGuidedRemediationDeviceName(deviceId: string): string {
+  return `Remediated ${deviceId}`;
+}
+
+function hydrateDerivedFlowContext(step: FlowTaskStep, ctx: RunContext): void {
+  const context = ctx.resolvedContext;
+
+  if (!context.device_id && context.watch_device_id) {
+    context.device_id = context.watch_device_id;
+  }
+
+  if (!context.incident_id) {
+    const incidentId = context.watch_incident_id ?? context.watch_item_id;
+    if (incidentId) {
+      context.incident_id = incidentId;
+    }
+  }
+
+  if (ctx.args.resolvedFlowId === 'flow.guided-remediation' && !context.updated_device_name && context.device_id) {
+    context.updated_device_name = buildGuidedRemediationDeviceName(context.device_id);
+  }
+}
+
 function runInstallDoctorLite() {
   const expectedPath = path.resolve(__dirname, '../../dist/bin/xyte-cli.js');
   const commandPath = resolveCommandFromPath('xyte-cli');
@@ -213,12 +259,8 @@ async function appendNdjson(targetPath: string, payload: unknown): Promise<void>
   await appendFile(targetPath, `${JSON.stringify(payload)}\n`, 'utf8');
 }
 
-function requiresWriteGuard(method: string): boolean {
+function isMutatingMethod(method: string): boolean {
   return !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase());
-}
-
-function requiresDestructiveGuard(method: string): boolean {
-  return method.toUpperCase() === 'DELETE';
 }
 
 function buildReportInputNeedsDataMessage(stepId: string, inputStepId: string, cause: unknown): string {
@@ -246,6 +288,7 @@ function extractPrimaryOutputPath(value: unknown): string | undefined {
 }
 
 async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  hydrateDerivedFlowContext(step, ctx);
   ensureContextKeys(step, ctx.resolvedContext);
 
   switch (step.task) {
@@ -421,16 +464,7 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
 
       const endpoint = getEndpoint(step.call.endpointKey);
       const method = endpoint.method.toUpperCase();
-      const isWrite = requiresWriteGuard(method);
-      if (isWrite && !ctx.args.allowWrite) {
-        throw new FlowNeedsInputError(`Step ${step.id} is mutating. Re-run with --apply --allow-write.`);
-      }
-      if (requiresDestructiveGuard(method)) {
-        const requiredConfirm = step.call.confirm ?? step.call.endpointKey;
-        if (requiredConfirm !== step.call.endpointKey) {
-          throw new Error(`Step ${step.id} has invalid destructive confirm token.`);
-        }
-      }
+      const isWrite = isMutatingMethod(method);
 
       const pathPayload = step.call.path ? resolveTemplateValue(step.call.path, ctx.resolvedContext) : undefined;
       const queryPayload = step.call.query ? resolveTemplateValue(step.call.query, ctx.resolvedContext) : undefined;
@@ -449,8 +483,7 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
         endpointKey: step.call.endpointKey,
         method,
         guard: {
-          allowWrite: isWrite,
-          ...(requiresDestructiveGuard(method) ? { confirm: step.call.endpointKey } : {})
+          allowWrite: isWrite
         },
         request: {
           path: pathPayload as any,
@@ -508,9 +541,6 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
     case 'space.import-tree': {
       if (!step.spaceImportTree) {
         throw new Error(`Flow step ${step.id} is missing space import configuration.`);
-      }
-      if (step.spaceImportTree.apply && !ctx.args.allowWrite) {
-        throw new FlowNeedsInputError(`Step ${step.id} applies changes. Re-run with --apply --allow-write.`);
       }
 
       const inputPath = path.resolve(resolveTemplateString(step.spaceImportTree.inputPath, ctx.resolvedContext));
@@ -626,21 +656,61 @@ function isInspectProviderScopeValue(value: unknown): value is InspectProviderSc
 }
 
 async function readStoredInspectProviderScope(bundleDir: string): Promise<InspectProviderScope | undefined> {
+  const storedInputs = await readStoredInputs(bundleDir);
+  if (!storedInputs) {
+    return undefined;
+  }
+
+  if (isInspectProviderScopeValue(storedInputs.inspectProviderScope)) {
+    return storedInputs.inspectProviderScope;
+  }
+
+  return undefined;
+}
+
+async function readStoredInputs(bundleDir: string): Promise<FlowRunInputsPayload | undefined> {
   const inputsPath = path.join(bundleDir, 'inputs.json');
   if (!existsSync(inputsPath)) {
     return undefined;
   }
 
   try {
-    const parsed = JSON.parse(await readFile(inputsPath, 'utf8')) as FlowRunInputsPayload;
-    if (isInspectProviderScopeValue(parsed.inspectProviderScope)) {
-      return parsed.inspectProviderScope;
-    }
+    return JSON.parse(await readFile(inputsPath, 'utf8')) as FlowRunInputsPayload;
   } catch {
     // Ignore malformed resume inputs and use current invocation defaults.
+    return undefined;
   }
+}
 
-  return undefined;
+function buildFlowRunInputsPayload(
+  ctx: Pick<RunContext, 'resolvedContext'>,
+  args: RunDeterministicFlowArgs,
+  inspectProviderScope: InspectProviderScope
+): FlowRunInputsPayload {
+  return {
+    flowId: args.flowId,
+    resolvedFlowId: args.resolvedFlowId,
+    tenantId: args.tenantId,
+    mode: args.mode,
+    inspectProviderScope,
+    context: ctx.resolvedContext,
+    resume: args.resume,
+    strictJson: args.strictJson,
+    once: args.once,
+    generatedAtUtc: nowIso()
+  };
+}
+
+async function persistFlowRunInputs(
+  ctx: Pick<RunContext, 'inputsPath' | 'resolvedContext'>,
+  args: RunDeterministicFlowArgs,
+  inspectProviderScope: InspectProviderScope
+): Promise<void> {
+  await writeFile(
+    ctx.inputsPath,
+    `${JSON.stringify(buildFlowRunInputsPayload(ctx, args, inspectProviderScope), null, 2)}\n`,
+    'utf8'
+  );
 }
 
 async function restoreTaskOutputsFromSteps(steps: FlowRunStep[]): Promise<Map<string, unknown>> {
@@ -681,6 +751,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
   let priorDecisions: FlowRunDecision[] = [];
   let priorErrors: FlowRunErrorEntry[] = [];
   let resumedInspectProviderScope: InspectProviderScope | undefined;
+  let resumedContext: Record<string, string> = {};
 
   if (resumeBundle) {
     const manifestPath = path.join(resumeBundle, 'manifest.json');
@@ -697,7 +768,9 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
     cursorIndex = existingSummary.cursor.nextStepIndex;
     priorDecisions = await readLinesAsJson<FlowRunDecision>(path.join(resumeBundle, 'decisions.ndjson'));
     priorErrors = await readLinesAsJson<FlowRunErrorEntry>(path.join(resumeBundle, 'errors.ndjson'));
+    const storedInputs = await readStoredInputs(resumeBundle);
     resumedInspectProviderScope = await readStoredInspectProviderScope(resumeBundle);
+    resumedContext = toStringRecord(storedInputs?.context);
   }
 
   const effectiveInspectProviderScope = args.inspectProviderScope ?? resumedInspectProviderScope ?? 'auto';
@@ -716,6 +789,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
     errorsPath: path.join(bundleDir, 'errors.ndjson'),
     watchFramesPath: path.join(bundleDir, 'watch-frames.ndjson'),
     resolvedContext: {
+      ...resumedContext,
       ...args.context
     },
     taskOutputs: restoredTaskOutputs
@@ -733,27 +807,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
     await writeFile(ctx.watchFramesPath, '', 'utf8');
   }
 
-  await writeFile(
-    ctx.inputsPath,
-    `${JSON.stringify(
-      {
-        flowId: args.flowId,
-        resolvedFlowId: args.resolvedFlowId,
-        tenantId: args.tenantId,
-        mode: args.mode,
-        allowWrite: args.allowWrite,
-        inspectProviderScope: effectiveInspectProviderScope,
-        context: ctx.resolvedContext,
-        resume: args.resume,
-        strictJson: args.strictJson,
-        once: args.once,
-        generatedAtUtc: nowIso()
-      },
-      null,
-      2
-    )}\n`,
-    'utf8'
-  );
+  await persistFlowRunInputs(ctx, args, effectiveInspectProviderScope);
 
   const runStartedAt = Date.now();
   let outcome: FlowRunSummary['outcome'] = 'completed';
@@ -778,22 +832,6 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
             action: 'pending',
             detail: 'Plan mode paused at human decision gate.',
             requiresWrite: step.mutating
-          };
-          decisions.push(decision);
-          await appendNdjson(ctx.decisionsPath, decision);
-          outcome = 'pending_gate';
-          nextStepIndex = index;
-          break;
-        }
-
-        if (step.mutating && !args.allowWrite) {
-          stepState.status = 'gate_pending';
-          const decision: FlowRunDecision = {
-            timestamp: nowIso(),
-            stepId: step.id,
-            action: 'blocked',
-            detail: 'Mutating gate requires --allow-write.',
-            requiresWrite: true
           };
           decisions.push(decision);
           await appendNdjson(ctx.decisionsPath, decision);
@@ -868,6 +906,10 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
           ctx.resolvedContext[`${step.id}_output`] = primaryOutputPath;
         }
 
+        if (result.contextUpdates || primaryOutputPath) {
+          await persistFlowRunInputs(ctx, args, effectiveInspectProviderScope);
+        }
+
         nextStepIndex = index + 1;
         continue;
       } catch (error) {
@@ -926,7 +968,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
     ...(nextStepIndex < args.definition.steps.length ? { nextResumeStepId: args.definition.steps[nextStepIndex].id } : {}),
     ...(nextStepIndex < args.definition.steps.length
       ? {
-          resumeCommand: `xyte-cli flow run ${args.flowId} --tenant ${args.tenantId} --apply --allow-write --inspect-provider-scope ${effectiveInspectProviderScope} --resume ${runId}`
+          resumeCommand: `xyte-cli flow run ${args.flowId} --tenant ${args.tenantId} --apply --inspect-provider-scope ${effectiveInspectProviderScope} --resume ${runId}`
         }
       : {}),
     steps,

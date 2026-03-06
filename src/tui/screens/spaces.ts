@@ -547,7 +547,7 @@ export function createSpacesScreen(): TuiScreen {
         }
       });
 
-      spaceTable.on('select item', (_item, index) => {
+      spaceTable.on('select item', (_item: unknown, index: number) => {
         if (shouldIgnoreSelectEvent(spaceSelectionSync)) {
           return;
         }

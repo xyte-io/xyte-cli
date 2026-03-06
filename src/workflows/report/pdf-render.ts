@@ -10,6 +10,7 @@ import {
   PDF_LAYOUT,
   drawBullets,
   drawEndOfReportDivider,
+  drawInsightPanelGrid,
   drawKpiGrid,
   drawPdfFooter,
   drawPdfHeader,
@@ -86,6 +87,205 @@ interface DeepDiveSummaryPlan {
   partnerHighlights: string[];
 }
 
+interface KpiCardPlan {
+  label: string;
+  value: string;
+  detail?: string;
+  tone?: 'normal' | 'warn' | 'bad';
+}
+
+interface InsightCardPlan {
+  eyebrow: string;
+  title: string;
+  body: string;
+  tone?: 'accent' | 'normal' | 'warn' | 'bad' | 'success';
+}
+
+interface DeepDiveOverviewPlan {
+  kpis: KpiCardPlan[];
+  insights: InsightCardPlan[];
+}
+
+interface DeepDiveSummaryMetrics {
+  totalDevices: number;
+  offlineDevices: number;
+  offlinePct: number;
+  totalIncidents: number;
+  activeIncidents: number;
+  activeIncidentPct: number;
+  totalTickets: number;
+  openTickets: number;
+  mismatches: number;
+}
+
+function parseDeepDiveSummaryMetrics(summary: string[]): DeepDiveSummaryMetrics {
+  const metrics: DeepDiveSummaryMetrics = {
+    totalDevices: 0,
+    offlineDevices: 0,
+    offlinePct: 0,
+    totalIncidents: 0,
+    activeIncidents: 0,
+    activeIncidentPct: 0,
+    totalTickets: 0,
+    openTickets: 0,
+    mismatches: 0
+  };
+
+  for (const line of summary) {
+    const deviceMatch = line.match(/^Devices:\s+(\d+)\s+total,\s+(\d+)\s+offline\s+\(([\d.]+)%\)\./i);
+    if (deviceMatch) {
+      metrics.totalDevices = Number.parseInt(deviceMatch[1], 10);
+      metrics.offlineDevices = Number.parseInt(deviceMatch[2], 10);
+      metrics.offlinePct = Number.parseFloat(deviceMatch[3]);
+      continue;
+    }
+
+    const incidentMatch = line.match(/^Incidents:\s+(\d+)\s+total,\s+(\d+)\s+active\s+\(([\d.]+)%\)\./i);
+    if (incidentMatch) {
+      metrics.totalIncidents = Number.parseInt(incidentMatch[1], 10);
+      metrics.activeIncidents = Number.parseInt(incidentMatch[2], 10);
+      metrics.activeIncidentPct = Number.parseFloat(incidentMatch[3]);
+      continue;
+    }
+
+    const ticketMatch = line.match(/^Tickets:\s+(\d+)\s+total,\s+(\d+)\s+open\./i);
+    if (ticketMatch) {
+      metrics.totalTickets = Number.parseInt(ticketMatch[1], 10);
+      metrics.openTickets = Number.parseInt(ticketMatch[2], 10);
+      continue;
+    }
+
+    const mismatchMatch = line.match(/^Data quality:\s+(\d+)\s+status mismatches detected\./i);
+    if (mismatchMatch) {
+      metrics.mismatches = Number.parseInt(mismatchMatch[1], 10);
+    }
+  }
+
+  return metrics;
+}
+
+function formatSpotlightDevice(value: string): string {
+  const compact = compactIdentifier(value);
+  return compact || 'n/a';
+}
+
+function shortenSpotlightTitle(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return 'n/a';
+  }
+  return trimmed.replace(/\s+\(.+\)$/, '');
+}
+
+export function buildDeepDiveOverviewPlan(deepDive: DeepDiveResult): DeepDiveOverviewPlan {
+  const metrics = parseDeepDiveSummaryMetrics(deepDive.summary);
+  const windowFocus = getWindowFocus(deepDive.windowHours);
+  const topOfflineSpace = deepDive.topOfflineSpaces[0];
+  const topIncidentDevice = deepDive.topIncidentDevices[0];
+  const overlapDevices = deepDive.ticketPosture.overlappingActiveIncidentDevices;
+  const churnTone: 'normal' | 'warn' | 'bad' =
+    deepDive.churn24h.incidents >= 10 ? 'bad' : deepDive.churn24h.incidents > 0 ? 'warn' : 'normal';
+  const dataQualityTone: 'normal' | 'warn' | 'bad' = metrics.mismatches > 0 ? 'warn' : 'normal';
+
+  const offlineTone: 'normal' | 'warn' | 'bad' =
+    metrics.offlinePct >= 45 ? 'bad' : metrics.offlinePct >= 20 ? 'warn' : 'normal';
+  const incidentTone: 'normal' | 'warn' | 'bad' =
+    metrics.activeIncidents >= 25 ? 'bad' : metrics.activeIncidents > 0 ? 'warn' : 'normal';
+  const ticketTone: 'normal' | 'warn' | 'bad' =
+    metrics.openTickets >= 10 ? 'bad' : metrics.openTickets > 0 ? 'warn' : 'normal';
+
+  const kpis: KpiCardPlan[] = [
+    {
+      label: 'Total devices',
+      value: String(metrics.totalDevices),
+      detail: metrics.totalDevices > 0 ? `${metrics.offlineDevices} currently offline` : 'No device inventory returned.'
+    },
+    {
+      label: 'Offline devices',
+      value: String(metrics.offlineDevices),
+      detail: `${metrics.offlinePct}% of fleet`,
+      tone: offlineTone
+    },
+    deepDive.topIncidentDevices.length > 0 || metrics.activeIncidents > 0
+      ? {
+          label: 'Active incidents',
+          value: String(metrics.activeIncidents),
+          detail: metrics.totalIncidents > 0 ? `${metrics.activeIncidentPct}% of incident volume` : 'No incident baseline returned.',
+          tone: incidentTone
+        }
+      : {
+          label: 'Report window',
+          value: `${deepDive.windowHours}h`,
+          detail: windowFocus.label,
+          tone: 'normal'
+        },
+    {
+      label: 'Open tickets',
+      value: String(metrics.openTickets),
+      detail: overlapDevices > 0 ? `${overlapDevices} devices overlap incidents` : 'No ticket overlap detected.',
+      tone: ticketTone
+    },
+    {
+      label: deepDive.windowHours <= 24 ? '24h churn' : 'Window churn',
+      value: String(deepDive.churn24h.incidents),
+      detail: `${deepDive.churn24h.devices} devices in ${deepDive.churn24h.spaces} spaces`,
+      tone: churnTone
+    },
+    {
+      label: 'Data quality',
+      value: String(metrics.mismatches),
+      detail: metrics.mismatches > 0 ? 'State mismatches detected' : 'No status mismatches',
+      tone: dataQualityTone
+    }
+  ];
+
+  const insights: InsightCardPlan[] = [
+    {
+      eyebrow: 'Focus',
+      title: windowFocus.label,
+      body: windowFocus.detail,
+      tone: 'accent'
+    },
+    topOfflineSpace
+      ? {
+          eyebrow: 'Space hotspot',
+          title: shortenSpotlightTitle(formatSpaceHierarchy(topOfflineSpace.space)),
+          body: `${topOfflineSpace.offlineDevices} offline devices, accounting for ${topOfflineSpace.shareOfOfflinePct}% of all offline inventory.`,
+          tone: topOfflineSpace.shareOfOfflinePct >= 50 ? 'bad' : 'warn'
+        }
+      : {
+          eyebrow: 'Space hotspot',
+          title: 'No offline concentration',
+          body: 'No single space is dominating the offline population in this snapshot.',
+          tone: 'success'
+        },
+    topIncidentDevice
+      ? {
+          eyebrow: 'Response posture',
+          title: formatSpotlightDevice(topIncidentDevice.device),
+          body:
+            topIncidentDevice.activeIncidents > 0
+              ? `${topIncidentDevice.activeIncidents} active incidents remain on the busiest device. ${metrics.openTickets} open tickets are still open overall, with ${overlapDevices} devices overlapping incidents and tickets.`
+              : `${topIncidentDevice.incidentCount} historical incidents on the busiest device. ${metrics.openTickets} tickets remain open overall, with ${overlapDevices} overlapping devices.`,
+          tone: overlapDevices > 0 || topIncidentDevice.activeIncidents > 0 ? 'warn' : 'normal'
+        }
+      : {
+          eyebrow: 'Data quality',
+          title: metrics.mismatches > 0 ? `${metrics.mismatches} mismatches need review` : 'No status mismatches detected',
+          body:
+            metrics.mismatches > 0
+              ? 'Device status and state disagree for part of the fleet. Review these before triage automation depends on them.'
+              : 'Status and state alignment is clean in this snapshot, so downstream triage can trust the operational posture.',
+          tone: metrics.mismatches > 0 ? 'warn' : 'success'
+        }
+  ];
+
+  return {
+    kpis,
+    insights
+  };
+}
+
 export function buildDeepDiveReportSectionPlan(deepDive: DeepDiveResult): DeepDiveReportSectionPlan {
   const includeIncidentSections =
     deepDive.topIncidentDevices.length > 0 ||
@@ -128,6 +328,7 @@ export function renderBrandedPdfReport(deepDive: DeepDiveResult, outputPath: str
     const sectionPlan = buildDeepDiveReportSectionPlan(deepDive);
     const windowLabel = formatWindowLabel(deepDive.windowHours);
     const summaryPlan = buildDeepDiveSummaryPlan(deepDive);
+    const overviewPlan = buildDeepDiveOverviewPlan(deepDive);
 
     const doc = new PDFDocument({
       size: 'A4',
@@ -160,18 +361,8 @@ export function renderBrandedPdfReport(deepDive: DeepDiveResult, outputPath: str
     doc.x = doc.page.margins.left;
     doc.y = PDF_LAYOUT.contentTopFirstPage;
 
-    const totalDevices = deepDive.summary.find((line) => line.startsWith('Devices:'))?.match(/^Devices:\s+(\d+)/)?.[1] ?? '0';
-    const kpiCards: Array<{ label: string; value: string; tone?: 'normal' | 'warn' | 'bad' }> = [{ label: 'Total devices', value: totalDevices }];
-    if (sectionPlan.includeIncidentSections) {
-      kpiCards.push({ label: 'Active incidents', value: String(deepDive.activeIncidentAging.length) });
-      kpiCards.push({ label: windowLabel, value: String(deepDive.churn24h.incidents) });
-    }
-    kpiCards.push({ label: 'Open tickets', value: String(deepDive.ticketPosture.openTickets) });
-    kpiCards.push({
-      label: 'Data mismatches',
-      value: String(deepDive.dataQuality.statusMismatches.length)
-    });
-    drawKpiGrid(doc, ctx, kpiCards);
+    drawKpiGrid(doc, ctx, overviewPlan.kpis);
+    drawInsightPanelGrid(doc, ctx, overviewPlan.insights);
 
     drawSectionTitle(doc, ctx, 'Executive Summary');
     drawBullets(doc, ctx, summaryPlan.executiveSummary);
@@ -196,7 +387,7 @@ export function renderBrandedPdfReport(deepDive: DeepDiveResult, outputPath: str
 
     if (sectionPlan.includeOfflineSpaces) {
       drawTable(doc, ctx, {
-        title: 'Top Spaces by Offline Devices',
+        title: 'Offline Device Concentration',
         columns: [
           { header: 'Space', width: 293, wrap: true },
           { header: 'Offline', width: 80, align: 'right', wrap: false },
@@ -213,7 +404,7 @@ export function renderBrandedPdfReport(deepDive: DeepDiveResult, outputPath: str
 
     if (sectionPlan.includeIncidentSections) {
       drawTable(doc, ctx, {
-        title: 'Top Devices by Incident Volume',
+        title: 'Incident Hotspots by Device',
         columns: [
           { header: 'Device', width: 293, wrap: true },
           { header: 'Incidents', width: 80, align: 'right', wrap: false },
@@ -228,7 +419,7 @@ export function renderBrandedPdfReport(deepDive: DeepDiveResult, outputPath: str
       });
 
       drawTable(doc, ctx, {
-        title: 'Active Incident Aging',
+        title: 'Aging Active Incidents',
         columns: [
           { header: 'Device', width: 94, wrap: true },
           { header: 'Space', width: 159, wrap: true },
@@ -246,7 +437,7 @@ export function renderBrandedPdfReport(deepDive: DeepDiveResult, outputPath: str
 
       if (deepDive.churn24h.bySpace.length > 0) {
         drawTable(doc, ctx, {
-          title: `${windowLabel} by Space`,
+          title: `${windowLabel} Churn by Space`,
           columns: [
             { header: 'Space', width: 333, wrap: true },
             { header: 'Incidents', width: 120, align: 'right', wrap: false }
@@ -259,7 +450,7 @@ export function renderBrandedPdfReport(deepDive: DeepDiveResult, outputPath: str
 
     if (sectionPlan.includeTicketTable) {
       drawTable(doc, ctx, {
-        title: 'Oldest Open Tickets',
+        title: 'Ticket Backlog',
         columns: [
           { header: 'Ticket', width: 78, wrap: false },
           { header: 'Title', width: 108, wrap: true },
@@ -280,7 +471,7 @@ export function renderBrandedPdfReport(deepDive: DeepDiveResult, outputPath: str
 
     if (sectionPlan.includeDataQualitySection) {
       drawTable(doc, ctx, {
-        title: 'Data Quality: Status Mismatches',
+        title: 'Data Quality Mismatches',
         columns: [
           { header: 'Device', width: 74, wrap: true },
           { header: 'Status', width: 70, wrap: false },

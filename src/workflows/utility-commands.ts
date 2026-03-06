@@ -108,6 +108,24 @@ async function listSpacesByParent(client: XyteClient, tenantId: string, parentId
   return results;
 }
 
+async function resolveRootSpaceId(client: XyteClient, tenantId: string): Promise<number> {
+  const response = await client.callWithMeta('organization.spaces.getSpaces', {
+    tenantId,
+    query: {
+      space_type: 'root',
+      page: 1,
+      per_page: 100
+    }
+  });
+  const items = extractItemsFromSpacesResponse(response.data as unknown);
+  const root = items.find((item) => item.parent_id === null || item.parent_id === undefined) ?? items[0];
+  const rootId = root ? parseSpaceId(root.id) : undefined;
+  if (rootId === undefined) {
+    throw new Error('Unable to resolve root space for import-tree.');
+  }
+  return rootId;
+}
+
 export async function runSpaceImportTree(args: {
   client: XyteClient;
   tenantId: string;
@@ -124,8 +142,8 @@ export async function runSpaceImportTree(args: {
   const pathField = args.pathField ?? 'path';
   const spaceTypeField = args.spaceTypeField ?? 'space_type';
   const configField = args.configField ?? 'config';
-  const rootParentId = 1;
   const resolvedSpaceCache = new Map<string, number>();
+  let resolvedRootSpaceId: number | undefined;
 
   const ensureSpace = async (params: {
     tenantId: string;
@@ -243,7 +261,10 @@ export async function runSpaceImportTree(args: {
       },
       execute: async (_client, tenantId) => {
         const preparedRow = prepare();
-        let parentId = rootParentId;
+        if (resolvedRootSpaceId === undefined) {
+          resolvedRootSpaceId = await resolveRootSpaceId(args.client, tenantId);
+        }
+        let parentId = resolvedRootSpaceId;
         for (let segmentIndex = 0; segmentIndex < preparedRow.segments.length; segmentIndex += 1) {
           const segment = preparedRow.segments[segmentIndex];
           const isLeaf = segmentIndex === preparedRow.segments.length - 1;

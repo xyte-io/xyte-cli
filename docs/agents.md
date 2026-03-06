@@ -5,7 +5,7 @@
 1. Install skill bundle once in your workspace:
 
 ```bash
-xyte-cli install --skills
+xyte-cli init
 ```
 
 2. Prompt your coding agent to run `xyte-cli` commands directly.
@@ -43,21 +43,21 @@ Detailed workflow authoring guide:
 ### Claude
 
 ```bash
-xyte-cli install --skills
+xyte-cli init
 claude
 ```
 
 ### Codex
 
 ```bash
-xyte-cli install --skills
+xyte-cli init
 # in prompts, ask Codex to run xyte-cli commands directly
 ```
 
 ### GitHub Copilot
 
 ```bash
-xyte-cli install --skills
+xyte-cli init
 # in prompts, ask Copilot to run xyte-cli commands directly
 ```
 

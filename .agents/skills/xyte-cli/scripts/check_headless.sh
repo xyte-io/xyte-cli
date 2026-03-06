@@ -35,7 +35,7 @@ trap 'rm -rf "$TMP_CFG"' EXIT
 
 PASS_COUNT=0
 for screen in "${SCREENS[@]}"; do
-  cmd=("$RUN_CLI" tui --headless --screen "$screen" --format json --once --no-motion)
+  cmd=("$RUN_CLI" ops console --headless --screen "$screen" --output json --once --no-motion)
   if [[ -n "$TENANT_ID" ]]; then
     cmd+=(--tenant "$TENANT_ID")
   fi

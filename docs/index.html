@@ -6,7 +6,7 @@
     <title>xyte-cli | Deterministic Xyte operations for teams and AI agents</title>
     <meta
       name="description"
-      content="Install xyte-cli, add agent skills, connect a tenant key, watch incidents, and export shareable reports with explicit command guardrails."
+      content="Install xyte-cli, connect a tenant key, inspect fleet state, run console workflows, and export shareable reports with direct commands."
     />
     <link rel="icon" href="./media/xyte-logo.jpg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -240,7 +240,6 @@
       .section-card,
       .workflow-card,
       .docs-card,
-      .video-shell,
       .install-shell,
       .disclosure,
       .final-card {
@@ -767,168 +766,6 @@
         font-size: 11px;
       }
 
-      .video-shell {
-        border-radius: var(--radius-l);
-        padding: 26px;
-      }
-
-      .video-layout {
-        display: grid;
-        grid-template-columns: minmax(280px, 0.75fr) minmax(0, 1.25fr);
-        gap: 20px;
-      }
-
-      .video-rail {
-        display: grid;
-        gap: 10px;
-        align-content: start;
-      }
-
-      .video-step {
-        width: 100%;
-        text-align: left;
-        border: 1px solid var(--line);
-        background: rgba(255, 255, 255, 0.76);
-        border-radius: 22px;
-        padding: 16px;
-        cursor: pointer;
-        transition:
-          transform 180ms ease,
-          border-color 180ms ease,
-          background 180ms ease,
-          box-shadow 180ms ease;
-      }
-
-      .video-step:hover {
-        transform: translateY(-1px);
-        border-color: var(--line-strong);
-        background: rgba(255, 255, 255, 0.78);
-      }
-
-      .video-step.is-active {
-        background: linear-gradient(180deg, rgba(79, 116, 168, 0.12), rgba(255, 255, 255, 0.86));
-        border-color: rgba(79, 116, 168, 0.32);
-        box-shadow: 0 14px 28px rgba(79, 116, 168, 0.08);
-      }
-
-      .video-step-number {
-        display: inline-flex;
-        margin-bottom: 10px;
-        font-family: var(--font-mono);
-        font-size: 11px;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: var(--ink-faint);
-      }
-
-      .video-step strong {
-        display: block;
-        font-size: 16px;
-      }
-
-      .video-step span:last-child {
-        display: block;
-        margin-top: 6px;
-        color: var(--ink-soft);
-        font-size: 14px;
-      }
-
-      .video-stage {
-        border: 1px solid rgba(24, 38, 58, 0.08);
-        border-radius: 28px;
-        background: rgba(255, 255, 255, 0.78);
-        padding: 18px;
-        display: grid;
-        gap: 16px;
-      }
-
-      .video-stage-top {
-        display: flex;
-        justify-content: space-between;
-        gap: 14px;
-        align-items: start;
-      }
-
-      .video-stage-copy h3 {
-        font-size: 30px;
-        letter-spacing: -0.05em;
-      }
-
-      .video-stage-copy p {
-        margin: 10px 0 0;
-        color: var(--ink-soft);
-      }
-
-      .video-badge {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 62px;
-        padding: 10px 12px;
-        border-radius: 16px;
-        background: rgba(255, 255, 255, 0.76);
-        border: 1px solid var(--line);
-        font-family: var(--font-mono);
-        font-size: 11px;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--accent-strong);
-      }
-
-      .video-stage-meta {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
-      }
-
-      .video-stage-meta div {
-        padding: 14px;
-        border-radius: 18px;
-        background: rgba(255, 255, 255, 0.82);
-        border: 1px solid rgba(24, 38, 58, 0.08);
-      }
-
-      .video-stage-meta dt {
-        margin: 0;
-        font-family: var(--font-mono);
-        font-size: 10px;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: var(--ink-faint);
-      }
-
-      .video-stage-meta dd {
-        margin: 8px 0 0;
-        color: var(--ink);
-        font-size: 14px;
-      }
-
-      .video-player-shell {
-        position: relative;
-        border-radius: 24px;
-        overflow: hidden;
-        background: #0f1b2b;
-        border: 1px solid rgba(24, 38, 58, 0.08);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-      }
-
-      .video-player-shell::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        background:
-          radial-gradient(circle at top left, rgba(125, 161, 212, 0.28), transparent 32%),
-          linear-gradient(180deg, transparent, rgba(12, 20, 34, 0.08));
-      }
-
-      .video-player-shell video {
-        width: 100%;
-        display: block;
-        aspect-ratio: 16 / 10;
-        background: #101927;
-      }
-
       .docs-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1050,8 +887,7 @@
 
       @media (max-width: 1100px) {
         .hero-layout,
-        .install-shell,
-        .video-layout {
+        .install-shell {
           grid-template-columns: 1fr;
         }
 
@@ -1077,7 +913,6 @@
 
         .hero-copy,
         .hero-panel,
-        .video-shell,
         .install-shell,
         .final-card {
           padding: 22px;
@@ -1095,8 +930,7 @@
         .proof-strip,
         .workflow-grid,
         .docs-grid,
-        .meta-grid,
-        .video-stage-meta {
+        .meta-grid {
           grid-template-columns: 1fr;
         }
 
@@ -1105,13 +939,8 @@
         }
 
         .section-head h2,
-        .final-copy h2,
-        .video-stage-copy h3 {
+        .final-copy h2 {
           font-size: clamp(1.9rem, 8vw, 2.6rem);
-        }
-
-        .video-stage-top {
-          flex-direction: column;
         }
       }
 
@@ -1147,7 +976,6 @@
         <nav class="nav-links" aria-label="Primary">
           <a href="#install">Install</a>
           <a href="#how-it-works">Workflow</a>
-          <a href="#videos">Clips</a>
           <a href="#docs">Docs</a>
         </nav>
 
@@ -1160,10 +988,10 @@
         <div class="wrap hero-layout">
           <article class="hero-copy reveal">
             <p class="eyebrow">Xyte operations for teams and AI agents</p>
-            <h1>Install once. Operate with <em>guardrails</em>.</h1>
+            <h1>Install once. Operate with <em>clarity</em>.</h1>
             <p class="hero-lead">
-              <code>@xyteai/cli</code> gives evaluators a direct path from npm install to incident watch, deep-dive
-              export, and PDF handoff, without hiding the actual commands behind a black box.
+              <code>@xyteai/cli</code> gives teams a direct path from install to setup, inspection, console use, and
+              report export without hiding the real commands behind a black box.
             </p>
 
             <div class="hero-actions">
@@ -1180,7 +1008,7 @@
               <div class="proof-item">
                 <span class="proof-label">Safety</span>
                 <strong>Read flows stay easy. Writes stay explicit.</strong>
-                <span>Write endpoints require extra flags instead of silent mutation.</span>
+                <span>Human gates still separate plan mode from write execution.</span>
               </div>
               <div class="proof-item">
                 <span class="proof-label">Contracts</span>
@@ -1195,16 +1023,16 @@
             </div>
           </article>
 
-          <aside class="hero-panel reveal" aria-label="Evaluation path">
+          <aside class="hero-panel reveal" aria-label="Public rollout path">
             <div class="panel-topline">
-              <span class="panel-kicker">Evaluation path</span>
+              <span class="panel-kicker">Public rollout</span>
               <span class="panel-pill">Install-first</span>
             </div>
 
-            <h2 class="panel-title">Reach a real first run in four moves.</h2>
+            <h2 class="panel-title">Reach operational value in four moves.</h2>
             <p class="panel-lead">
-              The homepage stays focused on the fast evaluator path. Deep docs remain available, but the first screen
-              shows what happens before and after the install.
+              The landing page stays focused on the real first-run path. Deep docs remain available, but the first
+              screen shows what happens before and after install.
             </p>
 
             <ol class="path-list">
@@ -1233,7 +1061,7 @@
                 <span class="path-step">04</span>
                 <span class="path-copy">
                   <strong>Run watch plus report</strong>
-                  <span>Capture incidents, export deep-dive JSON, and produce a shareable PDF handoff.</span>
+                  <span>Inspect the fleet, export deep-dive JSON, and produce a shareable PDF handoff.</span>
                 </span>
               </li>
             </ol>
@@ -1266,8 +1094,9 @@
             <p class="eyebrow">Install</p>
             <h2 id="install-title">Start with a short, credible path to value.</h2>
             <p>
-              Lead with the core install commands, then connect the tenant key, verify readiness, and move into watch
-              or reporting flows. The commands stay visible so evaluators can judge what the tool is actually doing.
+              Lead with the core install commands, then connect the tenant key, verify readiness, and move into
+              inspection, console, or reporting flows. The commands stay visible so users can judge what the tool is
+              actually doing.
             </p>
           </header>
 
@@ -1277,7 +1106,7 @@
                 <p class="card-label">Core install</p>
                 <div class="command-shell">
                   <pre id="install-snippet"><code>npm install -g @xyteai/cli@latest
-xyte-cli install --skills
+xyte-cli init
 xyte-cli --version</code></pre>
                 </div>
                 <div class="action-row">
@@ -1305,7 +1134,7 @@ xyte-cli --version</code></pre>
                   <li>
                     <strong>Check readiness in JSON.</strong>
                     <span>Read the tenant context back out before moving into watch or reporting commands.</span>
-                    <span class="detail-code">xyte-cli setup status --format json</span>
+                    <span class="detail-code">xyte-cli setup status --output json</span>
                   </li>
                 </ul>
               </article>
@@ -1313,7 +1142,8 @@ xyte-cli --version</code></pre>
 
             <div class="install-notes">
               <article class="section-card">
-                <p class="card-label">What evaluators should see</p>
+                <p class="card-label">What public users should see</p>
+                
                 <ul class="mini-list">
                   <li>
                     <strong>Install does not hide the real commands.</strong>
@@ -1321,7 +1151,7 @@ xyte-cli --version</code></pre>
                   </li>
                   <li>
                     <strong>Read-oriented workflows are the first experience.</strong>
-                    <span>Incident watch, deep-dive export, and PDF reporting are the lead use cases.</span>
+                    <span>Inspection, deep-dive export, console access, and PDF reporting are the lead use cases.</span>
                   </li>
                   <li>
                     <strong>Advanced reference still exists.</strong>
@@ -1333,10 +1163,12 @@ xyte-cli --version</code></pre>
               <article class="section-card">
                 <p class="card-label">Next commands</p>
                 <div class="command-shell">
-                  <pre><code>xyte-cli watch --tenant &lt;tenant-id&gt; --profile incidents-active --once
-xyte-cli inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --format json &gt; deep-dive.json
-xyte-cli report generate --tenant &lt;tenant-id&gt; --input deep-dive.json --out fleet-report.pdf</code></pre>
+                  <pre><code>xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-active --once
+xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json &gt; deep-dive.json
+xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input deep-dive.json --out fleet-report.pdf
+xyte-cli ops console --screen dashboard</code></pre>
                 </div>
+                <p class="card-caption">Terminal watch is human-readable by default. Agents should add <code>--strict-json</code>.</p>
               </article>
             </div>
           </div>
@@ -1356,21 +1188,20 @@ xyte-cli report generate --tenant &lt;tenant-id&gt; --input deep-dive.json --out
 
 Rules:
 - Never print secrets.
-- Do not use --allow-write.
 - Do not invent IDs or outputs.
 
 Run:
 npm install -g @xyteai/cli@latest
-xyte-cli install --skills
+xyte-cli init
 
 Then ask me for XYTE_CLI_KEY and run:
 XYTE_CLI_KEY="&lt;key&gt;" xyte-cli setup run --non-interactive --connectivity auto
-xyte-cli setup status --format json
+xyte-cli setup status --output json
 
 Read tenantId from setup status and continue:
-xyte-cli watch --tenant &lt;tenant-id&gt; --profile incidents-active --once
-xyte-cli inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --format json &gt; deep-dive.json
-xyte-cli report generate --tenant &lt;tenant-id&gt; --input deep-dive.json --out fleet-report.pdf
+xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-active --once --strict-json
+xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json &gt; deep-dive.json
+xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input deep-dive.json --out fleet-report.pdf
 
 Finish with:
 - concise success/failure summary
@@ -1400,7 +1231,7 @@ Finish with:
             <h2 id="how-title">Keep the operator path explicit from start to handoff.</h2>
             <p>
               The product story is not just “there is a CLI.” It is a repeatable path: install, prepare the agent
-              environment, connect safely, then move into incident visibility and reportable artifacts.
+              environment, connect safely, then move into inspection, console workflows, and reportable artifacts.
             </p>
           </header>
 
@@ -1409,42 +1240,27 @@ Finish with:
               <span class="workflow-step">01</span>
               <h3>Install for people and agents</h3>
               <p>Use the npm package directly, then install skills for Codex, Claude, and Copilot in the same workspace.</p>
-              <code>xyte-cli install --skills</code>
+              <code>xyte-cli init</code>
             </article>
             <article class="workflow-card">
               <span class="workflow-step">02</span>
               <h3>Connect tenant context once</h3>
               <p>Use setup status as the explicit contract for readiness instead of assuming hidden local state.</p>
-              <code>xyte-cli setup status --format json</code>
+              <code>xyte-cli setup status --output json</code>
             </article>
             <article class="workflow-card">
               <span class="workflow-step">03</span>
-              <h3>Inspect incidents without surprise writes</h3>
-              <p>Start with watch and inspection flows so evaluators understand the read-first posture before any mutation.</p>
-              <code>xyte-cli watch --profile incidents-active --once</code>
+              <h3>Inspect the fleet before changing it</h3>
+              <p>Start with inspection and console flows so users understand the read-first posture before any mutation.</p>
+              <code>xyte-cli ops inspect fleet --output json</code>
             </article>
             <article class="workflow-card">
               <span class="workflow-step">04</span>
               <h3>Produce artifacts other teams can consume</h3>
               <p>Deep-dive JSON and PDF reports make the workflow useful outside the terminal, not just inside it.</p>
-              <code>xyte-cli report generate ...</code>
+              <code>xyte-cli ops report generate ...</code>
             </article>
           </div>
-        </div>
-      </section>
-
-      <section class="section" id="videos" aria-labelledby="videos-title">
-        <div class="wrap section-shell">
-          <header class="section-head reveal">
-            <p class="eyebrow">Workflow clips</p>
-            <h2 id="videos-title">See the evaluator flow without turning the page into a video wall.</h2>
-            <p>
-              The story clips stay in the site, but the presentation is tighter: one active stage, lightweight step
-              selection, and lazy-loaded media only when the section is actually in view.
-            </p>
-          </header>
-
-          <div id="featured-videos" class="video-shell reveal" aria-live="polite"></div>
         </div>
       </section>
 
@@ -1455,7 +1271,7 @@ Finish with:
             <h2 id="docs-title">Reference without the clutter.</h2>
             <p>
               Keep the landing page lean. Use the docs grid for setup detail, command behavior, flow authoring, and
-              schema contracts once the evaluator wants depth.
+              schema contracts once someone wants depth.
             </p>
           </header>
 
@@ -1467,7 +1283,7 @@ Finish with:
             </a>
             <a class="docs-card" href="./commands.md">
               <strong>Commands reference</strong>
-              <p>Exact command behavior, guardrails, flags, and operator-facing examples.</p>
+              <p>Exact command behavior, operator-facing examples, and workflow patterns.</p>
               <span>Open commands</span>
             </a>
             <a class="docs-card" href="./agents.md">
@@ -1498,7 +1314,7 @@ Finish with:
         <div class="wrap">
           <div class="final-card reveal">
             <div class="final-copy">
-              <h2>Evaluate the CLI quickly. Keep the deeper material close.</h2>
+              <h2>Start quickly. Keep the deeper material close.</h2>
               <p>
                 The homepage now leads with install and operational credibility, while the docs remain one click away
                 for teams that need exact command semantics, flow definitions, or contract schemas.
@@ -1526,61 +1342,6 @@ Finish with:
 
     <script>
       (function () {
-        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        const inlineFeaturedVideos = [
-          {
-            id: 'Codex01InstallCli',
-            slug: '01-install-cli',
-            title: 'Install XYTE CLI',
-            prompt: 'Hey, install @xyteai/cli and make sure it runs.',
-            command: 'npm install -g @xyteai/cli@latest && xyte-cli --version',
-            gif: './assets/videos/01-install-cli.gif',
-            mp4: './assets/videos/01-install-cli.mp4',
-            focus: 'Get the CLI available globally in one command.'
-          },
-          {
-            id: 'Codex02InstallSkills',
-            slug: '02-install-skills',
-            title: 'Install Agent Skills',
-            prompt: 'Set this workspace up for AI agents.',
-            command: 'xyte-cli install --skills',
-            gif: './assets/videos/02-install-skills.gif',
-            mp4: './assets/videos/02-install-skills.mp4',
-            focus: 'Install Codex, Claude, and Copilot skill scaffolding.'
-          },
-          {
-            id: 'Codex03ConnectApiKey',
-            slug: '03-connect-api-key',
-            title: 'Connect with API Key',
-            prompt: 'Connect to my account using this API key.',
-            command: 'XYTE_CLI_KEY=<key> xyte-cli setup run --non-interactive && xyte-cli setup status --format json',
-            gif: './assets/videos/03-connect-api-key.gif',
-            mp4: './assets/videos/03-connect-api-key.mp4',
-            focus: 'Use tenant-bound setup, then confirm readiness in JSON.'
-          },
-          {
-            id: 'Codex06WatchIncidents',
-            slug: '06-watch-incidents',
-            title: 'Incident Snapshot Watch',
-            prompt: 'Watch active incidents now.',
-            command: 'xyte-cli watch --tenant <tenant-id> --profile incidents-active --once',
-            gif: './assets/videos/06-watch-incidents.gif',
-            mp4: './assets/videos/06-watch-incidents.mp4',
-            focus: 'Capture a deterministic incident snapshot without opening the write path.'
-          },
-          {
-            id: 'Codex09WeeklyPdfReport',
-            slug: '09-weekly-pdf-report',
-            title: 'Export PDF Report',
-            prompt: 'Generate a fleet PDF report I can share with leadership.',
-            command:
-              'xyte-cli inspect deep-dive --tenant <tenant-id> --window 24 --format json > deep-dive.json && xyte-cli report generate --tenant <tenant-id> --input deep-dive.json --out fleet-report.pdf',
-            gif: './assets/videos/09-weekly-pdf-report.gif',
-            mp4: './assets/videos/09-weekly-pdf-report.mp4',
-            focus: 'Turn captured fleet and incident data into a shareable PDF handoff.'
-          }
-        ];
-
         function wireCopyButtons() {
           const buttons = document.querySelectorAll('[data-copy-target]');
           buttons.forEach((button) => {
@@ -1605,144 +1366,7 @@ Finish with:
           });
         }
 
-        async function loadFeaturedVideos() {
-          if (window.location.protocol === 'file:') {
-            return inlineFeaturedVideos;
-          }
-
-          const candidates = ['./assets/videos/featured-videos.json', 'assets/videos/featured-videos.json'];
-          for (const url of candidates) {
-            try {
-              const response = await fetch(url, { cache: 'no-store' });
-              if (!response.ok) continue;
-              const json = await response.json();
-              if (Array.isArray(json) && json.length > 0) {
-                return json;
-              }
-            } catch (error) {
-              // Try the next path.
-            }
-          }
-
-          return inlineFeaturedVideos;
-        }
-
-        function renderVideoShowcase(items) {
-          const root = document.getElementById('featured-videos');
-          if (!root || !Array.isArray(items) || items.length === 0) return;
-
-          root.innerHTML = [
-            '<div class="video-layout">',
-            '  <div class="video-rail" id="video-rail"></div>',
-            '  <article class="video-stage">',
-            '    <div class="video-stage-top">',
-            '      <div class="video-stage-copy">',
-            '        <h3 id="video-title"></h3>',
-            '        <p id="video-focus"></p>',
-            '      </div>',
-            '      <div class="video-badge" id="video-badge">Step 01</div>',
-            '    </div>',
-            '    <dl class="video-stage-meta">',
-            '      <div><dt>Prompt</dt><dd id="video-prompt"></dd></div>',
-            '      <div><dt>Command</dt><dd id="video-command"></dd></div>',
-            '    </dl>',
-            '    <div class="video-player-shell">',
-            '      <video id="video-player" controls muted loop playsinline preload="none"></video>',
-            '    </div>',
-            '  </article>',
-            '</div>'
-          ].join('');
-
-          const rail = document.getElementById('video-rail');
-          const title = document.getElementById('video-title');
-          const focus = document.getElementById('video-focus');
-          const prompt = document.getElementById('video-prompt');
-          const command = document.getElementById('video-command');
-          const badge = document.getElementById('video-badge');
-          const player = document.getElementById('video-player');
-          if (!rail || !title || !focus || !prompt || !command || !badge || !player) return;
-
-          let activeIndex = 0;
-          let stageLoaded = false;
-
-          const buttons = items.map((item, index) => {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'video-step';
-            button.innerHTML =
-              '<span class="video-step-number">Step ' +
-              String(index + 1).padStart(2, '0') +
-              '</span>' +
-              '<strong>' +
-              item.title +
-              '</strong>' +
-              '<span>' +
-              item.focus +
-              '</span>';
-            button.addEventListener('click', () => {
-              activeIndex = index;
-              updateActiveState();
-              syncStage();
-            });
-            rail.appendChild(button);
-            return button;
-          });
-
-          function setVideoSource(item) {
-            player.poster = item.gif;
-            if (!stageLoaded) {
-              player.removeAttribute('src');
-              player.load();
-              return;
-            }
-
-            if (player.getAttribute('src') !== item.mp4) {
-              player.pause();
-              player.setAttribute('src', item.mp4);
-              player.load();
-            }
-
-            if (!reducedMotion) {
-              player.play().catch(() => {});
-            }
-          }
-
-          function updateActiveState() {
-            buttons.forEach((button, index) => {
-              const active = index === activeIndex;
-              button.classList.toggle('is-active', active);
-              button.setAttribute('aria-pressed', active ? 'true' : 'false');
-            });
-          }
-
-          function syncStage() {
-            const item = items[activeIndex];
-            title.textContent = item.title;
-            focus.textContent = item.focus;
-            prompt.textContent = item.prompt;
-            command.textContent = item.command;
-            badge.textContent = 'Step ' + String(activeIndex + 1).padStart(2, '0');
-            setVideoSource(item);
-          }
-
-          const observer = new IntersectionObserver(
-            (entries) => {
-              entries.forEach((entry) => {
-                if (!entry.isIntersecting || stageLoaded) return;
-                stageLoaded = true;
-                syncStage();
-              });
-            },
-            { threshold: 0.35 }
-          );
-
-          observer.observe(root);
-          updateActiveState();
-          syncStage();
-        }
-
         wireCopyButtons();
-        loadFeaturedVideos().then(renderVideoShowcase);
       })();
     </script>
   </body>

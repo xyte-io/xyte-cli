@@ -5,14 +5,14 @@ Use this prompt with an external AI assistant. The AI must only prepare files. I
 ## Prompt
 
 ```text
-You are preparing input files for xyte-cli utility execution.
+You are preparing input files for xyte-cli util execution.
 Do not execute any CLI commands. Only write output files.
 
 Input source:
 <provide source file path or pasted hierarchy data>
 
 Action contract:
-<paste JSON from `xyte-cli utility prepare --action space.import-tree ...`>
+<paste JSON from `xyte-cli util prepare --action space.import-tree ...`>
 
 Target outputs (required):
 1) artifacts.primary

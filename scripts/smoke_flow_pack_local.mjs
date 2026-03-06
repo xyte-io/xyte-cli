@@ -1,17 +1,18 @@
 #!/usr/bin/env node
 
 import { spawn } from 'node:child_process';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
-import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 
-const XYTE_COMMAND = process.platform === 'win32' ? 'xyte-cli.cmd' : './bin/xyte-cli';
-const DEFAULT_TENANT = 'local3000';
+const NPM_COMMAND = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const XYTE_COMMAND = process.platform === 'win32' ? 'xyte-cli.cmd' : 'xyte-cli';
 
 function parseArgs(argv) {
   const parsed = {
-    tenant: DEFAULT_TENANT,
+    tenant: 'local-flow',
+    baseUrl: 'http://127.0.0.1:3001',
     skipBuild: false,
     skipTest: false
   };
@@ -20,6 +21,11 @@ function parseArgs(argv) {
     const token = argv[index];
     if (token === '--tenant') {
       parsed.tenant = argv[index + 1] ?? parsed.tenant;
+      index += 1;
+      continue;
+    }
+    if (token === '--base-url') {
+      parsed.baseUrl = argv[index + 1] ?? parsed.baseUrl;
       index += 1;
       continue;
     }
@@ -35,11 +41,11 @@ function parseArgs(argv) {
   return parsed;
 }
 
-function runCommand(command, args) {
+function runCommand(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
-      cwd: process.cwd(),
-      env: process.env,
+      cwd: options.cwd ?? process.cwd(),
+      env: options.env ?? process.env,
       stdio: ['ignore', 'pipe', 'pipe']
     });
 
@@ -67,6 +73,7 @@ function parseJsonSafe(raw) {
   if (!trimmed) {
     return null;
   }
+
   try {
     return JSON.parse(trimmed);
   } catch {
@@ -82,7 +89,16 @@ function parseJsonSafe(raw) {
       }
     }
   }
+
   return null;
+}
+
+function parseNdjson(raw) {
+  return String(raw ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
 }
 
 function parseEnvelopeUpstreamError(result) {
@@ -118,22 +134,6 @@ function parseEnvelopeStatus(result) {
 }
 
 export function classifyStep(stepId, result, context = {}) {
-  const combined = `${result.stdout}\n${result.stderr}`;
-
-  if (stepId === 'send_command_guard_missing_allowwrite') {
-    if (result.code !== 0 && combined.includes('--allow-write')) {
-      return { status: 'pass', reason: 'Expected write guard rejection observed.' };
-    }
-    return { status: 'fail', reason: 'Expected --allow-write guard rejection was not observed.' };
-  }
-
-  if (stepId === 'close_incident_guard_missing_confirm') {
-    if (result.code !== 0 && combined.includes('--confirm organization.incidents.closeIncident')) {
-      return { status: 'pass', reason: 'Expected destructive confirm guard rejection observed.' };
-    }
-    return { status: 'fail', reason: 'Expected --confirm guard rejection was not observed.' };
-  }
-
   if (stepId === 'send_command_write') {
     if (result.code === 0) {
       return { status: 'pass', reason: 'Command dispatch succeeded.' };
@@ -147,21 +147,6 @@ export function classifyStep(stepId, result, context = {}) {
       };
     }
     return { status: 'fail', reason: 'Command dispatch failed with unexpected error.' };
-  }
-
-  if (stepId === 'claim_device_write') {
-    if (result.code === 0) {
-      return { status: 'pass', reason: 'Claim device succeeded.' };
-    }
-    const upstreamError = parseEnvelopeUpstreamError(result);
-    const envelopeStatus = parseEnvelopeStatus(result);
-    if (envelopeStatus === 422 && /no device found/i.test(upstreamError)) {
-      return {
-        status: 'pass',
-        reason: 'Endpoint reachable; claim probe indicates no claimable candidate in current dataset.'
-      };
-    }
-    return { status: 'fail', reason: 'Claim device failed with unexpected error.' };
   }
 
   if (stepId === 'update_device_verify') {
@@ -187,35 +172,19 @@ export function classifyStep(stepId, result, context = {}) {
   return { status: 'fail', reason: result.stderr.trim() || 'Command failed.' };
 }
 
-async function runStep(steps, id, command, args, context = {}) {
-  const startedAt = Date.now();
-  const result = await runCommand(command, args);
-  const endedAt = Date.now();
-  const classification = classifyStep(id, result, context);
-  steps.push({
-    id,
-    command,
-    args,
-    code: result.code,
-    durationMs: endedAt - startedAt,
-    stdout: result.stdout,
-    stderr: result.stderr,
-    status: classification.status,
-    reason: classification.reason
-  });
-  return result;
+function ensure(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
 }
 
-function getFirstIncidentAndDeviceFromWatch(raw) {
-  const payload = parseJsonSafe(raw);
-  if (!payload || typeof payload !== 'object') {
-    return {};
-  }
-  const item = Array.isArray(payload.items) ? payload.items[0] : undefined;
-  return {
-    incidentId: typeof item?.uuid === 'string' ? item.uuid : undefined,
-    deviceId: typeof item?.device_id === 'string' ? item.device_id : undefined
-  };
+function pushStep(steps, id, status, reason, extra = {}) {
+  steps.push({
+    id,
+    status,
+    reason,
+    ...extra
+  });
 }
 
 function renderSummary(steps) {
@@ -227,6 +196,7 @@ function renderSummary(steps) {
   for (const step of steps) {
     totals[step.status] += 1;
   }
+
   const lines = [
     '',
     'Flow-Pack Local Smoke Summary',
@@ -234,375 +204,172 @@ function renderSummary(steps) {
     ''
   ];
   for (const step of steps) {
-    lines.push(
-      `${step.id.padEnd(38)} ${step.status.toUpperCase().padEnd(4)} code=${String(step.code).padEnd(3)} time=${step.durationMs}ms  ${step.reason}`
-    );
+    lines.push(`${step.id.padEnd(34)} ${step.status.toUpperCase().padEnd(4)} ${step.reason}`);
   }
   return lines.join('\n');
 }
 
+async function resetMock(baseUrl) {
+  const response = await fetch(`${baseUrl}/_mock/reset`, {
+    method: 'POST'
+  });
+  ensure(response.ok, `Failed to reset mock server (${response.status}).`);
+}
+
+async function getMockState(baseUrl) {
+  const response = await fetch(`${baseUrl}/_mock/state`);
+  ensure(response.ok, `Failed to read mock state (${response.status}).`);
+  return await response.json();
+}
+
+async function runChecked(command, args, options = {}) {
+  const result = await runCommand(command, args, options);
+  if (result.code !== 0) {
+    const detail = [
+      `${command} ${args.join(' ')}`,
+      result.stdout.trim() ? `stdout:\n${result.stdout.trim()}` : '',
+      result.stderr.trim() ? `stderr:\n${result.stderr.trim()}` : ''
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+    throw new Error(detail);
+  }
+  return result;
+}
+
+async function runFlow(env, outDir, flowId, extraArgs = []) {
+  const args = ['flow', 'run', flowId, '--tenant', env.XYTE_FLOW_TENANT, '--out-dir', outDir, '--strict-json', ...extraArgs];
+  const result = await runChecked(XYTE_COMMAND, args, { env });
+  const payload = parseJsonSafe(result.stdout);
+  ensure(payload?.schemaVersion === 'xyte.flow.run.v1', `Unexpected flow output for ${flowId}.`);
+  return payload;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const runId = Date.now();
-  const outDir = path.join(tmpdir(), `xyte-flow-pack-smoke-${runId}`);
+  const root = mkdtempSync(path.join(tmpdir(), 'xyte-flow-pack-smoke-'));
+  const configDir = path.join(root, 'config');
+  const outDir = path.join(root, 'flow-runs');
+  mkdirSync(configDir, { recursive: true });
   mkdirSync(outDir, { recursive: true });
+
+  const env = {
+    ...process.env,
+    XYTE_CLI_CONFIG_DIR: configDir,
+    XYTE_FLOW_TENANT: args.tenant
+  };
+
   const steps = [];
 
   if (!args.skipBuild) {
-    await runStep(steps, 'build', process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'build']);
+    await runChecked(NPM_COMMAND, ['run', 'build'], { env });
+    pushStep(steps, 'build', 'pass', 'npm run build completed.');
   }
+
   if (!args.skipTest) {
-    await runStep(steps, 'test', process.platform === 'win32' ? 'npm.cmd' : 'npm', ['test']);
+    await runChecked(NPM_COMMAND, ['test'], { env });
+    pushStep(steps, 'test', 'pass', 'npm test completed.');
   }
 
-  await runStep(steps, 'setup_status', XYTE_COMMAND, ['setup', 'status', '--tenant', args.tenant, '--format', 'json']);
-  await runStep(steps, 'config_doctor', XYTE_COMMAND, ['config', 'doctor', '--tenant', args.tenant, '--format', 'json']);
-  await runStep(steps, 'status_fast', XYTE_COMMAND, ['status', '--tenant', args.tenant, '--mode', 'fast', '--format', 'json']);
-  await runStep(steps, 'inspect_fleet', XYTE_COMMAND, ['inspect', 'fleet', '--tenant', args.tenant, '--format', 'json']);
+  await resetMock(args.baseUrl);
+  pushStep(steps, 'mock_reset', 'pass', 'Mock state reset.');
 
-  const watchOnce = await runStep(steps, 'watch_once', XYTE_COMMAND, [
-    'watch',
-    '--tenant',
-    args.tenant,
-    '--profile',
-    'incidents-active',
-    '--once',
-    '--strict-json'
-  ]);
-  const watchOncePayload = parseJsonSafe(watchOnce.stdout);
-  if (!watchOncePayload || watchOncePayload.schemaVersion !== 'xyte.watch.frame.v1') {
-    steps.push({
-      id: 'watch_once_schema',
-      command: 'schema-check',
-      args: [],
-      code: 1,
-      durationMs: 0,
-      stdout: '',
-      stderr: '',
-      status: 'fail',
-      reason: 'watch_once output is not xyte.watch.frame.v1'
-    });
-  } else {
-    steps.push({
-      id: 'watch_once_schema',
-      command: 'schema-check',
-      args: [],
-      code: 0,
-      durationMs: 0,
-      stdout: '',
-      stderr: '',
-      status: 'pass',
-      reason: 'watch_once schemaVersion is xyte.watch.frame.v1'
-    });
-  }
-
-  await runStep(steps, 'watch_loop', XYTE_COMMAND, [
-    'watch',
-    '--tenant',
-    args.tenant,
-    '--profile',
-    'incidents-active',
-    '--interval-ms',
-    '1200',
-    '--max-polls',
-    '3',
-    '--strict-json'
-  ]);
-
-  const deepDivePath = path.join(outDir, 'deep-dive.json');
-  const deepDiveStep = await runStep(steps, 'inspect_deep_dive', XYTE_COMMAND, [
-    'inspect',
-    'deep-dive',
-    '--tenant',
-    args.tenant,
-    '--window',
-    '24',
-    '--format',
-    'json'
-  ]);
-  if (deepDiveStep.code === 0) {
-    writeFileSync(deepDivePath, deepDiveStep.stdout, 'utf8');
-  }
-
-  const reportPath = path.join(outDir, 'daily-report.md');
-  await runStep(steps, 'report_generate_markdown', XYTE_COMMAND, [
-    'report',
-    'generate',
-    '--tenant',
-    args.tenant,
-    '--input',
-    deepDivePath,
-    '--out',
-    reportPath,
-    '--format',
-    'markdown'
-  ]);
-
-  const treePath = path.join(outDir, 'space-import-tree.csv');
-  writeFileSync(
-    treePath,
-    `path,space_type,config\nOverview/Codex Smoke ${runId},room,{}\nOverview/Codex Smoke ${runId}/Room A,room,{}\n`,
-    'utf8'
+  await runChecked(
+    XYTE_COMMAND,
+    ['config', 'tenant', 'add', args.tenant, '--hub-url', args.baseUrl, '--entry-url', args.baseUrl],
+    { env }
   );
-  await runStep(steps, 'space_import_dryrun', XYTE_COMMAND, [
-    'space',
-    'import-tree',
-    '--tenant',
-    args.tenant,
-    '--input',
-    treePath,
-    '--report',
-    path.join(outDir, 'space-import.dryrun.ndjson')
-  ]);
-  await runStep(steps, 'space_import_apply', XYTE_COMMAND, [
-    'space',
-    'import-tree',
-    '--tenant',
-    args.tenant,
-    '--input',
-    treePath,
-    '--apply',
-    '--report',
-    path.join(outDir, 'space-import.apply.ndjson')
-  ]);
+  pushStep(steps, 'tenant_add', 'pass', `Tenant ${args.tenant} added for ${args.baseUrl}.`);
 
-  const { incidentId, deviceId } = getFirstIncidentAndDeviceFromWatch(watchOnce.stdout);
-  const spacesResult = await runStep(steps, 'get_spaces', XYTE_COMMAND, ['call', 'organization.spaces.getSpaces', '--tenant', args.tenant]);
-  const spacesPayload = parseJsonSafe(spacesResult.stdout);
-  const firstSpaceId =
-    (Array.isArray(spacesPayload) && spacesPayload[0]?.id) ||
-    (Array.isArray(spacesPayload?.items) && spacesPayload.items[0]?.id) ||
-    undefined;
-
-  if (deviceId) {
-    await runStep(steps, 'send_command_guard_missing_allowwrite', XYTE_COMMAND, [
-      'call',
-      'organization.commands.sendCommand',
-      '--tenant',
-      args.tenant,
-      '--path-json',
-      JSON.stringify({ device_id: deviceId }),
-      '--body-json',
-      JSON.stringify({ command: 'reboot' })
-    ]);
-
-    await runStep(steps, 'send_command_write', XYTE_COMMAND, [
-      'call',
-      'organization.commands.sendCommand',
-      '--tenant',
-      args.tenant,
-      '--allow-write',
-      '--output-mode',
-      'envelope',
-      '--path-json',
-      JSON.stringify({ device_id: deviceId }),
-      '--body-json',
-      JSON.stringify({ command: 'reboot' })
-    ]);
-  } else {
-    await runStep(
-      steps,
-      'skip_send_command',
-      process.platform === 'win32' ? 'cmd' : 'sh',
-      process.platform === 'win32' ? ['/c', 'exit 97'] : ['-c', 'exit 97']
-    );
-  }
-
-  if (incidentId) {
-    await runStep(steps, 'close_incident_guard_missing_confirm', XYTE_COMMAND, [
-      'call',
-      'organization.incidents.closeIncident',
-      '--tenant',
-      args.tenant,
-      '--allow-write',
-      '--path-json',
-      JSON.stringify({ incident_id: incidentId })
-    ]);
-
-    await runStep(steps, 'close_incident_write', XYTE_COMMAND, [
-      'call',
-      'organization.incidents.closeIncident',
-      '--tenant',
-      args.tenant,
-      '--allow-write',
-      '--confirm',
-      'organization.incidents.closeIncident',
-      '--path-json',
-      JSON.stringify({ incident_id: incidentId })
-    ]);
-  } else {
-    await runStep(
-      steps,
-      'skip_close_incident',
-      process.platform === 'win32' ? 'cmd' : 'sh',
-      process.platform === 'win32' ? ['/c', 'exit 97'] : ['-c', 'exit 97']
-    );
-  }
-
-  const ticketsResult = await runStep(steps, 'get_tickets', XYTE_COMMAND, [
-    'call',
-    'organization.tickets.getTickets',
-    '--tenant',
-    args.tenant,
-    '--query-json',
-    '{"page":1,"per_page":10}'
-  ]);
-  const ticketsPayload = parseJsonSafe(ticketsResult.stdout);
-  const firstTicketId =
-    (Array.isArray(ticketsPayload) && ticketsPayload[0]?.id) ||
-    (Array.isArray(ticketsPayload?.items) && ticketsPayload.items[0]?.id) ||
-    undefined;
-  if (firstTicketId) {
-    await runStep(steps, 'ticket_send_message', XYTE_COMMAND, [
-      'call',
-      'organization.tickets.sendMessage',
-      '--tenant',
-      args.tenant,
-      '--allow-write',
-      '--path-json',
-      JSON.stringify({ ticket_id: String(firstTicketId) }),
-      '--query-json',
-      JSON.stringify({ message: `Codex flow smoke ${runId}` })
-    ]);
-  } else {
-    await runStep(
-      steps,
-      'skip_ticket_send_message',
-      process.platform === 'win32' ? 'cmd' : 'sh',
-      process.platform === 'win32' ? ['/c', 'exit 97'] : ['-c', 'exit 97']
-    );
-  }
-
-  await runStep(steps, 'claim_device_write', XYTE_COMMAND, [
-    'call',
-    'organization.devices.claimDevice',
-    '--tenant',
-    args.tenant,
-    '--allow-write',
-    '--output-mode',
-    'envelope',
-    '--body-json',
-    JSON.stringify({
-      name: `Codex Claim ${runId}`,
-      space_id: firstSpaceId,
-      sn: `codex-sn-${runId}`,
-      mac: '02:00:00:11:22:33',
-      cloud_id: `codex-cloud-${runId}`
-    })
-  ]);
-
-  if (deviceId) {
-    const beforeDevice = await runStep(steps, 'update_device_read_before', XYTE_COMMAND, [
-      'call',
-      'organization.devices.getDevice',
-      '--tenant',
-      args.tenant,
-      '--path-json',
-      JSON.stringify({ device_id: deviceId })
-    ]);
-    const beforePayload = parseJsonSafe(beforeDevice.stdout);
-    const beforeName = beforePayload?.name;
-    const expectedName = `Codex Smoke Updated ${runId}`;
-
-    await runStep(steps, 'update_device_write', XYTE_COMMAND, [
-      'call',
-      'organization.devices.updateDevice',
-      '--tenant',
-      args.tenant,
-      '--allow-write',
-      '--path-json',
-      JSON.stringify({ device_id: deviceId }),
-      '--body-json',
-      JSON.stringify({ name: expectedName })
-    ]);
-
-    let updateVerified = false;
-    let readBackSucceeded = false;
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      const verifyResult = await runCommand(XYTE_COMMAND, [
-        'call',
-        'organization.devices.getDevice',
-        '--tenant',
-        args.tenant,
-        '--path-json',
-        JSON.stringify({ device_id: deviceId })
-      ]);
-      const verifyPayload = parseJsonSafe(verifyResult.stdout);
-      if (verifyResult.code === 0) {
-        readBackSucceeded = true;
-        if (verifyPayload?.name === expectedName) {
-          updateVerified = true;
-          break;
-        }
-      }
-      await new Promise((resolve) => setTimeout(resolve, 700));
-    }
-
-    const verifyPseudoResult = {
-      code: updateVerified ? 0 : 1,
-      stdout: JSON.stringify({ beforeName, expectedName }),
-      stderr: updateVerified ? '' : 'Update read-back did not match expected value.'
-    };
-    const classification = classifyStep('update_device_verify', verifyPseudoResult, { updateVerified, readBackSucceeded });
-    steps.push({
-      id: 'update_device_verify',
-      command: 'verify',
-      args: [],
-      code: verifyPseudoResult.code,
-      durationMs: 0,
-      stdout: verifyPseudoResult.stdout,
-      stderr: verifyPseudoResult.stderr,
-      status: classification.status,
-      reason: classification.reason
-    });
-  } else {
-    await runStep(
-      steps,
-      'skip_update_device',
-      process.platform === 'win32' ? 'cmd' : 'sh',
-      process.platform === 'win32' ? ['/c', 'exit 97'] : ['-c', 'exit 97']
-    );
-  }
-
-  await runStep(steps, 'watch_after_writes', XYTE_COMMAND, [
-    'watch',
-    '--tenant',
-    args.tenant,
-    '--profile',
-    'incidents-active',
-    '--once',
-    '--strict-json'
-  ]);
-
-  const summaryPath = path.join(outDir, 'summary.json');
-  writeFileSync(
-    summaryPath,
-    JSON.stringify(
-      {
-        runId,
-        tenant: args.tenant,
-        generatedAt: new Date().toISOString(),
-        outputDir: outDir,
-        steps
-      },
-      null,
-      2
-    ),
-    'utf8'
+  await runChecked(
+    XYTE_COMMAND,
+    ['config', 'key', 'add', '--tenant', args.tenant, '--provider', 'xyte-org', '--name', 'local', '--key', 'local-key', '--set-active'],
+    { env }
   );
+  pushStep(steps, 'key_add', 'pass', 'Local org key configured.');
 
-  const rendered = renderSummary(steps);
-  process.stdout.write(`${rendered}\n\nOutput: ${summaryPath}\n`);
-  if (steps.some((step) => step.status === 'fail')) {
-    process.exitCode = 1;
+  const setupFlow = await runFlow(env, outDir, 'flow.setup-readiness-10m');
+  ensure(setupFlow.outcome === 'completed', 'flow.setup-readiness-10m did not complete.');
+  ensure(setupFlow.steps.every((step) => step.status === 'completed'), 'setup flow had non-completed steps.');
+  ensure(existsSync(setupFlow.bundleDir), 'setup flow bundle was not created.');
+  pushStep(steps, 'flow_setup', 'pass', 'Setup readiness flow completed.');
+
+  const watchOnce = await runChecked(
+    XYTE_COMMAND,
+    ['ops', 'watch', 'incidents', '--tenant', args.tenant, '--profile', 'incidents-active', '--once', '--strict-json'],
+    { env }
+  );
+  const watchOnceFrame = parseJsonSafe(watchOnce.stdout);
+  ensure(watchOnceFrame?.schemaVersion === 'xyte.watch.frame.v1', 'watch once did not emit xyte.watch.frame.v1.');
+  ensure(watchOnceFrame?.eventType === 'snapshot', 'watch once did not emit a snapshot frame.');
+  ensure(Array.isArray(watchOnceFrame?.items) && watchOnceFrame.items.length > 0, 'watch once returned no incidents.');
+  pushStep(steps, 'watch_once', 'pass', `Watch once returned ${watchOnceFrame.items.length} active incidents.`);
+
+  const watchLoop = await runChecked(
+    XYTE_COMMAND,
+    ['ops', 'watch', 'incidents', '--tenant', args.tenant, '--profile', 'incidents-active', '--interval-ms', '1000', '--max-polls', '3', '--strict-json'],
+    { env }
+  );
+  const loopFrames = parseNdjson(watchLoop.stdout);
+  ensure(loopFrames.length === 3, `Expected 3 loop watch frames, got ${loopFrames.length}.`);
+  ensure(loopFrames[0]?.eventType === 'snapshot', 'Loop watch first frame was not snapshot.');
+  ensure(loopFrames.slice(1).every((frame) => frame.eventType === 'heartbeat' || frame.eventType === 'delta'), 'Loop watch follow-up frames were invalid.');
+  pushStep(steps, 'watch_loop', 'pass', `Loop watch emitted ${loopFrames.length} frames (${loopFrames.map((frame) => frame.eventType).join(', ')}).`);
+
+  const watchFlow = await runFlow(env, outDir, 'flow.incidents-delta-watch', ['--once']);
+  ensure(watchFlow.outcome === 'completed', 'flow.incidents-delta-watch did not complete.');
+  ensure(watchFlow.steps.every((step) => step.status === 'completed'), 'watch flow had non-completed steps.');
+  pushStep(steps, 'flow_watch', 'pass', 'Incidents delta watch flow completed.');
+
+  const triagePlan = await runFlow(env, outDir, 'flow.watch-to-triage', ['--once']);
+  ensure(triagePlan.outcome === 'pending_gate', 'flow.watch-to-triage did not stop at the human gate.');
+  ensure(existsSync(path.join(triagePlan.bundleDir, 'outputs', 'xyte-triage.md')), 'Triage report was not generated.');
+  const triageApply = await runFlow(env, outDir, 'flow.watch-to-triage', ['--apply', '--resume', triagePlan.runId]);
+  ensure(triageApply.outcome === 'completed', 'flow.watch-to-triage did not complete on resume.');
+  pushStep(steps, 'flow_triage', 'pass', 'Watch-to-triage flow produced artifacts and resumed cleanly.');
+
+  const dailyPlan = await runFlow(env, outDir, 'flow.daily-deep-dive-report', ['--once']);
+  ensure(dailyPlan.outcome === 'pending_gate', 'flow.daily-deep-dive-report did not stop at the human gate.');
+  ensure(existsSync(path.join(dailyPlan.bundleDir, 'outputs', 'xyte-daily.md')), 'Daily markdown report was not generated.');
+  const dailyApply = await runFlow(env, outDir, 'flow.daily-deep-dive-report', ['--apply', '--resume', dailyPlan.runId]);
+  ensure(dailyApply.outcome === 'completed', 'flow.daily-deep-dive-report did not complete on resume.');
+  pushStep(steps, 'flow_daily', 'pass', 'Daily deep-dive report flow produced artifacts and resumed cleanly.');
+
+  let remediation = await runFlow(env, outDir, 'flow.guided-remediation', ['--once', '--var', 'ticket_id=t1', '--var', 'command=restart']);
+  ensure(remediation.outcome === 'pending_gate', 'flow.guided-remediation did not stop at the first gate.');
+  ensure(remediation.nextResumeStepId === 'gate_send_command', 'Guided remediation did not stop at send-command gate first.');
+
+  const remediationGateOrder = [
+    'gate_update_device',
+    'gate_ticket_message',
+    'gate_close_incident'
+  ];
+  for (const expectedGate of remediationGateOrder) {
+    remediation = await runFlow(env, outDir, 'flow.guided-remediation', ['--apply', '--resume', remediation.runId]);
+    ensure(remediation.outcome === 'pending_gate', `Guided remediation did not stop at ${expectedGate}.`);
+    ensure(remediation.nextResumeStepId === expectedGate, `Guided remediation expected next gate ${expectedGate}, got ${remediation.nextResumeStepId}.`);
   }
+
+  remediation = await runFlow(env, outDir, 'flow.guided-remediation', ['--apply', '--resume', remediation.runId]);
+  ensure(remediation.outcome === 'completed', 'Guided remediation did not complete after final approval.');
+
+  const state = await getMockState(args.baseUrl);
+  const activeIncidents = (state.incidents ?? []).filter((incident) => incident.status === 'active');
+  const deviceTwo = (state.devices ?? []).find((device) => device.id === 'd2');
+  const ticket = (state.tickets ?? []).find((item) => item.id === 't1');
+  const commands = Array.isArray(state.commands?.d2) ? state.commands.d2 : [];
+  ensure(activeIncidents.length === 0, 'Guided remediation did not clear the active incident in mock state.');
+  ensure(deviceTwo?.name === 'Remediated d2', `Guided remediation did not update device name, got ${deviceTwo?.name ?? 'missing'}.`);
+  ensure(ticket?.messages?.length === 1, 'Guided remediation did not send a ticket message.');
+  ensure(commands.some((item) => item.command === 'restart'), 'Guided remediation did not record the restart command.');
+  pushStep(steps, 'flow_guided', 'pass', 'Guided remediation completed and mutated mock state as expected.');
+
+  process.stdout.write(`${renderSummary(steps)}\n`);
 }
 
-const isDirectRun = process.argv[1]
-  ? path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))
-  : false;
+const isDirectExecution = process.argv[1] ? import.meta.url === pathToFileURL(process.argv[1]).href : false;
 
-if (isDirectRun) {
+if (isDirectExecution) {
   main().catch((error) => {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;

@@ -11,7 +11,7 @@
 ```bash
 npm install -g @xyteai/cli@latest
 xyte-cli --help
-xyte-cli doctor install --format json
+xyte-cli status --mode fast --output json
 ```
 
 ## First-Time Setup
@@ -32,23 +32,23 @@ xyte-cli setup run --non-interactive --tenant acme
 Check readiness:
 
 ```bash
-xyte-cli setup status --tenant acme --format json
-xyte-cli config doctor --tenant acme --format json
+xyte-cli setup status --tenant acme --output json
+xyte-cli config doctor --tenant acme --output json
 ```
 
 ## Install Skills (Recommended)
 
 ```bash
-xyte-cli install --skills
+xyte-cli init
 ```
 
 Useful options:
 
 ```bash
-xyte-cli install --skills --no-setup
-xyte-cli install --skills --scope project --agents codex,claude
-xyte-cli install --skills --scope both --agents all --force
-xyte-cli install --skills --target /path/to/workspace
+xyte-cli init --no-setup
+xyte-cli init --scope project --agents codex,claude
+xyte-cli init --scope both --agents all --force
+xyte-cli init --target /path/to/workspace
 ```
 
 Default non-interactive behavior:

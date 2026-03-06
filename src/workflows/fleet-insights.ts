@@ -1250,7 +1250,7 @@ export const getWindowFocus = getWindowFocusFromTheme;
 export function parseDeepDiveForReport(raw: unknown, expectedTenantId?: string): DeepDiveResult {
   const parsed = DeepDiveResultSchema.safeParse(raw);
   if (!parsed.success) {
-    throw new Error('Input JSON must be produced by `xyte-cli inspect deep-dive --format json`.');
+    throw new Error('Input JSON must be produced by `xyte-cli ops inspect deep-dive --output json`.');
   }
 
   if (expectedTenantId && parsed.data.tenantId !== expectedTenantId) {

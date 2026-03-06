@@ -165,16 +165,16 @@ function drawTableHeader(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, columns
   const width = tableWidth(columns);
 
   doc.save();
-  doc.rect(x, y, width, PDF_LAYOUT.tableHeaderHeight).fill(REPORT_THEME.surface.subtle);
+  doc.roundedRect(x, y, width, PDF_LAYOUT.tableHeaderHeight, 10).fill(REPORT_THEME.surface.accent);
   doc.restore();
-  drawHorizontalRule(doc, x, y + PDF_LAYOUT.tableHeaderHeight, width, 2);
+  drawHorizontalRule(doc, x, y + PDF_LAYOUT.tableHeaderHeight, width, 1.5);
 
   let cursorX = x;
   columns.forEach((column) => {
     const header = column.header.toUpperCase();
     const innerWidth = column.width - PDF_LAYOUT.tableCellPadLeft - PDF_LAYOUT.tableCellPadRight;
     const fontSize = fitHeaderCellFontSize(doc, ctx, header, innerWidth);
-    doc.font(ctx.fonts.medium).fontSize(fontSize).fillColor(REPORT_THEME.text.secondary).text(header, cursorX + PDF_LAYOUT.tableCellPadLeft, y + PDF_LAYOUT.tableCellPadTop, {
+    doc.font(ctx.fonts.medium).fontSize(fontSize).fillColor(REPORT_THEME.accent.strong).text(header, cursorX + PDF_LAYOUT.tableCellPadLeft, y + PDF_LAYOUT.tableCellPadTop, {
       width: innerWidth,
       align: column.align ?? 'left',
       lineBreak: false,
@@ -199,7 +199,7 @@ function drawTableRow(
   const x = doc.page.margins.left;
   const y = doc.y;
   const width = tableWidth(columns);
-  const fill = rowIndex % 2 === 0 ? REPORT_THEME.surface.page : REPORT_THEME.surface.subtle;
+  const fill = rowIndex % 2 === 0 ? REPORT_THEME.surface.page : REPORT_THEME.surface.subtleAlt;
 
   doc.save();
   doc.rect(x, y, width, rowHeight).fill(fill);

@@ -120,7 +120,7 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
     const value = await secretStore.getSlotSecret(tenantId, provider, slotId);
     if (!value) {
       throw new XyteAuthError(
-        `Missing API key for provider ${provider} in tenant ${tenantId} (slot ${slotId}). Use "xyte-cli auth key add/use" or "xyte-cli setup run".`
+        `Missing API key for provider ${provider} in tenant ${tenantId} (slot ${slotId}). Use "xyte-cli config key add/use" or "xyte-cli setup run".`
       );
     }
 

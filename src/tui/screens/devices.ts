@@ -298,7 +298,7 @@ export function createDevicesScreen(): TuiScreen {
         widgets: ['devices-table', 'detail-box']
       });
 
-      table.on('select item', (_item, index) => {
+      table.on('select item', (_item: unknown, index: number) => {
         if (shouldIgnoreSelectEvent(selectionSync)) {
           return;
         }
