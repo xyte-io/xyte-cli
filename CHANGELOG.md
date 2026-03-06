@@ -6,6 +6,28 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-03-06
+
+### Added
+- Public v2 command surface built around `init`, `status`, `setup`, `config`, `api`, `ops`, `flow`, `util`, and `logs`.
+- Layered settings resolution with user config, workspace config, normalized `XYTE_CLI_*` environment overrides, and `config show|set|unset|path`.
+- Contextual root launcher output and structured user-facing problem details for setup, auth, and invalid command flows.
+- Structured `overviewMetrics` in the deep-dive contract for report rendering without summary-text parsing.
+
+### Changed
+- Removed legacy top-level command wrappers from the public CLI surface in favor of the canonical v2 layout.
+- Made `ops console` the canonical interactive entrypoint and aligned CLI, TUI, docs, skills, and GitHub Pages around the same operator vocabulary.
+- Reworked report PDF presentation with a cleaner first page, calmer card styling, and stronger information hierarchy.
+- Updated README, command docs, flow docs, GitHub Pages, and shipped skill packs to the v2 command model.
+- Removed stale public demo videos and other tracked temp leftovers from the published tree.
+
+### Fixed
+- Preserved request ID correlation for flow `call` tasks between transport metadata and emitted envelopes.
+- Hardened config path assignment against prototype-pollution style key paths.
+- Fixed report parsing to avoid regex-based deep-dive summary extraction and the associated security finding.
+- Fixed controlled upgrade smoke cancellation behavior and import-tree root-space resolution against live tenants.
+- Closed remaining typecheck, smoke, and review regressions discovered during PR validation.
+
 ## [0.5.2] - 2026-02-25
 
 ### Added
