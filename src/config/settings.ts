@@ -169,8 +169,6 @@ type SourceValue = {
   source: 'default' | 'profile' | 'user' | 'workspace' | 'env' | 'flag';
 };
 
-const BLOCKED_PATH_SEGMENTS = new Set(['__proto__', 'prototype', 'constructor']);
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -212,20 +210,17 @@ function getPathValue(record: unknown, keyPath: string): unknown {
   return current;
 }
 
-function assertSafeSegment(segment: string): void {
-  if (BLOCKED_PATH_SEGMENTS.has(segment)) {
-    throw new Error(`Blocked config key segment: ${segment}.`);
-  }
-}
-
 function setPathValue(record: Record<string, unknown>, keyPath: SettingPath, value: unknown): void {
   const segments = keyPath.split('.');
   let current: Record<string, unknown> = record;
-  segments.forEach((segment, index) => {
-    assertSafeSegment(segment);
+  for (let index = 0; index < segments.length; index += 1) {
+    const segment = segments[index];
+    if (segment === '__proto__' || segment === 'prototype' || segment === 'constructor') {
+      throw new Error(`Blocked config key segment: ${segment}.`);
+    }
     if (index === segments.length - 1) {
       current[segment] = value;
-      return;
+      break;
     }
 
     const next = Object.hasOwn(current, segment) ? current[segment] : undefined;
@@ -233,7 +228,7 @@ function setPathValue(record: Record<string, unknown>, keyPath: SettingPath, val
       current[segment] = Object.create(null) as Record<string, unknown>;
     }
     current = current[segment] as Record<string, unknown>;
-  });
+  }
 }
 
 function unsetPathValue(record: Record<string, unknown>, keyPath: SettingPath): void {
@@ -241,7 +236,9 @@ function unsetPathValue(record: Record<string, unknown>, keyPath: SettingPath): 
   let current: Record<string, unknown> | undefined = record;
   for (let index = 0; index < segments.length - 1; index += 1) {
     const segment = segments[index];
-    assertSafeSegment(segment);
+    if (segment === '__proto__' || segment === 'prototype' || segment === 'constructor') {
+      throw new Error(`Blocked config key segment: ${segment}.`);
+    }
     const next: unknown = current && Object.hasOwn(current, segment) ? current[segment] : undefined;
     if (!isRecord(next)) {
       return;
@@ -254,7 +251,9 @@ function unsetPathValue(record: Record<string, unknown>, keyPath: SettingPath): 
   }
 
   const leafSegment = segments.at(-1)!;
-  assertSafeSegment(leafSegment);
+  if (leafSegment === '__proto__' || leafSegment === 'prototype' || leafSegment === 'constructor') {
+    throw new Error(`Blocked config key segment: ${leafSegment}.`);
+  }
   delete current[leafSegment];
 }
 
