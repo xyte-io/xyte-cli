@@ -212,26 +212,23 @@ function getPathValue(record: unknown, keyPath: string): unknown {
   return current;
 }
 
-function parseSettingPath(keyPath: string): string[] {
-  const segments = keyPath.split('.');
-  for (const segment of segments) {
-    if (BLOCKED_PATH_SEGMENTS.has(segment)) {
-      throw new Error(`Blocked config key segment: ${segment}.`);
-    }
+function assertSafeSegment(segment: string): void {
+  if (BLOCKED_PATH_SEGMENTS.has(segment)) {
+    throw new Error(`Blocked config key segment: ${segment}.`);
   }
-  return segments;
 }
 
 function setPathValue(record: Record<string, unknown>, keyPath: SettingPath, value: unknown): void {
-  const segments = parseSettingPath(keyPath);
+  const segments = keyPath.split('.');
   let current: Record<string, unknown> = record;
   segments.forEach((segment, index) => {
+    assertSafeSegment(segment);
     if (index === segments.length - 1) {
       current[segment] = value;
       return;
     }
 
-    const next = current[segment];
+    const next = Object.hasOwn(current, segment) ? current[segment] : undefined;
     if (!isRecord(next)) {
       current[segment] = Object.create(null) as Record<string, unknown>;
     }
@@ -240,10 +237,12 @@ function setPathValue(record: Record<string, unknown>, keyPath: SettingPath, val
 }
 
 function unsetPathValue(record: Record<string, unknown>, keyPath: SettingPath): void {
-  const segments = parseSettingPath(keyPath);
+  const segments = keyPath.split('.');
   let current: Record<string, unknown> | undefined = record;
   for (let index = 0; index < segments.length - 1; index += 1) {
-    const next: unknown = current?.[segments[index]];
+    const segment = segments[index];
+    assertSafeSegment(segment);
+    const next: unknown = current && Object.hasOwn(current, segment) ? current[segment] : undefined;
     if (!isRecord(next)) {
       return;
     }
@@ -254,7 +253,9 @@ function unsetPathValue(record: Record<string, unknown>, keyPath: SettingPath): 
     return;
   }
 
-  delete current[segments.at(-1)!];
+  const leafSegment = segments.at(-1)!;
+  assertSafeSegment(leafSegment);
+  delete current[leafSegment];
 }
 
 function parseBoolean(value: unknown, label: string): boolean {
