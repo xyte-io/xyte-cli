@@ -414,7 +414,7 @@ describe('flow runner', () => {
   it('reuses the transport requestId in flow call envelopes', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();
-    const callWithMeta = vi.fn(async () => ({
+    const callWithMeta = vi.fn(async (_endpointKey: string, _args: { requestId?: string }) => ({
       status: 200,
       durationMs: 12,
       retryCount: 0,
@@ -422,7 +422,7 @@ describe('flow runner', () => {
     }));
 
     const definition: BuiltInFlowDefinition = {
-      id: 'flow.request-id-correlation',
+      id: 'flow.watch-to-triage',
       title: 'Request id correlation',
       intent: 'keep flow envelopes aligned with transport metadata',
       writeCapable: false,
@@ -463,7 +463,7 @@ describe('flow runner', () => {
 
     expect(result.outcome).toBe('completed');
     expect(callWithMeta).toHaveBeenCalledTimes(1);
-    const requestId = callWithMeta.mock.calls[0][1]?.requestId;
+    const requestId = callWithMeta.mock.calls[0]?.[1]?.requestId;
     expect(typeof requestId).toBe('string');
     const artifactPath = result.steps.find((step) => step.stepId === 'read_devices')?.artifactPath;
     expect(artifactPath).toBeDefined();
