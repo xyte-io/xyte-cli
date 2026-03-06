@@ -390,7 +390,7 @@ export function createTicketsScreen(): TuiScreen {
         widgets: ['tickets-table', 'detail-box']
       });
 
-      list.on('select item', (_item, index) => {
+      list.on('select item', (_item: unknown, index: number) => {
         if (shouldIgnoreSelectEvent(selectionSync)) {
           return;
         }

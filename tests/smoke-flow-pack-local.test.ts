@@ -3,16 +3,6 @@ import { describe, expect, it } from 'vitest';
 const scriptPath = '../scripts/smoke_flow_pack_local.mjs';
 
 describe('local flow-pack smoke classifier', () => {
-  it('treats expected write-guard rejection as pass', async () => {
-    const mod = await import(scriptPath);
-    const classified = mod.classifyStep('send_command_guard_missing_allowwrite', {
-      code: 1,
-      stdout: '',
-      stderr: 'Endpoint organization.commands.sendCommand is a write operation (POST). Re-run with --allow-write.'
-    });
-    expect(classified.status).toBe('pass');
-  });
-
   it('treats known data-gated sendCommand 422 as pass', async () => {
     const mod = await import(scriptPath);
     const classified = mod.classifyStep('send_command_write', {

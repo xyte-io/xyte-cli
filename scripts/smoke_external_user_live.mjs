@@ -231,25 +231,28 @@ export async function runExternalUserLiveSmoke(options = {}) {
       PATH: `${globalBinCandidates.join(delimiter)}${delimiter}${isolatedEnv.PATH ?? ''}`
     };
 
-    printStep(logger, 4, stepTotal, 'Running fresh-process doctor install check');
-    const doctorResult = await run(XYTE_COMMAND, ['doctor', 'install', '--format', 'json'], { cwd, env: runtimeEnv });
-    assertSuccess(doctorResult, 'xyte-cli doctor install', XYTE_COMMAND, ['doctor', 'install', '--format', 'json']);
-    const doctorPayload = normalizeJsonOutput(doctorResult.stdout);
-    if (!doctorPayload.commandOnPath || doctorPayload.sameTarget !== true) {
-      throw new Error(`Doctor install check did not confirm command wiring: ${JSON.stringify(doctorPayload)}`);
+    printStep(logger, 4, stepTotal, 'Running fresh-process status check');
+    const statusResult = await run(XYTE_COMMAND, ['status', '--mode', 'fast', '--output', 'json'], {
+      cwd,
+      env: runtimeEnv
+    });
+    assertSuccess(statusResult, 'xyte-cli status', XYTE_COMMAND, ['status', '--mode', 'fast', '--output', 'json']);
+    const statusPayload = normalizeJsonOutput(statusResult.stdout);
+    if (statusPayload.schemaVersion !== 'xyte.status.v1' || statusPayload.mode !== 'fast') {
+      throw new Error(`Status check did not return the expected payload: ${JSON.stringify(statusPayload)}`);
     }
 
     printStep(logger, 5, stepTotal, 'Installing skills as new user and validating copied files');
     const skillsInstallResult = await run(
       XYTE_COMMAND,
-      ['install', '--skills', '--scope', 'both', '--agents', 'all', '--target', dirs.workspaceDir, '--force', '--no-setup'],
+      ['init', '--scope', 'both', '--agents', 'all', '--target', dirs.workspaceDir, '--force', '--no-setup'],
       { cwd, env: runtimeEnv }
     );
     assertSuccess(
       skillsInstallResult,
-      'xyte-cli install --skills',
+      'xyte-cli init',
       XYTE_COMMAND,
-      ['install', '--skills', '--scope', 'both', '--agents', 'all', '--target', dirs.workspaceDir, '--force', '--no-setup']
+      ['init', '--scope', 'both', '--agents', 'all', '--target', dirs.workspaceDir, '--force', '--no-setup']
     );
 
     const requiredSkillFiles = [
@@ -298,11 +301,11 @@ export async function runExternalUserLiveSmoke(options = {}) {
     );
 
     printStep(logger, 7, stepTotal, 'Validating persisted key reuse from second process');
-    const setupStatusResult = await run(XYTE_COMMAND, ['setup', 'status', '--tenant', tenant, '--format', 'json'], {
+    const setupStatusResult = await run(XYTE_COMMAND, ['setup', 'status', '--tenant', tenant, '--output', 'json'], {
       cwd,
       env: runtimeEnv
     });
-    assertSuccess(setupStatusResult, 'xyte-cli setup status', XYTE_COMMAND, ['setup', 'status', '--tenant', tenant, '--format', 'json']);
+    assertSuccess(setupStatusResult, 'xyte-cli setup status', XYTE_COMMAND, ['setup', 'status', '--tenant', tenant, '--output', 'json']);
     const setupStatusPayload = normalizeJsonOutput(setupStatusResult.stdout);
     if (setupStatusPayload.state !== 'ready') {
       throw new Error(`Setup status is not ready after setup run: ${JSON.stringify(setupStatusPayload)}`);
@@ -311,7 +314,7 @@ export async function runExternalUserLiveSmoke(options = {}) {
     printStep(logger, 8, stepTotal, 'Running real read endpoint call and asserting envelope');
     const callResult = await run(
       XYTE_COMMAND,
-      ['call', 'organization.devices.getDevices', '--tenant', tenant, '--output-mode', 'envelope', '--strict-json'],
+      ['api', 'call', 'organization.devices.getDevices', '--tenant', tenant, '--output-mode', 'envelope', '--strict-json'],
       {
         cwd,
         env: runtimeEnv
@@ -319,9 +322,9 @@ export async function runExternalUserLiveSmoke(options = {}) {
     );
     assertSuccess(
       callResult,
-      'xyte-cli call organization.devices.getDevices',
+      'xyte-cli api call organization.devices.getDevices',
       XYTE_COMMAND,
-      ['call', 'organization.devices.getDevices', '--tenant', tenant, '--output-mode', 'envelope', '--strict-json']
+      ['api', 'call', 'organization.devices.getDevices', '--tenant', tenant, '--output-mode', 'envelope', '--strict-json']
     );
     const callPayload = normalizeJsonOutput(callResult.stdout);
     if (callPayload.schemaVersion !== 'xyte.call.envelope.v1') {

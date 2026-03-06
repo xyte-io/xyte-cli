@@ -1,4 +1,4 @@
-# Utility AI Node: Space Import Tree Decode
+# Util AI Node: Space Import Tree Decode
 
 Use this node only when the target action is `space.import-tree`.
 
@@ -28,18 +28,18 @@ Decode a messy source hierarchy into canonical space-import artifacts for `xyte-
 3. Trim whitespace around each path segment.
 4. Do not infer missing hierarchy segments.
 5. Put ambiguous rows in rejected output with `reject_reason`.
-6. `config` must be an object (or valid JSON string that parses to object).
+6. `config` must be an object (or valid JSON string that parses to an object).
 
 ## Execution Sequence
 
 Decision gate (required):
-- After files are structured, ask user: `Run dry-run, apply, or stop?`
+- After files are structured, ask the user: `Run dry-run, apply, or stop?`
 - Never auto-run apply without explicit user choice.
 
 Dry-run:
 
 ```bash
-xyte-cli space import-tree \
+xyte-cli util import-tree \
   --tenant <tenant-id> \
   --input /Users/porton/Projects/xyte-cli/tmp/space-import-tree.csv \
   --report /Users/porton/Projects/xyte-cli/tmp/space-import-tree.dryrun.ndjson
@@ -48,7 +48,7 @@ xyte-cli space import-tree \
 Apply:
 
 ```bash
-xyte-cli space import-tree \
+xyte-cli util import-tree \
   --tenant <tenant-id> \
   --input /Users/porton/Projects/xyte-cli/tmp/space-import-tree.csv \
   --apply \
@@ -58,7 +58,7 @@ xyte-cli space import-tree \
 Verify:
 
 ```bash
-xyte-cli call organization.spaces.getSpaces \
+xyte-cli api call organization.spaces.getSpaces \
   --tenant <tenant-id> \
   --query-json '{"path_includes":"<sample-path>"}'
 ```

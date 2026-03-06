@@ -1,22 +1,22 @@
-# Utility Prepare Flows (Preprocess-First)
+# Util Prepare Flows (Preprocess-First)
 
-`xyte-cli` utility preprocessing is auth-agnostic. It creates structured files only.
+`xyte-cli` util preprocessing is auth-agnostic. It creates structured files only.
 
 References:
 1. `/Users/porton/Projects/xyte-cli/docs/ai-utility-preprocessing.md`
 2. `/Users/porton/Projects/xyte-cli/scripts/templates/ai-utility-prepare-generic.prompt.md`
 3. `/Users/porton/Projects/xyte-cli/scripts/templates/ai-space-import.prompt.md`
 
-## Safety defaults
+## Safety Defaults
 
 1. Always run preprocessing first.
-2. After files are generated, ask user what to do next.
+2. After files are generated, ask the user what to do next.
 3. Never auto-run `--apply`.
 
-## SOP A: Bulk claim preprocessing (`organization.devices.claimDevice`)
+## SOP A: Bulk Claim Preprocessing (`organization.devices.claimDevice`)
 
 ```bash
-xyte-cli utility prepare \
+xyte-cli util prepare \
   --action organization.devices.claimDevice \
   --input /path/to/raw-source.xlsx \
   --tenant <tenant-id> \
@@ -31,14 +31,14 @@ Expected files:
 Decision gate:
 1. Validate each target `space_id` with `organization.spaces.getSpace` before write loops.
 2. Run a single probe claim with `--output-mode envelope`; if upstream returns `No device found`, stop bulk claim writes.
-3. Ask user whether to execute this action via `xyte-cli call` loop or stop.
+3. Ask the user whether to execute this action via an `xyte-cli api call` loop or stop.
 
-## SOP B: Space import preprocessing + execution (`space.import-tree`)
+## SOP B: Space Import Preprocessing + Execution (`space.import-tree`)
 
 Prepare:
 
 ```bash
-xyte-cli utility prepare \
+xyte-cli util prepare \
   --action space.import-tree \
   --input /path/to/raw-hierarchy.pdf \
   --tenant <tenant-id> \
@@ -48,7 +48,7 @@ xyte-cli utility prepare \
 Dry-run:
 
 ```bash
-xyte-cli space import-tree \
+xyte-cli util import-tree \
   --tenant <tenant-id> \
   --input /Users/porton/Projects/xyte-cli/tmp/space-import-tree.csv \
   --report /Users/porton/Projects/xyte-cli/tmp/space-import-tree.dryrun.ndjson
@@ -57,7 +57,7 @@ xyte-cli space import-tree \
 Apply:
 
 ```bash
-xyte-cli space import-tree \
+xyte-cli util import-tree \
   --tenant <tenant-id> \
   --input /Users/porton/Projects/xyte-cli/tmp/space-import-tree.csv \
   --apply \
@@ -67,23 +67,23 @@ xyte-cli space import-tree \
 Verify:
 
 ```bash
-xyte-cli call organization.spaces.getSpaces \
+xyte-cli api call organization.spaces.getSpaces \
   --tenant <tenant-id> \
   --query-json '{"path_includes":"HQ/Floor 1/Office 1"}'
 ```
 
-## SOP C: Generic endpoint preprocessing
+## SOP C: Generic Endpoint Preprocessing
 
 List actions:
 
 ```bash
-xyte-cli utility list-actions --format text
+xyte-cli util list-actions --output text
 ```
 
 Prepare generic action:
 
 ```bash
-xyte-cli utility prepare \
+xyte-cli util prepare \
   --action organization.tickets.updateTicket \
   --input /path/to/raw-ticket-updates.csv \
   --tenant <tenant-id> \
@@ -93,7 +93,7 @@ xyte-cli utility prepare \
 Generic canonical headers:
 1. `<path params in order>,query_json,body_json`
 
-## Local utility sandbox
+## Local Util Sandbox
 
 ```bash
 # terminal A

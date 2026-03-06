@@ -261,10 +261,10 @@ describe('schema contracts', () => {
       outcome: 'completed',
       steps: [
         {
-          stepId: 'doctor_install',
-          title: 'Doctor Install',
+          stepId: 'status_fast',
+          title: 'Status Fast',
           kind: 'task',
-          command: 'xyte-cli doctor install --format json',
+          command: 'xyte-cli status --mode fast --output json',
           status: 'completed'
         }
       ],

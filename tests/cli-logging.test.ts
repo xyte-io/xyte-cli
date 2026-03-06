@@ -49,7 +49,7 @@ describe('cli action logging', () => {
       argv: ['call', '--key', 'super-secret']
     });
     logger.log('command.start', {
-      commandPath: 'xyte-cli call',
+      commandPath: 'xyte-cli api call',
       options: {
         key: 'super-secret',
         apiKey: 'super-secret',
@@ -181,6 +181,7 @@ describe('cli action logging', () => {
       '--log-actions',
       '--log-actions-path',
       logPath,
+      'config',
       'tenant',
       'list'
     ]);
@@ -188,10 +189,10 @@ describe('cli action logging', () => {
     const result = readCliActionLog({ path: logPath });
     expect(result.entries.some((entry) => entry.event === 'command.start')).toBe(true);
     expect(result.entries.some((entry) => entry.event === 'command.complete')).toBe(true);
-    expect(result.entries.some((entry) => entry.commandPath === 'xyte-cli tenant list')).toBe(true);
+    expect(result.entries.some((entry) => entry.commandPath === 'xyte-cli config tenant list')).toBe(true);
     const commandStart = result.entries.find((entry) => entry.event === 'command.start');
     const commandStartData = asRecord(commandStart?.data);
-    expect(commandStartData.commandPath).toBe('xyte-cli tenant list');
+    expect(commandStartData.commandPath).toBe('xyte-cli config tenant list');
     expect(commandStartData.options).toBeUndefined();
     expect(commandStartData.argv).toBeUndefined();
 
@@ -204,6 +205,7 @@ describe('cli action logging', () => {
       '--log-actions-verbose',
       '--log-actions-path',
       verbosePath,
+      'config',
       'tenant',
       'list'
     ]);

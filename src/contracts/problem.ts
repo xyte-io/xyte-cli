@@ -1,4 +1,5 @@
 import { XyteAuthError, XyteHttpError, XyteValidationError } from '../http/errors';
+import { isCliUserError } from '../cli/user-error';
 import { redactSensitiveData, redactSensitiveText } from '../utils/redact';
 
 export interface ProblemDetails {
@@ -10,6 +11,8 @@ export interface ProblemDetails {
   xyteCode: string;
   retriable: boolean;
   upstream?: unknown;
+  cause?: string;
+  suggestedCommands?: string[];
 }
 
 function toMessage(error: unknown): string {
@@ -20,6 +23,20 @@ function toMessage(error: unknown): string {
 }
 
 export function toProblemDetails(error: unknown, instance?: string): ProblemDetails {
+  if (isCliUserError(error)) {
+    return {
+      type: 'https://xyte.dev/problems/cli-user-error',
+      title: error.summary,
+      status: 400,
+      detail: redactSensitiveText(error.message),
+      instance,
+      xyteCode: error.xyteCode,
+      retriable: false,
+      cause: error.causeDetail ? redactSensitiveText(error.causeDetail) : undefined,
+      suggestedCommands: error.suggestedCommands.map((item) => redactSensitiveText(item))
+    };
+  }
+
   if (error instanceof XyteHttpError) {
     return {
       type: 'https://xyte.dev/problems/http-error',

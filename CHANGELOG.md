@@ -11,7 +11,7 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 ### Added
 - First-class deterministic flow runner:
   - `xyte-cli flow run <flow-id>` with safe default `--plan`.
-  - guarded progression with `--apply --allow-write`.
+  - gated progression with `--apply`.
   - resumable execution via `--resume <run-id-or-path>`.
   - structured artifact bundles under `./tmp/flow-runs/...`.
 - Flow discovery and lifecycle commands:

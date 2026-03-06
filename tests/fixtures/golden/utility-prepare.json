@@ -42,8 +42,8 @@
   "skillNodePath": "skills/xyte-cli/references/utilities.md",
   "suggestedCommands": {
     "next": "Review <OUTPUT_DIR>/organization-devices-claimdevice.csv. Preflight gate: validate target space_id rows with organization.spaces.getSpace before write loops. Run one envelope probe row first; if upstream returns \"No device found\", skip bulk claim writes and collect claimable identifiers.",
-    "apply": "xyte-cli call organization.devices.claimDevice --tenant acme --allow-write --output-mode envelope --body-json '{\"name\":\"<name>\",\"space_id\":<space_id>,\"sn\":\"<sn>\",\"mac\":\"<mac>\",\"cloud_id\":\"<cloud_id>\"}'",
-    "verify": "xyte-cli call organization.devices.getDevices --tenant acme --query-json '{\"space_id\":\"<space_id>\"}'"
+    "apply": "xyte-cli api call organization.devices.claimDevice --tenant acme --output-mode envelope --body-json '{\"name\":\"<name>\",\"space_id\":<space_id>,\"sn\":\"<sn>\",\"mac\":\"<mac>\",\"cloud_id\":\"<cloud_id>\"}'",
+    "verify": "xyte-cli api call organization.devices.getDevices --tenant acme --query-json '{\"space_id\":\"<space_id>\"}'"
   },
   "executionSupport": "call-loop-only"
 }

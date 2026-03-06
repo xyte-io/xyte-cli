@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildDeepDive, formatDeepDiveMarkdown, formatUtcForReport, getWindowFocus } from '../src/workflows/fleet-insights';
-import { buildDeepDiveReportSectionPlan, buildDeepDiveSummaryPlan } from '../src/workflows/report/pdf-render';
+import { buildDeepDiveOverviewPlan, buildDeepDiveReportSectionPlan, buildDeepDiveSummaryPlan } from '../src/workflows/report/pdf-render';
 import { formatWindowLabel } from '../src/workflows/report/time-format';
 
 describe('report layout helpers', () => {
@@ -182,5 +182,90 @@ describe('report layout helpers', () => {
     expect(plan.partnerHighlights.length).toBeGreaterThan(0);
     expect(plan.partnerHighlights.every((line) => line.startsWith('Partner '))).toBe(true);
     expect(plan.executiveSummary.some((line) => line.startsWith('Devices:'))).toBe(true);
+  });
+
+  it('builds PDF overview plan with KPI details and spotlight cards', () => {
+    const result = buildDeepDive({
+      generatedAtUtc: new Date().toISOString(),
+      tenantId: 'acme',
+      devices: [
+        { id: 'd1', name: 'Room One', status: 'offline', space: { full_path: 'Overview/HQ/Room 1' } },
+        { id: 'd2', name: 'Room Two', status: 'offline', space: { full_path: 'Overview/HQ/Room 1' } },
+        { id: 'd3', name: 'Room Three', status: 'online', space: { full_path: 'Overview/HQ/Room 2' } }
+      ],
+      spaces: [{ id: 's1', name: 'Room 1', space_type: 'room' }],
+      incidents: [
+        {
+          id: 'i1',
+          device_id: 'd1',
+          device_name: 'Room One',
+          status: 'active',
+          space_tree_path_name: 'Overview/HQ/Room 1',
+          created_at: new Date().toISOString()
+        }
+      ],
+      tickets: [
+        {
+          id: 't1',
+          title: 'Need help',
+          status: 'open',
+          created_at: new Date().toISOString(),
+          device_id: 'd1'
+        }
+      ]
+    });
+
+    const plan = buildDeepDiveOverviewPlan(result);
+
+    expect(plan.kpis).toHaveLength(6);
+    expect(plan.kpis[1].label).toBe('Offline devices');
+    expect(plan.kpis[1].detail).toContain('% of fleet');
+    expect(plan.kpis[2].label).toBe('Active incidents');
+    expect(plan.insights).toHaveLength(3);
+    expect(plan.insights[0].title).toContain('Immediate');
+    expect(plan.insights[1].eyebrow).toBe('Space hotspot');
+    expect(plan.insights[2].body).toContain('overlap');
+  });
+
+  it('strips only trailing parenthetical suffixes from spotlight titles', () => {
+    const result = buildDeepDive({
+      generatedAtUtc: new Date().toISOString(),
+      tenantId: 'acme',
+      devices: [{ id: 'd1', name: 'Room One', status: 'offline', space: { full_path: 'Overview/Xyte Office (NY)' } }],
+      spaces: [{ id: 's1', name: 'Room 1', space_type: 'room' }],
+      incidents: [
+        {
+          id: 'i1',
+          device_id: 'd1',
+          device_name: 'Room One',
+          status: 'active',
+          space_tree_path_name: 'Overview/Xyte Office (NY)',
+          created_at: new Date().toISOString()
+        }
+      ],
+      tickets: []
+    });
+
+    const plan = buildDeepDiveOverviewPlan(result);
+    expect(plan.insights[1].title).toBe('Xyte Office');
+  });
+
+  it('builds overview KPIs from structured deep-dive metrics instead of summary wording', () => {
+    const result = buildDeepDive({
+      generatedAtUtc: new Date().toISOString(),
+      tenantId: 'acme',
+      devices: [{ id: 'd1', name: 'Device 1', status: 'offline', space: { full_path: 'Overview/A' } }],
+      spaces: [{ id: 's1', name: 'Room A', space_type: 'room' }],
+      incidents: [{ id: 'i1', device_name: 'Device 1', status: 'active', space_tree_path_name: 'Overview/A', created_at: new Date().toISOString() }],
+      tickets: [{ id: 't1', title: 'Need help', status: 'open', created_at: new Date().toISOString(), device_id: 'd1' }]
+    });
+
+    result.summary = ['Summary wording can change freely.'];
+    const plan = buildDeepDiveOverviewPlan(result);
+
+    expect(plan.kpis[0].value).toBe('1');
+    expect(plan.kpis[1].value).toBe('1');
+    expect(plan.kpis[2].value).toBe('1');
+    expect(plan.kpis[3].value).toBe('1');
   });
 });

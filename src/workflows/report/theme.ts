@@ -7,19 +7,35 @@ export interface WindowFocus {
 }
 
 const XYTE_PALETTE = {
-  brandPrimary: '#3B82F6',
-  brandPrimaryLight: '#EFF6FF',
-  textPrimary: '#111827',
-  textSecondary: '#6B7280',
-  textTertiary: '#9CA3AF',
-  textWarning: '#92400E',
+  brandPrimary: '#2457F5',
+  brandPrimaryStrong: '#173FB8',
+  brandPrimaryLight: '#DCE7FF',
+  brandPrimaryWash: '#EDF3FF',
+  brandNavy: '#10254A',
+  brandNavySoft: '#16366E',
+  accentTeal: '#0F9F8A',
+  textPrimary: '#0F172A',
+  textSecondary: '#475569',
+  textTertiary: '#64748B',
+  textInverse: '#FFFFFF',
+  textInverseMuted: '#D9E4FF',
+  textWarning: '#9A3412',
   textDanger: '#991B1B',
+  textSuccess: '#166534',
   bgPage: '#FFFFFF',
-  bgSubtle: '#F9FAFB',
-  bgWarning: '#FFF7ED',
-  bgDanger: '#FEF2F2',
-  border: '#E5E7EB',
+  bgCanvas: '#F8FAFC',
+  bgSubtle: '#F4F7FB',
+  bgSubtleAlt: '#E8EEF7',
+  bgPanel: '#FFFFFF',
+  bgHero: '#10254A',
+  bgHeroSoft: '#16366E',
+  bgWarning: '#FFF8EE',
+  bgSuccess: '#F2FBF7',
+  bgDanger: '#FFF5F5',
+  border: '#D7E0ED',
+  borderStrong: '#C2D0E0',
   borderWarning: '#F59E0B',
+  borderSuccess: '#10B981',
   borderDanger: '#DC2626',
   statusGreen: '#059669',
   statusRed: '#DC2626',
@@ -30,18 +46,32 @@ export const REPORT_THEME = {
   text: {
     primary: XYTE_PALETTE.textPrimary,
     secondary: XYTE_PALETTE.textSecondary,
-    tertiary: XYTE_PALETTE.textTertiary
+    tertiary: XYTE_PALETTE.textTertiary,
+    inverse: XYTE_PALETTE.textInverse,
+    inverseMuted: XYTE_PALETTE.textInverseMuted
   },
   surface: {
     page: XYTE_PALETTE.bgPage,
+    canvas: XYTE_PALETTE.bgCanvas,
     subtle: XYTE_PALETTE.bgSubtle,
-    badge: XYTE_PALETTE.brandPrimaryLight
+    subtleAlt: XYTE_PALETTE.bgSubtleAlt,
+    panel: XYTE_PALETTE.bgPanel,
+    hero: XYTE_PALETTE.bgHero,
+    heroSoft: XYTE_PALETTE.bgHeroSoft,
+    badge: XYTE_PALETTE.brandPrimaryWash,
+    accent: XYTE_PALETTE.brandPrimaryLight,
+    success: XYTE_PALETTE.bgSuccess,
+    warning: XYTE_PALETTE.bgWarning,
+    danger: XYTE_PALETTE.bgDanger
   },
   border: {
-    default: XYTE_PALETTE.border
+    default: XYTE_PALETTE.border,
+    strong: XYTE_PALETTE.borderStrong
   },
   accent: {
-    primary: XYTE_PALETTE.brandPrimary
+    primary: XYTE_PALETTE.brandPrimary,
+    strong: XYTE_PALETTE.brandPrimaryStrong,
+    secondary: XYTE_PALETTE.accentTeal
   },
   status: {
     online: XYTE_PALETTE.statusGreen,
@@ -58,32 +88,52 @@ interface MetricTone {
   accent: string;
 }
 
-const METRIC_TONES: Record<'normal' | 'warn' | 'bad', MetricTone> = {
-  normal: {
-    panel: REPORT_THEME.surface.subtle,
+export type ReportTone = 'accent' | 'normal' | 'warn' | 'bad' | 'success';
+
+const PANEL_TONES: Record<ReportTone, MetricTone> = {
+  accent: {
+    panel: REPORT_THEME.surface.accent,
     border: REPORT_THEME.border.default,
-    label: REPORT_THEME.text.secondary,
+    label: REPORT_THEME.accent.strong,
     value: REPORT_THEME.text.primary,
     accent: REPORT_THEME.accent.primary
   },
+  normal: {
+    panel: REPORT_THEME.surface.panel,
+    border: REPORT_THEME.border.default,
+    label: REPORT_THEME.text.secondary,
+    value: REPORT_THEME.text.primary,
+    accent: REPORT_THEME.border.strong
+  },
   warn: {
     panel: XYTE_PALETTE.bgWarning,
-    border: XYTE_PALETTE.borderWarning,
+    border: REPORT_THEME.border.default,
     label: XYTE_PALETTE.textWarning,
     value: REPORT_THEME.text.primary,
     accent: REPORT_THEME.status.warning
   },
   bad: {
-    panel: XYTE_PALETTE.bgDanger,
-    border: XYTE_PALETTE.borderDanger,
+    panel: REPORT_THEME.surface.danger,
+    border: REPORT_THEME.border.default,
     label: XYTE_PALETTE.textDanger,
     value: REPORT_THEME.text.primary,
     accent: REPORT_THEME.status.offline
+  },
+  success: {
+    panel: REPORT_THEME.surface.success,
+    border: REPORT_THEME.border.default,
+    label: XYTE_PALETTE.textSuccess,
+    value: REPORT_THEME.text.primary,
+    accent: REPORT_THEME.status.online
   }
 };
 
 export function getMetricTone(tone: 'normal' | 'warn' | 'bad'): MetricTone {
-  return METRIC_TONES[tone];
+  return PANEL_TONES[tone];
+}
+
+export function getPanelTone(tone: ReportTone): MetricTone {
+  return PANEL_TONES[tone];
 }
 
 export function getWindowFocus(windowHours: number): WindowFocus {

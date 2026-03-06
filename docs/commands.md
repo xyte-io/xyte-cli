@@ -8,21 +8,19 @@ Use it as a unified map for flow runner execution, utility pipelines, and endpoi
 - [`flow.setup-readiness-10m`](flows/agent-ops.md#flowsetup-readiness-10m): establish install/readiness/connectivity baseline before ops.
 - [`flow.incidents-delta-watch`](flows/agent-ops.md#flowincidents-delta-watch): stream incident snapshots and deltas as watch frames.
 - [`flow.watch-to-triage`](flows/agent-ops.md#flowwatch-to-triage): convert watch output into inspect/report triage artifacts.
-- [`flow.guided-remediation`](flows/agent-ops.md#flowguided-remediation): execute guarded org command/ticket/incident actions with verification.
-- [`flow.bulk-claim-and-space-import`](flows/agent-ops.md#flowbulk-claim-and-space-import): preprocess, dry-run, then approve claim/import writes.
+- [`flow.guided-remediation`](flows/agent-ops.md#flowguided-remediation): execute org command/ticket/incident actions with verification.
 - [`flow.daily-deep-dive-report`](flows/agent-ops.md#flowdaily-deep-dive-report): produce daily deep-dive JSON and markdown report outputs.
 
 ## Flow Commands
 
 ```bash
 xyte-cli flow list
-xyte-cli flow run <flow-id> --tenant <tenant-id> [--plan|--apply] [--allow-write] [--resume <run-id-or-path>] [--out-dir <path>] [--inspect-provider-scope organization|partner|auto] [--context-json <path>] [--var key=value ...] [--once] [--strict-json]
+xyte-cli flow run <flow-id> --tenant <tenant-id> [--plan|--apply] [--resume <run-id-or-path>] [--out-dir <path>] [--inspect-provider-scope organization|partner|auto] [--context-json <path>] [--var key=value ...] [--once] [--strict-json]
 ```
 
 Notes:
 - `--plan` is the default mode; `--plan` and `--apply` are mutually exclusive.
 - `--apply` advances one human gate per invocation and should be paired with `--resume`.
-- mutating steps require `--allow-write`; missing approval produces a structured pending-gate state.
 - run bundles are written to `./tmp/flow-runs` by default and return `xyte.flow.run.v1` summary JSON on stdout.
 - full authoring walkthrough: [`flows/custom-workflows.md`](flows/custom-workflows.md).
 
@@ -38,18 +36,17 @@ xyte-cli flow import --file <path> [--force]
 ## Core
 
 ```bash
-xyte-cli install --skills [--scope project|user|both] [--agents all|claude|copilot|codex] [--force] [--no-setup]
-xyte-cli doctor install --format json
-xyte-cli status [--tenant <tenant-id>] [--mode fast|full] [--format json|text]
-xyte-cli setup status --tenant <tenant-id> --format json
+xyte-cli init [--scope project|user|both] [--agents all|claude|copilot|codex] [--force] [--no-setup]
+xyte-cli status [--tenant <tenant-id>] [--mode fast|full] [--output json|text]
+xyte-cli setup status --tenant <tenant-id> --output json
 xyte-cli setup run [--non-interactive] [--tenant <tenant-id>] [--name <display-name>] [--provider xyte-org|xyte-partner] [--key <value>] [--connectivity auto|always|never]
-xyte-cli config doctor --tenant <tenant-id> --format json
-xyte-cli upgrade --check --format json
-xyte-cli upgrade --yes --format json
+xyte-cli config doctor --tenant <tenant-id> --output json
+xyte-cli upgrade --check --output json
+xyte-cli upgrade --yes --output json
 xyte-cli --log-actions [--log-actions-verbose] status --tenant <tenant-id>
-xyte-cli logs list [--path <path>] [--limit <n>] [--format text|json]
-xyte-cli logs stats [--path <path>] [--format text|json]
-xyte-cli logs gc [--path <path>] [--max-files <n>] [--max-age-days <days>] [--dry-run] [--format text|json]
+xyte-cli logs list [--path <path>] [--limit <n>] [--output text|json]
+xyte-cli logs stats [--path <path>] [--output text|json]
+xyte-cli logs gc [--path <path>] [--max-files <n>] [--max-age-days <days>] [--dry-run] [--output text|json]
 xyte-cli logs view [--path <path>] [--limit <n>]
 ```
 
@@ -61,49 +58,51 @@ Setup notes:
 ## Tenant And Auth Slots
 
 ```bash
-xyte-cli tenant add <tenant-id> --name "Acme"
-xyte-cli tenant use <tenant-id>
-xyte-cli tenant list
+xyte-cli config tenant add <tenant-id> --name "Acme"
+xyte-cli config tenant use <tenant-id>
+xyte-cli config tenant list
 
-xyte-cli auth key add --tenant <tenant-id> --provider xyte-org --name primary --key "<value>" --set-active
-xyte-cli auth key list --tenant <tenant-id> --format json
-xyte-cli auth key use --tenant <tenant-id> --provider xyte-org --slot primary
-xyte-cli auth key update --tenant <tenant-id> --provider xyte-org --slot primary --key "<value>"
-xyte-cli auth key rename --tenant <tenant-id> --provider xyte-org --slot primary --name prod-primary
-xyte-cli auth key test --tenant <tenant-id> --provider xyte-org --slot prod-primary
-xyte-cli auth key remove --tenant <tenant-id> --provider xyte-org --slot prod-primary --confirm
+xyte-cli config key add --tenant <tenant-id> --provider xyte-org --name primary --key "<value>" --set-active
+xyte-cli config key list --tenant <tenant-id> --output json
+xyte-cli config key use --tenant <tenant-id> --provider xyte-org --slot primary
+xyte-cli config key update --tenant <tenant-id> --provider xyte-org --slot primary --key "<value>"
+xyte-cli config key rename --tenant <tenant-id> --provider xyte-org --slot primary --name prod-primary
+xyte-cli config key test --tenant <tenant-id> --provider xyte-org --slot prod-primary
+xyte-cli config key remove --tenant <tenant-id> --provider xyte-org --slot prod-primary --confirm
 ```
 
 ## Endpoint Operations
 
 ```bash
-xyte-cli list-endpoints
-xyte-cli describe-endpoint organization.devices.getDevices
-xyte-cli call organization.devices.getDevices --tenant <tenant-id>
-xyte-cli call organization.devices.getDevices --tenant <tenant-id> --output-mode envelope --strict-json
-xyte-cli watch --tenant <tenant-id> --profile incidents-active --once
-xyte-cli watch --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 10
+xyte-cli api endpoints list
+xyte-cli api endpoints describe organization.devices.getDevices
+xyte-cli api call organization.devices.getDevices --tenant <tenant-id>
+xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --output-mode envelope --strict-json
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 10
 ```
 
 Watch guardrails:
 - `--interval-ms` minimum is `1000`.
 - default watch loops are bounded when `--max-polls` is omitted.
 - `--max-polls` hard cap is `3600`.
+- terminal output is text by default; add `--strict-json` when you want machine-readable frames.
 
 Reliable incident fetch:
 
 ```bash
 NOW=$(date +%s)
-xyte-cli call organization.incidents.getIncidents \
+xyte-cli api call organization.incidents.getIncidents \
   --tenant <tenant-id> \
   --query-json "{\"status\":\"active\",\"from\":0,\"to\":$NOW,\"page\":1,\"per_page\":100}"
 ```
 
-Incident delta watch (NDJSON frames):
+Incident delta watch:
 
 ```bash
-xyte-cli watch --tenant <tenant-id> --profile incidents-active --once
-xyte-cli watch --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 10
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 10
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --strict-json
 ```
 
 Frame event types:
@@ -113,47 +112,44 @@ Frame event types:
 - `heartbeat`: no changes detected.
 - `error`: poll failed; baseline is preserved for the next successful poll.
 
-## Guarded Writes
+## Write Examples
 
 ```bash
-xyte-cli call organization.commands.sendCommand \
+xyte-cli api call organization.commands.sendCommand \
   --tenant <tenant-id> \
-  --allow-write \
   --path-json '{"device_id":"DEVICE_ID"}' \
   --body-json '{"command":"reboot"}'
 
-xyte-cli call organization.commands.cancelCommand \
+xyte-cli api call organization.commands.cancelCommand \
   --tenant <tenant-id> \
-  --allow-write \
-  --confirm organization.commands.cancelCommand \
   --path-json '{"device_id":"DEVICE_ID","command_id":"COMMAND_ID"}'
 ```
 
 ## Utility Pipelines And Space Import
 
 ```bash
-xyte-cli utility list-actions --format text
+xyte-cli util list-actions --output text
 
-xyte-cli utility prepare \
+xyte-cli util prepare \
   --action organization.devices.claimDevice \
   --input ./raw-claims.xlsx \
   --output-dir ./tmp
 
-xyte-cli utility prepare \
+xyte-cli util prepare \
   --action space.import-tree \
   --input ./raw-hierarchy.pdf \
   --output-dir ./tmp
 
-xyte-cli space import-tree --tenant <tenant-id> --input ./tmp/space-import-tree.csv
-xyte-cli space import-tree --tenant <tenant-id> --input ./tmp/space-import-tree.csv --apply --report ./space-import.apply.ndjson
+xyte-cli util import-tree --tenant <tenant-id> --input ./tmp/space-import-tree.csv
+xyte-cli util import-tree --tenant <tenant-id> --input ./tmp/space-import-tree.csv --apply --report ./space-import.apply.ndjson
 ```
 
 ## Insights And Reports
 
 ```bash
-xyte-cli inspect fleet --tenant <tenant-id> --provider-scope auto --format json
-xyte-cli inspect deep-dive --tenant <tenant-id> --provider-scope auto --window 24 --format json > /tmp/deep-dive.json
-xyte-cli report generate --tenant <tenant-id> --input /tmp/deep-dive.json --out /tmp/xyte-report.pdf
+xyte-cli ops inspect fleet --tenant <tenant-id> --provider-scope auto --output json
+xyte-cli ops inspect deep-dive --tenant <tenant-id> --provider-scope auto --window 24 --output json > /tmp/deep-dive.json
+xyte-cli ops report generate --tenant <tenant-id> --input /tmp/deep-dive.json --out /tmp/xyte-report.pdf
 ```
 
 Provider scope behavior:
@@ -163,12 +159,12 @@ Provider scope behavior:
 - Partner deep-dive/report enrichment is best-effort; optional partner enrichment endpoint failures do not block report generation.
 - Partner reports include `Partner Highlights` when partner enrichment data is available.
 
-## TUI And Headless
+## Console And Headless
 
 ```bash
-xyte-cli tui
-xyte-cli tui --headless --screen dashboard --format json --once --tenant <tenant-id>
-xyte-cli tui --headless --screen spaces --format json --follow --interval-ms 2000 --tenant <tenant-id>
+xyte-cli ops console
+xyte-cli ops console --headless --screen dashboard --output json --once --tenant <tenant-id>
+xyte-cli ops console --headless --screen spaces --output json --follow --interval-ms 2000 --tenant <tenant-id>
 ```
 
 ## Action Log Environment Flags

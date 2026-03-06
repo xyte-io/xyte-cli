@@ -4,9 +4,9 @@ Deterministic operator flows for AI-agent usage on top of existing `xyte-cli` co
 
 ## Shared Safety Rules
 
-1. Non-read endpoint calls require `--allow-write`.
-2. Destructive deletes require `--allow-write --confirm <endpoint-key>`.
-3. `xyte-cli space import-tree` is dry-run by default unless `--apply` is provided.
+1. Non-read endpoint calls execute directly once the operator chooses the write step.
+2. Destructive deletes execute directly; no extra confirm flag is required.
+3. `xyte-cli util import-tree` is dry-run by default unless `--apply` is provided.
 4. Human decision gate is mandatory before any write/apply loop.
 
 ## Executable Flows
@@ -16,13 +16,13 @@ These recipes are first-class executable flows:
 ```bash
 xyte-cli flow list
 xyte-cli flow run <flow-id> --tenant <tenant-id> --plan
-xyte-cli flow run <flow-id> --tenant <tenant-id> --apply --allow-write --resume <run-id-or-path>
+xyte-cli flow run <flow-id> --tenant <tenant-id> --apply --resume <run-id-or-path>
 ```
 
 Runner behavior:
 - default mode is `--plan` (safe dry mode).
 - `--apply` advances one explicit human gate per invocation.
-- missing guard flags/context produce structured stop states (`pending_gate` or `needs_input`), not silent skips.
+- missing context still produces structured stop states (`pending_gate` or `needs_input`), not silent skips.
 - artifacts are persisted under `./tmp/flow-runs/<flow-id>/<timestamp>-<run-id>/`:
   - `manifest.json`, `inputs.json`
   - `decisions.ndjson`, `errors.ndjson`, `watch-frames.ndjson`
@@ -39,11 +39,10 @@ Runner behavior:
 - Exact commands:
 
 ```bash
-xyte-cli doctor install --format json
-xyte-cli setup status --tenant <tenant-id> --format json
-xyte-cli config doctor --tenant <tenant-id> --format json
-xyte-cli status --tenant <tenant-id> --mode fast --format json
-xyte-cli inspect fleet --tenant <tenant-id> --format json > /tmp/xyte-fleet.setup.json
+xyte-cli setup status --tenant <tenant-id> --output json
+xyte-cli config doctor --tenant <tenant-id> --output json
+xyte-cli status --tenant <tenant-id> --mode fast --output json
+xyte-cli ops inspect fleet --tenant <tenant-id> --output json > /tmp/xyte-fleet.setup.json
 ```
 
 - Expected artifacts:
@@ -61,15 +60,15 @@ xyte-cli inspect fleet --tenant <tenant-id> --format json > /tmp/xyte-fleet.setu
 ## flow.incidents-delta-watch
 
 - Flow ID: `flow.incidents-delta-watch`
-- Intent: stream deterministic incident deltas as `xyte.watch.frame.v1` NDJSON frames.
+- Intent: stream deterministic incident deltas. Use terminal text for operators and `--strict-json` for `xyte.watch.frame.v1` frames.
 - Prerequisites:
   - `flow.setup-readiness-10m` completed.
   - `<tenant-id>` is active and authorized.
 - Exact commands:
 
 ```bash
-xyte-cli watch --tenant <tenant-id> --profile incidents-active --once --strict-json
-xyte-cli watch --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 30 --strict-json > /tmp/xyte-watch.incidents.ndjson
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --strict-json
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 30 --strict-json > /tmp/xyte-watch.incidents.ndjson
 ```
 
 - Expected artifacts:
@@ -83,7 +82,7 @@ xyte-cli watch --tenant <tenant-id> --profile incidents-active --interval-ms 200
 
 ```bash
 NOW=$(date +%s)
-xyte-cli call organization.incidents.getIncidents --tenant <tenant-id> --query-json "{\"status\":\"active\",\"from\":0,\"to\":$NOW,\"page\":1,\"per_page\":100}"
+xyte-cli api call organization.incidents.getIncidents --tenant <tenant-id> --query-json "{\"status\":\"active\",\"from\":0,\"to\":$NOW,\"page\":1,\"per_page\":100}"
 ```
 
 ## flow.watch-to-triage
@@ -96,10 +95,10 @@ xyte-cli call organization.incidents.getIncidents --tenant <tenant-id> --query-j
 - Exact commands:
 
 ```bash
-xyte-cli watch --tenant <tenant-id> --profile incidents-active --once --strict-json > /tmp/xyte-watch.triage.ndjson
-xyte-cli inspect fleet --tenant <tenant-id> --format json > /tmp/xyte-fleet.triage.json
-xyte-cli inspect deep-dive --tenant <tenant-id> --window 24 --format json > /tmp/xyte-deep-dive.triage.json
-xyte-cli report generate --tenant <tenant-id> --input /tmp/xyte-deep-dive.triage.json --out /tmp/xyte-triage.md --format markdown
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --strict-json > /tmp/xyte-watch.triage.ndjson
+xyte-cli ops inspect fleet --tenant <tenant-id> --output json > /tmp/xyte-fleet.triage.json
+xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json > /tmp/xyte-deep-dive.triage.json
+xyte-cli ops report generate --tenant <tenant-id> --input /tmp/xyte-deep-dive.triage.json --out /tmp/xyte-triage.md --render markdown
 ```
 
 - Expected artifacts:
@@ -117,49 +116,44 @@ xyte-cli report generate --tenant <tenant-id> --input /tmp/xyte-deep-dive.triage
 ## flow.guided-remediation
 
 - Flow ID: `flow.guided-remediation`
-- Intent: run controlled org-scope command/ticket/incident remediation with explicit write guards.
+- Intent: run controlled org-scope command/ticket/incident remediation with explicit human gates.
 - Prerequisites:
   - triage artifacts exist and identify concrete `<device-id>`, `<ticket-id>`, and `<incident-id>`.
   - human operator approval to execute writes.
 - Exact commands:
 
 ```bash
-xyte-cli watch --tenant <tenant-id> --profile incidents-active --once --strict-json > /tmp/xyte-watch.before.ndjson
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --strict-json > /tmp/xyte-watch.before.ndjson
 
-xyte-cli call organization.commands.getCommands \
+xyte-cli api call organization.commands.getCommands \
   --tenant <tenant-id> \
   --path-json '{"device_id":"<device-id>"}' \
   --query-json '{"page":1,"per_page":20}'
 
-xyte-cli call organization.commands.sendCommand \
+xyte-cli api call organization.commands.sendCommand \
   --tenant <tenant-id> \
-  --allow-write \
   --path-json '{"device_id":"<device-id>"}' \
   --body-json '{"command":"<valid-command-from-history>"}'
 
-xyte-cli call organization.devices.updateDevice \
+xyte-cli api call organization.devices.updateDevice \
   --tenant <tenant-id> \
-  --allow-write \
   --path-json '{"device_id":"<device-id>"}' \
   --body-json '{"name":"<updated-device-name>"}'
 
-xyte-cli call organization.devices.getDevice \
+xyte-cli api call organization.devices.getDevice \
   --tenant <tenant-id> \
   --path-json '{"device_id":"<device-id>"}'
 
-xyte-cli call organization.tickets.sendMessage \
+xyte-cli api call organization.tickets.sendMessage \
   --tenant <tenant-id> \
-  --allow-write \
   --path-json '{"ticket_id":"<ticket-id>"}' \
   --query-json '{"message":"Operator approved remediation for incident <incident-id> on device <device-id>."}'
 
-xyte-cli call organization.incidents.closeIncident \
+xyte-cli api call organization.incidents.closeIncident \
   --tenant <tenant-id> \
-  --allow-write \
-  --confirm organization.incidents.closeIncident \
   --path-json '{"incident_id":"<incident-id>"}'
 
-xyte-cli watch --tenant <tenant-id> --profile incidents-active --once --strict-json > /tmp/xyte-watch.after.ndjson
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --strict-json > /tmp/xyte-watch.after.ndjson
 ```
 
 - Expected artifacts:
@@ -175,77 +169,20 @@ xyte-cli watch --tenant <tenant-id> --profile incidents-active --once --strict-j
   - Stop if post-remediation watch still shows unchanged high-priority incidents.
 - Failure fallback:
   - Re-run endpoint contract checks and correct payload shape:
-    - `xyte-cli describe-endpoint organization.commands.sendCommand`
-    - `xyte-cli describe-endpoint organization.tickets.sendMessage`
-    - `xyte-cli describe-endpoint organization.incidents.closeIncident`
+    - `xyte-cli api endpoints describe organization.commands.sendCommand`
+    - `xyte-cli api endpoints describe organization.tickets.sendMessage`
+    - `xyte-cli api endpoints describe organization.incidents.closeIncident`
   - Return to `flow.watch-to-triage` to re-evaluate incident state.
 - Write safety requirements:
-  - Non-read endpoint calls require `--allow-write`.
-  - Destructive deletes require `--allow-write --confirm <endpoint-key>`.
-  - `xyte-cli space import-tree` is dry-run by default unless `--apply` is provided.
+  - Non-read endpoint calls execute directly once the operator clears the human gate.
+  - Destructive deletes execute directly once the operator clears the human gate.
+  - `xyte-cli util import-tree` is dry-run by default unless `--apply` is provided.
   - Human decision gate is mandatory before any write/apply loop.
-
-## flow.bulk-claim-and-space-import
-
-- Flow ID: `flow.bulk-claim-and-space-import`
-- Intent: preprocess bulk claim/import inputs, dry-run safely, then execute guarded apply/write steps.
-- Prerequisites:
-  - source files exist at `./claims-source.csv` and `./spaces-source.csv`.
-  - `<tenant-id>` is active and authorized.
-  - human operator approval to execute writes.
-- Exact commands:
-
-```bash
-xyte-cli utility prepare \
-  --action organization.devices.claimDevice \
-  --tenant <tenant-id> \
-  --input ./claims-source.csv \
-  --output-dir ./tmp/flow-bulk-claim
-
-xyte-cli call organization.spaces.getSpace \
-  --tenant <tenant-id> \
-  --path-json '{"space_id":"<space-id>"}'
-
-xyte-cli utility prepare \
-  --action space.import-tree \
-  --tenant <tenant-id> \
-  --input ./spaces-source.csv \
-  --output-dir ./tmp/flow-space-import
-
-xyte-cli space import-tree \
-  --tenant <tenant-id> \
-  --input ./tmp/flow-space-import/space-import-tree.csv \
-  --report ./tmp/flow-space-import/space-import-tree.dryrun.ndjson
-
-xyte-cli call organization.devices.claimDevice \
-  --tenant <tenant-id> \
-  --allow-write \
-  --output-mode envelope \
-  --body-json '{"name":"<device-name>","space_id":"<space-id>","sn":"<serial>","mac":"<mac>","cloud_id":"<cloud-id>"}'
-
-xyte-cli space import-tree \
-  --tenant <tenant-id> \
-  --input ./tmp/flow-space-import/space-import-tree.csv \
-  --apply \
-  --report ./tmp/flow-space-import/space-import-tree.apply.ndjson
-```
-
-- Expected artifacts:
-  - claim prep files in `./tmp/flow-bulk-claim`.
-  - space import prep files and dry-run/apply NDJSON reports in `./tmp/flow-space-import`.
-- Stop/decision gates:
-  - Mandatory human decision gate after preprocessing and before claim/apply loops.
-  - Stop claim loops when claim probe returns `HTTP 422` with upstream `No device found`.
-  - Stop if `organization.spaces.getSpace` fails for target `space_id`.
-  - Stop if dry-run report shows invalid rows or unexpected creates/updates.
-  - Stop if any claim response fails.
-- Failure fallback:
-  - Correct rejected rows and re-run `utility prepare`.
   - Re-run dry-run import before any `--apply`.
 - Write safety requirements:
-  - Non-read endpoint calls require `--allow-write`.
-  - Destructive deletes require `--allow-write --confirm <endpoint-key>`.
-  - `xyte-cli space import-tree` is dry-run by default unless `--apply` is provided.
+  - Non-read endpoint calls execute directly once the operator clears the human gate.
+  - Destructive deletes execute directly once the operator clears the human gate.
+  - `xyte-cli util import-tree` is dry-run by default unless `--apply` is provided.
   - Human decision gate is mandatory before any write/apply loop.
 
 ## flow.daily-deep-dive-report
@@ -258,10 +195,10 @@ xyte-cli space import-tree \
 - Exact commands:
 
 ```bash
-xyte-cli setup status --tenant <tenant-id> --format json
-xyte-cli inspect deep-dive --tenant <tenant-id> --window 24 --format json > /tmp/xyte-deep-dive.daily.json
-xyte-cli report generate --tenant <tenant-id> --input /tmp/xyte-deep-dive.daily.json --out /tmp/xyte-daily.md --format markdown
-xyte-cli inspect fleet --tenant <tenant-id> --format json > /tmp/xyte-fleet.daily.json
+xyte-cli setup status --tenant <tenant-id> --output json
+xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json > /tmp/xyte-deep-dive.daily.json
+xyte-cli ops report generate --tenant <tenant-id> --input /tmp/xyte-deep-dive.daily.json --out /tmp/xyte-daily.md --render markdown
+xyte-cli ops inspect fleet --tenant <tenant-id> --output json > /tmp/xyte-fleet.daily.json
 ```
 
 - Expected artifacts:

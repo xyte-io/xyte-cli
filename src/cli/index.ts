@@ -22,7 +22,19 @@ import { getEndpoint, listEndpoints } from '../client/catalog';
 import { buildCallEnvelope } from '../contracts/call-envelope';
 import { toProblemDetails } from '../contracts/problem';
 import { buildStatusContract, type StatusMode } from '../contracts/status';
+import type { WatchFrameV1 } from '../contracts/watch-frame';
 import { evaluateReadiness, type ReadinessCheck } from '../config/readiness';
+import {
+  SUPPORTED_SETTING_KEYS,
+  parseSettingValue,
+  resolveCliSettingsSync,
+  setCliSettingSync,
+  unsetCliSettingSync,
+  type CliTextJsonOutputMode,
+  type ResolvedCliSettingsState,
+  type SettingKey,
+  type SettingsScope
+} from '../config/settings';
 import { createSecretStore, type SecretStore } from '../secure/secret-store';
 import { makeKeyFingerprint, matchesSlotRef } from '../secure/key-slots';
 import { FileProfileStore, type ProfileStore } from '../secure/profile-store';
@@ -71,6 +83,7 @@ import { runWatch } from '../workflows/watch';
 import { buildUtilityPrepare, listUtilityPrepareActions } from '../workflows/utility-prepare';
 import type { UtilityPreparePrimaryFormat } from '../workflows/utility-action-profiles';
 import { runSpaceImportTree } from '../workflows/utility-commands';
+import { CliUserError } from './user-error';
 
 type OutputStream = Pick<typeof process.stdout, 'write'>;
 type ErrorStream = Pick<typeof process.stderr, 'write'>;
@@ -103,6 +116,7 @@ interface InstallDoctorResult {
 }
 
 interface CliGlobalOptions {
+  output?: CliTextJsonOutputMode;
   logActions?: boolean;
   logActionsPath?: string;
   logActionsVerbose?: boolean;
@@ -134,7 +148,10 @@ interface CliRuntime {
   runTui?: typeof runTuiApp;
   promptValue?: PromptValueFn;
   isTTY?: boolean;
+  stdoutIsTTY?: boolean;
   upgradeDependencies?: UpgradeDependencies;
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
 }
 
 interface SlotView {
@@ -188,6 +205,15 @@ function commandPathFor(command: Command): string {
     current = current.parent ?? undefined;
   }
   return names.join(' ');
+}
+
+function getExplicitGlobalOutput(command: Command): CliTextJsonOutputMode | undefined {
+  const source = command.getOptionValueSourceWithGlobals('output');
+  if (!source || source === 'default') {
+    return undefined;
+  }
+  const options = command.optsWithGlobals() as { output?: string };
+  return parseCliTextJsonOutputMode(options.output);
 }
 
 function argvForCommand(command: Command): string[] {
@@ -517,12 +543,8 @@ function parseFlowContextJson(value: string | undefined): Record<string, string>
   return out;
 }
 
-function requiresWriteGuard(method: string): boolean {
+function isMutatingMethod(method: string): boolean {
   return !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase());
-}
-
-function requiresDestructiveGuard(method: string): boolean {
-  return method.toUpperCase() === 'DELETE';
 }
 
 function formatReadinessText(readiness: ReadinessCheck): string {
@@ -688,6 +710,288 @@ function requireKeyValue(value: string | undefined): string {
   return resolved;
 }
 
+function parseCliTextJsonOutputMode(value: string | undefined): CliTextJsonOutputMode | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized !== 'auto' && normalized !== 'json' && normalized !== 'text') {
+    throw new CliUserError({
+      summary: 'Invalid output mode.',
+      cause: `Received "${value}".`,
+      suggestedCommands: ['Use --output auto', 'Use --output json', 'Use --output text']
+    });
+  }
+  return normalized as CliTextJsonOutputMode;
+}
+
+function resolveTextJsonOutput(args: {
+  output?: string;
+  format?: string;
+  stdoutIsTTY: boolean;
+  settings: ResolvedCliSettingsState;
+}): OutputFormat {
+  const explicitOutput = parseCliTextJsonOutputMode(args.output);
+  const localFormat = args.format?.trim().toLowerCase();
+  if (localFormat) {
+    if (localFormat !== 'json' && localFormat !== 'text') {
+      throw new CliUserError({
+        summary: 'Invalid format.',
+        cause: `Received "${args.format}".`,
+        suggestedCommands: ['Use --output json', 'Use --output text']
+      });
+    }
+    return localFormat;
+  }
+
+  const mode = explicitOutput ?? args.settings.values.output.mode;
+  if (mode === 'auto') {
+    return args.stdoutIsTTY ? 'text' : 'json';
+  }
+  return mode;
+}
+
+function resolveStrictJson(args: { strictJson?: boolean; settings: ResolvedCliSettingsState }): boolean {
+  if (args.strictJson === true) {
+    return true;
+  }
+  return args.settings.values.output.strictJson;
+}
+
+function formatProblemForText(error: unknown): string {
+  const problem = toProblemDetails(error);
+  const lines = [problem.title];
+  if (problem.cause) {
+    lines.push(`Cause: ${problem.cause}`);
+  }
+  if (problem.suggestedCommands?.length) {
+    lines.push('Next commands:');
+    for (const command of problem.suggestedCommands) {
+      lines.push(`- ${command}`);
+    }
+  }
+  if (lines.length === 1 && problem.detail !== problem.title) {
+    lines.push(problem.detail);
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+function stringifyWatchValue(value: unknown, fallback = '-'): string {
+  if (typeof value === 'string' && value.trim()) {
+    return value.trim();
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return fallback;
+}
+
+function formatWatchIncidentText(item: unknown): string {
+  if (!isRecord(item)) {
+    return stringifyWatchValue(item, 'Unknown incident');
+  }
+
+  const priority = stringifyWatchValue(item.priority, 'unknown').toUpperCase();
+  const title = stringifyWatchValue(item.title ?? item.issue ?? item.id ?? item.uuid, 'Untitled incident');
+  const device = stringifyWatchValue(item.device_name ?? item.device_id, 'unknown device');
+  const space = stringifyWatchValue(item.space_tree_path_name ?? item.space_name, 'unknown space');
+  return `[${priority}] ${title} | ${device} | ${space}`;
+}
+
+function formatWatchFrameText(frame: WatchFrameV1): string {
+  const lines: string[] = [];
+  const summary = frame.summary;
+
+  if (frame.eventType === 'snapshot') {
+    lines.push(`[snapshot] poll ${frame.pollIndex} | ${summary.total} active incidents`);
+    const items = Array.isArray(frame.items) ? frame.items : [];
+    if (items.length === 0) {
+      lines.push('No active incidents.');
+    } else {
+      const preview = items.slice(0, 5);
+      for (const item of preview) {
+        lines.push(`- ${formatWatchIncidentText(item)}`);
+      }
+      if (items.length > preview.length) {
+        lines.push(`... ${items.length - preview.length} more incidents`);
+      }
+    }
+    return `${lines.join('\n')}\n`;
+  }
+
+  if (frame.eventType === 'heartbeat') {
+    return `[heartbeat] poll ${frame.pollIndex} | no incident changes | ${summary.total} active incidents\n`;
+  }
+
+  if (frame.eventType === 'delta') {
+    lines.push(
+      `[delta] poll ${frame.pollIndex} | ${summary.total} active incidents | +${summary.added} -${summary.removed} ~${summary.updated}`
+    );
+    const previewEntries = [
+      ...(frame.delta?.added ?? []).slice(0, 3).map((entry) => `+ ${formatWatchIncidentText(entry.current ?? entry.after ?? entry.previous)}`),
+      ...(frame.delta?.updated ?? []).slice(0, 3).map((entry) => `~ ${formatWatchIncidentText(entry.after ?? entry.current ?? entry.before)}`),
+      ...(frame.delta?.removed ?? []).slice(0, 3).map((entry) => `- ${formatWatchIncidentText(entry.previous ?? entry.before ?? entry.current ?? entry.id)}`)
+    ];
+    if (previewEntries.length === 0) {
+      lines.push('No incident detail changes captured.');
+    } else {
+      lines.push(...previewEntries);
+    }
+    return `${lines.join('\n')}\n`;
+  }
+
+  if (frame.eventType === 'error') {
+    const detail = frame.error?.detail ?? frame.error?.title ?? 'Watch failed.';
+    return `[error] poll ${frame.pollIndex} | ${detail}\n`;
+  }
+
+  return `${JSON.stringify(frame)}\n`;
+}
+
+interface RootLauncherPayload {
+  schemaVersion: 'xyte.root.launcher.v1';
+  generatedAtUtc: string;
+  readiness: ReadinessCheck;
+  configured: boolean;
+  settings: {
+    tenantId?: string;
+    outputMode: CliTextJsonOutputMode;
+    consoleScreen: TuiScreenId;
+  };
+  sections: Array<{
+    title: string;
+    description: string;
+    commands: string[];
+  }>;
+}
+
+function buildRootLauncherPayload(args: {
+  readiness: ReadinessCheck;
+  settings: ResolvedCliSettingsState;
+}): RootLauncherPayload {
+  const tenantId = args.settings.values.defaults.tenant ?? args.readiness.tenantId ?? SIMPLE_SETUP_DEFAULT_TENANT;
+  const configured = args.readiness.state === 'ready';
+  const sections = configured
+    ? [
+        {
+          title: 'Everyday Ops',
+          description: 'Operator flows and fleet visibility.',
+          commands: [
+            `xyte-cli ops watch incidents --tenant ${tenantId} --once --strict-json`,
+            `xyte-cli ops inspect fleet --tenant ${tenantId} --output json`,
+            `xyte-cli ops inspect deep-dive --tenant ${tenantId} --render markdown`
+          ]
+        },
+        {
+          title: 'Raw API',
+          description: 'Direct endpoint discovery and invocation.',
+          commands: [
+            `xyte-cli api endpoints list --tenant ${tenantId}`,
+            `xyte-cli api endpoints describe organization.devices.getDevices`,
+            `xyte-cli api call organization.devices.getDevices --tenant ${tenantId} --output json`
+          ]
+        },
+        {
+          title: 'Config & Credentials',
+          description: 'Inspect resolved settings, tenants, and key slots.',
+          commands: [
+            'xyte-cli config show --scope resolved',
+            `xyte-cli config tenant use ${tenantId}`,
+            `xyte-cli config key list --tenant ${tenantId} --output text`
+          ]
+        },
+        {
+          title: 'Console / Headless',
+          description: 'Interactive console and machine-readable frames.',
+          commands: [
+            `xyte-cli ops console --screen ${args.settings.values.console.screen}`,
+            `xyte-cli ops console --headless --screen dashboard --tenant ${tenantId} --output json`
+          ]
+        },
+        {
+          title: 'Examples',
+          description: 'Task-first shortcuts.',
+          commands: [
+            `xyte-cli flow run flow.daily-deep-dive-report --tenant ${tenantId} --plan`,
+            `xyte-cli util prepare --action organization.devices.claimDevice --tenant ${tenantId} --input ./claims.csv`
+          ]
+        }
+      ]
+    : [
+        {
+          title: 'Setup',
+          description: 'First-run onboarding and readiness checks.',
+          commands: [
+            `xyte-cli setup run --non-interactive --tenant ${tenantId} --key "$XYTE_CLI_KEY"`,
+            `xyte-cli setup status --tenant ${tenantId}`,
+            `xyte-cli config doctor --tenant ${tenantId}`
+          ]
+        },
+        {
+          title: 'Everyday Ops',
+          description: 'Console entrypoints become useful after setup succeeds.',
+          commands: [`xyte-cli ops console --screen setup`, `xyte-cli status --mode full --tenant ${tenantId}`]
+        },
+        {
+          title: 'Raw API',
+          description: 'Once credentials exist, raw API calls live under api.',
+          commands: [`xyte-cli api endpoints list --tenant ${tenantId}`, `xyte-cli api call organization.getOrganizationInfo --tenant ${tenantId}`]
+        },
+        {
+          title: 'Config & Credentials',
+          description: 'Store tenants, key slots, and layered defaults.',
+          commands: [
+            'xyte-cli config show --scope resolved',
+            `xyte-cli config tenant add ${tenantId}`,
+            `xyte-cli config key add --tenant ${tenantId} --provider xyte-org --name primary --key "$XYTE_CLI_KEY"`
+          ]
+        },
+        {
+          title: 'Console / Headless',
+          description: 'Root no longer auto-opens the console.',
+          commands: [`xyte-cli ops console --screen setup`, `xyte-cli ops console --headless --screen setup --output json`]
+        },
+        {
+          title: 'Examples',
+          description: 'Canonical v2 entrypoints.',
+          commands: ['xyte-cli init --scope both --agents all', 'xyte-cli --output json']
+        }
+      ];
+
+  return {
+    schemaVersion: 'xyte.root.launcher.v1',
+    generatedAtUtc: new Date().toISOString(),
+    readiness: args.readiness,
+    configured,
+    settings: {
+      tenantId: args.settings.values.defaults.tenant,
+      outputMode: args.settings.values.output.mode,
+      consoleScreen: args.settings.values.console.screen
+    },
+    sections
+  };
+}
+
+function formatRootLauncherText(payload: RootLauncherPayload): string {
+  const lines = [
+    'xyte-cli',
+    `Readiness: ${payload.readiness.state}`,
+    `Tenant: ${payload.readiness.tenantId ?? 'none'}`,
+    `Connectivity: ${payload.readiness.connectionState} (${payload.readiness.connectivity.message})`
+  ];
+
+  for (const section of payload.sections) {
+    lines.push('');
+    lines.push(section.title);
+    lines.push(section.description);
+    for (const command of section.commands) {
+      lines.push(`- ${command}`);
+    }
+  }
+
+  return `${lines.join('\n')}\n`;
+}
+
 async function runSlotConnectivityTest(args: {
   provider: SecretProvider;
   tenantId: string;
@@ -732,8 +1036,13 @@ export function createCli(runtime: CliRuntime = {}): Command {
   const stderr = runtime.stderr ?? process.stderr;
   const prompt = runtime.promptValue ?? promptValue;
   const isInteractive = runtime.isTTY ?? Boolean(process.stdin.isTTY);
+  const stdoutIsTTY =
+    runtime.stdoutIsTTY ??
+    Boolean(('isTTY' in stdout ? (stdout as typeof process.stdout).isTTY : undefined) ?? process.stdout.isTTY);
   const profileStore = runtime.profileStore ?? new FileProfileStore();
   const runTui = runtime.runTui ?? runTuiApp;
+  const cwd = runtime.cwd ?? process.cwd();
+  const env = runtime.env ?? process.env;
 
   let secretStorePromise: Promise<SecretStore> | undefined;
   const getSecretStore = async () => {
@@ -746,14 +1055,30 @@ export function createCli(runtime: CliRuntime = {}): Command {
     return secretStorePromise;
   };
 
-  const withClient = async (tenantId?: string, retry?: { attempts?: number; backoffMs?: number }) => {
+  const resolveSettings = async (flagOverrides: Partial<Record<SettingKey, unknown>> = {}) => {
+    const activeTenantId = (await profileStore.getData()).activeTenantId;
+    return resolveCliSettingsSync({
+      cwd,
+      env,
+      activeTenantId,
+      flagOverrides
+    });
+  };
+
+  const withClient = async (
+    tenantId?: string,
+    retry?: { attempts?: number; backoffMs?: number },
+    flagOverrides: Partial<Record<SettingKey, unknown>> = {}
+  ) => {
     const secretStore = await getSecretStore();
+    const settings = await resolveSettings(flagOverrides);
+    const resolvedTenantId = tenantId ?? settings.values.defaults.tenant;
     return createXyteClient({
       profileStore,
       secretStore,
-      tenantId,
-      retryAttempts: retry?.attempts,
-      retryBackoffMs: retry?.backoffMs
+      tenantId: resolvedTenantId,
+      retryAttempts: retry?.attempts ?? settings.values.http.retryAttempts,
+      retryBackoffMs: retry?.backoffMs ?? settings.values.http.retryBackoffMs
     });
   };
 
@@ -870,6 +1195,1123 @@ export function createCli(runtime: CliRuntime = {}): Command {
     };
   };
 
+  const handleRootLauncher = async (options: { output?: string } = {}) => {
+    const settings = await resolveSettings();
+    const tenantId = settings.values.defaults.tenant;
+    const secretStore = await getSecretStore();
+    const client = tenantId ? await withClient(tenantId) : undefined;
+    const readiness = await evaluateReadiness({
+      profileStore,
+      secretStore,
+      tenantId,
+      client,
+      checkConnectivity: true
+    });
+    const payload = buildRootLauncherPayload({ readiness, settings });
+    const output = resolveTextJsonOutput({
+      output: options.output,
+      stdoutIsTTY,
+      settings
+    });
+
+    if (output === 'text') {
+      stdout.write(formatRootLauncherText(payload));
+      return;
+    }
+
+    printJson(stdout, payload, { strictJson: resolveStrictJson({ settings }) });
+  };
+
+  const handleInit = async (options: {
+    target?: string;
+    scope?: string;
+    agents?: string;
+    force?: boolean;
+    setup?: boolean;
+  }) => {
+    let scope = parseSkillInstallScope(options.scope);
+    let agents = parseSkillAgents(options.agents);
+    if (isInteractive) {
+      if (!scope) {
+        scope = parseSkillInstallScope(
+          await prompt({
+            question: 'Install scope (project|user|both)',
+            initial: 'project',
+            stdout
+          })
+        );
+      }
+      if (!agents) {
+        agents = parseSkillAgents(
+          await prompt({
+            question: 'Agents (all|claude,copilot,codex)',
+            initial: 'all',
+            stdout
+          })
+        );
+      }
+    }
+    scope = scope ?? 'project';
+    agents = agents ?? [...SKILL_AGENTS];
+
+    const skillSource = resolveSkillSourceDir();
+    const result = await installSkills({
+      skillName: 'xyte-cli',
+      sourceDir: skillSource,
+      scope,
+      agents,
+      targetWorkspace: options.target,
+      force: options.force === true
+    });
+
+    if (scope === 'project' || scope === 'both') {
+      stdout.write(`✅ Workspace target: \`${result.workspaceRoot}\`.\n`);
+    }
+    if (scope === 'user' || scope === 'both') {
+      stdout.write(`✅ User target: \`${result.homeRoot}\`.\n`);
+    }
+    stdout.write('Skill install summary:\n');
+    result.outcomes.forEach((outcome) => stdout.write(`${formatInstallOutcome(outcome)}\n`));
+
+    const failed = result.outcomes.filter((outcome) => outcome.status === 'failed');
+    if (failed.length > 0) {
+      throw new CliUserError({
+        summary: 'Skill installation failed.',
+        cause: `Failed on ${failed.length} target(s).`,
+        suggestedCommands: ['Re-run with xyte-cli init --force', 'Inspect the failed targets reported above.']
+      });
+    }
+
+    if (options.setup === false) {
+      return;
+    }
+
+    let keyValue = env.XYTE_CLI_KEY?.trim();
+    let tenantLabel = SIMPLE_SETUP_DEFAULT_TENANT;
+
+    if (isInteractive) {
+      keyValue = keyValue || (await prompt({ question: 'XYTE API key', stdout })).trim();
+      tenantLabel =
+        (await prompt({
+          question: 'Tenant label (optional)',
+          initial: tenantLabel,
+          stdout
+        })).trim() || SIMPLE_SETUP_DEFAULT_TENANT;
+    }
+
+    if (!keyValue) {
+      throw new CliUserError({
+        summary: 'Missing API key for init setup.',
+        cause: 'Neither XYTE_CLI_KEY nor --no-setup was supplied.',
+        suggestedCommands: ['Set XYTE_CLI_KEY and re-run xyte-cli init', 'Re-run xyte-cli init --no-setup']
+      });
+    }
+
+    const tenantId = normalizeTenantId(tenantLabel);
+    const setupResult = await runSimpleSetup({
+      tenantId,
+      tenantName: tenantLabel,
+      keyValue,
+      setActive: true,
+      connectivityMode: 'auto'
+    });
+
+    if (setupResult.readiness.state !== 'ready') {
+      throw new CliUserError({
+        summary: 'Init setup did not complete.',
+        cause: setupResult.readiness.connectivity.message || 'Connectivity validation failed.',
+        suggestedCommands: [`xyte-cli setup status --tenant ${tenantId}`, `xyte-cli config doctor --tenant ${tenantId}`]
+      });
+    }
+
+    stdout.write(`✅ Setup complete for tenant \`${tenantId}\`.\n`);
+  };
+
+  const handleSetupStatus = async (options: { tenant?: string; output?: string; format?: OutputFormat }) => {
+    const settings = await resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
+    const secretStore = await getSecretStore();
+    const tenantId = options.tenant ?? settings.values.defaults.tenant;
+    const client = tenantId ? await withClient(tenantId) : undefined;
+    const readiness = await evaluateReadiness({
+      profileStore,
+      secretStore,
+      tenantId,
+      client,
+      checkConnectivity: true
+    });
+
+    if (
+      resolveTextJsonOutput({
+        output: options.output,
+        format: options.format,
+        stdoutIsTTY,
+        settings
+      }) === 'text'
+    ) {
+      stdout.write(formatReadinessText(readiness));
+      return;
+    }
+    printJson(stdout, readiness, { strictJson: resolveStrictJson({ settings }) });
+  };
+
+  const handleSetupRun = async (options: {
+    tenant?: string;
+    name?: string;
+    advanced?: boolean;
+    provider?: string;
+    slotName?: string;
+    key?: string;
+    setActive?: boolean;
+    connectivity?: string;
+    nonInteractive?: boolean;
+    output?: string;
+    format?: OutputFormat;
+  }) => {
+    if (!options.nonInteractive && !isInteractive) {
+      throw new CliUserError({
+        summary: 'Interactive setup requires a TTY.',
+        suggestedCommands: ['Use xyte-cli setup run --non-interactive --tenant <tenant-id> --key <value>']
+      });
+    }
+
+    const settings = await resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
+    const explicitTenantName = typeof options.name === 'string' && options.name.trim().length > 0;
+    const connectivityMode = parseSetupConnectivityMode(options.connectivity);
+    const advanced = options.advanced === true || options.provider !== undefined;
+    const output = resolveTextJsonOutput({
+      output: options.output,
+      format: options.format,
+      stdoutIsTTY,
+      settings
+    });
+    if (!advanced) {
+      let tenantLabel =
+        (options.name ?? options.tenant ?? settings.values.defaults.tenant ?? SIMPLE_SETUP_DEFAULT_TENANT).trim() ||
+        SIMPLE_SETUP_DEFAULT_TENANT;
+      let keyValue = options.key ?? env.XYTE_CLI_KEY;
+
+      if (!options.nonInteractive) {
+        keyValue = keyValue || (await prompt({ question: 'XYTE API key', stdout }));
+        tenantLabel =
+          (await prompt({
+            question: 'Tenant label (optional)',
+            initial: tenantLabel,
+            stdout
+          })) || tenantLabel;
+      }
+
+      if (!keyValue) {
+        throw new CliUserError({
+          summary: 'Missing API key.',
+          cause: 'Setup needs --key or XYTE_CLI_KEY.',
+          suggestedCommands: ['Use xyte-cli setup run --non-interactive --tenant <tenant-id> --key <value>']
+        });
+      }
+
+      const tenantId = normalizeTenantId(options.tenant?.trim() || tenantLabel);
+      const tenantName = tenantLabel.trim() || tenantId;
+      const resolvedTenantName =
+        !explicitTenantName && tenantName === tenantId
+          ? await resolveTenantNameFromKey({
+              tenantId,
+              provider: SIMPLE_SETUP_AUTH_PROVIDER,
+              keyValue
+            })
+          : undefined;
+      const setupResult = await runSimpleSetup({
+        tenantId,
+        tenantName: resolvedTenantName ?? tenantName,
+        keyValue,
+        setActive: options.setActive !== false,
+        connectivityMode
+      });
+
+      if (output === 'text') {
+        stdout.write(formatReadinessText(setupResult.readiness));
+        return;
+      }
+
+      printJson(stdout, setupResult, { strictJson: resolveStrictJson({ settings }) });
+      return;
+    }
+
+    let tenantId = options.tenant ?? settings.values.defaults.tenant;
+    let tenantName = options.name;
+    let provider = options.provider ? parseProvider(options.provider) : undefined;
+    let slotName = options.slotName ?? 'primary';
+    let keyValue = options.key ?? env.XYTE_CLI_KEY;
+    const steps: SetupStep[] = [];
+
+    if (!options.nonInteractive) {
+      tenantId = tenantId || (await prompt({ question: 'Tenant id', stdout }));
+      tenantName = tenantName || (await prompt({ question: 'Tenant display name', initial: tenantId, stdout }));
+      const providerAnswer = provider || parseProvider(await prompt({ question: 'Provider', initial: 'xyte-org', stdout }));
+      provider = providerAnswer;
+      slotName = await prompt({ question: 'Slot name', initial: slotName, stdout });
+      keyValue = keyValue || (await prompt({ question: 'API key', stdout }));
+    }
+
+    if (!tenantId) {
+      throw new CliUserError({
+        summary: 'Missing tenant id.',
+        suggestedCommands: ['Use xyte-cli setup run --advanced --tenant <tenant-id> --provider xyte-org --key <value>']
+      });
+    }
+    if (!provider) {
+      throw new CliUserError({
+        summary: 'Missing provider.',
+        suggestedCommands: ['Use --provider xyte-org', 'Use --provider xyte-partner']
+      });
+    }
+    if (!keyValue) {
+      throw new CliUserError({
+        summary: 'Missing API key.',
+        suggestedCommands: ['Use xyte-cli setup run --advanced --tenant <tenant-id> --provider xyte-org --key <value>']
+      });
+    }
+
+    const candidateTenantName = (tenantName?.trim() || tenantId).trim() || tenantId;
+    const resolvedTenantName =
+      !explicitTenantName && candidateTenantName === tenantId
+        ? await resolveTenantNameFromKey({
+            tenantId,
+            provider,
+            keyValue
+          })
+        : undefined;
+    tenantName = resolvedTenantName ?? candidateTenantName;
+
+    await profileStore.upsertTenant({
+      id: tenantId,
+      name: tenantName
+    });
+    steps.push({
+      key: 'tenant_upserted',
+      status: 'ok',
+      detail: tenantId
+    });
+    await profileStore.setActiveTenant(tenantId);
+    steps.push({
+      key: 'tenant_activated',
+      status: 'ok',
+      detail: tenantId
+    });
+    const secretStore = await getSecretStore();
+
+    let slot;
+    try {
+      slot = await profileStore.addKeySlot(tenantId, {
+        provider,
+        name: slotName,
+        fingerprint: makeKeyFingerprint(keyValue)
+      });
+    } catch (error) {
+      const knownSlots = await profileStore.listKeySlots(tenantId, provider);
+      const existing = knownSlots.find((item) => item.name.toLowerCase() === slotName.toLowerCase());
+      if (!existing) {
+        throw error;
+      }
+      slot = await profileStore.updateKeySlot(tenantId, provider, existing.slotId, {
+        fingerprint: makeKeyFingerprint(keyValue)
+      });
+    }
+    await secretStore.setSlotSecret(tenantId, provider, slot.slotId, keyValue);
+    steps.push({
+      key: 'slot_written',
+      status: 'ok',
+      detail: slot.slotId
+    });
+
+    if (options.setActive !== false) {
+      await profileStore.setActiveKeySlot(tenantId, provider, slot.slotId);
+      steps.push({
+        key: 'slot_activated',
+        status: 'ok',
+        detail: slot.slotId
+      });
+    } else {
+      steps.push({
+        key: 'slot_activated',
+        status: 'skipped',
+        detail: 'setActive=false'
+      });
+    }
+
+    const checkConnectivity = connectivityMode !== 'never';
+    const client = checkConnectivity ? await withClient(tenantId) : undefined;
+    const readiness = await evaluateReadiness({
+      profileStore,
+      secretStore,
+      tenantId,
+      client,
+      checkConnectivity
+    });
+    steps.push({
+      key: 'connectivity_checked',
+      status: checkConnectivity ? 'ok' : 'skipped',
+      detail: checkConnectivity ? readiness.connectivity.message : 'Connectivity probe skipped by setup mode.'
+    });
+    steps.push({
+      key: 'readiness_evaluated',
+      status: 'ok',
+      detail: readiness.state
+    });
+
+    if (output === 'text') {
+      stdout.write(formatReadinessText(readiness));
+      return;
+    }
+
+    printJson(
+      stdout,
+      {
+        tenantId,
+        provider,
+        slot,
+        readiness,
+        connectivityMode,
+        steps
+      },
+      { strictJson: resolveStrictJson({ settings }) }
+    );
+  };
+
+  const handleConfigDoctor = async (options: {
+    tenant?: string;
+    retryAttempts?: string;
+    retryBackoffMs?: string;
+    output?: string;
+    format?: OutputFormat;
+  }) => {
+    const overrides: Partial<Record<SettingKey, unknown>> = {};
+    if (options.tenant) {
+      overrides['defaults.tenant'] = options.tenant;
+    }
+    if (options.retryAttempts) {
+      overrides['http.retryAttempts'] = parsePositiveIntegerOption(options.retryAttempts, 2, 'retry-attempts');
+    }
+    if (options.retryBackoffMs) {
+      overrides['http.retryBackoffMs'] = parsePositiveIntegerOption(options.retryBackoffMs, 250, 'retry-backoff-ms');
+    }
+    const settings = await resolveSettings(overrides);
+    const tenantId = options.tenant ?? settings.values.defaults.tenant;
+    const secretStore = await getSecretStore();
+    const client = await withClient(tenantId, undefined, overrides);
+    const readiness = await evaluateReadiness({
+      profileStore,
+      secretStore,
+      tenantId,
+      client,
+      checkConnectivity: true
+    });
+
+    if (
+      resolveTextJsonOutput({
+        output: options.output,
+        format: options.format,
+        stdoutIsTTY,
+        settings
+      }) === 'text'
+    ) {
+      stdout.write(formatReadinessText(readiness));
+      return;
+    }
+
+    printJson(
+      stdout,
+      {
+        retryAttempts: settings.values.http.retryAttempts,
+        retryBackoffMs: settings.values.http.retryBackoffMs,
+        readiness
+      },
+      { strictJson: resolveStrictJson({ settings }) }
+    );
+  };
+
+  const handleConfigShow = async (options: {
+    scope?: string;
+    output?: string;
+    format?: OutputFormat;
+  }) => {
+    const scope = (options.scope ?? 'resolved').trim().toLowerCase();
+    if (!['user', 'workspace', 'resolved'].includes(scope)) {
+      throw new CliUserError({
+        summary: 'Invalid config scope.',
+        cause: `Received "${options.scope}".`,
+        suggestedCommands: ['Use --scope resolved', 'Use --scope user', 'Use --scope workspace']
+      });
+    }
+    const settings = await resolveSettings();
+    const output = resolveTextJsonOutput({
+      output: options.output,
+      format: options.format,
+      stdoutIsTTY,
+      settings
+    });
+    const payload =
+      scope === 'resolved'
+        ? settings
+        : {
+            schemaVersion: 'xyte.settings.v1',
+            scope,
+            path: scope === 'user' ? settings.paths.user : settings.paths.workspace,
+            values: scope === 'user' ? settings.user : settings.workspace
+          };
+
+    if (output === 'text') {
+      stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+      return;
+    }
+    printJson(stdout, payload, { strictJson: resolveStrictJson({ settings }) });
+  };
+
+  const handleConfigPath = async (options: { output?: string; format?: OutputFormat }) => {
+    const settings = await resolveSettings();
+    const output = resolveTextJsonOutput({
+      output: options.output,
+      format: options.format,
+      stdoutIsTTY,
+      settings
+    });
+    const payload = {
+      schemaVersion: 'xyte.settings.v1',
+      configDir: settings.paths.configDir,
+      user: settings.paths.user,
+      workspace: settings.paths.workspace,
+      secretStore: path.join(settings.paths.configDir, 'secrets.v1.json'),
+      profile: path.join(settings.paths.configDir, 'profile.json')
+    };
+
+    if (output === 'text') {
+      stdout.write(`configDir: ${payload.configDir}\nuser: ${payload.user}\nworkspace: ${payload.workspace}\nprofile: ${payload.profile}\nsecretStore: ${payload.secretStore}\n`);
+      return;
+    }
+    printJson(stdout, payload, { strictJson: resolveStrictJson({ settings }) });
+  };
+
+  const handleConfigSet = async (key: string, value: string, options: { scope?: string; output?: string; format?: OutputFormat }) => {
+    if (!SUPPORTED_SETTING_KEYS.includes(key as SettingKey)) {
+      throw new CliUserError({
+        summary: 'Unknown config key.',
+        cause: `Received "${key}".`,
+        suggestedCommands: [`Supported keys: ${SUPPORTED_SETTING_KEYS.join(', ')}`]
+      });
+    }
+    const scope = (options.scope ?? 'user').trim().toLowerCase();
+    if (scope !== 'user' && scope !== 'workspace') {
+      throw new CliUserError({
+        summary: 'Invalid config scope.',
+        cause: `Received "${options.scope}".`,
+        suggestedCommands: ['Use --scope user', 'Use --scope workspace']
+      });
+    }
+    const targetScope = scope as Exclude<SettingsScope, 'resolved'>;
+    const parsedValue = parseSettingValue(key as SettingKey, value);
+    const result = setCliSettingSync({
+      scope: targetScope,
+      key: key as SettingKey,
+      value: parsedValue,
+      cwd,
+      env
+    });
+    const settings = await resolveSettings();
+    const output = resolveTextJsonOutput({
+      output: options.output,
+      format: options.format,
+      stdoutIsTTY,
+      settings
+    });
+    const payload = {
+      schemaVersion: 'xyte.settings.v1',
+      scope,
+      path: result.path,
+      key,
+      value: parsedValue,
+      values: result.data
+    };
+    if (output === 'text') {
+      stdout.write(`Set ${key}=${JSON.stringify(parsedValue)} in ${result.path}\n`);
+      return;
+    }
+    printJson(stdout, payload, { strictJson: resolveStrictJson({ settings }) });
+  };
+
+  const handleConfigUnset = async (key: string, options: { scope?: string; output?: string; format?: OutputFormat }) => {
+    if (!SUPPORTED_SETTING_KEYS.includes(key as SettingKey)) {
+      throw new CliUserError({
+        summary: 'Unknown config key.',
+        cause: `Received "${key}".`,
+        suggestedCommands: [`Supported keys: ${SUPPORTED_SETTING_KEYS.join(', ')}`]
+      });
+    }
+    const scope = (options.scope ?? 'user').trim().toLowerCase();
+    if (scope !== 'user' && scope !== 'workspace') {
+      throw new CliUserError({
+        summary: 'Invalid config scope.',
+        cause: `Received "${options.scope}".`,
+        suggestedCommands: ['Use --scope user', 'Use --scope workspace']
+      });
+    }
+    const targetScope = scope as Exclude<SettingsScope, 'resolved'>;
+    const result = unsetCliSettingSync({
+      scope: targetScope,
+      key: key as SettingKey,
+      cwd,
+      env
+    });
+    const settings = await resolveSettings();
+    const output = resolveTextJsonOutput({
+      output: options.output,
+      format: options.format,
+      stdoutIsTTY,
+      settings
+    });
+    const payload = {
+      schemaVersion: 'xyte.settings.v1',
+      scope,
+      path: result.path,
+      key,
+      values: result.data
+    };
+    if (output === 'text') {
+      stdout.write(`Unset ${key} in ${result.path}\n`);
+      return;
+    }
+    printJson(stdout, payload, { strictJson: resolveStrictJson({ settings }) });
+  };
+
+  const handleApiEndpointsList = async (options: { tenant?: string; output?: string; format?: string }) => {
+    const settings = await resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
+    const tenantId = options.tenant ?? settings.values.defaults.tenant;
+    const payload = tenantId ? await (await withClient(tenantId)).listTenantEndpoints(tenantId) : listEndpoints();
+    const output = resolveTextJsonOutput({
+      output: options.output,
+      format: options.format,
+      stdoutIsTTY,
+      settings
+    });
+    if (output === 'text') {
+      const rows = Array.isArray(payload) ? payload.map((item) => item.key) : [];
+      stdout.write(rows.join('\n') + (rows.length ? '\n' : ''));
+      return;
+    }
+    printJson(stdout, payload, { strictJson: resolveStrictJson({ settings }) });
+  };
+
+  const handleApiEndpointsDescribe = async (key: string, options: { output?: string; format?: string } = {}) => {
+    const settings = await resolveSettings();
+    const endpoint = getEndpoint(key);
+    const output = resolveTextJsonOutput({
+      output: options.output,
+      format: options.format,
+      stdoutIsTTY,
+      settings
+    });
+    if (output === 'text') {
+      stdout.write(`${endpoint.key}\n${endpoint.method} ${endpoint.pathTemplate}\nauth=${endpoint.authScope}\n`);
+      return;
+    }
+    printJson(stdout, endpoint, { strictJson: resolveStrictJson({ settings }) });
+  };
+
+  const handleApiCall = async (key: string, options: Record<string, unknown>) => {
+    const tenantOverride = typeof options.tenant === 'string' ? options.tenant : undefined;
+    const settings = await resolveSettings(tenantOverride ? { 'defaults.tenant': tenantOverride } : {});
+    const endpoint = getEndpoint(key);
+    const method = endpoint.method.toUpperCase();
+    const outputMode = String(options.outputMode ?? 'raw').trim().toLowerCase();
+    if (!['raw', 'envelope'].includes(outputMode)) {
+      throw new CliUserError({
+        summary: 'Invalid API call output mode.',
+        cause: `Received "${outputMode}".`,
+        suggestedCommands: ['Use --output-mode raw', 'Use --output-mode envelope']
+      });
+    }
+    const requestId = randomUUID();
+    const tenantId = tenantOverride ?? settings.values.defaults.tenant;
+    const path = parsePathJson(options.pathJson as string | undefined);
+    const query = parseQueryJson(options.queryJson as string | undefined);
+    const body = options.bodyJson ? JSON.parse(String(options.bodyJson)) : undefined;
+    const strictJson = resolveStrictJson({ strictJson: options.strictJson === true, settings });
+    const mutating = isMutatingMethod(method);
+
+    try {
+      const client = await withClient(tenantId);
+      const result = await client.callWithMeta(key, {
+        requestId,
+        tenantId,
+        path,
+        query,
+        body
+      });
+
+      if (outputMode === 'envelope') {
+        const envelope = buildCallEnvelope({
+          requestId,
+          tenantId,
+          endpointKey: key,
+          method,
+          guard: {
+            allowWrite: mutating
+          },
+          request: {
+            path,
+            query,
+            body
+          },
+          response: {
+            status: result.status,
+            durationMs: result.durationMs,
+            retryCount: result.retryCount,
+            data: result.data
+          }
+        });
+        printJson(stdout, envelope, { strictJson });
+        return;
+      }
+
+      const output = resolveTextJsonOutput({
+        output: options.output as string | undefined,
+        stdoutIsTTY,
+        settings
+      });
+      if (output === 'text') {
+        stdout.write(`${JSON.stringify(result.data, null, 2)}\n`);
+        return;
+      }
+      printJson(stdout, result.data, { strictJson });
+    } catch (error) {
+      if (outputMode !== 'envelope') {
+        throw error;
+      }
+
+      const envelope = buildCallEnvelope({
+        requestId,
+        tenantId,
+        endpointKey: key,
+        method,
+        guard: {
+          allowWrite: mutating
+        },
+        request: {
+          path,
+          query,
+          body
+        },
+        error: toProblemDetails(error, `/api/call/${key}`)
+      });
+      printJson(stdout, envelope, { strictJson });
+      process.exitCode = 1;
+    }
+  };
+
+  const handleOpsWatchIncidents = async (options: {
+    tenant?: string;
+    profile?: string;
+    queryJson?: string;
+    intervalMs?: string;
+    maxPolls?: string;
+    once?: boolean;
+    output?: string;
+    strictJson?: boolean;
+  }) => {
+    const overrides: Partial<Record<SettingKey, unknown>> = {};
+    if (options.tenant) {
+      overrides['defaults.tenant'] = options.tenant;
+    }
+    if (options.profile) {
+      overrides['watch.profile'] = parseWatchProfile(options.profile);
+    }
+    if (options.intervalMs) {
+      overrides['watch.intervalMs'] = parseWatchIntervalMs(options.intervalMs);
+    }
+    if (options.maxPolls) {
+      overrides['watch.maxPolls'] = parseWatchMaxPolls(options.maxPolls);
+    }
+    const settings = await resolveSettings(overrides);
+    const tenantId = options.tenant ?? settings.values.defaults.tenant;
+    const query = parseQueryJson(options.queryJson);
+    const output = resolveTextJsonOutput({
+      output: options.output,
+      stdoutIsTTY,
+      settings
+    });
+    const strictJson = resolveStrictJson({ strictJson: options.strictJson, settings });
+    const client = await withClient(tenantId, undefined, overrides);
+    await runWatch({
+      client,
+      tenantId,
+      profile: (overrides['watch.profile'] as 'incidents-active' | undefined) ?? settings.values.watch.profile,
+      query,
+      intervalMs: (overrides['watch.intervalMs'] as number | undefined) ?? settings.values.watch.intervalMs,
+      once: options.once === true,
+      maxPolls:
+        options.maxPolls !== undefined
+          ? (overrides['watch.maxPolls'] as number | undefined)
+          : settings.values.watch.maxPolls,
+      onFrame: (frame) => {
+        if (output === 'text') {
+          stdout.write(formatWatchFrameText(frame));
+          return;
+        }
+        printJson(stdout, frame, { strictJson, compact: true });
+      }
+    });
+  };
+
+  const handleOpsInspectFleet = async (options: {
+    tenant?: string;
+    providerScope?: string;
+    render?: string;
+    format?: string;
+    output?: string;
+    strictJson?: boolean;
+  }) => {
+    const overrides: Partial<Record<SettingKey, unknown>> = {};
+    if (options.tenant) {
+      overrides['defaults.tenant'] = options.tenant;
+    }
+    if (options.providerScope) {
+      overrides['ops.providerScope'] = parseInspectProviderScope(options.providerScope);
+    }
+    const settings = await resolveSettings(overrides);
+    const tenantId = options.tenant ?? settings.values.defaults.tenant;
+    if (!tenantId) {
+      throw new CliUserError({
+        summary: 'Missing tenant for ops inspect fleet.',
+        suggestedCommands: ['Use --tenant <tenant-id>', 'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>']
+      });
+    }
+    const render = (options.render ?? options.format ?? 'json').trim().toLowerCase();
+    if (!['json', 'ascii'].includes(render)) {
+      throw new CliUserError({
+        summary: 'Invalid inspect fleet render mode.',
+        cause: `Received "${render}".`,
+        suggestedCommands: ['Use --render json', 'Use --render ascii']
+      });
+    }
+    const providerScope =
+      (overrides['ops.providerScope'] as InspectProviderScope | undefined) ?? settings.values.ops.providerScope;
+    const client = await withClient(tenantId, undefined, overrides);
+    const tenantProfile = await profileStore.getTenant(tenantId);
+    const snapshot = await collectFleetSnapshot(client, tenantId, tenantProfile?.name, providerScope);
+    const result = buildFleetInspect(snapshot);
+
+    if (render === 'ascii') {
+      stdout.write(`${formatFleetInspectAscii(result)}\n`);
+      return;
+    }
+
+    const output = resolveTextJsonOutput({
+      output: options.output,
+      stdoutIsTTY,
+      settings
+    });
+    if (output === 'text') {
+      stdout.write(`${formatFleetInspectAscii(result)}\n`);
+      return;
+    }
+    printJson(stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+  };
+
+  const handleOpsInspectDeepDive = async (options: {
+    tenant?: string;
+    providerScope?: string;
+    window?: string;
+    render?: string;
+    format?: string;
+    output?: string;
+    strictJson?: boolean;
+  }) => {
+    const overrides: Partial<Record<SettingKey, unknown>> = {};
+    if (options.tenant) {
+      overrides['defaults.tenant'] = options.tenant;
+    }
+    if (options.providerScope) {
+      overrides['ops.providerScope'] = parseInspectProviderScope(options.providerScope);
+    }
+    const settings = await resolveSettings(overrides);
+    const tenantId = options.tenant ?? settings.values.defaults.tenant;
+    if (!tenantId) {
+      throw new CliUserError({
+        summary: 'Missing tenant for ops inspect deep-dive.',
+        suggestedCommands: ['Use --tenant <tenant-id>', 'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>']
+      });
+    }
+    const render = (options.render ?? options.format ?? 'json').trim().toLowerCase();
+    if (!['json', 'ascii', 'markdown'].includes(render)) {
+      throw new CliUserError({
+        summary: 'Invalid deep-dive render mode.',
+        cause: `Received "${render}".`,
+        suggestedCommands: ['Use --render json', 'Use --render ascii', 'Use --render markdown']
+      });
+    }
+    const providerScope =
+      (overrides['ops.providerScope'] as InspectProviderScope | undefined) ?? settings.values.ops.providerScope;
+    const windowHours = Number.parseInt(options.window ?? '24', 10);
+    const client = await withClient(tenantId, undefined, overrides);
+    const tenantProfile = await profileStore.getTenant(tenantId);
+    const snapshot = await collectFleetSnapshot(client, tenantId, tenantProfile?.name, providerScope);
+    const result = buildDeepDive(snapshot, Number.isFinite(windowHours) ? windowHours : 24);
+
+    if (render === 'ascii') {
+      stdout.write(`${formatDeepDiveAscii(result)}\n`);
+      return;
+    }
+    if (render === 'markdown') {
+      stdout.write(`${formatDeepDiveMarkdown(result, false)}\n`);
+      return;
+    }
+
+    const output = resolveTextJsonOutput({
+      output: options.output,
+      stdoutIsTTY,
+      settings
+    });
+    if (output === 'text') {
+      stdout.write(`${formatDeepDiveMarkdown(result, false)}\n`);
+      return;
+    }
+    printJson(stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+  };
+
+  const handleOpsReportGenerate = async (options: {
+    tenant?: string;
+    input: string;
+    out: string;
+    render?: 'markdown' | 'pdf';
+    format?: 'markdown' | 'pdf';
+    includeSensitive?: boolean;
+    strictJson?: boolean;
+  }) => {
+    const overrides: Partial<Record<SettingKey, unknown>> = {};
+    if (options.tenant) {
+      overrides['defaults.tenant'] = options.tenant;
+    }
+    if (options.includeSensitive === true) {
+      overrides['report.includeSensitive'] = true;
+    }
+    const settings = await resolveSettings(overrides);
+    const tenantId = options.tenant ?? settings.values.defaults.tenant;
+    if (!tenantId) {
+      throw new CliUserError({
+        summary: 'Missing tenant for ops report generate.',
+        suggestedCommands: ['Use --tenant <tenant-id>', 'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>']
+      });
+    }
+    const inputPath = path.resolve(options.input);
+    let raw: unknown;
+    try {
+      raw = JSON.parse(readFileSync(inputPath, 'utf8')) as unknown;
+    } catch {
+      throw new CliUserError({
+        summary: 'Input JSON is invalid.',
+        cause: `Failed to parse ${inputPath}.`,
+        suggestedCommands: ['Generate fresh input with xyte-cli ops inspect deep-dive --output json']
+      });
+    }
+
+    const render = (options.render ?? options.format ?? 'pdf').trim().toLowerCase();
+    if (!['markdown', 'pdf'].includes(render)) {
+      throw new CliUserError({
+        summary: 'Invalid report render mode.',
+        cause: `Received "${render}".`,
+        suggestedCommands: ['Use --render pdf', 'Use --render markdown']
+      });
+    }
+
+    let deepDive = parseDeepDiveForReport(raw, tenantId);
+    if (!deepDive.tenantName) {
+      const tenantProfile = await profileStore.getTenant(tenantId);
+      if (tenantProfile?.name) {
+        deepDive = {
+          ...deepDive,
+          tenantName: tenantProfile.name
+        };
+      }
+    }
+
+    const generated = await generateFleetReport({
+      deepDive,
+      format: render as 'markdown' | 'pdf',
+      outPath: options.out,
+      includeSensitive: options.includeSensitive === true || settings.values.report.includeSensitive
+    });
+    printJson(stdout, generated, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+  };
+
+  const handleOpsConsole = async (options: {
+    headless?: boolean;
+    screen?: string;
+    format?: string;
+    output?: string;
+    once?: boolean;
+    follow?: boolean;
+    intervalMs?: string;
+    tenant?: string;
+    motion?: boolean;
+    debug?: boolean;
+    debugLog?: string;
+  }) => {
+    const overrides: Partial<Record<SettingKey, unknown>> = {};
+    if (options.tenant) {
+      overrides['defaults.tenant'] = options.tenant;
+    }
+    if (options.screen) {
+      overrides['console.screen'] = options.screen as TuiScreenId;
+    }
+    if (options.motion === false) {
+      overrides['console.motion'] = false;
+    }
+    if (options.follow === true) {
+      overrides['console.follow'] = true;
+    }
+    if (options.intervalMs) {
+      overrides['console.intervalMs'] = parsePositiveIntegerOption(options.intervalMs, 2000, 'interval-ms');
+    }
+    if (options.debugLog) {
+      overrides['console.debugLogPath'] = options.debugLog;
+    }
+    const settings = await resolveSettings(overrides);
+    const secretStore = await getSecretStore();
+    const client = createXyteClient({
+      profileStore,
+      secretStore,
+      tenantId: options.tenant ?? settings.values.defaults.tenant,
+      retryAttempts: settings.values.http.retryAttempts,
+      retryBackoffMs: settings.values.http.retryBackoffMs
+    });
+    const allowedScreens: TuiScreenId[] = ['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets'];
+    const screen = (options.screen ?? settings.values.console.screen ?? 'dashboard') as TuiScreenId;
+    if (!allowedScreens.includes(screen)) {
+      throw new CliUserError({
+        summary: 'Invalid console screen.',
+        cause: `Received "${options.screen}".`,
+        suggestedCommands: [`Use one of: ${allowedScreens.join(', ')}`]
+      });
+    }
+    const requestedOutput = parseCliTextJsonOutputMode(options.output ?? options.format ?? (options.headless ? 'json' : undefined));
+    if (Boolean(options.headless) && requestedOutput && requestedOutput !== 'json') {
+      throw new CliUserError({
+        summary: 'Headless mode is JSON-only.',
+        suggestedCommands: ['Use xyte-cli ops console --headless --output json']
+      });
+    }
+    const follow = options.once ? false : options.follow ?? settings.values.console.follow;
+    const intervalMs =
+      options.intervalMs !== undefined
+        ? parsePositiveIntegerOption(options.intervalMs, settings.values.console.intervalMs, 'interval-ms')
+        : settings.values.console.intervalMs;
+    const motionEnabled = options.motion === false ? false : settings.values.console.motion;
+
+    await runTui({
+      client,
+      profileStore,
+      secretStore,
+      initialScreen: screen,
+      headless: Boolean(options.headless),
+      format: (options.headless ? 'json' : requestedOutput === 'text' ? 'text' : 'json') as OutputFormat,
+      motionEnabled,
+      follow,
+      intervalMs,
+      tenantId: options.tenant ?? settings.values.defaults.tenant,
+      output: stdout,
+      debug: options.debug,
+      debugLogPath: options.debugLog ?? settings.values.console.debugLogPath
+    });
+  };
+
+  const handleUtilPrepare = async (options: {
+    input: string;
+    action: string;
+    tenant?: string;
+    outputDir?: string;
+    primaryFormat?: string;
+    force?: boolean;
+    strictJson?: boolean;
+  }) => {
+    const settings = await resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
+    const result = buildUtilityPrepare({
+      inputPath: options.input,
+      actionKey: options.action,
+      outputDir: options.outputDir,
+      tenantId: options.tenant ?? settings.values.defaults.tenant,
+      primaryFormat: parseUtilityPreparePrimaryFormat(options.primaryFormat),
+      force: options.force === true
+    });
+    printJson(stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+  };
+
+  const handleUtilListActions = async (options: {
+    output?: string;
+    format?: string;
+    entity?: string;
+    includeGeneric?: boolean;
+    strictJson?: boolean;
+  }) => {
+    const settings = await resolveSettings();
+    const output = resolveTextJsonOutput({
+      output: options.output,
+      format: options.format,
+      stdoutIsTTY,
+      settings
+    });
+    const actions = listUtilityPrepareActions({
+      entity: options.entity,
+      includeGeneric: options.includeGeneric !== false
+    });
+    if (output === 'json') {
+      printJson(stdout, actions, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+      return;
+    }
+    if (!actions.length) {
+      stdout.write('No utility actions found.\n');
+      return;
+    }
+    for (const action of actions) {
+      stdout.write(`${action.actionKey} | entity=${action.entity} | mode=${action.mode} | execution=${action.executionSupport}\n`);
+    }
+  };
+
+  const handleUtilImportTree = async (options: {
+    tenant?: string;
+    input: string;
+    inputFormat?: string;
+    pathField?: string;
+    spaceTypeField?: string;
+    configField?: string;
+    apply?: boolean;
+    continueOnError?: boolean;
+    report?: string;
+    strictJson?: boolean;
+  }) => {
+    const settings = await resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
+    const tenantId = options.tenant ?? settings.values.defaults.tenant;
+    if (!tenantId) {
+      throw new CliUserError({
+        summary: 'Missing tenant for util import-tree.',
+        suggestedCommands: ['Use --tenant <tenant-id>', 'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>']
+      });
+    }
+    const client = await withClient(tenantId);
+    const result = await runSpaceImportTree({
+      client,
+      tenantId,
+      inputPath: options.input,
+      inputFormat: parseUtilityInputFormat(options.inputFormat),
+      apply: options.apply === true,
+      continueOnError: options.continueOnError === true,
+      reportPath: options.report,
+      pathField: options.pathField,
+      spaceTypeField: options.spaceTypeField,
+      configField: options.configField
+    });
+    printJson(stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+    if (result.totals.failed > 0) {
+      process.exitCode = 1;
+    }
+  };
+
   const program = new Command();
   let actionLogger: CliActionLogger | undefined;
   let actionLogVerbose = false;
@@ -882,14 +2324,15 @@ export function createCli(runtime: CliRuntime = {}): Command {
     }
 
     const options = command.optsWithGlobals() as CliGlobalOptions;
+    const settings = resolveCliSettingsSync({ cwd, env });
     const envEnabled = parseBooleanEnvFlag(process.env.XYTE_LOG_ACTIONS);
     const envMirrorToStderr = parseBooleanEnvFlag(process.env.XYTE_LOG_ACTIONS_STDERR);
     const envVerbose = parseBooleanEnvFlag(process.env.XYTE_LOG_ACTIONS_VERBOSE);
-    const configuredPath = options.logActionsPath ?? process.env.XYTE_LOG_ACTIONS_PATH;
-    const enabled = options.logActions === true || envEnabled || Boolean(configuredPath);
-    const maxFileBytes = parsePositiveIntegerEnv(process.env.XYTE_LOG_ACTIONS_MAX_FILE_BYTES, 10 * 1024 * 1024);
-    const maxFiles = parsePositiveIntegerEnv(process.env.XYTE_LOG_ACTIONS_MAX_FILES, 5);
-    actionLogVerbose = options.logActionsVerbose === true || envVerbose;
+    const configuredPath = options.logActionsPath ?? settings.values.logs.path ?? process.env.XYTE_LOG_ACTIONS_PATH;
+    const enabled = options.logActions === true || settings.values.logs.enabled || envEnabled || Boolean(configuredPath);
+    const maxFileBytes = settings.values.logs.maxFileBytes;
+    const maxFiles = settings.values.logs.maxFiles;
+    actionLogVerbose = options.logActionsVerbose === true || settings.values.logs.verbose || envVerbose;
 
     actionLogger = createCliActionLogger({
       enabled,
@@ -903,182 +2346,65 @@ export function createCli(runtime: CliRuntime = {}): Command {
     return actionLogger;
   };
 
-  program.name('xyte-cli').description('Xyte CLI + TUI').version(getCliVersion());
+  program.name('xyte-cli').description('Agent-first Xyte CLI and console').version(getCliVersion());
+  program.showSuggestionAfterError(true);
   program.option('--error-format <format>', 'text|json', 'text');
+  program.option('--output <mode>', 'auto|json|text', 'auto');
   program.option('--log-actions', 'Log each CLI action (start/complete/error) to NDJSON');
   program.option('--log-actions-path <path>', 'Write action logs to this NDJSON file');
   program.option('--log-actions-verbose', 'Include command args/options payloads in action logs');
+  program.addHelpText(
+    'after',
+    [
+      '',
+      'Setup:',
+      '  xyte-cli init --scope both --agents all',
+      '  xyte-cli setup run --non-interactive --tenant <tenant-id> --key <value>',
+      '',
+      'Everyday Ops:',
+      '  xyte-cli ops watch incidents --tenant <tenant-id> --once --strict-json',
+      '  xyte-cli ops inspect fleet --tenant <tenant-id> --output json',
+      '',
+      'Raw API:',
+      '  xyte-cli api endpoints list --tenant <tenant-id>',
+      '  xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --output json',
+      '',
+      'Config & Credentials:',
+      '  xyte-cli config show --scope resolved',
+      '  xyte-cli config key list --tenant <tenant-id>',
+      '',
+      'Console / Headless:',
+      '  xyte-cli ops console --screen dashboard',
+      '  xyte-cli ops console --headless --screen dashboard --output json',
+      '',
+      'Examples:',
+      '  xyte-cli flow run flow.daily-deep-dive-report --tenant <tenant-id> --plan',
+      '  xyte-cli util prepare --action organization.devices.claimDevice --tenant <tenant-id> --input ./claims.csv'
+    ].join('\n')
+  );
 
   program
-    .command('install')
-    .description('Initialize workspace')
-    .option('--skills', 'install local agent skills')
+    .command('init')
+    .description('Bootstrap workspace skills and optionally run first-time setup')
     .option('--target <path>', 'Workspace directory override')
     .option('--scope <scope>', 'project|user|both')
     .option('--agents <agents>', 'all|claude|copilot|codex[,..]')
     .option('--force', 'Overwrite existing skill install')
     .option('--no-setup', 'Skip guided setup after installing skills')
-    .action(
-      async (options: {
-        skills?: boolean;
-        target?: string;
-        scope?: string;
-        agents?: string;
-        force?: boolean;
-        setup?: boolean;
-      }) => {
-        if (!options.skills) {
-          throw new Error('Use "xyte-cli install --skills" to install agent skills.');
-        }
+    .addHelpText(
+      'after',
+      [
+        '',
+        'Examples:',
+        '  xyte-cli init --scope both --agents all',
+        '  xyte-cli init --target ./workspace --no-setup'
+      ].join('\n')
+    )
+    .action(handleInit);
 
-        let scope = parseSkillInstallScope(options.scope);
-        let agents = parseSkillAgents(options.agents);
-        if (isInteractive) {
-          if (!scope) {
-            scope = parseSkillInstallScope(
-              await prompt({
-                question: 'Install scope (project|user|both)',
-                initial: 'project',
-                stdout
-              })
-            );
-          }
-          if (!agents) {
-            agents = parseSkillAgents(
-              await prompt({
-                question: 'Agents (all|claude,copilot,codex)',
-                initial: 'all',
-                stdout
-              })
-            );
-          }
-        }
-        scope = scope ?? 'project';
-        agents = agents ?? [...SKILL_AGENTS];
-
-        const skillSource = resolveSkillSourceDir();
-        const result = await installSkills({
-          skillName: 'xyte-cli',
-          sourceDir: skillSource,
-          scope,
-          agents,
-          targetWorkspace: options.target,
-          force: options.force === true
-        });
-
-        if (scope === 'project' || scope === 'both') {
-          stdout.write(`✅ Workspace target: \`${result.workspaceRoot}\`.\n`);
-        }
-        if (scope === 'user' || scope === 'both') {
-          stdout.write(`✅ User target: \`${result.homeRoot}\`.\n`);
-        }
-        stdout.write('Skill install summary:\n');
-        result.outcomes.forEach((outcome) => stdout.write(`${formatInstallOutcome(outcome)}\n`));
-
-        const failed = result.outcomes.filter((outcome) => outcome.status === 'failed');
-        if (failed.length > 0) {
-          throw new Error(`Skill installation failed for ${failed.length} target(s).`);
-        }
-
-        if (options.setup === false) {
-          return;
-        }
-
-        let keyValue = process.env.XYTE_CLI_KEY?.trim();
-        let tenantLabel = SIMPLE_SETUP_DEFAULT_TENANT;
-
-        if (isInteractive) {
-          keyValue = keyValue || (await prompt({ question: 'XYTE API key', stdout })).trim();
-          tenantLabel =
-            (await prompt({
-              question: 'Tenant label (optional)',
-              initial: tenantLabel,
-              stdout
-            })).trim() || SIMPLE_SETUP_DEFAULT_TENANT;
-        }
-
-        if (!keyValue) {
-          throw new Error('Missing API key. Set XYTE_CLI_KEY or re-run with --no-setup.');
-        }
-
-        const tenantId = normalizeTenantId(tenantLabel);
-        const setupResult = await runSimpleSetup({
-          tenantId,
-          tenantName: tenantLabel,
-          keyValue,
-          setActive: true,
-          connectivityMode: 'auto'
-        });
-
-        if (setupResult.readiness.state !== 'ready') {
-          throw new Error(
-            `Setup did not complete: ${setupResult.readiness.connectivity.message || 'connectivity validation failed'}`
-          );
-        }
-
-        stdout.write(`✅ Setup complete for tenant \`${tenantId}\`.\n`);
-      }
-    );
-
-  program.action(async () => {
-    const secretStore = await getSecretStore();
-    const readinessClient = await withClient(undefined);
-    const readiness = await evaluateReadiness({
-      profileStore,
-      secretStore,
-      client: readinessClient,
-      checkConnectivity: true
-    });
-
-    if (readiness.state !== 'ready') {
-      if (!isInteractive) {
-        throw new Error('Setup required. Run: xyte-cli setup run --non-interactive --tenant default --key "$XYTE_CLI_KEY".');
-      }
-
-      const apiKey = await prompt({ question: 'XYTE API key', stdout });
-      if (!apiKey.trim()) {
-        throw new Error('API key is required to complete first-run setup.');
-      }
-
-      const tenantLabelInput = await prompt({
-        question: 'Tenant label (optional)',
-        initial: SIMPLE_SETUP_DEFAULT_TENANT,
-        stdout
-      });
-      const tenantLabel = tenantLabelInput.trim() || SIMPLE_SETUP_DEFAULT_TENANT;
-      const tenantId = normalizeTenantId(tenantLabel);
-
-      const setupResult = await runSimpleSetup({
-        tenantId,
-        tenantName: tenantLabel,
-        keyValue: apiKey.trim(),
-        setActive: true,
-        connectivityMode: 'auto'
-      });
-
-      if (setupResult.readiness.state !== 'ready') {
-        throw new Error(
-          `Setup did not complete: ${setupResult.readiness.connectivity.message || 'connectivity validation failed'}`
-        );
-      }
-    }
-
-    const activeTenantId = readiness.tenantId ?? (await profileStore.getData()).activeTenantId;
-    const secretStoreReady = await getSecretStore();
-    const client = createXyteClient({
-      profileStore,
-      secretStore: secretStoreReady,
-      tenantId: activeTenantId
-    });
-
-    await runTui({
-      client,
-      profileStore,
-      secretStore: secretStoreReady,
-      initialScreen: 'dashboard',
-      headless: false,
-      tenantId: activeTenantId
-    });
+  program.action(async (_args: unknown, command: Command) => {
+    const options = command.optsWithGlobals() as { output?: string };
+    await handleRootLauncher({ output: options.output });
   });
 
   const doctor = program.command('doctor').description('Runtime diagnostics');
@@ -1087,9 +2413,17 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .command('install')
     .description('Check global xyte-cli command wiring')
     .option('--format <format>', 'json|text', 'json')
-    .action((options: { format?: OutputFormat }) => {
+    .action(async (options: { format?: OutputFormat }, command: Command) => {
       const report = runInstallDoctor();
-      if ((options.format ?? 'json') === 'text') {
+      const settings = await resolveSettings();
+      if (
+        resolveTextJsonOutput({
+          output: getExplicitGlobalOutput(command),
+          format: options.format,
+          stdoutIsTTY,
+          settings
+        }) === 'text'
+      ) {
         stdout.write(
           [
             `Status: ${report.status}`,
@@ -1106,7 +2440,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
         );
         return;
       }
-      printJson(stdout, report);
+      printJson(stdout, report, { strictJson: resolveStrictJson({ settings }) });
     });
 
   program
@@ -1115,20 +2449,28 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .option('--tenant <tenantId>', 'Tenant id override')
     .option('--mode <mode>', 'fast|full', 'fast')
     .option('--format <format>', 'json|text', 'json')
-    .action(async (options: { tenant?: string; mode?: string; format?: OutputFormat }) => {
-      const format = (options.format ?? 'json').trim().toLowerCase();
-      if (format !== 'json' && format !== 'text') {
-        throw new Error(`Invalid format: ${options.format}. Use json|text.`);
-      }
-
+    .addHelpText(
+      'after',
+      [
+        '',
+        'Examples:',
+        '  xyte-cli status',
+        '  xyte-cli status --mode full --tenant <tenant-id>',
+        '  xyte-cli status --output json'
+      ].join('\n')
+    )
+    .action(async (options: { tenant?: string; mode?: string; format?: OutputFormat }, command: Command) => {
+      const globals = command.optsWithGlobals() as { output?: string };
+      const settings = await resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
       const mode = parseStatusMode(options.mode);
       const checkConnectivity = mode === 'full';
+      const tenantId = options.tenant ?? settings.values.defaults.tenant;
       const secretStore = await getSecretStore();
-      const client = checkConnectivity ? await withClient(options.tenant) : undefined;
+      const client = checkConnectivity ? await withClient(tenantId) : undefined;
       const readiness = await evaluateReadiness({
         profileStore,
         secretStore,
-        tenantId: options.tenant,
+        tenantId,
         client,
         checkConnectivity
       });
@@ -1138,14 +2480,21 @@ export function createCli(runtime: CliRuntime = {}): Command {
         readiness
       });
 
-      if (format === 'text') {
+      if (
+        resolveTextJsonOutput({
+          output: globals.output,
+          format: options.format,
+          stdoutIsTTY,
+          settings
+        }) === 'text'
+      ) {
         stdout.write(`Status mode: ${payload.mode}\n`);
         stdout.write(`Generated: ${payload.generatedAtUtc}\n`);
         stdout.write(formatReadinessText(readiness));
         return;
       }
 
-      printJson(stdout, payload);
+      printJson(stdout, payload, { strictJson: resolveStrictJson({ settings }) });
     });
 
   program
@@ -1154,12 +2503,14 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .option('--check', 'Check current and latest version without upgrading')
     .option('--yes', 'Skip confirmation prompt')
     .option('--format <format>', 'json|text', 'json')
-    .action(async (options: { check?: boolean; yes?: boolean; format?: OutputFormat }) => {
-      const format = (options.format ?? 'json').trim().toLowerCase();
-      if (format !== 'json' && format !== 'text') {
-        throw new Error(`Invalid format: ${options.format}. Use json|text.`);
-      }
-
+    .action(async (options: { check?: boolean; yes?: boolean; format?: OutputFormat }, command: Command) => {
+      const settings = await resolveSettings();
+      const output = resolveTextJsonOutput({
+        output: getExplicitGlobalOutput(command),
+        format: options.format,
+        stdoutIsTTY,
+        settings
+      });
       const latestVersionOverride = process.env.XYTE_CLI_UPGRADE_TARGET_VERSION?.trim() || undefined;
       const installSpec = process.env.XYTE_CLI_UPGRADE_SPEC?.trim() || undefined;
       const check = await checkForUpgrade(
@@ -1167,7 +2518,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
         runtime.upgradeDependencies
       );
       if (options.check) {
-        if (format === 'text') {
+        if (output === 'text') {
           stdout.write(`Package: ${check.packageName}\n`);
           stdout.write(`Current: ${check.currentVersion}\n`);
           stdout.write(`Latest: ${check.latestVersion}\n`);
@@ -1177,7 +2528,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
           }
           return;
         }
-        printJson(stdout, check);
+        printJson(stdout, check, { strictJson: resolveStrictJson({ settings }) });
         return;
       }
 
@@ -1195,10 +2546,10 @@ export function createCli(runtime: CliRuntime = {}): Command {
           .trim()
           .toLowerCase();
         if (!['y', 'yes'].includes(answer)) {
-          if (format === 'text') {
+          if (output === 'text') {
             stdout.write('Upgrade canceled.\n');
           } else {
-            printJson(stdout, check);
+            printJson(stdout, check, { strictJson: resolveStrictJson({ settings }) });
           }
           return;
         }
@@ -1214,7 +2565,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
         runtime.upgradeDependencies
       );
 
-      if (format === 'text') {
+      if (output === 'text') {
         stdout.write(`Package: ${result.packageName}\n`);
         stdout.write(`Current: ${result.currentVersion}\n`);
         stdout.write(`Latest: ${result.latestVersion}\n`);
@@ -1229,31 +2580,45 @@ export function createCli(runtime: CliRuntime = {}): Command {
         return;
       }
 
-      printJson(stdout, result);
+      printJson(stdout, result, { strictJson: resolveStrictJson({ settings }) });
     });
 
-  program
-    .command('list-endpoints')
-    .description('List endpoint keys')
+  const api = program.command('api').description('Raw endpoint catalog and invocation');
+  api.addHelpText(
+    'after',
+    [
+      '',
+      'Examples:',
+      '  xyte-cli api endpoints list --tenant <tenant-id>',
+      '  xyte-cli api endpoints describe organization.devices.getDevices',
+      '  xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --output json'
+    ].join('\n')
+  );
+  const apiEndpoints = api.command('endpoints').description('List and describe endpoint metadata');
+
+  apiEndpoints
+    .command('list')
     .option('--tenant <tenantId>', 'Filter endpoints available for tenant credentials')
-    .action(async (options: { tenant?: string }) => {
-      if (options.tenant) {
-        const client = await withClient(options.tenant);
-        printJson(stdout, await client.listTenantEndpoints(options.tenant));
-        return;
-      }
-      printJson(stdout, listEndpoints());
+    .option('--format <format>', 'json|text')
+    .action(async function (options: { tenant?: string; format?: string }) {
+      await handleApiEndpointsList({
+        ...options,
+        output: (this.optsWithGlobals() as CliGlobalOptions).output
+      });
     });
 
-  program
-    .command('describe-endpoint')
+  apiEndpoints
+    .command('describe')
     .argument('<key>', 'Endpoint key')
-    .description('Describe endpoint metadata')
-    .action((key: string) => {
-      printJson(stdout, getEndpoint(key));
+    .option('--format <format>', 'json|text')
+    .action(async function (key: string, options: { format?: string }) {
+      await handleApiEndpointsDescribe(key, {
+        ...options,
+        output: (this.optsWithGlobals() as CliGlobalOptions).output
+      });
     });
 
-  program
+  api
     .command('call')
     .argument('<key>', 'Endpoint key')
     .description('Call endpoint by key')
@@ -1261,137 +2626,188 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .option('--path-json <json>', 'Path params JSON object')
     .option('--query-json <json>', 'Query params JSON object')
     .option('--body-json <json>', 'Body JSON object')
-    .option('--allow-write', 'Allow mutation endpoint invocation')
-    .option('--confirm <token>', 'Confirm token required for destructive operations')
     .option('--output-mode <mode>', 'raw|envelope', 'raw')
     .option('--strict-json', 'Fail on non-serializable output')
-    .action(async (key: string, options: Record<string, unknown>) => {
-      const endpoint = getEndpoint(key);
-      const method = endpoint.method.toUpperCase();
-      const outputMode = String(options.outputMode ?? 'raw');
-      if (!['raw', 'envelope'].includes(outputMode)) {
-        throw new Error(`Invalid output mode: ${outputMode}. Use raw|envelope.`);
-      }
-      const requestId = randomUUID();
-      const tenantId = options.tenant as string | undefined;
-      const path = parsePathJson(options.pathJson as string | undefined);
-      const query = parseQueryJson(options.queryJson as string | undefined);
-      const body = options.bodyJson ? JSON.parse(String(options.bodyJson)) : undefined;
-      const allowWrite = options.allowWrite === true;
-      const confirmToken = options.confirm as string | undefined;
-      const strictJson = options.strictJson === true;
-
-      try {
-        if (requiresWriteGuard(method) && !allowWrite) {
-          throw new Error(`Endpoint ${key} is a write operation (${method}). Re-run with --allow-write.`);
-        }
-
-        if (requiresDestructiveGuard(method) && confirmToken !== key) {
-          throw new Error(`Endpoint ${key} is destructive. Re-run with --confirm ${key}.`);
-        }
-
-        const client = await withClient(tenantId);
-        const result = await client.callWithMeta(key, {
-          requestId,
-          tenantId,
-          path,
-          query,
-          body
-        });
-
-        if (outputMode === 'envelope') {
-          const envelope = buildCallEnvelope({
-            requestId,
-            tenantId,
-            endpointKey: key,
-            method,
-            guard: {
-              allowWrite,
-              confirm: confirmToken
-            },
-            request: {
-              path,
-              query,
-              body
-            },
-            response: {
-              status: result.status,
-              durationMs: result.durationMs,
-              retryCount: result.retryCount,
-              data: result.data
-            }
-          });
-          printJson(stdout, envelope, { strictJson });
-          return;
-        }
-
-        printJson(stdout, result.data, { strictJson });
-      } catch (error) {
-        if (outputMode !== 'envelope') {
-          throw error;
-        }
-
-        const envelope = buildCallEnvelope({
-          requestId,
-          tenantId,
-          endpointKey: key,
-          method,
-          guard: {
-            allowWrite,
-            confirm: confirmToken
-          },
-          request: {
-            path,
-            query,
-            body
-          },
-          error: toProblemDetails(error, `/call/${key}`)
-        });
-        printJson(stdout, envelope, { strictJson });
-        process.exitCode = 1;
-      }
+    .action(async function (key: string, options: Record<string, unknown>) {
+      await handleApiCall(key, {
+        ...options,
+        output: (this.optsWithGlobals() as CliGlobalOptions).output
+      });
     });
 
-  program
-    .command('watch')
-    .description('Continuously watch incident deltas as NDJSON frames')
-    .option('--tenant <tenantId>', 'Tenant id')
-    .option('--profile <profile>', 'incidents-active', 'incidents-active')
-    .option('--query-json <json>', 'Query params JSON object (merged over profile defaults)')
-    .option('--interval-ms <ms>', 'Polling interval in ms (minimum 1000)', '2000')
-    .option('--max-polls <n>', 'Stop after N polls (maximum 3600, default bounded)')
+  const ops = program.command('ops').description('Operator-focused console, watch, inspect, and report workflows');
+  ops.addHelpText(
+    'after',
+    [
+      '',
+      'Examples:',
+      '  xyte-cli ops watch incidents --tenant <tenant-id> --once',
+      '  xyte-cli ops watch incidents --tenant <tenant-id> --once --strict-json',
+      '  xyte-cli ops inspect fleet --tenant <tenant-id> --output json',
+      '  xyte-cli ops console --screen dashboard'
+    ].join('\n')
+  );
+  const opsWatch = ops.command('watch').description('Watch operator-facing streams');
+  opsWatch
+    .command('incidents')
+    .description('Watch active incidents as terminal text or JSON frames')
+    .option('--tenant <tenantId>', 'Tenant id override')
+    .option('--profile <profile>', 'Watch profile override')
+    .option('--query-json <json>', 'Query params JSON object (merged over defaults)')
+    .option('--interval-ms <ms>', 'Polling interval in ms (minimum 1000)')
+    .option('--max-polls <n>', 'Stop after N polls (maximum 3600)')
     .option('--once', 'Run one poll and exit')
     .option('--strict-json', 'Fail on non-serializable output')
-    .action(
-      async (options: {
-        tenant?: string;
-        profile?: string;
-        queryJson?: string;
-        intervalMs?: string;
-        maxPolls?: string;
-        once?: boolean;
-        strictJson?: boolean;
-      }) => {
-        const profile = parseWatchProfile(options.profile);
-        const intervalMs = parseWatchIntervalMs(options.intervalMs);
-        const maxPolls = parseWatchMaxPolls(options.maxPolls);
-        const query = parseQueryJson(options.queryJson);
-        const strictJson = options.strictJson === true;
-        const tenantId = options.tenant;
+    .action(async function (options: Record<string, unknown>) {
+      await handleOpsWatchIncidents({
+        ...options,
+        output: (this.optsWithGlobals() as CliGlobalOptions).output
+      });
+    });
 
-        const client = await withClient(tenantId);
-        await runWatch({
-          client,
-          tenantId,
-          profile,
-          query,
-          intervalMs,
-          once: options.once === true,
-          maxPolls,
-          onFrame: (frame) => printJson(stdout, frame, { strictJson, compact: true })
-        });
-      }
-    );
+  const opsInspect = ops.command('inspect').description('Deterministic fleet insights');
+  opsInspect
+    .command('fleet')
+    .description('Build a fleet summary snapshot')
+    .option('--tenant <tenantId>', 'Tenant id override')
+    .option('--provider-scope <scope>', 'organization|partner|auto')
+    .option('--render <render>', 'json|ascii', 'json')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(async function (options: {
+      tenant?: string;
+      providerScope?: string;
+      render?: string;
+      strictJson?: boolean;
+    }) {
+      await handleOpsInspectFleet({
+        ...options,
+        output: (this.optsWithGlobals() as CliGlobalOptions).output
+      });
+    });
+
+  opsInspect
+    .command('deep-dive')
+    .description('Build deep-dive operational analytics')
+    .option('--tenant <tenantId>', 'Tenant id override')
+    .option('--provider-scope <scope>', 'organization|partner|auto')
+    .option('--window <hours>', 'Window in hours', '24')
+    .option('--render <render>', 'json|ascii|markdown', 'json')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(async function (options: {
+      tenant?: string;
+      providerScope?: string;
+      window?: string;
+      render?: string;
+      strictJson?: boolean;
+    }) {
+      await handleOpsInspectDeepDive({
+        ...options,
+        output: (this.optsWithGlobals() as CliGlobalOptions).output
+      });
+    });
+
+  const opsReport = ops.command('report').description('Generate reports from inspect outputs');
+  opsReport
+    .command('generate')
+    .description('Generate report from deep-dive JSON input')
+    .requiredOption('--input <path>', 'Path to deep-dive JSON input')
+    .requiredOption('--out <path>', 'Output path')
+    .option('--tenant <tenantId>', 'Tenant id override')
+    .option('--render <render>', 'markdown|pdf', 'pdf')
+    .option('--include-sensitive', 'Include full ticket/device IDs in report')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(async function (options: {
+      tenant?: string;
+      input: string;
+      out: string;
+      render?: 'markdown' | 'pdf';
+      includeSensitive?: boolean;
+      strictJson?: boolean;
+    }) {
+      await handleOpsReportGenerate(options);
+    });
+
+  ops
+    .command('console')
+    .description('Launch the interactive console or JSON-only headless mode')
+    .option('--headless', 'Run headless visual mode for agents')
+    .option('--screen <screen>', 'setup|config|dashboard|spaces|devices|incidents|tickets')
+    .option('--once', 'Render one frame and exit (default behavior)')
+    .option('--follow', 'Continuously stream frames')
+    .option('--interval-ms <ms>', 'Polling interval for --follow')
+    .option('--tenant <tenantId>', 'Tenant id override')
+    .option('--no-motion', 'Disable motion and animation effects')
+    .option('--debug', 'Enable TUI debug logging')
+    .option('--debug-log <path>', 'Write TUI debug logs to this file')
+    .action(async function (options: {
+      headless?: boolean;
+      screen?: string;
+      once?: boolean;
+      follow?: boolean;
+      intervalMs?: string;
+      tenant?: string;
+      motion?: boolean;
+      debug?: boolean;
+      debugLog?: string;
+    }) {
+      await handleOpsConsole({
+        ...options,
+        output: getExplicitGlobalOutput(this)
+      });
+    });
+
+  const util = program.command('util').description('Utility preprocessing and import workflows');
+  util.addHelpText(
+    'after',
+    [
+      '',
+      'Examples:',
+      '  xyte-cli util list-actions --output text',
+      '  xyte-cli util prepare --action organization.devices.claimDevice --tenant <tenant-id> --input ./claims.csv',
+      '  xyte-cli util import-tree --tenant <tenant-id> --input ./space-import.csv'
+    ].join('\n')
+  );
+  util
+    .command('prepare')
+    .description('Build preprocessing contract and scaffold canonical files for one action')
+    .requiredOption('--input <path>', 'Input source path')
+    .requiredOption('--action <actionKey>', 'Action key (endpoint key or space.import-tree)')
+    .option('--tenant <tenantId>', 'Tenant id override')
+    .option('--output-dir <path>', 'Directory for scaffolded files')
+    .option('--primary-format <format>', 'csv|jsonl')
+    .option('--force', 'Overwrite scaffold files if they already exist')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(handleUtilPrepare);
+
+  util
+    .command('list-actions')
+    .description('List utility prepare action keys')
+    .option('--entity <entity>', 'Filter by entity')
+    .option('--include-generic', 'Include generic profiles', true)
+    .option('--no-include-generic', 'Exclude generic profiles')
+    .option('--format <format>', 'json|text')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(async function (options: { entity?: string; includeGeneric?: boolean; format?: string; strictJson?: boolean }) {
+      await handleUtilListActions({
+        ...options,
+        output: (this.optsWithGlobals() as CliGlobalOptions).output
+      });
+    });
+
+  util
+    .command('import-tree')
+    .description('Create or find spaces from file-defined paths')
+    .requiredOption('--input <path>', 'Input path (CSV/JSON/JSONL)')
+    .option('--tenant <tenantId>', 'Tenant id override')
+    .option('--input-format <format>', 'auto|csv|json|jsonl', 'auto')
+    .option('--path-field <name>', 'Input column/field for full path', 'path')
+    .option('--space-type-field <name>', 'Input column/field for space type', 'space_type')
+    .option('--config-field <name>', 'Input column/field for config object', 'config')
+    .option('--apply', 'Apply changes (default is dry-run)')
+    .option('--continue-on-error', 'Continue processing rows after failures')
+    .option('--report <path>', 'Write NDJSON row report file')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(handleUtilImportTree);
 
   const flow = program.command('flow').description('Deterministic flow orchestration');
 
@@ -1537,8 +2953,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .argument('<flowId>', 'Flow id (built-in or custom alias)')
     .requiredOption('--tenant <tenantId>', 'Tenant id')
     .option('--plan', 'Dry mode (default)')
-    .option('--apply', 'Guarded apply mode')
-    .option('--allow-write', 'Allow write steps after explicit gate approval')
+    .option('--apply', 'Advance the next human gate')
     .option('--resume <runRef>', 'Resume from a previous run id or bundle path')
     .option('--out-dir <path>', 'Flow run bundle root directory', './tmp/flow-runs')
     .option('--inspect-provider-scope <scope>', 'organization|partner|auto')
@@ -1553,7 +2968,6 @@ export function createCli(runtime: CliRuntime = {}): Command {
           tenant: string;
           plan?: boolean;
           apply?: boolean;
-          allowWrite?: boolean;
           resume?: string;
           outDir?: string;
           inspectProviderScope?: string;
@@ -1593,7 +3007,6 @@ export function createCli(runtime: CliRuntime = {}): Command {
           definition,
           tenantId: options.tenant,
           mode,
-          allowWrite: options.allowWrite === true,
           outDir: options.outDir ?? './tmp/flow-runs',
           inspectProviderScope,
           resume: options.resume,
@@ -1615,244 +3028,118 @@ export function createCli(runtime: CliRuntime = {}): Command {
       }
     );
 
-  const utility = program.command('utility').description('Utility preprocessing helpers');
+  const setup = program.command('setup').description('Run setup and readiness checks');
 
-  utility
-    .command('prepare')
-    .description('Build utility preprocessing contract and scaffold canonical files for one action')
-    .requiredOption('--input <path>', 'Input source path')
-    .requiredOption('--action <actionKey>', 'Action key (endpoint key or space.import-tree)')
-    .option('--tenant <tenantId>', 'Tenant id used in suggested command strings')
-    .option('--output-dir <path>', 'Directory for scaffolded files')
-    .option('--primary-format <format>', 'csv|jsonl')
-    .option('--force', 'Overwrite scaffold files if they already exist')
-    .option('--strict-json', 'Fail on non-serializable output')
+  setup
+    .command('status')
+    .description('Show setup/readiness status')
+    .option('--tenant <tenantId>', 'Tenant id override')
+    .option('--format <format>', 'json|text', 'json')
+    .action(async (options: { tenant?: string; format?: OutputFormat }, command: Command) => {
+      const globals = command.optsWithGlobals() as { output?: string };
+      await handleSetupStatus({ tenant: options.tenant, format: options.format, output: globals.output });
+    });
+
+  setup
+    .command('run')
+    .description('Run setup flow (simple first-run by default, advanced with --advanced)')
+    .option('--tenant <tenantId>', 'Tenant id')
+    .option('--name <name>', 'Tenant display name')
+    .option('--advanced', 'Use advanced provider/slot prompts')
+    .option('--provider <provider>', 'Primary provider for key setup')
+    .option('--slot-name <name>', 'Key slot name', 'primary')
+    .option('--key <value>', 'API key value')
+    .option('--set-active', 'Set slot active (default true in setup flow)')
+    .option('--connectivity <mode>', 'auto|always|never', 'auto')
+    .option('--non-interactive', 'Disable prompts and require needed options')
+    .option('--format <format>', 'json|text', 'json')
     .action(
-      async (options: {
-        input: string;
-        action: string;
-        tenant?: string;
-        outputDir?: string;
-        primaryFormat?: string;
-        force?: boolean;
-        strictJson?: boolean;
-      }) => {
-        const result = buildUtilityPrepare({
-          inputPath: options.input,
-          actionKey: options.action,
-          outputDir: options.outputDir,
-          tenantId: options.tenant,
-          primaryFormat: parseUtilityPreparePrimaryFormat(options.primaryFormat),
-          force: options.force === true
-        });
-        printJson(stdout, result, { strictJson: options.strictJson });
+      async (
+        options: {
+          tenant?: string;
+          name?: string;
+          advanced?: boolean;
+          provider?: string;
+          slotName?: string;
+          key?: string;
+          setActive?: boolean;
+          connectivity?: string;
+          nonInteractive?: boolean;
+          format?: OutputFormat;
+        },
+        command: Command
+      ) => {
+        const globals = command.optsWithGlobals() as { output?: string };
+        await handleSetupRun({ ...options, output: globals.output });
       }
     );
 
-  utility
-    .command('list-actions')
-    .description('List utility prepare action keys')
-    .option('--format <format>', 'text|json', 'text')
-    .option('--entity <entity>', 'Filter by entity (devices|spaces|tickets|commands|...)')
-    .option('--include-generic', 'Include generic profiles', true)
-    .option('--no-include-generic', 'Exclude generic profiles')
-    .option('--strict-json', 'Fail on non-serializable output')
-    .action(async (options: { format?: string; entity?: string; includeGeneric?: boolean; strictJson?: boolean }) => {
-      const format = (options.format ?? 'text').trim().toLowerCase();
-      if (format !== 'text' && format !== 'json') {
-        throw new Error(`Invalid format: ${options.format}. Use text|json.`);
-      }
+  const config = program.command('config').description('Configuration and diagnostics');
 
-      const actions = listUtilityPrepareActions({
-        entity: options.entity,
-        includeGeneric: options.includeGeneric !== false
+  config
+    .command('doctor')
+    .description('Run connectivity and readiness diagnostics')
+    .option('--tenant <tenantId>', 'Tenant id override')
+    .option('--retry-attempts <n>', 'Retry attempts for HTTP transport', '2')
+    .option('--retry-backoff-ms <n>', 'Retry backoff (ms) for HTTP transport', '250')
+    .option('--format <format>', 'json|text', 'json')
+    .action(async (options: { tenant?: string; retryAttempts?: string; retryBackoffMs?: string; format?: OutputFormat }, command: Command) => {
+      const globals = command.optsWithGlobals() as { output?: string };
+      await handleConfigDoctor({
+        tenant: options.tenant,
+        retryAttempts: options.retryAttempts,
+        retryBackoffMs: options.retryBackoffMs,
+        format: options.format,
+        output: globals.output
       });
-
-      if (format === 'json') {
-        printJson(stdout, actions, { strictJson: options.strictJson });
-        return;
-      }
-
-      if (!actions.length) {
-        stdout.write('No utility actions found.\n');
-        return;
-      }
-
-      for (const action of actions) {
-        stdout.write(
-          `${action.actionKey} | entity=${action.entity} | mode=${action.mode} | execution=${action.executionSupport}\n`
-        );
-      }
     });
 
-  const space = program.command('space').description('Space utility operations');
-
-  space
-    .command('import-tree')
-    .description('Create or find spaces from file-defined paths (prepare-first: run `xyte-cli utility prepare --action space.import-tree`)')
-    .requiredOption('--tenant <tenantId>', 'Tenant id')
-    .requiredOption('--input <path>', 'Input path (CSV/JSON/JSONL)')
-    .option('--input-format <format>', 'auto|csv|json|jsonl', 'auto')
-    .option('--path-field <name>', 'Input column/field for full path', 'path')
-    .option('--space-type-field <name>', 'Input column/field for space type', 'space_type')
-    .option('--config-field <name>', 'Input column/field for config object', 'config')
-    .option('--apply', 'Apply changes (default is dry-run)')
-    .option('--continue-on-error', 'Continue processing rows after failures')
-    .option('--report <path>', 'Write NDJSON row report file')
-    .option('--strict-json', 'Fail on non-serializable output')
-    .action(
-      async (options: {
-        tenant: string;
-        input: string;
-        inputFormat?: string;
-        pathField?: string;
-        spaceTypeField?: string;
-        configField?: string;
-        apply?: boolean;
-        continueOnError?: boolean;
-        report?: string;
-        strictJson?: boolean;
-      }) => {
-        const client = await withClient(options.tenant);
-        const result = await runSpaceImportTree({
-          client,
-          tenantId: options.tenant,
-          inputPath: options.input,
-          inputFormat: parseUtilityInputFormat(options.inputFormat),
-          apply: options.apply === true,
-          continueOnError: options.continueOnError === true,
-          reportPath: options.report,
-          pathField: options.pathField,
-          spaceTypeField: options.spaceTypeField,
-          configField: options.configField
-        });
-        printJson(stdout, result, { strictJson: options.strictJson });
-        if (result.totals.failed > 0) {
-          process.exitCode = 1;
-        }
-      }
-    );
-
-  const inspect = program.command('inspect').description('Deterministic fleet insights');
-
-  inspect
-    .command('fleet')
-    .description('Build a fleet summary snapshot')
-    .requiredOption('--tenant <tenantId>', 'Tenant id')
-    .option('--provider-scope <scope>', 'organization|partner|auto', 'auto')
-    .option('--format <format>', 'json|ascii', 'json')
-    .option('--strict-json', 'Fail on non-serializable output')
-    .action(async (options: { tenant: string; providerScope?: string; format?: string; strictJson?: boolean }) => {
-      const format = options.format ?? 'json';
-      if (!['json', 'ascii'].includes(format)) {
-        throw new Error(`Invalid format: ${format}. Use json|ascii.`);
-      }
-      const providerScope = parseInspectProviderScope(options.providerScope);
-      const client = await withClient(options.tenant);
-      const tenantProfile = await profileStore.getTenant(options.tenant);
-      const snapshot = await collectFleetSnapshot(client, options.tenant, tenantProfile?.name, providerScope);
-      const result = buildFleetInspect(snapshot);
-
-      if (format === 'ascii') {
-        stdout.write(`${formatFleetInspectAscii(result)}\n`);
-        return;
-      }
-
-      printJson(stdout, result, { strictJson: options.strictJson });
+  config
+    .command('show')
+    .description('Show user, workspace, or resolved settings')
+    .option('--scope <scope>', 'user|workspace|resolved', 'resolved')
+    .option('--format <format>', 'json|text')
+    .action(async (options: { scope?: string; format?: OutputFormat }, command: Command) => {
+      const globals = command.optsWithGlobals() as { output?: string };
+      await handleConfigShow({ scope: options.scope, format: options.format, output: globals.output });
     });
 
-  inspect
-    .command('deep-dive')
-    .description('Build deep-dive operational analytics')
-    .requiredOption('--tenant <tenantId>', 'Tenant id')
-    .option('--provider-scope <scope>', 'organization|partner|auto', 'auto')
-    .option('--window <hours>', 'Window in hours', '24')
-    .option('--format <format>', 'json|ascii|markdown', 'json')
-    .option('--strict-json', 'Fail on non-serializable output')
-    .action(async (options: { tenant: string; providerScope?: string; window?: string; format?: string; strictJson?: boolean }) => {
-      const format = options.format ?? 'json';
-      if (!['json', 'ascii', 'markdown'].includes(format)) {
-        throw new Error(`Invalid format: ${format}. Use json|ascii|markdown.`);
-      }
-      const windowHours = Number.parseInt(options.window ?? '24', 10);
-      const providerScope = parseInspectProviderScope(options.providerScope);
-      const client = await withClient(options.tenant);
-      const tenantProfile = await profileStore.getTenant(options.tenant);
-      const snapshot = await collectFleetSnapshot(client, options.tenant, tenantProfile?.name, providerScope);
-      const result = buildDeepDive(snapshot, Number.isFinite(windowHours) ? windowHours : 24);
-
-      if (format === 'ascii') {
-        stdout.write(`${formatDeepDiveAscii(result)}\n`);
-        return;
-      }
-      if (format === 'markdown') {
-        stdout.write(`${formatDeepDiveMarkdown(result, false)}\n`);
-        return;
-      }
-      printJson(stdout, result, { strictJson: options.strictJson });
+  config
+    .command('path')
+    .description('Show settings, profile, and secret-store paths')
+    .option('--format <format>', 'json|text')
+    .action(async (options: { format?: OutputFormat }, command: Command) => {
+      const globals = command.optsWithGlobals() as { output?: string };
+      await handleConfigPath({ format: options.format, output: globals.output });
     });
 
-  const report = program.command('report').description('Generate fleet findings reports');
+  config
+    .command('set')
+    .description('Set a layered config value')
+    .argument('<key>', 'Config key')
+    .argument('<value>', 'Config value')
+    .option('--scope <scope>', 'user|workspace', 'user')
+    .option('--format <format>', 'json|text')
+    .action(async (key: string, value: string, options: { scope?: string; format?: OutputFormat }, command: Command) => {
+      const globals = command.optsWithGlobals() as { output?: string };
+      await handleConfigSet(key, value, { scope: options.scope, format: options.format, output: globals.output });
+    });
 
-  report
-    .command('generate')
-    .description('Generate report from deep-dive JSON input')
-    .requiredOption('--tenant <tenantId>', 'Tenant id')
-    .requiredOption('--input <path>', 'Path to deep-dive JSON input')
-    .requiredOption('--out <path>', 'Output path')
-    .option('--format <format>', 'markdown|pdf', 'pdf')
-    .option('--include-sensitive', 'Include full ticket/device IDs in report')
-    .option('--strict-json', 'Fail on non-serializable output')
-    .action(
-      async (options: {
-        tenant: string;
-        input: string;
-        out: string;
-        format?: 'markdown' | 'pdf';
-        includeSensitive?: boolean;
-        strictJson?: boolean;
-      }) => {
-        const inputPath = path.resolve(options.input);
-        let raw: unknown;
-        try {
-          raw = JSON.parse(readFileSync(inputPath, 'utf8')) as unknown;
-        } catch {
-          throw new Error(`Input JSON is invalid at ${inputPath}.`);
-        }
+  config
+    .command('unset')
+    .description('Unset a layered config value')
+    .argument('<key>', 'Config key')
+    .option('--scope <scope>', 'user|workspace', 'user')
+    .option('--format <format>', 'json|text')
+    .action(async (key: string, options: { scope?: string; format?: OutputFormat }, command: Command) => {
+      const globals = command.optsWithGlobals() as { output?: string };
+      await handleConfigUnset(key, { scope: options.scope, format: options.format, output: globals.output });
+    });
 
-        const format = options.format ?? 'pdf';
-        if (!['markdown', 'pdf'].includes(format)) {
-          throw new Error(`Invalid format: ${format}. Use markdown|pdf.`);
-        }
-
-        let deepDive = parseDeepDiveForReport(raw, options.tenant);
-
-        if (!deepDive.tenantName) {
-          const tenantProfile = await profileStore.getTenant(options.tenant);
-          if (tenantProfile?.name) {
-            deepDive = {
-              ...deepDive,
-              tenantName: tenantProfile.name
-            };
-          }
-        }
-
-        const generated = await generateFleetReport({
-          deepDive,
-          format: format as 'markdown' | 'pdf',
-          outPath: options.out,
-          includeSensitive: options.includeSensitive === true
-        });
-        printJson(stdout, generated, { strictJson: options.strictJson });
-      }
-    );
-
-  const tenant = program.command('tenant').description('Manage tenant profiles');
-
-  tenant
+  const configTenant = config.command('tenant').description('Manage tenant profiles');
+  configTenant
     .command('add')
     .argument('<tenantId>', 'Tenant id')
-    .description('Create or update a tenant profile')
     .option('--name <name>', 'Display name')
     .option('--hub-url <url>', 'Hub API base URL')
     .option('--entry-url <url>', 'Entry API base URL')
@@ -1866,9 +3153,8 @@ export function createCli(runtime: CliRuntime = {}): Command {
       printJson(stdout, tenantProfile);
     });
 
-  tenant
+  configTenant
     .command('list')
-    .description('List tenants')
     .action(async () => {
       const data = await profileStore.getData();
       printJson(stdout, {
@@ -1877,39 +3163,24 @@ export function createCli(runtime: CliRuntime = {}): Command {
       });
     });
 
-  tenant
+  configTenant
     .command('use')
     .argument('<tenantId>', 'Tenant id to set active')
-    .description('Set active tenant')
     .action(async (tenantId: string) => {
       await profileStore.setActiveTenant(tenantId);
       stdout.write(`Active tenant set to ${tenantId}\n`);
     });
 
-  tenant
+  configTenant
     .command('remove')
     .argument('<tenantId>', 'Tenant id')
-    .description('Remove tenant profile')
     .action(async (tenantId: string) => {
       await profileStore.removeTenant(tenantId);
       stdout.write(`Removed tenant ${tenantId}\n`);
     });
 
-  const profile = program.command('profile').description('Manage profile settings');
-
-  profile
-    .command('set-default')
-    .requiredOption('--tenant <tenantId>', 'Tenant id')
-    .description('Set active default tenant')
-    .action(async (options: { tenant: string }) => {
-      await profileStore.setActiveTenant(options.tenant);
-      stdout.write(`Default tenant set to ${options.tenant}\n`);
-    });
-
-  const auth = program.command('auth').description('Manage API keys in persistent secret store');
-  const authKey = auth.command('key').description('Manage named key slots');
-
-  authKey
+  const configKey = config.command('key').description('Manage named key slots');
+  configKey
     .command('add')
     .requiredOption('--tenant <tenantId>', 'Tenant id')
     .requiredOption('--provider <provider>', SUPPORTED_SECRET_PROVIDERS.join('|'))
@@ -1922,19 +3193,16 @@ export function createCli(runtime: CliRuntime = {}): Command {
       const value = requireKeyValue(options.key);
       await profileStore.upsertTenant({ id: options.tenant });
       const secretStore = await getSecretStore();
-
       const slot = await profileStore.addKeySlot(options.tenant, {
         provider,
         name: options.name,
         slotId: options.slotId,
         fingerprint: makeKeyFingerprint(value)
       });
-
       await secretStore.setSlotSecret(options.tenant, provider, slot.slotId, value);
       if (options.setActive) {
         await profileStore.setActiveKeySlot(options.tenant, provider, slot.slotId);
       }
-
       printJson(stdout, {
         tenantId: options.tenant,
         provider,
@@ -1942,12 +3210,14 @@ export function createCli(runtime: CliRuntime = {}): Command {
       });
     });
 
-  authKey
+  configKey
     .command('list')
     .requiredOption('--tenant <tenantId>', 'Tenant id')
     .option('--provider <provider>', 'Optional provider filter')
     .option('--format <format>', 'json|text', 'json')
-    .action(async (options: { tenant: string; provider?: string; format?: OutputFormat }) => {
+    .action(async (options: { tenant: string; provider?: string; format?: OutputFormat }, command: Command) => {
+      const globals = command.optsWithGlobals() as { output?: string };
+      const settings = await resolveSettings({ 'defaults.tenant': options.tenant });
       const secretStore = await getSecretStore();
       const provider = options.provider ? parseProvider(options.provider) : undefined;
       const slots = await collectSlotViews({
@@ -1956,19 +3226,21 @@ export function createCli(runtime: CliRuntime = {}): Command {
         tenantId: options.tenant,
         provider
       });
-
-      if ((options.format ?? 'json') === 'text') {
+      if (
+        resolveTextJsonOutput({
+          output: globals.output,
+          format: options.format,
+          stdoutIsTTY,
+          settings
+        }) === 'text'
+      ) {
         stdout.write(formatSlotListText(slots));
         return;
       }
-
-      printJson(stdout, {
-        tenantId: options.tenant,
-        slots
-      });
+      printJson(stdout, { tenantId: options.tenant, slots }, { strictJson: resolveStrictJson({ settings }) });
     });
 
-  authKey
+  configKey
     .command('use')
     .requiredOption('--tenant <tenantId>', 'Tenant id')
     .requiredOption('--provider <provider>', 'Provider')
@@ -1983,7 +3255,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       });
     });
 
-  authKey
+  configKey
     .command('rename')
     .requiredOption('--tenant <tenantId>', 'Tenant id')
     .requiredOption('--provider <provider>', 'Provider')
@@ -2001,7 +3273,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       });
     });
 
-  authKey
+  configKey
     .command('update')
     .requiredOption('--tenant <tenantId>', 'Tenant id')
     .requiredOption('--provider <provider>', 'Provider')
@@ -2012,12 +3284,10 @@ export function createCli(runtime: CliRuntime = {}): Command {
       const slot = await resolveSlotByRef(profileStore, options.tenant, provider, options.slot);
       const value = requireKeyValue(options.key);
       const secretStore = await getSecretStore();
-
       await secretStore.setSlotSecret(options.tenant, provider, slot.slotId, value);
       const updated = await profileStore.updateKeySlot(options.tenant, provider, slot.slotId, {
         fingerprint: makeKeyFingerprint(value)
       });
-
       printJson(stdout, {
         tenantId: options.tenant,
         provider,
@@ -2025,7 +3295,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       });
     });
 
-  authKey
+  configKey
     .command('remove')
     .requiredOption('--tenant <tenantId>', 'Tenant id')
     .requiredOption('--provider <provider>', 'Provider')
@@ -2033,12 +3303,14 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .option('--confirm', 'Confirm removal')
     .action(async (options: { tenant: string; provider: string; slot: string; confirm?: boolean }) => {
       if (!options.confirm) {
-        throw new Error('Key slot removal is destructive. Re-run with --confirm.');
+        throw new CliUserError({
+          summary: 'Key slot removal is destructive.',
+          suggestedCommands: ['Re-run with --confirm']
+        });
       }
       const provider = parseProvider(options.provider);
       const slot = await resolveSlotByRef(profileStore, options.tenant, provider, options.slot);
       const secretStore = await getSecretStore();
-
       await secretStore.clearSlotSecret(options.tenant, provider, slot.slotId);
       await profileStore.removeKeySlot(options.tenant, provider, slot.slotId);
       printJson(stdout, {
@@ -2048,7 +3320,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       });
     });
 
-  authKey
+  configKey
     .command('test')
     .requiredOption('--tenant <tenantId>', 'Tenant id')
     .requiredOption('--provider <provider>', 'Provider')
@@ -2058,299 +3330,28 @@ export function createCli(runtime: CliRuntime = {}): Command {
       const slot = await resolveSlotByRef(profileStore, options.tenant, provider, options.slot);
       const secretStore = await getSecretStore();
       const secret = await secretStore.getSlotSecret(options.tenant, provider, slot.slotId);
-
       if (!secret) {
-        throw new Error(`No secret found for slot "${slot.slotId}" (${provider}) in tenant ${options.tenant}.`);
+        throw new CliUserError({
+          summary: 'No secret found for selected key slot.',
+          cause: `Slot "${slot.slotId}" has no stored secret.`,
+          suggestedCommands: [`xyte-cli config key update --tenant ${options.tenant} --provider ${provider} --slot ${slot.slotId} --key <value>`]
+        });
       }
-
       const probe = await runSlotConnectivityTest({
         provider,
         tenantId: options.tenant,
         key: secret,
         profileStore
       });
-
       const validatedAt = new Date().toISOString();
       const updated = await profileStore.updateKeySlot(options.tenant, provider, slot.slotId, {
         lastValidatedAt: validatedAt
       });
-
       printJson(stdout, {
         tenantId: options.tenant,
         provider,
         slot: updated,
         probe
-      });
-    });
-
-  const setup = program.command('setup').description('Run setup and readiness checks');
-
-  setup
-    .command('status')
-    .description('Show setup/readiness status')
-    .option('--tenant <tenantId>', 'Tenant id override')
-    .option('--format <format>', 'json|text', 'json')
-    .action(async (options: { tenant?: string; format?: OutputFormat }) => {
-      const secretStore = await getSecretStore();
-      const client = await withClient(options.tenant);
-      const readiness = await evaluateReadiness({
-        profileStore,
-        secretStore,
-        tenantId: options.tenant,
-        client,
-        checkConnectivity: true
-      });
-
-      if ((options.format ?? 'json') === 'text') {
-        stdout.write(formatReadinessText(readiness));
-        return;
-      }
-      printJson(stdout, readiness);
-    });
-
-  setup
-    .command('run')
-    .description('Run setup flow (simple first-run by default, advanced with --advanced)')
-    .option('--tenant <tenantId>', 'Tenant id')
-    .option('--name <name>', 'Tenant display name')
-    .option('--advanced', 'Use advanced provider/slot prompts')
-    .option('--provider <provider>', 'Primary provider for key setup')
-    .option('--slot-name <name>', 'Key slot name', 'primary')
-    .option('--key <value>', 'API key value')
-    .option('--set-active', 'Set slot active (default true in setup flow)')
-    .option('--connectivity <mode>', 'auto|always|never', 'auto')
-    .option('--non-interactive', 'Disable prompts and require needed options')
-    .option('--format <format>', 'json|text', 'json')
-    .action(
-      async (options: {
-        tenant?: string;
-        name?: string;
-        advanced?: boolean;
-        provider?: string;
-        slotName?: string;
-        key?: string;
-        setActive?: boolean;
-        connectivity?: string;
-        nonInteractive?: boolean;
-        format?: OutputFormat;
-      }) => {
-        if (!options.nonInteractive && !isInteractive) {
-          throw new Error('Interactive setup requires a TTY. Use --non-interactive with explicit flags.');
-        }
-
-        const explicitTenantName = typeof options.name === 'string' && options.name.trim().length > 0;
-        const connectivityMode = parseSetupConnectivityMode(options.connectivity);
-        // Provider selection only exists in advanced setup; honor explicit --provider by switching modes automatically.
-        const advanced = options.advanced === true || options.provider !== undefined;
-        if (!advanced) {
-          let tenantLabel = (options.name ?? options.tenant ?? SIMPLE_SETUP_DEFAULT_TENANT).trim() || SIMPLE_SETUP_DEFAULT_TENANT;
-          let keyValue = options.key ?? process.env.XYTE_CLI_KEY;
-
-          if (!options.nonInteractive) {
-            keyValue = keyValue || (await prompt({ question: 'XYTE API key', stdout }));
-            tenantLabel =
-              (await prompt({
-                question: 'Tenant label (optional)',
-                initial: tenantLabel,
-                stdout
-              })) || tenantLabel;
-          }
-
-          if (!keyValue) {
-            throw new Error('Missing API key. Provide --key/XYTE_CLI_KEY (or run interactive setup).');
-          }
-
-          const tenantId = normalizeTenantId(options.tenant?.trim() || tenantLabel);
-          const tenantName = tenantLabel.trim() || tenantId;
-          const resolvedTenantName =
-            !explicitTenantName && tenantName === tenantId
-              ? await resolveTenantNameFromKey({
-                  tenantId,
-                  provider: SIMPLE_SETUP_AUTH_PROVIDER,
-                  keyValue
-                })
-              : undefined;
-          const setupResult = await runSimpleSetup({
-            tenantId,
-            tenantName: resolvedTenantName ?? tenantName,
-            keyValue,
-            setActive: options.setActive !== false,
-            connectivityMode
-          });
-
-          if ((options.format ?? 'json') === 'text') {
-            stdout.write(formatReadinessText(setupResult.readiness));
-            return;
-          }
-
-          printJson(stdout, setupResult);
-          return;
-        }
-
-        let tenantId = options.tenant;
-        let tenantName = options.name;
-        let provider = options.provider ? parseProvider(options.provider) : undefined;
-        let slotName = options.slotName ?? 'primary';
-        let keyValue = options.key ?? process.env.XYTE_CLI_KEY;
-        const steps: SetupStep[] = [];
-
-        if (!options.nonInteractive) {
-          tenantId = tenantId || (await prompt({ question: 'Tenant id', stdout }));
-          tenantName = tenantName || (await prompt({ question: 'Tenant display name', initial: tenantId, stdout }));
-          const providerAnswer = provider || parseProvider(await prompt({ question: 'Provider', initial: 'xyte-org', stdout }));
-          provider = providerAnswer;
-          slotName = await prompt({ question: 'Slot name', initial: slotName, stdout });
-          keyValue = keyValue || (await prompt({ question: 'API key', stdout }));
-        }
-
-        if (!tenantId) {
-          throw new Error('Missing tenant id. Provide --tenant (or run interactive setup).');
-        }
-        if (!provider) {
-          throw new Error('Missing provider. Provide --provider (or run interactive setup).');
-        }
-        if (!keyValue) {
-          throw new Error('Missing API key. Provide --key/XYTE_CLI_KEY (or run interactive setup).');
-        }
-
-        const candidateTenantName = (tenantName?.trim() || tenantId).trim() || tenantId;
-        const resolvedTenantName =
-          !explicitTenantName && candidateTenantName === tenantId
-            ? await resolveTenantNameFromKey({
-                tenantId,
-                provider,
-                keyValue
-              })
-            : undefined;
-        tenantName = resolvedTenantName ?? candidateTenantName;
-
-        await profileStore.upsertTenant({
-          id: tenantId,
-          name: tenantName
-        });
-        steps.push({
-          key: 'tenant_upserted',
-          status: 'ok',
-          detail: tenantId
-        });
-        await profileStore.setActiveTenant(tenantId);
-        steps.push({
-          key: 'tenant_activated',
-          status: 'ok',
-          detail: tenantId
-        });
-        const secretStore = await getSecretStore();
-
-        let slot;
-        try {
-          slot = await profileStore.addKeySlot(tenantId, {
-            provider,
-            name: slotName,
-            fingerprint: makeKeyFingerprint(keyValue)
-          });
-        } catch (error) {
-          const knownSlots = await profileStore.listKeySlots(tenantId, provider);
-          const existing = knownSlots.find((item) => item.name.toLowerCase() === slotName.toLowerCase());
-          if (!existing) {
-            throw error;
-          }
-          slot = await profileStore.updateKeySlot(tenantId, provider, existing.slotId, {
-            fingerprint: makeKeyFingerprint(keyValue)
-          });
-        }
-        await secretStore.setSlotSecret(tenantId, provider, slot.slotId, keyValue);
-        steps.push({
-          key: 'slot_written',
-          status: 'ok',
-          detail: slot.slotId
-        });
-
-        if (options.setActive !== false) {
-          await profileStore.setActiveKeySlot(tenantId, provider, slot.slotId);
-          steps.push({
-            key: 'slot_activated',
-            status: 'ok',
-            detail: slot.slotId
-          });
-        } else {
-          steps.push({
-            key: 'slot_activated',
-            status: 'skipped',
-            detail: 'setActive=false'
-          });
-        }
-
-        const checkConnectivity = connectivityMode !== 'never';
-        const client = checkConnectivity ? await withClient(tenantId) : undefined;
-        const readiness = await evaluateReadiness({
-          profileStore,
-          secretStore,
-          tenantId,
-          client,
-          checkConnectivity
-        });
-        steps.push({
-          key: 'connectivity_checked',
-          status: checkConnectivity ? 'ok' : 'skipped',
-          detail: checkConnectivity ? readiness.connectivity.message : 'Connectivity probe skipped by setup mode.'
-        });
-        steps.push({
-          key: 'readiness_evaluated',
-          status: 'ok',
-          detail: readiness.state
-        });
-
-        if ((options.format ?? 'json') === 'text') {
-          stdout.write(formatReadinessText(readiness));
-          return;
-        }
-
-        printJson(stdout, {
-          tenantId,
-          provider,
-          slot,
-          readiness,
-          connectivityMode,
-          steps
-        });
-      }
-    );
-
-  const config = program.command('config').description('Configuration and diagnostics');
-
-  config
-    .command('doctor')
-    .description('Run connectivity and readiness diagnostics')
-    .option('--tenant <tenantId>', 'Tenant id override')
-    .option('--retry-attempts <n>', 'Retry attempts for HTTP transport', '2')
-    .option('--retry-backoff-ms <n>', 'Retry backoff (ms) for HTTP transport', '250')
-    .option('--format <format>', 'json|text', 'json')
-    .action(async (options: { tenant?: string; retryAttempts?: string; retryBackoffMs?: string; format?: OutputFormat }) => {
-      const retryAttempts = Number.parseInt(options.retryAttempts ?? '2', 10);
-      const retryBackoffMs = Number.parseInt(options.retryBackoffMs ?? '250', 10);
-      const secretStore = await getSecretStore();
-      const client = await withClient(options.tenant, {
-        attempts: Number.isFinite(retryAttempts) ? retryAttempts : 2,
-        backoffMs: Number.isFinite(retryBackoffMs) ? retryBackoffMs : 250
-      });
-
-      const readiness = await evaluateReadiness({
-        profileStore,
-        secretStore,
-        tenantId: options.tenant,
-        client,
-        checkConnectivity: true
-      });
-
-      if ((options.format ?? 'json') === 'text') {
-        stdout.write(formatReadinessText(readiness));
-        return;
-      }
-
-      printJson(stdout, {
-        retryAttempts,
-        retryBackoffMs,
-        readiness
       });
     });
 
@@ -2365,18 +3366,14 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .option('--command <text>', 'Filter by command path substring')
     .option('--format <format>', 'text|json', 'text')
     .action(
-      (options: {
+      async (options: {
         path?: string;
         limit?: string;
         event?: string;
         command?: string;
         format?: string;
-      }) => {
-        const format = (options.format ?? 'text').trim().toLowerCase();
-        if (format !== 'text' && format !== 'json') {
-          throw new Error(`Invalid format: ${options.format}. Use text|json.`);
-        }
-
+      }, command: Command) => {
+        const settings = await resolveSettings();
         const limit = parsePositiveIntegerOption(options.limit, 100, 'limit');
         const result = readCliActionLog({
           path: options.path,
@@ -2385,14 +3382,21 @@ export function createCli(runtime: CliRuntime = {}): Command {
           command: options.command
         });
 
-        if (format === 'json') {
+        if (
+          resolveTextJsonOutput({
+            output: getExplicitGlobalOutput(command),
+            format: options.format,
+            stdoutIsTTY,
+            settings
+          }) === 'json'
+        ) {
           printJson(stdout, {
             schemaVersion: 'xyte.cli.action-log.v1',
             path: result.path,
             count: result.entries.length,
             parseErrors: result.parseErrors,
             entries: result.entries
-          });
+          }, { strictJson: resolveStrictJson({ settings }) });
           return;
         }
 
@@ -2415,17 +3419,20 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .description('Show action log storage stats')
     .option('--path <path>', 'Action log file override')
     .option('--format <format>', 'text|json', 'text')
-    .action((options: { path?: string; format?: string }) => {
-      const format = (options.format ?? 'text').trim().toLowerCase();
-      if (format !== 'text' && format !== 'json') {
-        throw new Error(`Invalid format: ${options.format}. Use text|json.`);
-      }
-
+    .action(async (options: { path?: string; format?: string }, command: Command) => {
+      const settings = await resolveSettings();
       const path = resolveCliActionLogPath(options.path);
       const files = listCliActionLogFiles(path);
       const totalBytes = files.reduce((sum, item) => sum + item.sizeBytes, 0);
 
-      if (format === 'json') {
+      if (
+        resolveTextJsonOutput({
+          output: getExplicitGlobalOutput(command),
+          format: options.format,
+          stdoutIsTTY,
+          settings
+        }) === 'json'
+      ) {
         printJson(stdout, {
           schemaVersion: 'xyte.cli.action-log.stats.v1',
           path,
@@ -2438,7 +3445,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
             sizeBytes: item.sizeBytes,
             modifiedAtUtc: item.modifiedAtUtc
           }))
-        });
+        }, { strictJson: resolveStrictJson({ settings }) });
         return;
       }
 
@@ -2463,18 +3470,14 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .option('--dry-run', 'Preview cleanup without deleting files')
     .option('--format <format>', 'text|json', 'text')
     .action(
-      (options: {
+      async (options: {
         path?: string;
         maxFiles?: string;
         maxAgeDays?: string;
         dryRun?: boolean;
         format?: string;
-      }) => {
-        const format = (options.format ?? 'text').trim().toLowerCase();
-        if (format !== 'text' && format !== 'json') {
-          throw new Error(`Invalid format: ${options.format}. Use text|json.`);
-        }
-
+      }, command: Command) => {
+        const settings = await resolveSettings();
         const maxFilesDefault = parsePositiveIntegerEnv(process.env.XYTE_LOG_ACTIONS_MAX_FILES, 5);
         const maxFiles = parsePositiveIntegerOption(options.maxFiles, maxFilesDefault, 'max-files');
         const maxAgeDays = parsePositiveNumberOption(options.maxAgeDays, undefined, 'max-age-days');
@@ -2490,7 +3493,14 @@ export function createCli(runtime: CliRuntime = {}): Command {
         });
         const removedBytes = result.removed.reduce((sum, item) => sum + (beforeMap.get(item)?.sizeBytes ?? 0), 0);
 
-        if (format === 'json') {
+        if (
+          resolveTextJsonOutput({
+            output: getExplicitGlobalOutput(command),
+            format: options.format,
+            stdoutIsTTY,
+            settings
+          }) === 'json'
+        ) {
           printJson(stdout, {
             schemaVersion: 'xyte.cli.action-log.gc.v1',
             path: result.path,
@@ -2501,7 +3511,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
             removedBytes,
             removed: result.removed,
             kept: result.kept
-          });
+          }, { strictJson: resolveStrictJson({ settings }) });
           return;
         }
 
@@ -2545,70 +3555,6 @@ export function createCli(runtime: CliRuntime = {}): Command {
       await runActionLogViewer({
         entries: result.entries,
         title: `xyte-cli logs | ${result.path}`
-      });
-    });
-
-  program
-    .command('tui')
-    .description('Launch the full-screen TUI')
-    .option('--headless', 'Run headless visual mode for agents')
-    .option('--screen <screen>', 'setup|config|dashboard|spaces|devices|incidents|tickets', 'dashboard')
-    .option('--format <format>', 'json|text (headless is json-only)', 'json')
-    .option('--once', 'Render one frame and exit (default behavior)')
-    .option('--follow', 'Continuously stream frames')
-    .option('--interval-ms <ms>', 'Polling interval for --follow', '2000')
-    .option('--tenant <tenantId>', 'Tenant id override')
-    .option('--no-motion', 'Disable motion and animation effects')
-    .option('--debug', 'Enable TUI debug logging')
-    .option('--debug-log <path>', 'Write TUI debug logs to this file')
-    .action(async (options: {
-      headless?: boolean;
-      screen?: string;
-      format?: string;
-      once?: boolean;
-      follow?: boolean;
-      intervalMs?: string;
-      tenant?: string;
-      motion?: boolean;
-      debug?: boolean;
-      debugLog?: string;
-    }) => {
-      const secretStore = await getSecretStore();
-      const client = createXyteClient({ profileStore, secretStore });
-
-      const allowedScreens: TuiScreenId[] = ['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets'];
-      const screen = (options.screen ?? 'dashboard') as TuiScreenId;
-      if (!allowedScreens.includes(screen)) {
-        throw new Error(`Invalid screen: ${options.screen}`);
-      }
-
-      const format = options.format ?? 'json';
-      if (Boolean(options.headless)) {
-        if (format !== 'json') {
-          throw new Error('Headless mode is JSON-only. Use --format json and parse NDJSON frames.');
-        }
-      } else if (!['json', 'text'].includes(format)) {
-        throw new Error(`Invalid format: ${options.format}.`);
-      }
-
-      const follow = options.once ? false : Boolean(options.follow);
-      const intervalMs = Number.parseInt(options.intervalMs ?? '2000', 10);
-      const motionEnabled = options.motion === false ? false : undefined;
-
-      await runTui({
-        client,
-        profileStore,
-        secretStore,
-        initialScreen: screen,
-        headless: Boolean(options.headless),
-        format: (options.headless ? 'json' : format) as OutputFormat,
-        motionEnabled,
-        follow,
-        intervalMs: Number.isFinite(intervalMs) ? intervalMs : 2000,
-        tenantId: options.tenant,
-        output: stdout,
-        debug: options.debug,
-        debugLogPath: options.debugLog
       });
     });
 

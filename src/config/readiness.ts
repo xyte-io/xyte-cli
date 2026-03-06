@@ -109,7 +109,7 @@ export async function evaluateReadiness(options: ReadinessOptions): Promise<Read
   const hasXyteCredential = providers.some((provider) => XYTE_PROVIDERS.includes(provider.provider) && provider.hasActiveSecret);
   if (!hasXyteCredential) {
     missingItems.push('No active Xyte API key slot is configured (xyte-org / xyte-partner).');
-    recommendedActions.push('Run "xyte-cli" for guided setup, or "xyte-cli setup run --tenant <tenant-id> --key <value>".');
+    recommendedActions.push('Run "xyte-cli setup run --tenant <tenant-id> --key <value>" or review "xyte-cli config doctor".');
   }
 
   let connectivity = defaultConnectivity();
@@ -117,7 +117,7 @@ export async function evaluateReadiness(options: ReadinessOptions): Promise<Read
     connectivity = await probeConnectivity({ client: options.client, tenantId: tenant.id });
     if (connectivity.state === 'auth_required' || connectivity.state === 'missing_key') {
       missingItems.push(`Connectivity check requires updated credentials: ${connectivity.message}`);
-      recommendedActions.push('Use "xyte-cli auth key list/use/update" to select or update the active slot.');
+      recommendedActions.push('Use "xyte-cli config key list/use/update" to select or update the active slot.');
     } else if (connectivity.state !== 'connected') {
       recommendedActions.push('Use retry/reconnect actions in TUI or run "xyte-cli config doctor".');
     }

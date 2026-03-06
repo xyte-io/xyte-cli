@@ -301,7 +301,7 @@ export function createIncidentsScreen(): TuiScreen {
         widgets: ['incidents-table', 'detail-box']
       });
 
-      list.on('select item', (_item, index) => {
+      list.on('select item', (_item: unknown, index: number) => {
         if (shouldIgnoreSelectEvent(selectionSync)) {
           return;
         }

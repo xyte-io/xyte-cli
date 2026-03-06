@@ -139,38 +139,38 @@ async function main() {
 
   await resetMock(args.baseUrl);
 
-  const tenantAdd = ['tenant', 'add', args.tenant, '--hub-url', args.baseUrl, '--entry-url', args.baseUrl];
-  assertOk(await run(XYTE_COMMAND, tenantAdd, env), 'tenant add', XYTE_COMMAND, tenantAdd);
+  const tenantAdd = ['config', 'tenant', 'add', args.tenant, '--hub-url', args.baseUrl, '--entry-url', args.baseUrl];
+  assertOk(await run(XYTE_COMMAND, tenantAdd, env), 'config tenant add', XYTE_COMMAND, tenantAdd);
 
-  const authAdd = ['auth', 'key', 'add', '--tenant', args.tenant, '--provider', 'xyte-org', '--name', 'local', '--key', 'local-key', '--set-active'];
-  assertOk(await run(XYTE_COMMAND, authAdd, env), 'auth key add', XYTE_COMMAND, authAdd);
+  const authAdd = ['config', 'key', 'add', '--tenant', args.tenant, '--provider', 'xyte-org', '--name', 'local', '--key', 'local-key', '--set-active'];
+  assertOk(await run(XYTE_COMMAND, authAdd, env), 'config key add', XYTE_COMMAND, authAdd);
 
-  const prepareArgs = ['utility', 'prepare', '--action', 'space.import-tree', '--input', fixtures.space, '--output-dir', configDir, '--tenant', args.tenant, '--force'];
+  const prepareArgs = ['util', 'prepare', '--action', 'space.import-tree', '--input', fixtures.space, '--output-dir', configDir, '--tenant', args.tenant, '--force'];
   const prepare = await run(XYTE_COMMAND, prepareArgs, env);
-  assertOk(prepare, 'utility prepare for space.import-tree', XYTE_COMMAND, prepareArgs);
+  assertOk(prepare, 'util prepare for space.import-tree', XYTE_COMMAND, prepareArgs);
   const prepareOutput = parseJsonOutput(prepare.stdout);
   if (prepareOutput.schemaVersion !== 'xyte.utility.prepare.v1') {
     throw new Error(`Unexpected prepare schemaVersion: ${prepareOutput.schemaVersion}`);
   }
 
-  const spaceDryArgs = ['space', 'import-tree', '--tenant', args.tenant, '--input', fixtures.space];
+  const spaceDryArgs = ['util', 'import-tree', '--tenant', args.tenant, '--input', fixtures.space];
   const spaceDry = await run(XYTE_COMMAND, spaceDryArgs, env);
-  assertOk(spaceDry, 'space import-tree dry-run', XYTE_COMMAND, spaceDryArgs);
+  assertOk(spaceDry, 'util import-tree dry-run', XYTE_COMMAND, spaceDryArgs);
   expectSummary(parseJsonOutput(spaceDry.stdout), 'dry-run');
 
-  const spaceApplyArgs = ['space', 'import-tree', '--tenant', args.tenant, '--input', fixtures.space, '--apply'];
+  const spaceApplyArgs = ['util', 'import-tree', '--tenant', args.tenant, '--input', fixtures.space, '--apply'];
   const spaceApply = await run(XYTE_COMMAND, spaceApplyArgs, env);
-  assertOk(spaceApply, 'space import-tree apply', XYTE_COMMAND, spaceApplyArgs);
+  assertOk(spaceApply, 'util import-tree apply', XYTE_COMMAND, spaceApplyArgs);
   expectSummary(parseJsonOutput(spaceApply.stdout), 'apply');
 
   const spaceApplyAgain = await run(XYTE_COMMAND, spaceApplyArgs, env);
-  assertOk(spaceApplyAgain, 'space import-tree apply (idempotent rerun)', XYTE_COMMAND, spaceApplyArgs);
+  assertOk(spaceApplyAgain, 'util import-tree apply (idempotent rerun)', XYTE_COMMAND, spaceApplyArgs);
   expectSummary(parseJsonOutput(spaceApplyAgain.stdout), 'apply');
 
   const state = await getMockState(args.baseUrl);
   const spacesByPath = new Map((state.spaces ?? []).map((item) => [item.full_path, item]));
 
-  if (!spacesByPath.has('HQ/Floor-1/Room-A')) {
+  if (!spacesByPath.has('Overview/HQ/Floor-1/Room-A')) {
     throw new Error('Space import verification failed in mock state.');
   }
 

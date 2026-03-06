@@ -137,13 +137,12 @@ xyte-cli flow run flow.local-guided-remediation \
 xyte-cli flow run flow.local-guided-remediation --tenant <tenant-id> --plan
 ```
 
-`--apply --allow-write --resume` advances one gate per invocation.
+`--apply --resume` advances one gate per invocation.
 
 ```bash
 xyte-cli flow run flow.local-guided-remediation \
   --tenant <tenant-id> \
   --apply \
-  --allow-write \
   --resume <run-id-or-run-dir>
 ```
 

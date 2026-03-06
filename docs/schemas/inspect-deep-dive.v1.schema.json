@@ -33,6 +33,49 @@
     "windowHours": {
       "type": "integer"
     },
+    "overviewMetrics": {
+      "type": "object",
+      "required": [
+        "totalDevices",
+        "offlineDevices",
+        "offlinePct",
+        "totalIncidents",
+        "activeIncidents",
+        "activeIncidentPct",
+        "totalTickets",
+        "openTickets",
+        "statusMismatches"
+      ],
+      "properties": {
+        "totalDevices": {
+          "type": "integer"
+        },
+        "offlineDevices": {
+          "type": "integer"
+        },
+        "offlinePct": {
+          "type": "number"
+        },
+        "totalIncidents": {
+          "type": "integer"
+        },
+        "activeIncidents": {
+          "type": "integer"
+        },
+        "activeIncidentPct": {
+          "type": "number"
+        },
+        "totalTickets": {
+          "type": "integer"
+        },
+        "openTickets": {
+          "type": "integer"
+        },
+        "statusMismatches": {
+          "type": "integer"
+        }
+      }
+    },
     "summary": {
       "type": "array",
       "items": {

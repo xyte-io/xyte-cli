@@ -733,7 +733,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
     process.on('unhandledRejection', onUnhandledRejection);
     process.on('uncaughtException', onUncaughtException);
 
-    screen.on('keypress', (ch, key) => {
+    screen.on('keypress', (ch: string, key: blessed.Widgets.Events.IKeyEventArg) => {
       const dispatchResult = inputController.dispatch({
         ch,
         key,

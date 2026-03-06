@@ -5,14 +5,14 @@ Use this prompt with an external AI assistant. The AI must only prepare files. I
 ## Prompt
 
 ```text
-You are preparing input files for xyte-cli utility preprocessing.
+You are preparing input files for xyte-cli util preprocessing.
 Do not execute any CLI commands. Only write output files.
 
 Input source:
 <provide source file path or pasted data>
 
 Action contract:
-<paste JSON from `xyte-cli utility prepare --action <action-key> ...`>
+<paste JSON from `xyte-cli util prepare --action <action-key> ...`>
 
 Write exactly these files from the contract:
 1) artifacts.primary
