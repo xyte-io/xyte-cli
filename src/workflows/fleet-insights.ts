@@ -89,6 +89,17 @@ export interface DeepDiveResult {
   tenantId: string;
   tenantName?: string;
   windowHours: number;
+  overviewMetrics?: {
+    totalDevices: number;
+    offlineDevices: number;
+    offlinePct: number;
+    totalIncidents: number;
+    activeIncidents: number;
+    activeIncidentPct: number;
+    totalTickets: number;
+    openTickets: number;
+    statusMismatches: number;
+  };
   summary: string[];
   topOfflineSpaces: Array<{ space: string; offlineDevices: number; shareOfOfflinePct: number }>;
   topIncidentDevices: Array<{ device: string; incidentCount: number; activeIncidents: number }>;
@@ -155,12 +166,25 @@ const DeepDiveStatusMismatchSchema = z.object({
   space: z.string()
 });
 
+const DeepDiveOverviewMetricsSchema = z.object({
+  totalDevices: z.number(),
+  offlineDevices: z.number(),
+  offlinePct: z.number(),
+  totalIncidents: z.number(),
+  activeIncidents: z.number(),
+  activeIncidentPct: z.number(),
+  totalTickets: z.number(),
+  openTickets: z.number(),
+  statusMismatches: z.number()
+});
+
 const DeepDiveResultSchema = z.object({
   schemaVersion: z.literal(INSPECT_DEEP_DIVE_SCHEMA_VERSION),
   generatedAtUtc: z.string(),
   tenantId: z.string(),
   tenantName: z.string().optional(),
   windowHours: z.number(),
+  overviewMetrics: DeepDiveOverviewMetricsSchema.optional(),
   summary: z.array(z.string()),
   topOfflineSpaces: z.array(DeepDiveTopOfflineSpaceSchema),
   topIncidentDevices: z.array(DeepDiveTopIncidentDeviceSchema),
@@ -1070,6 +1094,17 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
     tenantId: snapshot.tenantId,
     tenantName: snapshot.tenantName,
     windowHours,
+    overviewMetrics: {
+      totalDevices: snapshot.devices.length,
+      offlineDevices: offlineDevices.length,
+      offlinePct: pct(offlineDevices.length, snapshot.devices.length),
+      totalIncidents: snapshot.incidents.length,
+      activeIncidents: activeIncidents.length,
+      activeIncidentPct: pct(activeIncidents.length, snapshot.incidents.length),
+      totalTickets: snapshot.tickets.length,
+      openTickets: openTickets.length,
+      statusMismatches: mismatches.length
+    },
     summary,
     topOfflineSpaces,
     topIncidentDevices,
@@ -1247,6 +1282,52 @@ function ensureDir(filePath: string): void {
 export const formatUtcForReport = formatUtcForReportFromLayout;
 export const getWindowFocus = getWindowFocusFromTheme;
 
+function parseLegacyOverviewMetrics(summary: string[]): DeepDiveResult['overviewMetrics'] {
+  const metrics = {
+    totalDevices: 0,
+    offlineDevices: 0,
+    offlinePct: 0,
+    totalIncidents: 0,
+    activeIncidents: 0,
+    activeIncidentPct: 0,
+    totalTickets: 0,
+    openTickets: 0,
+    statusMismatches: 0
+  };
+
+  for (const line of summary) {
+    const deviceMatch = line.match(/^Devices:\s+(\d+)\s+total,\s+(\d+)\s+offline\s+\(([\d.]+)%\)\.$/i);
+    if (deviceMatch) {
+      metrics.totalDevices = Number.parseInt(deviceMatch[1], 10);
+      metrics.offlineDevices = Number.parseInt(deviceMatch[2], 10);
+      metrics.offlinePct = Number.parseFloat(deviceMatch[3]);
+      continue;
+    }
+
+    const incidentMatch = line.match(/^Incidents:\s+(\d+)\s+total,\s+(\d+)\s+active\s+\(([\d.]+)%\)\.$/i);
+    if (incidentMatch) {
+      metrics.totalIncidents = Number.parseInt(incidentMatch[1], 10);
+      metrics.activeIncidents = Number.parseInt(incidentMatch[2], 10);
+      metrics.activeIncidentPct = Number.parseFloat(incidentMatch[3]);
+      continue;
+    }
+
+    const ticketMatch = line.match(/^Tickets:\s+(\d+)\s+total,\s+(\d+)\s+open\.$/i);
+    if (ticketMatch) {
+      metrics.totalTickets = Number.parseInt(ticketMatch[1], 10);
+      metrics.openTickets = Number.parseInt(ticketMatch[2], 10);
+      continue;
+    }
+
+    const mismatchMatch = line.match(/^Data quality:\s+(\d+)\s+status mismatches detected\.$/i);
+    if (mismatchMatch) {
+      metrics.statusMismatches = Number.parseInt(mismatchMatch[1], 10);
+    }
+  }
+
+  return metrics;
+}
+
 export function parseDeepDiveForReport(raw: unknown, expectedTenantId?: string): DeepDiveResult {
   const parsed = DeepDiveResultSchema.safeParse(raw);
   if (!parsed.success) {
@@ -1257,7 +1338,12 @@ export function parseDeepDiveForReport(raw: unknown, expectedTenantId?: string):
     throw new Error(`Input tenant mismatch. Expected ${expectedTenantId}, got ${parsed.data.tenantId}.`);
   }
 
-  return parsed.data;
+  return parsed.data.overviewMetrics
+    ? parsed.data
+    : {
+        ...parsed.data,
+        overviewMetrics: parseLegacyOverviewMetrics(parsed.data.summary)
+      };
 }
 
 export async function generateFleetReport(args: {

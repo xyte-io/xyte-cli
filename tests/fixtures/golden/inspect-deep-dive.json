@@ -3,6 +3,17 @@
   "generatedAtUtc": "2026-02-25T00:00:00.000Z",
   "tenantId": "acme",
   "windowHours": 24,
+  "overviewMetrics": {
+    "totalDevices": 2,
+    "offlineDevices": 1,
+    "offlinePct": 50,
+    "totalIncidents": 1,
+    "activeIncidents": 1,
+    "activeIncidentPct": 100,
+    "totalTickets": 1,
+    "openTickets": 1,
+    "statusMismatches": 0
+  },
   "summary": [
     "Devices: 2 total, 1 offline (50%).",
     "Incidents: 1 total, 1 active (100%).",

@@ -121,98 +121,18 @@ interface DeepDiveSummaryMetrics {
   mismatches: number;
 }
 
-function splitOnce(value: string, delimiter: string): [string, string] | undefined {
-  const index = value.indexOf(delimiter);
-  if (index < 0) {
-    return undefined;
-  }
-  return [value.slice(0, index), value.slice(index + delimiter.length)];
-}
-
-function parseIntegerToken(value: string): number | undefined {
-  const trimmed = value.trim();
-  if (!/^\d+$/.test(trimmed)) {
-    return undefined;
-  }
-  return Number.parseInt(trimmed, 10);
-}
-
-function parsePercentToken(value: string): number | undefined {
-  const trimmed = value.trim();
-  if (!/^\d+(?:\.\d+)?$/.test(trimmed)) {
-    return undefined;
-  }
-  return Number.parseFloat(trimmed);
-}
-
-function parseDeepDiveSummaryMetrics(summary: string[]): DeepDiveSummaryMetrics {
-  const metrics: DeepDiveSummaryMetrics = {
-    totalDevices: 0,
-    offlineDevices: 0,
-    offlinePct: 0,
-    totalIncidents: 0,
-    activeIncidents: 0,
-    activeIncidentPct: 0,
-    totalTickets: 0,
-    openTickets: 0,
-    mismatches: 0
+function getDeepDiveSummaryMetrics(deepDive: DeepDiveResult): DeepDiveSummaryMetrics {
+  return {
+    totalDevices: deepDive.overviewMetrics?.totalDevices ?? 0,
+    offlineDevices: deepDive.overviewMetrics?.offlineDevices ?? 0,
+    offlinePct: deepDive.overviewMetrics?.offlinePct ?? 0,
+    totalIncidents: deepDive.overviewMetrics?.totalIncidents ?? 0,
+    activeIncidents: deepDive.overviewMetrics?.activeIncidents ?? 0,
+    activeIncidentPct: deepDive.overviewMetrics?.activeIncidentPct ?? 0,
+    totalTickets: deepDive.overviewMetrics?.totalTickets ?? 0,
+    openTickets: deepDive.overviewMetrics?.openTickets ?? 0,
+    mismatches: deepDive.overviewMetrics?.statusMismatches ?? 0
   };
-
-  for (const line of summary) {
-    if (line.startsWith('Devices: ')) {
-      const parts = splitOnce(line.slice('Devices: '.length), ' total, ');
-      const offlineParts = parts ? splitOnce(parts[1], ' offline (') : undefined;
-      const offlinePctText = offlineParts?.[1]?.endsWith('%).') ? offlineParts[1].slice(0, -3) : undefined;
-      const totalDevices = parts ? parseIntegerToken(parts[0]) : undefined;
-      const offlineDevices = offlineParts ? parseIntegerToken(offlineParts[0]) : undefined;
-      const offlinePct = offlinePctText ? parsePercentToken(offlinePctText) : undefined;
-      if (totalDevices !== undefined && offlineDevices !== undefined && offlinePct !== undefined) {
-        metrics.totalDevices = totalDevices;
-        metrics.offlineDevices = offlineDevices;
-        metrics.offlinePct = offlinePct;
-        continue;
-      }
-    }
-
-    if (line.startsWith('Incidents: ')) {
-      const parts = splitOnce(line.slice('Incidents: '.length), ' total, ');
-      const activeParts = parts ? splitOnce(parts[1], ' active (') : undefined;
-      const activePctText = activeParts?.[1]?.endsWith('%).') ? activeParts[1].slice(0, -3) : undefined;
-      const totalIncidents = parts ? parseIntegerToken(parts[0]) : undefined;
-      const activeIncidents = activeParts ? parseIntegerToken(activeParts[0]) : undefined;
-      const activeIncidentPct = activePctText ? parsePercentToken(activePctText) : undefined;
-      if (totalIncidents !== undefined && activeIncidents !== undefined && activeIncidentPct !== undefined) {
-        metrics.totalIncidents = totalIncidents;
-        metrics.activeIncidents = activeIncidents;
-        metrics.activeIncidentPct = activeIncidentPct;
-        continue;
-      }
-    }
-
-    if (line.startsWith('Tickets: ')) {
-      const parts = splitOnce(line.slice('Tickets: '.length), ' total, ');
-      const openTicketsText = parts?.[1]?.endsWith(' open.') ? parts[1].slice(0, -6) : undefined;
-      const totalTickets = parts ? parseIntegerToken(parts[0]) : undefined;
-      const openTickets = openTicketsText ? parseIntegerToken(openTicketsText) : undefined;
-      if (totalTickets !== undefined && openTickets !== undefined) {
-        metrics.totalTickets = totalTickets;
-        metrics.openTickets = openTickets;
-        continue;
-      }
-    }
-
-    if (line.startsWith('Data quality: ') && line.endsWith(' status mismatches detected.')) {
-      const mismatchText = line
-        .slice('Data quality: '.length, line.length - ' status mismatches detected.'.length)
-        .trim();
-      const mismatches = parseIntegerToken(mismatchText);
-      if (mismatches !== undefined) {
-        metrics.mismatches = mismatches;
-      }
-    }
-  }
-
-  return metrics;
 }
 
 function formatSpotlightDevice(value: string): string {
@@ -247,7 +167,7 @@ function shortenSpotlightTitle(value: string): string {
 }
 
 export function buildDeepDiveOverviewPlan(deepDive: DeepDiveResult): DeepDiveOverviewPlan {
-  const metrics = parseDeepDiveSummaryMetrics(deepDive.summary);
+  const metrics = getDeepDiveSummaryMetrics(deepDive);
   const windowFocus = getWindowFocus(deepDive.windowHours);
   const topOfflineSpace = deepDive.topOfflineSpaces[0];
   const topIncidentDevice = deepDive.topIncidentDevices[0];

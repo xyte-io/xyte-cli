@@ -411,6 +411,66 @@ describe('flow runner', () => {
     expect(result.classifications.bug).toBe(0);
   });
 
+  it('reuses the transport requestId in flow call envelopes', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const callWithMeta = vi.fn(async () => ({
+      status: 200,
+      durationMs: 12,
+      retryCount: 0,
+      data: { ok: true }
+    }));
+
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.request-id-correlation',
+      title: 'Request id correlation',
+      intent: 'keep flow envelopes aligned with transport metadata',
+      writeCapable: false,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'task',
+          id: 'read_devices',
+          title: 'Read Devices',
+          command: 'xyte-cli api call organization.devices.getDevices',
+          task: 'call',
+          mutating: false,
+          call: {
+            endpointKey: 'organization.devices.getDevices',
+            outputMode: 'envelope'
+          }
+        }
+      ]
+    };
+
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-request-id`);
+    const result = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client: {
+        callWithMeta
+      } as any
+    });
+
+    expect(result.outcome).toBe('completed');
+    expect(callWithMeta).toHaveBeenCalledTimes(1);
+    const requestId = callWithMeta.mock.calls[0][1]?.requestId;
+    expect(typeof requestId).toBe('string');
+    const artifactPath = result.steps.find((step) => step.stepId === 'read_devices')?.artifactPath;
+    expect(artifactPath).toBeDefined();
+    const envelope = JSON.parse(readFileSync(artifactPath!, 'utf8'));
+    expect(envelope.requestId).toBe(requestId);
+  });
+
   it('runs inspect.deep-dive and report.generate with partner-only provider scope', async () => {
     const { profileStore, secretStore, client } = await makeClientWithProviders(['xyte-partner']);
 

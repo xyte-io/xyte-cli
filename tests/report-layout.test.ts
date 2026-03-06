@@ -249,4 +249,23 @@ describe('report layout helpers', () => {
     const plan = buildDeepDiveOverviewPlan(result);
     expect(plan.insights[1].title).toBe('Xyte Office');
   });
+
+  it('builds overview KPIs from structured deep-dive metrics instead of summary wording', () => {
+    const result = buildDeepDive({
+      generatedAtUtc: new Date().toISOString(),
+      tenantId: 'acme',
+      devices: [{ id: 'd1', name: 'Device 1', status: 'offline', space: { full_path: 'Overview/A' } }],
+      spaces: [{ id: 's1', name: 'Room A', space_type: 'room' }],
+      incidents: [{ id: 'i1', device_name: 'Device 1', status: 'active', space_tree_path_name: 'Overview/A', created_at: new Date().toISOString() }],
+      tickets: [{ id: 't1', title: 'Need help', status: 'open', created_at: new Date().toISOString(), device_id: 'd1' }]
+    });
+
+    result.summary = ['Summary wording can change freely.'];
+    const plan = buildDeepDiveOverviewPlan(result);
+
+    expect(plan.kpis[0].value).toBe('1');
+    expect(plan.kpis[1].value).toBe('1');
+    expect(plan.kpis[2].value).toBe('1');
+    expect(plan.kpis[3].value).toBe('1');
+  });
 });

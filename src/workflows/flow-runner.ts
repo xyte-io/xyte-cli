@@ -465,12 +465,14 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
       const endpoint = getEndpoint(step.call.endpointKey);
       const method = endpoint.method.toUpperCase();
       const isWrite = isMutatingMethod(method);
+      const requestId = randomUUID();
 
       const pathPayload = step.call.path ? resolveTemplateValue(step.call.path, ctx.resolvedContext) : undefined;
       const queryPayload = step.call.query ? resolveTemplateValue(step.call.query, ctx.resolvedContext) : undefined;
       const bodyPayload = step.call.body ? resolveTemplateValue(step.call.body, ctx.resolvedContext) : undefined;
 
       const result = await ctx.args.client.callWithMeta(step.call.endpointKey, {
+        requestId,
         tenantId: ctx.args.tenantId,
         ...(pathPayload ? { path: pathPayload as Record<string, string | number> } : {}),
         ...(queryPayload ? { query: queryPayload as Record<string, string | number | boolean | null | undefined> } : {}),
@@ -478,7 +480,7 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
       });
 
       const envelope = buildCallEnvelope({
-        requestId: randomUUID(),
+        requestId,
         tenantId: ctx.args.tenantId,
         endpointKey: step.call.endpointKey,
         method,
