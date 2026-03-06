@@ -1,6 +1,7 @@
 import blessed from 'blessed';
 
 import {
+  applyPaneChrome,
   clampIndex,
   movePaneWithBoundary,
   moveTableSelection,
@@ -15,10 +16,14 @@ import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
 import { loadIncidentsData } from '../data-loaders';
 import { sceneFromIncidentsState } from '../scene';
 import { payloadSummary } from '../serialize';
-import { confirmWriteWithToken, openActionPalette } from '../actions';
+import { confirmWriteWithToken, openActionPalette, promptChoice } from '../actions';
 
 function incidentIdOf(incident: any): string {
   return String(incident?.id ?? incident?._id ?? incident?.uuid ?? '');
+}
+
+function incidentLabelOf(incident: any): string {
+  return String(incident?.title ?? incident?.name ?? incidentIdOf(incident) ?? 'incident').trim() || 'incident';
 }
 
 interface CloseIncidentWithGuardArgs {
@@ -85,12 +90,21 @@ export function createIncidentsScreen(): TuiScreen {
   const paneConfig = SCREEN_PANE_CONFIG.incidents;
   let activePane: TuiPaneId = paneConfig.defaultPane;
   let isMounted = false;
+  let detailOpen = false;
   let renderErrorMessage = '';
   let renderErrorCount = 0;
   let renderErrorWindowStart = 0;
   let renderFrozen = false;
 
+  const renderPaneChrome = () => {
+    applyPaneChrome(activePane, [
+      { id: 'incidents-table', label: 'Incidents', widget: list },
+      { id: 'detail-box', label: detailOpen ? 'Incident Detail Node' : 'Incident Preview', widget: detailBox }
+    ]);
+  };
+
   const focusPane = () => {
+    renderPaneChrome();
     if (activePane === 'incidents-table') {
       list?.focus();
       return;
@@ -117,6 +131,9 @@ export function createIncidentsScreen(): TuiScreen {
       selectedIndex = restoreIndex >= 0 ? restoreIndex : clampIndex(selectedIndex, filtered.length);
     } else {
       selectedIndex = clampIndex(selectedIndex, filtered.length);
+    }
+    if (!filtered.length) {
+      detailOpen = false;
     }
 
     const actionsHint = 'actions: a close-incident, f filters, [ ] pages, p per-page';
@@ -301,7 +318,7 @@ export function createIncidentsScreen(): TuiScreen {
         widgets: ['incidents-table', 'detail-box']
       });
 
-      list.on('select item', (_item, index) => {
+      list.on('select item', (_item: unknown, index: number) => {
         if (shouldIgnoreSelectEvent(selectionSync)) {
           return;
         }
@@ -324,8 +341,26 @@ export function createIncidentsScreen(): TuiScreen {
     getActivePane() {
       return activePane;
     },
+    getNavigationTrail() {
+      const selected = selectedIncident();
+      if (detailOpen && selected) {
+        return ['Incidents', incidentLabelOf(selected)];
+      }
+      return ['Incidents', 'Browse'];
+    },
     getAvailablePanes() {
       return paneConfig.panes;
+    },
+    goBack() {
+      if (!detailOpen) {
+        return false;
+      }
+      detailOpen = false;
+      activePane = 'incidents-table';
+      renderRows(incidentIdOf(selectedIncident()));
+      context.screen.render();
+      context.setStatus('Back to incident list.');
+      return true;
     },
     async handleArrow(key: TuiArrowKey) {
       if (key === 'left' || key === 'right') {
@@ -388,32 +423,83 @@ export function createIncidentsScreen(): TuiScreen {
       }
 
       if (ch === 'f') {
-        const nextStatus = await context.prompt('Status filter (empty clears):', statusFilter);
-        if (nextStatus === undefined || !isMounted) {
-          return true;
-        }
-        const nextPriority = await context.prompt('Priority filter (empty clears):', priorityFilter);
-        if (nextPriority === undefined || !isMounted) {
-          return true;
-        }
-        const nextSpaceId = await context.prompt('Space ID filter (empty clears):', spaceIdFilter);
-        if (nextSpaceId === undefined || !isMounted) {
-          return true;
-        }
-        const nextTitle = await context.prompt('Title filter (empty clears):', titleFilter);
-        if (nextTitle === undefined || !isMounted) {
-          return true;
-        }
-        const nextIssue = await context.prompt('Issue filter (empty clears):', issueFilter);
-        if (nextIssue === undefined || !isMounted) {
+        const choice = await promptChoice(context, {
+          title: 'Incident filters',
+          choices: [
+            { label: `Edit status (${statusFilter || 'all'})`, value: 'status' },
+            { label: `Edit priority (${priorityFilter || 'all'})`, value: 'priority' },
+            { label: `Edit space_id (${spaceIdFilter || 'all'})`, value: 'space_id' },
+            { label: `Edit title (${titleFilter || 'all'})`, value: 'title' },
+            { label: `Edit issue (${issueFilter || 'all'})`, value: 'issue' },
+            { label: 'Clear all incident filters', value: 'clear' }
+          ]
+        });
+        if (!choice || !isMounted) {
           return true;
         }
 
-        statusFilter = nextStatus.trim().toLowerCase();
-        priorityFilter = nextPriority.trim().toLowerCase();
-        spaceIdFilter = nextSpaceId.trim();
-        titleFilter = nextTitle.trim();
-        issueFilter = nextIssue.trim();
+        if (choice.value === 'clear') {
+          statusFilter = '';
+          priorityFilter = '';
+          spaceIdFilter = '';
+          titleFilter = '';
+          issueFilter = '';
+          page = 1;
+          selectedIndex = 0;
+          await refreshRows();
+          return true;
+        }
+
+        const promptConfig: Record<string, { label: string; current: string; normalize?: (value: string) => string; apply: (value: string) => void }> = {
+          status: {
+            label: 'Status filter (empty clears):',
+            current: statusFilter,
+            normalize: (value) => value.toLowerCase(),
+            apply: (value) => {
+              statusFilter = value;
+            }
+          },
+          priority: {
+            label: 'Priority filter (empty clears):',
+            current: priorityFilter,
+            normalize: (value) => value.toLowerCase(),
+            apply: (value) => {
+              priorityFilter = value;
+            }
+          },
+          space_id: {
+            label: 'Space ID filter (empty clears):',
+            current: spaceIdFilter,
+            apply: (value) => {
+              spaceIdFilter = value;
+            }
+          },
+          title: {
+            label: 'Title filter (empty clears):',
+            current: titleFilter,
+            apply: (value) => {
+              titleFilter = value;
+            }
+          },
+          issue: {
+            label: 'Issue filter (empty clears):',
+            current: issueFilter,
+            apply: (value) => {
+              issueFilter = value;
+            }
+          }
+        };
+
+        const selectedPrompt = promptConfig[choice.value];
+        if (!selectedPrompt) {
+          return true;
+        }
+        const nextValue = await context.prompt(selectedPrompt.label, selectedPrompt.current);
+        if (nextValue === undefined || !isMounted) {
+          return true;
+        }
+
+        selectedPrompt.apply((selectedPrompt.normalize?.(nextValue.trim()) ?? nextValue.trim()));
         page = 1;
         selectedIndex = 0;
         await refreshRows();
@@ -478,8 +564,16 @@ export function createIncidentsScreen(): TuiScreen {
       }
 
       if (key.name === 'enter' && activePane === 'incidents-table') {
-        renderRows();
+        const incident = selectedIncident();
+        if (!incident) {
+          context.setStatus('No incident selected.');
+          return true;
+        }
+        detailOpen = true;
+        activePane = 'detail-box';
+        renderRows(incidentIdOf(incident));
         context.screen.render();
+        context.setStatus(`Opened ${incidentLabelOf(incident)}.`);
         return true;
       }
 

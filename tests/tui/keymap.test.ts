@@ -5,6 +5,8 @@ import { GLOBAL_KEYMAP, SCREEN_ACTION_KEYMAP } from '../../src/tui/keymap';
 describe('tui keymaps', () => {
   it('defines required global shortcuts', () => {
     const keys = GLOBAL_KEYMAP.map((item) => item.keys);
+    expect(keys).toContain('Tab / Shift+Tab');
+    expect(keys).toContain('1-7');
     expect(keys).toContain('←/→');
     expect(keys).toContain('↑/↓');
     expect(keys).toContain('Enter');

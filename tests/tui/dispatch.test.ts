@@ -87,7 +87,7 @@ describe('tui key dispatch', () => {
     expect(handleGlobal).not.toHaveBeenCalled();
   });
 
-  it('routes horizontal arrows to global handler by default', async () => {
+  it('routes horizontal arrows to screen arrow handler by default', async () => {
     const handleArrow = vi.fn().mockResolvedValue('handled');
     const handleGlobal = vi.fn().mockResolvedValue(undefined);
 
@@ -98,12 +98,12 @@ describe('tui key dispatch', () => {
       handleGlobal
     });
 
-    expect(result).toBe('global');
-    expect(handleArrow).not.toHaveBeenCalled();
-    expect(handleGlobal).toHaveBeenCalledTimes(1);
+    expect(result).toBe('arrow');
+    expect(handleArrow).toHaveBeenCalledTimes(1);
+    expect(handleGlobal).not.toHaveBeenCalled();
   });
 
-  it('bypasses global horizontal arrow routing when screen requests text-edit priority', async () => {
+  it('blocks horizontal arrows when pane navigation hits a boundary', async () => {
     const handleArrow = vi.fn().mockResolvedValue('handled');
     const handleGlobal = vi.fn().mockResolvedValue(undefined);
 
@@ -111,32 +111,31 @@ describe('tui key dispatch', () => {
       ch: undefined,
       key: { name: 'left', full: 'left' } as any,
       handleArrow,
-      handleGlobal,
-      shouldBypassHorizontalGlobal: () => true
+      handleGlobal
     });
 
-    expect(result).toBe('blocked');
-    expect(handleArrow).not.toHaveBeenCalled();
+    expect(result).toBe('arrow');
+    expect(handleArrow).toHaveBeenCalledTimes(1);
     expect(handleGlobal).not.toHaveBeenCalled();
   });
 
-  it('falls through to global handler when pane-mode arrow reaches pane boundary', async () => {
+  it('blocks when screen arrow handling reports a pane boundary', async () => {
     const handleArrow = vi.fn().mockResolvedValue('boundary');
     const handleGlobal = vi.fn().mockResolvedValue(undefined);
 
     const result = await dispatchKeypress({
       ch: undefined,
-      key: { name: 'right', full: 'S-right', shift: true } as any,
+      key: { name: 'right', full: 'right' } as any,
       handleArrow,
       handleGlobal
     });
 
-    expect(result).toBe('global');
+    expect(result).toBe('blocked');
     expect(handleArrow).toHaveBeenCalledTimes(1);
-    expect(handleGlobal).toHaveBeenCalledTimes(1);
+    expect(handleGlobal).not.toHaveBeenCalled();
   });
 
-  it('routes pane-mode horizontal arrows to screen arrow handler', async () => {
+  it('still routes modified horizontal arrows to screen arrow handler', async () => {
     const handleArrow = vi.fn().mockResolvedValue('handled');
     const handleGlobal = vi.fn().mockResolvedValue(undefined);
 

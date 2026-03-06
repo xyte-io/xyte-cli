@@ -1,6 +1,6 @@
 import type { TuiContext } from './types';
 
-type PromptContext = Pick<TuiContext, 'prompt' | 'setStatus'>;
+type PromptContext = Pick<TuiContext, 'prompt' | 'setStatus' | 'choose'>;
 type GuardContext = Pick<TuiContext, 'confirmWrite' | 'setStatus'>;
 type ErrorContext = Pick<TuiContext, 'showError'>;
 
@@ -38,21 +38,38 @@ export async function openActionPalette(args: {
     return true;
   }
 
-  const lines = [args.title, ...args.actions.map((action, index) => {
-    const disabled = action.enabled === false ? ' (disabled)' : '';
-    return `${index + 1}. ${action.label}${disabled}`;
-  })];
+  let selectedIndex: number | undefined;
+  if (args.context.choose) {
+    selectedIndex = await args.context.choose({
+      title: args.title,
+      items: args.actions.map((action) => ({
+        label: action.label,
+        disabled: action.enabled === false,
+        disabledReason: action.disabledReason,
+        hint: action.enabled === false ? action.disabledReason ?? 'Unavailable' : undefined
+      }))
+    });
+    if (selectedIndex === undefined) {
+      args.context.setStatus('Action menu canceled.');
+      return true;
+    }
+  } else {
+    const lines = [args.title, ...args.actions.map((action, index) => {
+      const disabled = action.enabled === false ? ' (disabled)' : '';
+      return `${index + 1}. ${action.label}${disabled}`;
+    })];
 
-  const raw = await args.context.prompt(`${lines.join('\n')}\n\nSelect action number:`, '');
-  if (raw === undefined || raw.trim() === '') {
-    args.context.setStatus('Action menu canceled.');
-    return true;
-  }
+    const raw = await args.context.prompt(`${lines.join('\n')}\n\nSelect action number:`, '');
+    if (raw === undefined || raw.trim() === '') {
+      args.context.setStatus('Action menu canceled.');
+      return true;
+    }
 
-  const selectedIndex = parseOneBasedIndex(raw, args.actions.length);
-  if (selectedIndex === undefined) {
-    args.context.setStatus('Invalid action selection.');
-    return true;
+    selectedIndex = parseOneBasedIndex(raw, args.actions.length);
+    if (selectedIndex === undefined) {
+      args.context.setStatus('Invalid action selection.');
+      return true;
+    }
   }
 
   const selected = args.actions[selectedIndex];
@@ -93,17 +110,31 @@ export async function promptChoice(
     return undefined;
   }
 
-  const lines = [args.title, ...args.choices.map((choice, index) => `${index + 1}. ${choice.label}`)];
-  const raw = await context.prompt(`${lines.join('\n')}\n\nChoose number:`, '');
-  if (raw === undefined || raw.trim() === '') {
-    context.setStatus('Selection canceled.');
-    return undefined;
-  }
+  let selectedIndex: number | undefined;
+  if (context.choose) {
+    selectedIndex = await context.choose({
+      title: args.title,
+      items: args.choices.map((choice) => ({
+        label: choice.label
+      }))
+    });
+    if (selectedIndex === undefined) {
+      context.setStatus('Selection canceled.');
+      return undefined;
+    }
+  } else {
+    const lines = [args.title, ...args.choices.map((choice, index) => `${index + 1}. ${choice.label}`)];
+    const raw = await context.prompt(`${lines.join('\n')}\n\nChoose number:`, '');
+    if (raw === undefined || raw.trim() === '') {
+      context.setStatus('Selection canceled.');
+      return undefined;
+    }
 
-  const selectedIndex = parseOneBasedIndex(raw, args.choices.length);
-  if (selectedIndex === undefined) {
-    context.setStatus('Invalid selection.');
-    return undefined;
+    selectedIndex = parseOneBasedIndex(raw, args.choices.length);
+    if (selectedIndex === undefined) {
+      context.setStatus('Invalid selection.');
+      return undefined;
+    }
   }
   return args.choices[selectedIndex];
 }

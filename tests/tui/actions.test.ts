@@ -26,6 +26,27 @@ describe('tui actions helpers', () => {
     expect(run).toHaveBeenCalledTimes(1);
   });
 
+  it('uses chooser UI when available for palette actions', async () => {
+    const run = vi.fn().mockResolvedValue(undefined);
+    const context: any = {
+      choose: vi.fn().mockResolvedValue(0),
+      prompt: vi.fn(),
+      setStatus: vi.fn(),
+      showError: vi.fn()
+    };
+
+    const handled = await openActionPalette({
+      context,
+      title: 'Actions',
+      actions: [{ label: 'Do thing', run }]
+    });
+
+    expect(handled).toBe(true);
+    expect(context.choose).toHaveBeenCalledTimes(1);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(context.prompt).not.toHaveBeenCalled();
+  });
+
   it('does not run disabled palette action', async () => {
     const run = vi.fn();
     const context: any = {
@@ -69,6 +90,25 @@ describe('tui actions helpers', () => {
     });
 
     expect(choice?.value).toBe('two');
+  });
+
+  it('uses chooser UI when available for prompt choices', async () => {
+    const context: any = {
+      choose: vi.fn().mockResolvedValue(1),
+      prompt: vi.fn(),
+      setStatus: vi.fn()
+    };
+    const choice = await promptChoice(context, {
+      title: 'Pick one',
+      choices: [
+        { label: 'One', value: 'one' },
+        { label: 'Two', value: 'two' }
+      ]
+    });
+
+    expect(choice?.value).toBe('two');
+    expect(context.choose).toHaveBeenCalledTimes(1);
+    expect(context.prompt).not.toHaveBeenCalled();
   });
 
   it('parses JSON object input only', () => {

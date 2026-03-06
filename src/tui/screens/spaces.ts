@@ -1,6 +1,7 @@
 import blessed from 'blessed';
 
 import {
+  applyPaneChrome,
   clampIndex,
   movePaneWithBoundary,
   moveTableSelection,
@@ -20,10 +21,23 @@ import {
   loadSpacesData
 } from '../data-loaders';
 import { sceneFromSpacesState } from '../scene';
-import { safeSearchText } from '../serialize';
-import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput } from '../actions';
+import { safePreviewLines, safeSearchText } from '../serialize';
+import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, promptChoice } from '../actions';
 
 const SPINNER_FRAMES = ['|', '/', '-', '\\'];
+
+type SpacesDetailNode =
+  | { kind: 'root' }
+  | { kind: 'space'; spaceId: string; spaceLabel: string }
+  | { kind: 'device'; spaceId: string; spaceLabel: string; deviceId: string; deviceLabel: string };
+
+function spaceLabelOf(space: any): string {
+  return String(space?.name ?? space?.title ?? getSpaceId(space) ?? 'space').trim() || 'space';
+}
+
+function deviceLabelOf(device: any): string {
+  return String(device?.name ?? device?.title ?? device?.id ?? device?._id ?? 'device').trim() || 'device';
+}
 
 interface ClaimDeviceWithGuardArgs {
   spaceId: string;
@@ -211,9 +225,14 @@ export function createSpacesScreen(): TuiScreen {
     syncing: false,
     name: 'spaces-table'
   };
+  let devicesSelectionSync: SelectionSyncState = {
+    syncing: false,
+    name: 'spaces-devices-table'
+  };
   const paneConfig = SCREEN_PANE_CONFIG.spaces;
   let activePane = paneConfig.defaultPane;
   let isMounted = false;
+  let detailNode: SpacesDetailNode = { kind: 'root' };
   let idFilter = '';
   let nameFilter = '';
   let parentIdFilter = '';
@@ -222,7 +241,27 @@ export function createSpacesScreen(): TuiScreen {
   let createdAfterFilter = '';
   let createdBeforeFilter = '';
 
+  const selectedDeviceInSpace = () => devicesInSpace[clampIndex(selectedDeviceIndex, devicesInSpace.length)];
+
+  const renderPaneChrome = () => {
+    applyPaneChrome(activePane, [
+      { id: 'spaces-table', label: 'Spaces', widget: spaceTable },
+      {
+        id: 'detail-box',
+        label:
+          detailNode.kind === 'device'
+            ? 'Device Detail Node'
+            : detailNode.kind === 'space'
+              ? 'Space Detail Node'
+              : 'Space Preview',
+        widget: detailBox
+      },
+      { id: 'devices-table', label: 'Devices In Space', widget: devicesTable }
+    ]);
+  };
+
   const focusPane = () => {
+    renderPaneChrome();
     if (activePane === 'spaces-table') {
       spaceTable?.focus();
       return;
@@ -301,13 +340,24 @@ export function createSpacesScreen(): TuiScreen {
     ], spaceSelectionSync);
     syncListSelection(spaceTable, selectedIndex, spaceSelectionSync);
 
-    detailBox.setContent((detailPanel?.text?.lines ?? ['No space selected.']).join('\n'));
+    const selectedDevice = selectedDeviceInSpace();
+    const detailLines = detailNode.kind === 'device' && selectedDevice
+      ? [
+          `Device: ${deviceLabelOf(selectedDevice)}`,
+          `ID: ${String(selectedDevice?.id ?? selectedDevice?._id ?? 'n/a')}`,
+          `State: ${String(selectedDevice?.status ?? selectedDevice?.state ?? 'unknown')}`,
+          `Space: ${detailNode.spaceLabel}`,
+          '',
+          ...safePreviewLines(selectedDevice).lines
+        ]
+      : (detailPanel?.text?.lines ?? ['No space selected.']);
+    detailBox.setContent(detailLines.join('\n'));
 
     setListTableData(devicesTable, [
       (devicesPanel?.table?.columns ?? ['ID', 'Name', 'Status']) as [string, string, string],
       ...((devicesPanel?.table?.rows ?? []) as Array<[string, string, string]>)
-    ]);
-    devicesTable.select(clampIndex(selectedDeviceIndex, devicesInSpace.length) + 1);
+    ], devicesSelectionSync);
+    syncListSelection(devicesTable, selectedDeviceIndex, devicesSelectionSync);
 
     const statusPrefix = loading ? `${SPINNER_FRAMES[spinnerPhase % SPINNER_FRAMES.length]} ` : '';
     statusBox.setContent(` ${statusPrefix}${paneStatus}`);
@@ -355,6 +405,16 @@ export function createSpacesScreen(): TuiScreen {
       selectedSpaceDetail = result.selectedSpaceDetail;
       devicesInSpace = result.devicesInSpace;
       selectedDeviceIndex = 0;
+      if (detailNode.kind !== 'root' && detailNode.spaceId !== result.selectedSpaceId) {
+        detailNode = { kind: 'root' };
+      }
+      if (detailNode.kind === 'device' && !result.devicesInSpace.length) {
+        detailNode = {
+          kind: 'space',
+          spaceId: result.selectedSpaceId,
+          spaceLabel: spaceLabelOf(filtered[result.index])
+        };
+      }
       paneStatus = result.paneStatus;
       renderState();
     }
@@ -396,6 +456,7 @@ export function createSpacesScreen(): TuiScreen {
       selectedSpaceDetail = undefined;
       devicesInSpace = [];
       selectedDeviceIndex = 0;
+      detailNode = { kind: 'root' };
       paneStatus = 'No spaces matched the current filter.';
       loading = false;
       stopSpinner();
@@ -469,6 +530,11 @@ export function createSpacesScreen(): TuiScreen {
       spaceSelectionSync = {
         syncing: false,
         name: 'spaces-table',
+        onLog: (event, data) => context.debugLog?.(event, data)
+      };
+      devicesSelectionSync = {
+        syncing: false,
+        name: 'spaces-devices-table',
         onLog: (event, data) => context.debugLog?.(event, data)
       };
       isMounted = true;
@@ -547,12 +613,20 @@ export function createSpacesScreen(): TuiScreen {
         }
       });
 
-      spaceTable.on('select item', (_item, index) => {
+      spaceTable.on('select item', (_item: unknown, index: number) => {
         if (shouldIgnoreSelectEvent(spaceSelectionSync)) {
           return;
         }
         clearSelectionDebounce();
         void loadSelection(Math.max(0, index - 1));
+      });
+
+      devicesTable.on('select item', (_item: unknown, index: number) => {
+        if (shouldIgnoreSelectEvent(devicesSelectionSync)) {
+          return;
+        }
+        selectedDeviceIndex = Math.max(0, index - 1);
+        renderState();
       });
     },
     unmount() {
@@ -571,8 +645,38 @@ export function createSpacesScreen(): TuiScreen {
     getActivePane() {
       return activePane;
     },
+    getNavigationTrail() {
+      if (detailNode.kind === 'device') {
+        return ['Spaces', detailNode.spaceLabel, detailNode.deviceLabel];
+      }
+      if (detailNode.kind === 'space') {
+        return ['Spaces', detailNode.spaceLabel];
+      }
+      return ['Spaces', 'Browse'];
+    },
     getAvailablePanes() {
       return paneConfig.panes;
+    },
+    goBack() {
+      if (detailNode.kind === 'device') {
+        detailNode = {
+          kind: 'space',
+          spaceId: detailNode.spaceId,
+          spaceLabel: detailNode.spaceLabel
+        };
+        activePane = 'devices-table';
+        renderState();
+        context.setStatus(`Back to devices in ${detailNode.spaceLabel}.`);
+        return true;
+      }
+      if (detailNode.kind === 'space') {
+        detailNode = { kind: 'root' };
+        activePane = 'spaces-table';
+        renderState();
+        context.setStatus('Back to space list.');
+        return true;
+      }
+      return false;
     },
     async handleArrow(key: TuiArrowKey) {
       if (key === 'left' || key === 'right') {
@@ -621,7 +725,8 @@ export function createSpacesScreen(): TuiScreen {
         table: devicesTable,
         index: selectedDeviceIndex,
         delta,
-        totalRows: devicesInSpace.length
+        totalRows: devicesInSpace.length,
+        selectionSync: devicesSelectionSync
       });
       renderState();
       return 'handled';
@@ -641,42 +746,98 @@ export function createSpacesScreen(): TuiScreen {
       }
 
       if (ch === 'f') {
-        const nextId = await context.prompt('Filter id (empty clears):', idFilter);
-        if (nextId === undefined || !isMounted) {
-          return true;
-        }
-        const nextName = await context.prompt('Filter name (empty clears):', nameFilter);
-        if (nextName === undefined || !isMounted) {
-          return true;
-        }
-        const nextParentId = await context.prompt('Filter parent_id (empty clears):', parentIdFilter);
-        if (nextParentId === undefined || !isMounted) {
-          return true;
-        }
-        const nextType = await context.prompt('Filter space_type (empty clears):', spaceTypeFilter);
-        if (nextType === undefined || !isMounted) {
-          return true;
-        }
-        const nextPath = await context.prompt('Filter path_includes (empty clears):', pathIncludesFilter);
-        if (nextPath === undefined || !isMounted) {
-          return true;
-        }
-        const nextCreatedAfter = await context.prompt('Filter created_after (empty clears):', createdAfterFilter);
-        if (nextCreatedAfter === undefined || !isMounted) {
-          return true;
-        }
-        const nextCreatedBefore = await context.prompt('Filter created_before (empty clears):', createdBeforeFilter);
-        if (nextCreatedBefore === undefined || !isMounted) {
+        const choice = await promptChoice(context, {
+          title: 'Space filters',
+          choices: [
+            { label: `Edit id (${idFilter || 'all'})`, value: 'id' },
+            { label: `Edit name (${nameFilter || 'all'})`, value: 'name' },
+            { label: `Edit parent_id (${parentIdFilter || 'all'})`, value: 'parent_id' },
+            { label: `Edit space_type (${spaceTypeFilter || 'all'})`, value: 'space_type' },
+            { label: `Edit path_includes (${pathIncludesFilter || 'all'})`, value: 'path_includes' },
+            { label: `Edit created_after (${createdAfterFilter || 'all'})`, value: 'created_after' },
+            { label: `Edit created_before (${createdBeforeFilter || 'all'})`, value: 'created_before' },
+            { label: 'Clear all space filters', value: 'clear' }
+          ]
+        });
+        if (!choice || !isMounted) {
           return true;
         }
 
-        idFilter = nextId.trim();
-        nameFilter = nextName.trim();
-        parentIdFilter = nextParentId.trim();
-        spaceTypeFilter = nextType.trim();
-        pathIncludesFilter = nextPath.trim();
-        createdAfterFilter = nextCreatedAfter.trim();
-        createdBeforeFilter = nextCreatedBefore.trim();
+        if (choice.value === 'clear') {
+          idFilter = '';
+          nameFilter = '';
+          parentIdFilter = '';
+          spaceTypeFilter = '';
+          pathIncludesFilter = '';
+          createdAfterFilter = '';
+          createdBeforeFilter = '';
+          await refreshSpaces();
+          return true;
+        }
+
+        const prompts: Record<string, { label: string; current: string; apply: (value: string) => void }> = {
+          id: {
+            label: 'Filter id (empty clears):',
+            current: idFilter,
+            apply: (value) => {
+              idFilter = value;
+            }
+          },
+          name: {
+            label: 'Filter name (empty clears):',
+            current: nameFilter,
+            apply: (value) => {
+              nameFilter = value;
+            }
+          },
+          parent_id: {
+            label: 'Filter parent_id (empty clears):',
+            current: parentIdFilter,
+            apply: (value) => {
+              parentIdFilter = value;
+            }
+          },
+          space_type: {
+            label: 'Filter space_type (empty clears):',
+            current: spaceTypeFilter,
+            apply: (value) => {
+              spaceTypeFilter = value;
+            }
+          },
+          path_includes: {
+            label: 'Filter path_includes (empty clears):',
+            current: pathIncludesFilter,
+            apply: (value) => {
+              pathIncludesFilter = value;
+            }
+          },
+          created_after: {
+            label: 'Filter created_after (empty clears):',
+            current: createdAfterFilter,
+            apply: (value) => {
+              createdAfterFilter = value;
+            }
+          },
+          created_before: {
+            label: 'Filter created_before (empty clears):',
+            current: createdBeforeFilter,
+            apply: (value) => {
+              createdBeforeFilter = value;
+            }
+          }
+        };
+
+        const selectedPrompt = prompts[choice.value];
+        if (!selectedPrompt) {
+          return true;
+        }
+
+        const nextValue = await context.prompt(selectedPrompt.label, selectedPrompt.current);
+        if (nextValue === undefined || !isMounted) {
+          return true;
+        }
+
+        selectedPrompt.apply(nextValue.trim());
         await refreshSpaces();
         return true;
       }
@@ -803,8 +964,41 @@ export function createSpacesScreen(): TuiScreen {
       }
 
       if (key.name === 'enter' && activePane === 'spaces-table') {
+        const space = selectedSpace();
+        if (!space) {
+          context.setStatus('No space selected.');
+          return true;
+        }
         clearSelectionDebounce();
         await loadSelection(selectedIndex);
+        detailNode = {
+          kind: 'space',
+          spaceId: getSpaceId(space),
+          spaceLabel: spaceLabelOf(space)
+        };
+        activePane = 'detail-box';
+        renderState();
+        context.setStatus(`Opened ${detailNode.spaceLabel}.`);
+        return true;
+      }
+
+      if (key.name === 'enter' && activePane === 'devices-table') {
+        const device = selectedDeviceInSpace();
+        const space = selectedSpace();
+        if (!device || !space) {
+          context.setStatus('No device selected.');
+          return true;
+        }
+        detailNode = {
+          kind: 'device',
+          spaceId: getSpaceId(space),
+          spaceLabel: spaceLabelOf(space),
+          deviceId: String(device?.id ?? device?._id ?? ''),
+          deviceLabel: deviceLabelOf(device)
+        };
+        activePane = 'detail-box';
+        renderState();
+        context.setStatus(`Opened ${detailNode.deviceLabel}.`);
         return true;
       }
 

@@ -8,6 +8,17 @@ export interface SelectionSyncState {
   onLog?: (event: string, data?: Record<string, unknown>) => void;
 }
 
+interface PaneChromeWidget {
+  setLabel(label: string): void;
+  style: any;
+}
+
+export interface PaneChromeSpec {
+  id: TuiPaneId;
+  label: string;
+  widget?: PaneChromeWidget;
+}
+
 function withSelectionSyncGuard(state: SelectionSyncState | undefined, fn: () => void): void {
   if (!state) {
     fn();
@@ -158,4 +169,18 @@ export function clampIndex(index: number, totalRows: number): number {
     return 0;
   }
   return Math.max(0, Math.min(index, totalRows - 1));
+}
+
+export function applyPaneChrome(activePane: TuiPaneId, panes: PaneChromeSpec[]): void {
+  for (const pane of panes) {
+    if (!pane.widget) {
+      continue;
+    }
+    const active = pane.id === activePane;
+    pane.widget.setLabel(active ? ` ${pane.label} [active] ` : ` ${pane.label} `);
+    pane.widget.style.border = {
+      ...(pane.widget.style.border ?? {}),
+      fg: active ? 'cyan' : 'white'
+    };
+  }
 }

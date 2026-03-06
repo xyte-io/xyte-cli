@@ -1,6 +1,6 @@
 import blessed from 'blessed';
 
-import { movePaneWithBoundary, scrollBox } from '../navigation';
+import { applyPaneChrome, movePaneWithBoundary, scrollBox } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
 import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
 import { loadDashboardData } from '../data-loaders';
@@ -27,7 +27,17 @@ export function createDashboardScreen(): TuiScreen {
   const paneConfig = SCREEN_PANE_CONFIG.dashboard;
   let activePane: TuiPaneId = paneConfig.defaultPane;
 
+  const renderPaneChrome = () => {
+    applyPaneChrome(activePane, [
+      { id: 'kpi', label: 'KPI Overview', widget: kpis },
+      { id: 'provider', label: 'Provider Status', widget: providerBox },
+      { id: 'incidents', label: 'Recent Incidents', widget: incidentsBox },
+      { id: 'tickets', label: 'Recent Tickets', widget: ticketsBox }
+    ]);
+  };
+
   const focusActivePane = () => {
+    renderPaneChrome();
     if (activePane === 'kpi') {
       kpis?.focus();
       return;
@@ -153,6 +163,16 @@ export function createDashboardScreen(): TuiScreen {
     getActivePane() {
       return activePane;
     },
+    getNavigationTrail() {
+      const activeLabel = activePane === 'kpi'
+        ? 'KPI Overview'
+        : activePane === 'provider'
+          ? 'Provider Status'
+          : activePane === 'incidents'
+            ? 'Recent Incidents'
+            : 'Recent Tickets';
+      return ['Dashboard', activeLabel];
+    },
     getAvailablePanes() {
       return paneConfig.panes;
     },
@@ -183,6 +203,25 @@ export function createDashboardScreen(): TuiScreen {
       }
 
       return 'unhandled';
+    },
+    async handleKey(_ch, key) {
+      if (key.name !== 'enter') {
+        return false;
+      }
+      if (activePane === 'provider') {
+        await context.switchScreen?.('config');
+        return true;
+      }
+      if (activePane === 'incidents') {
+        await context.switchScreen?.('incidents');
+        return true;
+      }
+      if (activePane === 'tickets') {
+        await context.switchScreen?.('tickets');
+        return true;
+      }
+      await context.switchScreen?.('devices');
+      return true;
     }
   };
 }

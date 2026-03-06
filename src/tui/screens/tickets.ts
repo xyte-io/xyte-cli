@@ -1,6 +1,7 @@
 import blessed from 'blessed';
 
 import {
+  applyPaneChrome,
   clampIndex,
   movePaneWithBoundary,
   moveTableSelection,
@@ -15,7 +16,7 @@ import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
 import { loadTicketsData } from '../data-loaders';
 import { sceneFromTicketsState } from '../scene';
 import { payloadSummary, safePreviewLines, safeSearchText } from '../serialize';
-import { confirmWriteWithToken, openActionPalette } from '../actions';
+import { confirmWriteWithToken, openActionPalette, promptChoice } from '../actions';
 
 function ticketIdOf(ticket: any): string {
   return String(ticket?.id ?? ticket?._id ?? '');
@@ -27,6 +28,10 @@ function ticketStatusOf(ticket: any): string {
 
 function ticketPriorityOf(ticket: any): string {
   return String(ticket?.priority ?? '').trim().toLowerCase();
+}
+
+function ticketLabelOf(ticket: any): string {
+  return String(ticket?.subject ?? ticket?.title ?? ticketIdOf(ticket) ?? 'ticket').trim() || 'ticket';
 }
 
 interface ResolveTicketWithGuardArgs {
@@ -137,13 +142,22 @@ export function createTicketsScreen(): TuiScreen {
   const paneConfig = SCREEN_PANE_CONFIG.tickets;
   let activePane: TuiPaneId = paneConfig.defaultPane;
   let isMounted = false;
+  let detailOpen = false;
   let renderErrorMessage = '';
   let renderErrorCount = 0;
   let renderErrorWindowStart = 0;
   let renderFrozen = false;
   const detailCacheByTicket = new Map<string, string>();
 
+  const renderPaneChrome = () => {
+    applyPaneChrome(activePane, [
+      { id: 'tickets-table', label: 'Tickets', widget: list },
+      { id: 'detail-box', label: detailOpen ? 'Ticket Detail Node' : 'Ticket Preview', widget: detail }
+    ]);
+  };
+
   const focusPane = () => {
+    renderPaneChrome();
     if (activePane === 'tickets-table') {
       list?.focus();
       return;
@@ -188,6 +202,9 @@ export function createTicketsScreen(): TuiScreen {
       }
     } else {
       selectedIndex = clampIndex(selectedIndex, filtered.length);
+    }
+    if (!filtered.length) {
+      detailOpen = false;
     }
   };
 
@@ -390,7 +407,7 @@ export function createTicketsScreen(): TuiScreen {
         widgets: ['tickets-table', 'detail-box']
       });
 
-      list.on('select item', (_item, index) => {
+      list.on('select item', (_item: unknown, index: number) => {
         if (shouldIgnoreSelectEvent(selectionSync)) {
           return;
         }
@@ -451,8 +468,26 @@ export function createTicketsScreen(): TuiScreen {
     getActivePane() {
       return activePane;
     },
+    getNavigationTrail() {
+      const selected = selectedTicket();
+      if (detailOpen && selected) {
+        return ['Tickets', ticketLabelOf(selected)];
+      }
+      return ['Tickets', 'Browse'];
+    },
     getAvailablePanes() {
       return paneConfig.panes;
+    },
+    goBack() {
+      if (!detailOpen) {
+        return false;
+      }
+      detailOpen = false;
+      activePane = 'tickets-table';
+      renderRows(ticketIdOf(selectedTicket()));
+      context.screen.render();
+      context.setStatus('Back to ticket list.');
+      return true;
     },
     async handleArrow(key: TuiArrowKey) {
       if (key === 'left' || key === 'right') {
@@ -558,16 +593,44 @@ export function createTicketsScreen(): TuiScreen {
       }
 
       if (ch === 'f') {
-        const status = await context.prompt('Status filter (empty clears):', statusFilter);
-        if (status === undefined || !isMounted) {
+        const choice = await promptChoice(context, {
+          title: 'Ticket filters',
+          choices: [
+            { label: `Edit status (${statusFilter || 'all'})`, value: 'status' },
+            { label: `Edit priority (${priorityFilter || 'all'})`, value: 'priority' },
+            { label: 'Clear all ticket filters', value: 'clear' }
+          ]
+        });
+        if (!choice || !isMounted) {
           return true;
         }
-        const priority = await context.prompt('Priority filter (empty clears):', priorityFilter);
-        if (priority === undefined || !isMounted) {
+        if (choice.value === 'clear') {
+          statusFilter = '';
+          priorityFilter = '';
+          page = 1;
+          selectedIndex = 0;
+          renderRows();
+          if (filtered.length) {
+            queueTicketDetailFetch(selectedIndex);
+          } else {
+            context.screen.render();
+          }
           return true;
         }
-        statusFilter = status.trim().toLowerCase();
-        priorityFilter = priority.trim().toLowerCase();
+
+        const promptLabel = choice.value === 'status'
+          ? 'Status filter (empty clears):'
+          : 'Priority filter (empty clears):';
+        const currentValue = choice.value === 'status' ? statusFilter : priorityFilter;
+        const nextValue = await context.prompt(promptLabel, currentValue);
+        if (nextValue === undefined || !isMounted) {
+          return true;
+        }
+        if (choice.value === 'status') {
+          statusFilter = nextValue.trim().toLowerCase();
+        } else {
+          priorityFilter = nextValue.trim().toLowerCase();
+        }
         page = 1;
         selectedIndex = 0;
         renderRows();
@@ -661,7 +724,15 @@ export function createTicketsScreen(): TuiScreen {
       }
 
       if (key.name === 'enter' && activePane === 'tickets-table') {
+        const ticket = selectedTicket();
+        if (!ticket) {
+          context.setStatus('No ticket selected.');
+          return true;
+        }
+        detailOpen = true;
+        activePane = 'detail-box';
         queueTicketDetailFetch(selectedIndex);
+        context.setStatus(`Opened ${ticketLabelOf(ticket)}.`);
         return true;
       }
 

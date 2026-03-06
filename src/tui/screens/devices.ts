@@ -1,6 +1,7 @@
 import blessed from 'blessed';
 
 import {
+  applyPaneChrome,
   clampIndex,
   movePaneWithBoundary,
   moveTableSelection,
@@ -20,6 +21,10 @@ import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, promptC
 
 function deviceIdOf(device: any): string {
   return String(device?.id ?? device?._id ?? device?.device_id ?? '');
+}
+
+function deviceLabelOf(device: any): string {
+  return String(device?.name ?? device?.title ?? deviceIdOf(device) ?? 'device').trim() || 'device';
 }
 
 interface SendCommandWithGuardArgs {
@@ -80,13 +85,22 @@ export function createDevicesScreen(): TuiScreen {
   const paneConfig = SCREEN_PANE_CONFIG.devices;
   let activePane: TuiPaneId = paneConfig.defaultPane;
   let isMounted = false;
+  let detailOpen = false;
   let renderErrorMessage = '';
   let renderErrorCount = 0;
   let renderErrorWindowStart = 0;
   let renderFrozen = false;
   let spaceFilter = '';
 
+  const renderPaneChrome = () => {
+    applyPaneChrome(activePane, [
+      { id: 'devices-table', label: 'Devices', widget: table },
+      { id: 'detail-box', label: detailOpen ? 'Device Detail Node' : 'Device Preview', widget: detail }
+    ]);
+  };
+
   const focusPane = () => {
+    renderPaneChrome();
     if (activePane === 'devices-table') {
       table?.focus();
       return;
@@ -114,6 +128,9 @@ export function createDevicesScreen(): TuiScreen {
       selectedIndex = restoreIndex >= 0 ? restoreIndex : clampIndex(selectedIndex, filtered.length);
     } else {
       selectedIndex = clampIndex(selectedIndex, filtered.length);
+    }
+    if (!filtered.length) {
+      detailOpen = false;
     }
 
     const actionsHint = 'actions: a send-command, f endpoint filter';
@@ -298,7 +315,7 @@ export function createDevicesScreen(): TuiScreen {
         widgets: ['devices-table', 'detail-box']
       });
 
-      table.on('select item', (_item, index) => {
+      table.on('select item', (_item: unknown, index: number) => {
         if (shouldIgnoreSelectEvent(selectionSync)) {
           return;
         }
@@ -320,8 +337,25 @@ export function createDevicesScreen(): TuiScreen {
     getActivePane() {
       return activePane;
     },
+    getNavigationTrail() {
+      const selected = selectedDevice();
+      if (detailOpen && selected) {
+        return ['Devices', deviceLabelOf(selected)];
+      }
+      return ['Devices', 'Browse'];
+    },
     getAvailablePanes() {
       return paneConfig.panes;
+    },
+    goBack() {
+      if (!detailOpen) {
+        return false;
+      }
+      detailOpen = false;
+      activePane = 'devices-table';
+      applyFilter(deviceIdOf(selectedDevice()));
+      context.setStatus('Back to device list.');
+      return true;
     },
     async handleArrow(key: TuiArrowKey) {
       if (key === 'left' || key === 'right') {
@@ -379,6 +413,28 @@ export function createDevicesScreen(): TuiScreen {
       }
 
       if (ch === 'f') {
+        const choice = await promptChoice(context, {
+          title: 'Device filters',
+          choices: [
+            {
+              label: `Edit space_id filter (${spaceFilter || 'all'})`,
+              value: 'space_id'
+            },
+            {
+              label: 'Clear all device filters',
+              value: 'clear'
+            }
+          ]
+        });
+        if (!choice || !isMounted) {
+          return true;
+        }
+        if (choice.value === 'clear') {
+          spaceFilter = '';
+          selectedIndex = 0;
+          await refreshDevices();
+          return true;
+        }
         const value = await context.prompt('Space ID filter (empty clears):', spaceFilter);
         if (value === undefined || !isMounted) {
           return true;
@@ -467,7 +523,15 @@ export function createDevicesScreen(): TuiScreen {
       }
 
       if (key.name === 'enter') {
-        applyFilter();
+        const device = selectedDevice();
+        if (!device) {
+          context.setStatus('No device selected.');
+          return true;
+        }
+        detailOpen = true;
+        activePane = 'detail-box';
+        applyFilter(deviceIdOf(device));
+        context.setStatus(`Opened ${deviceLabelOf(device)}.`);
         return true;
       }
 

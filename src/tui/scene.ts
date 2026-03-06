@@ -490,7 +490,7 @@ export function sceneFromSetupState(state: SetupSceneState): ScenePanel[] {
           '- p set active slot',
           '- c test connectivity',
           '- r refresh',
-          'Global keys: u/g/d/s/v/i/t, r refresh, ? help, q quit'
+          'Global keys: Tab/Shift+Tab or 1-7 screens, legacy u/g/d/s/v/i/t, r refresh, ? help, q quit'
         ]
       }
     }
@@ -559,7 +559,7 @@ export function sceneFromConfigState(state: ConfigSceneState): ScenePanel[] {
           '- x remove slot',
           '- c doctor',
           '- r refresh',
-          'Global keys: u/g/d/s/v/i/t, r refresh, ? help, q quit'
+          'Global keys: Tab/Shift+Tab or 1-7 screens, legacy u/g/d/s/v/i/t, r refresh, ? help, q quit'
         ]
       }
     }

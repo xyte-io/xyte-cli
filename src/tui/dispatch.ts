@@ -25,23 +25,13 @@ export async function dispatchKeypress(args: KeyDispatchArgs): Promise<'screen' 
 
   const keyName = args.key.name as TuiArrowKey | undefined;
   if (keyName && ARROW_KEYS.includes(keyName)) {
-    const horizontal = keyName === 'left' || keyName === 'right';
-    const paneModeRequested = Boolean(args.key.ctrl || args.key.meta || args.key.shift);
-    if (horizontal && !paneModeRequested && args.shouldBypassHorizontalGlobal?.()) {
-      return 'blocked';
-    }
-    if (horizontal && !paneModeRequested) {
-      await args.handleGlobal(args.ch, args.key);
-      return 'global';
-    }
     if (args.handleArrow) {
       const handled = await args.handleArrow(keyName);
       if (handled === 'handled') {
         return 'arrow';
       }
       if (handled === 'boundary') {
-        await args.handleGlobal(args.ch, args.key);
-        return 'global';
+        return 'blocked';
       }
     }
   }

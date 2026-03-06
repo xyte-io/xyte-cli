@@ -2,6 +2,7 @@ import blessed from 'blessed';
 
 import { createXyteClient } from '../../client/create-client';
 import {
+  applyPaneChrome,
   clampIndex,
   movePaneWithBoundary,
   moveTableSelection,
@@ -96,7 +97,16 @@ export function createConfigScreen(): TuiScreen {
   let activePane = paneConfig.defaultPane;
   let isMounted = false;
 
+  const renderPaneChrome = () => {
+    applyPaneChrome(activePane, [
+      { id: 'providers-table', label: 'Provider Health', widget: providerTable },
+      { id: 'slots-table', label: 'Provider Slots', widget: slotTable },
+      { id: 'actions-box', label: 'Actions', widget: actionBox }
+    ]);
+  };
+
   const focusPane = () => {
+    renderPaneChrome();
     if (activePane === 'providers-table') {
       providerTable?.focus();
       return;
@@ -290,6 +300,14 @@ export function createConfigScreen(): TuiScreen {
     },
     getActivePane() {
       return activePane;
+    },
+    getNavigationTrail() {
+      const activeLabel = activePane === 'providers-table'
+        ? 'Provider Health'
+        : activePane === 'slots-table'
+          ? 'Provider Slots'
+          : 'Actions';
+      return ['Config', activeLabel];
     },
     getAvailablePanes() {
       return paneConfig.panes;

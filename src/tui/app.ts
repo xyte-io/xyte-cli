@@ -2,8 +2,8 @@ import blessed from 'blessed';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { createLayout } from './layout';
-import { GLOBAL_KEYMAP, SCREEN_ACTION_KEYMAP } from './keymap';
-import type { TuiContext, TuiScreen, TuiScreenId } from './types';
+import { GLOBAL_KEYMAP, SCREEN_ACTION_KEYMAP, SCREEN_INLINE_HINTS } from './keymap';
+import type { TuiChoiceItem, TuiContext, TuiScreen, TuiScreenId } from './types';
 import { createSetupScreen } from './screens/setup';
 import { createConfigScreen } from './screens/config';
 import { createDashboardScreen } from './screens/dashboard';
@@ -39,6 +39,65 @@ interface TuiAppOptions {
   output?: Pick<typeof process.stdout, 'write'>;
   debug?: boolean;
   debugLogPath?: string;
+}
+
+const SCREEN_TITLE_LABELS: Record<TuiScreenId, string> = {
+  setup: 'Setup',
+  config: 'Config',
+  dashboard: 'Dashboard',
+  spaces: 'Spaces',
+  devices: 'Devices',
+  incidents: 'Incidents',
+  tickets: 'Tickets'
+};
+
+const PANE_LABELS: Record<string, string> = {
+  'providers-table': 'Providers',
+  'slots-table': 'Key Slots',
+  'actions-box': 'Actions',
+  'checklist-box': 'Checklist',
+  'kpi': 'KPIs',
+  'provider': 'Provider Status',
+  'incidents': 'Recent Incidents',
+  'tickets': 'Recent Tickets',
+  'spaces-table': 'Spaces',
+  'detail-box': 'Details',
+  'devices-table': 'Devices'
+};
+
+function formatPaneLabel(pane: string | undefined): string {
+  if (!pane) {
+    return 'n/a';
+  }
+  return PANE_LABELS[pane] ?? pane.replace(/[-_]+/g, ' ');
+}
+
+function screenFromShortcut(ch: string | undefined): TuiScreenId | undefined {
+  switch (ch) {
+    case '1':
+    case 'u':
+      return 'setup';
+    case '2':
+    case 'g':
+      return 'config';
+    case '3':
+    case 'd':
+      return 'dashboard';
+    case '4':
+    case 's':
+      return 'spaces';
+    case '5':
+    case 'v':
+      return 'devices';
+    case '6':
+    case 'i':
+      return 'incidents';
+    case '7':
+    case 't':
+      return 'tickets';
+    default:
+      return undefined;
+  }
 }
 
 function toErrorText(error: unknown): string {
@@ -161,6 +220,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
     let readinessState: ReadinessCheck | undefined;
     let isPromptActive = false;
     let isMessageActive = false;
+    let isChooserActive = false;
     let isShuttingDown = false;
     let mountTransitionToken = 0;
     let transitionState: 'idle' | 'switching' = 'idle';
@@ -187,18 +247,52 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
       motionEnabled
     });
 
+    const renderRouteBar = () => {
+      const trail = mounted?.getNavigationTrail?.();
+      layout.setRouteText(
+        (trail && trail.length ? trail : [SCREEN_TITLE_LABELS[activeScreenId], formatPaneLabel(mounted?.getActivePane?.())]).join(
+          ' > '
+        )
+      );
+    };
+
+    const renderHelpBar = () => {
+      const pane = mounted?.getActivePane?.();
+      const paneLabel = formatPaneLabel(pane);
+      const screenHint = SCREEN_INLINE_HINTS[activeScreenId];
+      layout.setHelpText(`${SCREEN_TITLE_LABELS[activeScreenId]} • pane ${paneLabel} • ${screenHint}`);
+    };
+
     const renderFooter = (statusText?: string) => {
       if (statusText !== undefined) {
         footerStatusText = statusText;
       }
 
+      const pane = formatPaneLabel(mounted?.getActivePane?.());
       const readiness = readinessState
-        ? `${readinessState.state}/${readinessState.connectionState} tenant=${readinessState.tenantId ?? 'none'}`
-        : 'status=unknown';
-      const inputState = getInputState();
-      const runtime = `refresh=${runtimeStatus.state}${runtimeStatus.refreshQueued ? '+queued' : ''} stale=${runtimeStatus.staleDiscarded} in=${inputState.queueDepth} drop=${inputState.droppedEvents} tx=${transitionState}`;
-      const detail = runtimeStatus.lastError ? `${footerStatusText} | err=${runtimeStatus.lastError}` : footerStatusText;
-      layout.footer.setContent(` @ ${readiness} | ${runtime} | ${detail}`);
+        ? `${readinessState.state} / ${readinessState.connectionState} / tenant ${readinessState.tenantId ?? 'none'}`
+        : 'status unknown';
+      const segments = [
+        `screen ${SCREEN_TITLE_LABELS[activeScreenId]}`,
+        `pane ${pane}`,
+        readiness,
+        footerStatusText
+      ];
+      if (runtimeStatus.lastError) {
+        segments.push(`last error ${runtimeStatus.lastError}`);
+      }
+      if (debugEnabled) {
+        const inputState = getInputState();
+        segments.push(
+          `dbg refresh=${runtimeStatus.state}${runtimeStatus.refreshQueued ? '+queued' : ''}`,
+          `q=${inputState.queueDepth}`,
+          `drop=${inputState.droppedEvents}`,
+          `tx=${transitionState}`
+        );
+      }
+      layout.setFooterText(segments.join(' | '));
+      renderRouteBar();
+      renderHelpBar();
       screen.render();
     };
 
@@ -226,8 +320,140 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
       hidden: true
     });
 
+    const chooserBox = blessed.box({
+      parent: screen,
+      border: 'line',
+      width: '72%',
+      height: '70%',
+      top: 'center',
+      left: 'center',
+      label: ' Choose ',
+      hidden: true,
+      style: {
+        border: { fg: 'blue' }
+      }
+    });
+
+    const chooserList = blessed.list({
+      parent: chooserBox,
+      top: 0,
+      left: 0,
+      width: '100%-2',
+      height: '100%-3',
+      border: 'line',
+      label: ' Options ',
+      keys: true,
+      mouse: true,
+      vi: true,
+      tags: true,
+      style: {
+        border: { fg: 'blue' },
+        item: { fg: 'white' },
+        selected: { fg: 'white', bg: 'blue', bold: true }
+      },
+      hidden: false
+    });
+
+    const chooserHelp = blessed.box({
+      parent: chooserBox,
+      bottom: 0,
+      left: 0,
+      width: '100%-2',
+      height: 1,
+      content: ' ↑/↓ move | Enter select | 1-9 quick pick | Esc cancel ',
+      style: {
+        fg: 'cyan'
+      }
+    });
+
     const setMessageModalState = (active: boolean) => {
       isMessageActive = active;
+    };
+
+    let chooserItems: TuiChoiceItem[] = [];
+    let chooserResolve: ((value: number | undefined) => void) | undefined;
+    let chooserPreviousFocus: { focus: () => void } | undefined;
+
+    const closeChooser = (value: number | undefined) => {
+      if (!isChooserActive) {
+        return;
+      }
+      isChooserActive = false;
+      chooserBox.hide();
+      const resolveChoice = chooserResolve;
+      chooserResolve = undefined;
+      chooserItems = [];
+      chooserPreviousFocus?.focus();
+      chooserPreviousFocus = undefined;
+      screen.render();
+      resolveChoice?.(value);
+    };
+
+    chooserList.on('select item', (_item: unknown, index: number) => {
+      const selectedIndex = Number(index);
+      const item = chooserItems[selectedIndex];
+      if (!item) {
+        closeChooser(undefined);
+        return;
+      }
+      if (item.disabled) {
+        renderFooter(item.disabledReason ?? `${item.label} is disabled.`);
+        return;
+      }
+      closeChooser(selectedIndex);
+    });
+
+    chooserList.key(['escape'], () => {
+      closeChooser(undefined);
+    });
+
+    chooserList.on('keypress', (ch: string | undefined) => {
+      if (!ch || !/^[1-9]$/.test(ch)) {
+        return;
+      }
+      const selectedIndex = Number(ch) - 1;
+      if (selectedIndex < 0 || selectedIndex >= chooserItems.length) {
+        return;
+      }
+      const item = chooserItems[selectedIndex];
+      if (item.disabled) {
+        renderFooter(item.disabledReason ?? `${item.label} is disabled.`);
+        return;
+      }
+      closeChooser(selectedIndex);
+    });
+
+    const runChooser = (args: { title: string; items: TuiChoiceItem[]; initialIndex?: number }): Promise<number | undefined> => {
+      if (!args.items.length) {
+        return Promise.resolve(undefined);
+      }
+
+      chooserItems = args.items;
+      chooserBox.setLabel(` ${args.title} `);
+      chooserHelp.setContent(' ↑/↓ move | Enter select | 1-9 quick pick | Esc cancel ');
+      chooserList.setItems(
+        args.items.map((item, index) => {
+          const number = `${index + 1}.`;
+          const detail = item.hint ? ` {gray-fg}${item.hint}{/gray-fg}` : '';
+          if (item.disabled) {
+            return `{gray-fg}${number} ${item.label} (disabled){/gray-fg}${detail}`;
+          }
+          return `${number} ${item.label}${detail}`;
+        })
+      );
+      const firstEnabledIndex = args.items.findIndex((item) => !item.disabled);
+      const fallbackIndex = firstEnabledIndex >= 0 ? firstEnabledIndex : 0;
+      const initialIndex = Math.max(0, Math.min(args.initialIndex ?? fallbackIndex, Math.max(args.items.length - 1, 0)));
+      chooserPreviousFocus = screen.focused as { focus: () => void } | undefined;
+      chooserList.select(initialIndex);
+      chooserBox.show();
+      isChooserActive = true;
+      chooserList.focus();
+      screen.render();
+
+      return new Promise((resolveChoice) => {
+        chooserResolve = resolveChoice;
+      });
     };
 
     const writeErrorStderr = (source: string, messageText: string) => {
@@ -399,9 +625,15 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
       promptSecret(promptText, initial = '') {
         return runPrompt(promptText, initial, true);
       },
+      choose(args) {
+        return runChooser(args);
+      },
       async confirmWrite(actionLabel, token) {
         const value = await context.prompt(`Type "${token}" to confirm: ${actionLabel}`, '');
         return value === token;
+      },
+      async switchScreen(screenId) {
+        await mountScreen(screenId);
       }
     };
 
@@ -495,7 +727,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
       runtimeStatus = mountedRuntime.getStatus();
 
       layout.setActiveTab(nextId);
-      layout.header.setContent(` XYTE SDK TUI | ${next.title.toUpperCase()} `);
+      layout.setHeaderTitle(next.title);
       transitionState = 'idle';
       next.focus?.();
       logger.log('screen.mount.active', {
@@ -543,37 +775,28 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
         ch,
         activeScreenId
       });
-      if (key.name === 'left' || key.name === 'right') {
-        const target = nextTab(activeScreenId, key.name);
+      if (key.name === 'escape' || key.name === 'backspace') {
+        const wentBack = await mounted?.goBack?.();
+        if (wentBack) {
+          renderFooter('Back.');
+          return;
+        }
+        renderFooter('Already at the root node. Press ? for help.');
+        return;
+      }
+      if (key.name === 'tab' && !key.shift) {
+        const target = nextTab(activeScreenId, 'right');
         await mountScreen(target);
         return;
       }
-      if (ch === 'u') {
-        await mountScreen('setup');
+      if (key.full === 'S-tab' || (key.name === 'tab' && key.shift)) {
+        const target = nextTab(activeScreenId, 'left');
+        await mountScreen(target);
         return;
       }
-      if (ch === 'g') {
-        await mountScreen('config');
-        return;
-      }
-      if (ch === 'd') {
-        await mountScreen('dashboard');
-        return;
-      }
-      if (ch === 's') {
-        await mountScreen('spaces');
-        return;
-      }
-      if (ch === 'v') {
-        await mountScreen('devices');
-        return;
-      }
-      if (ch === 'i') {
-        await mountScreen('incidents');
-        return;
-      }
-      if (ch === 't') {
-        await mountScreen('tickets');
+      const shortcutTarget = screenFromShortcut(ch);
+      if (shortcutTarget) {
+        await mountScreen(shortcutTarget);
         return;
       }
       if (ch === 'r') {
@@ -604,10 +827,6 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
       if (ch === '?') {
         showHelp();
         return;
-      }
-
-      if (key.name === 'escape') {
-        showHelp();
       }
     };
 
@@ -645,7 +864,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
           return;
         }
 
-        const modalActive = isPromptActive || isMessageActive;
+        const modalActive = isPromptActive || isMessageActive || isChooserActive;
         const safeCh = modalActive ? undefined : event.ch;
         const activeMounted = mounted;
         const dispatchResult = await dispatchKeypress({
@@ -733,13 +952,13 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
     process.on('unhandledRejection', onUnhandledRejection);
     process.on('uncaughtException', onUncaughtException);
 
-    screen.on('keypress', (ch, key) => {
+    screen.on('keypress', (ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg) => {
       const dispatchResult = inputController.dispatch({
         ch,
         key,
         timestamp: Date.now()
       });
-      const modalActive = isPromptActive || isMessageActive;
+      const modalActive = isPromptActive || isMessageActive || isChooserActive;
       logger.log('input.enqueue', {
         key: key.name ?? key.full,
         ch: modalActive ? undefined : ch,
@@ -760,7 +979,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
     void (async () => {
       await renderStartupSequence(screen, message, motionEnabled);
       message.hide();
-      layout.header.setContent(` XYTE SDK TUI | ${xyteLogoText().split('\n')[0]} `);
+      layout.setHeaderTitle(xyteLogoText().split('\n')[0]);
       const readiness = await context.refreshReadiness(true);
       if (readiness.state !== 'ready') {
         activeScreenId = 'setup';

@@ -1,6 +1,7 @@
 import blessed from 'blessed';
 
 import {
+  applyPaneChrome,
   clampIndex,
   movePaneWithBoundary,
   moveTableSelection,
@@ -42,7 +43,15 @@ export function createSetupScreen(): TuiScreen {
   let activePane = paneConfig.defaultPane;
   let isMounted = false;
 
+  const renderPaneChrome = () => {
+    applyPaneChrome(activePane, [
+      { id: 'providers-table', label: 'Provider Slots', widget: providerTable },
+      { id: 'checklist-box', label: 'Checklist', widget: checklistBox }
+    ]);
+  };
+
   const focusPane = () => {
+    renderPaneChrome();
     if (activePane === 'providers-table') {
       providerTable?.focus();
       return;
@@ -166,6 +175,9 @@ export function createSetupScreen(): TuiScreen {
     },
     getActivePane() {
       return activePane;
+    },
+    getNavigationTrail() {
+      return ['Setup', activePane === 'providers-table' ? 'Provider Slots' : 'Checklist'];
     },
     getAvailablePanes() {
       return paneConfig.panes;
