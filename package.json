@@ -67,12 +67,14 @@
     "ajv": "^8.18.0",
     "blessed": "^0.1.81",
     "commander": "^14.0.3",
+    "cross-spawn": "^7.0.6",
     "pdfkit": "^0.17.2",
     "pino": "^10.3.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/blessed": "^0.1.25",
+    "@types/cross-spawn": "^6.0.6",
     "@types/node": "^22.13.4",
     "tsx": "^4.19.3",
     "typescript": "^5.7.3",

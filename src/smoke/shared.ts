@@ -1,6 +1,7 @@
-import { spawn } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import path from 'node:path';
+
+import { runProcess } from '../utils/run-command';
 
 export const NPM_COMMAND = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 export const XYTE_COMMAND = process.platform === 'win32' ? 'xyte-cli.cmd' : 'xyte-cli';
@@ -28,46 +29,6 @@ export interface IsolatedEnvDirs {
 
 export interface LoggerLike {
   log: (message: string) => void;
-}
-
-function shouldUseWindowsShell(command: string): boolean {
-  return process.platform === 'win32' && /\.(cmd|bat)$/i.test(command);
-}
-
-interface SpawnPlan {
-  command: string;
-  args: string[];
-  shell?: boolean;
-}
-
-function quoteWindowsCmdArg(value: string): string {
-  if (!value) {
-    return '""';
-  }
-  if (!/[ \t"&()<>^[\]|]/.test(value)) {
-    return value;
-  }
-  return `"${value.replace(/"/g, '""')}"`;
-}
-
-export function buildSpawnPlan(command: string, args: string[], platform: NodeJS.Platform = process.platform): SpawnPlan {
-  const isWindowsShellScript = platform === 'win32' && /\.(cmd|bat)$/i.test(command);
-  if (!isWindowsShellScript) {
-    return {
-      command,
-      args,
-      shell: false
-    };
-  }
-
-  const comspec = process.env.ComSpec || process.env.COMSPEC || 'cmd.exe';
-  const commandLine = [quoteWindowsCmdArg(command), ...args.map((arg) => quoteWindowsCmdArg(arg))].join(' ');
-
-  return {
-    command: comspec,
-    args: ['/d', '/s', '/c', commandLine],
-    shell: false
-  };
 }
 
 export function normalizeJsonOutput(raw: unknown): any {
@@ -117,47 +78,7 @@ export function buildIsolatedEnv(baseEnv: NodeJS.ProcessEnv, dirs: IsolatedEnvDi
 }
 
 export async function runCommand(command: string, args: string[], options: RunCommandOptions = {}): Promise<CommandResult> {
-  const stdinMode = options.stdinMode ?? 'pipe';
-  const spawnPlan = buildSpawnPlan(command, args);
-
-  return await new Promise((resolve, reject) => {
-    const child = spawn(spawnPlan.command, spawnPlan.args, {
-      cwd: options.cwd,
-      env: options.env,
-      stdio: [stdinMode, 'pipe', 'pipe'],
-      shell: spawnPlan.shell,
-      windowsHide: true
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout?.on('data', (chunk) => {
-      stdout += chunk.toString();
-    });
-
-    child.stderr?.on('data', (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    child.on('error', (error) => reject(error));
-    child.on('close', (code) => {
-      resolve({
-        code: code ?? 1,
-        stdout,
-        stderr
-      });
-    });
-
-    if (stdinMode === 'pipe' && child.stdin) {
-      child.stdin.on('error', (error) => reject(error));
-      if (options.input === undefined) {
-        child.stdin.end();
-      } else {
-        child.stdin.end(options.input);
-      }
-    }
-  });
+  return await runProcess(command, args, options);
 }
 
 export function assertSuccess(result: CommandResult, label: string, command: string, args: string[]): void {

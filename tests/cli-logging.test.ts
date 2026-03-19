@@ -2,7 +2,7 @@ import { appendFileSync, mkdtempSync, readFileSync, rmSync, statSync } from 'nod
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createCli } from '../src/cli/index';
 import { createCliActionLogger, listCliActionLogFiles, sanitizeArgvForLog } from '../src/cli/action-logger';
@@ -15,6 +15,11 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 describe('cli action logging', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
   it('sanitizes sensitive argv tokens', () => {
     const sanitized = sanitizeArgvForLog([
       'call',

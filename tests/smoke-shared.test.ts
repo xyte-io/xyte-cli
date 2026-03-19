@@ -1,30 +1,54 @@
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
-import { buildSpawnPlan } from '../src/smoke/shared';
+import { runCommand } from '../src/smoke/shared';
 
 describe('smoke shared runner', () => {
-  it('uses direct spawning for non-Windows commands', () => {
-    const plan = buildSpawnPlan('xyte-cli', ['config', 'tenant', 'add', 'acme'], 'darwin');
+  const itWindows = process.platform === 'win32' ? it : it.skip;
 
-    expect(plan).toEqual({
-      command: 'xyte-cli',
-      args: ['config', 'tenant', 'add', 'acme'],
-      shell: false
-    });
-  });
+  itWindows('preserves spaced arguments through a real cmd shim round-trip', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-cmd-roundtrip-'));
+    const collectorPath = join(dir, 'collect-argv.cjs');
+    const shimPath = join(dir, 'collect-argv.cmd');
+    const outputPath = join(dir, 'argv.json');
 
-  it('routes cmd shims through cmd.exe with quoted spaced arguments', () => {
-    const plan = buildSpawnPlan(
-      'xyte-cli.cmd',
-      ['config', 'tenant', 'add', 'acme', '--name', 'Acme Mock', '--hub-url', 'http://127.0.0.1:43123'],
-      'win32'
+    writeFileSync(
+      collectorPath,
+      [
+        'const fs = require("node:fs");',
+        'fs.writeFileSync(process.argv[2], JSON.stringify(process.argv.slice(3)), "utf8");'
+      ].join('\n'),
+      'utf8'
+    );
+    writeFileSync(
+      shimPath,
+      `@echo off\r\n"${process.execPath}" "%~dp0collect-argv.cjs" %*\r\n`,
+      'utf8'
     );
 
-    expect(plan.command.toLowerCase()).toContain('cmd');
-    expect(plan.args.slice(0, 3)).toEqual(['/d', '/s', '/c']);
-    expect(plan.args[3]).toBe(
-      'xyte-cli.cmd config tenant add acme --name "Acme Mock" --hub-url http://127.0.0.1:43123'
-    );
-    expect(plan.shell).toBe(false);
+    try {
+      const result = await runCommand(
+        shimPath,
+        [outputPath, 'config', 'tenant', 'add', 'acme', '--name', 'Acme Mock', '--hub-url', 'http://127.0.0.1:43123'],
+        { stdinMode: 'ignore' }
+      );
+
+      expect(result.code).toBe(0);
+      expect(JSON.parse(readFileSync(outputPath, 'utf8'))).toEqual([
+        'config',
+        'tenant',
+        'add',
+        'acme',
+        '--name',
+        'Acme Mock',
+        '--hub-url',
+        'http://127.0.0.1:43123'
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

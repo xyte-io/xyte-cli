@@ -1,7 +1,6 @@
-import { spawn } from 'node:child_process';
-
 import type { SkillAgent, SkillInstallOutcome } from './install-skills';
 import { installSkills } from './install-skills';
+import { runProcess } from './run-command';
 import { getCliVersion } from './version';
 import { buildUpgradeCheck, type UpgradeCheckV1, type UpgradeResultV1 } from '../contracts/upgrade';
 import { UPGRADE_RESULT_SCHEMA_VERSION } from '../contracts/versions';
@@ -123,36 +122,7 @@ export function compareSemver(a: string, b: string): number {
 }
 
 function defaultRunner(command: string, args: string[]): Promise<CommandResult> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: process.platform === 'win32' && /\.(cmd|bat)$/i.test(command),
-      windowsHide: true
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout.on('data', (chunk) => {
-      stdout += String(chunk);
-    });
-
-    child.stderr.on('data', (chunk) => {
-      stderr += String(chunk);
-    });
-
-    child.on('error', (error) => {
-      reject(error);
-    });
-
-    child.on('close', (code) => {
-      resolve({
-        code: code ?? 1,
-        stdout,
-        stderr
-      });
-    });
-  });
+  return runProcess(command, args, { stdinMode: 'ignore' });
 }
 
 function parseVersionFromOutput(output: string): string | undefined {
