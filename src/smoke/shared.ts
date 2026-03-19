@@ -34,6 +34,42 @@ function shouldUseWindowsShell(command: string): boolean {
   return process.platform === 'win32' && /\.(cmd|bat)$/i.test(command);
 }
 
+interface SpawnPlan {
+  command: string;
+  args: string[];
+  shell?: boolean;
+}
+
+function quoteWindowsCmdArg(value: string): string {
+  if (!value) {
+    return '""';
+  }
+  if (!/[ \t"&()<>^[\]|]/.test(value)) {
+    return value;
+  }
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+export function buildSpawnPlan(command: string, args: string[], platform: NodeJS.Platform = process.platform): SpawnPlan {
+  const isWindowsShellScript = platform === 'win32' && /\.(cmd|bat)$/i.test(command);
+  if (!isWindowsShellScript) {
+    return {
+      command,
+      args,
+      shell: false
+    };
+  }
+
+  const comspec = process.env.ComSpec || process.env.COMSPEC || 'cmd.exe';
+  const commandLine = [quoteWindowsCmdArg(command), ...args.map((arg) => quoteWindowsCmdArg(arg))].join(' ');
+
+  return {
+    command: comspec,
+    args: ['/d', '/s', '/c', commandLine],
+    shell: false
+  };
+}
+
 export function normalizeJsonOutput(raw: unknown): any {
   const trimmed = String(raw ?? '').trim();
   if (!trimmed) {
@@ -82,13 +118,14 @@ export function buildIsolatedEnv(baseEnv: NodeJS.ProcessEnv, dirs: IsolatedEnvDi
 
 export async function runCommand(command: string, args: string[], options: RunCommandOptions = {}): Promise<CommandResult> {
   const stdinMode = options.stdinMode ?? 'pipe';
+  const spawnPlan = buildSpawnPlan(command, args);
 
   return await new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
+    const child = spawn(spawnPlan.command, spawnPlan.args, {
       cwd: options.cwd,
       env: options.env,
       stdio: [stdinMode, 'pipe', 'pipe'],
-      shell: shouldUseWindowsShell(command),
+      shell: spawnPlan.shell,
       windowsHide: true
     });
 
