@@ -2828,7 +2828,7 @@ describe('cli integration', () => {
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
     const commandRunner = vi.fn(async (command: string) => {
-      if (command === 'xyte-cli') {
+      if (/^xyte-cli(?:\.cmd)?$/.test(command)) {
         return {
           code: 0,
           stdout: 'xyte-cli 0.5.0\n',

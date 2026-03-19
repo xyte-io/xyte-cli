@@ -7,7 +7,7 @@ const scriptPath = pathToFileURL(resolve(__dirname, '../scripts/smoke_flow_pack_
 
 describe('local flow-pack smoke classifier', () => {
   it('treats known data-gated sendCommand 422 as pass', async () => {
-    const mod = await import(scriptPath);
+    const mod = await import(/* @vite-ignore */ scriptPath);
     const classified = mod.classifyStep('send_command_write', {
       code: 1,
       stdout: JSON.stringify({
@@ -22,7 +22,7 @@ describe('local flow-pack smoke classifier', () => {
   });
 
   it('fails update-device verify when read-back did not match expected values', async () => {
-    const mod = await import(scriptPath);
+    const mod = await import(/* @vite-ignore */ scriptPath);
     const classified = mod.classifyStep(
       'update_device_verify',
       {
@@ -36,7 +36,7 @@ describe('local flow-pack smoke classifier', () => {
   });
 
   it('passes update-device verify when read-back succeeds but fields are unchanged', async () => {
-    const mod = await import(scriptPath);
+    const mod = await import(/* @vite-ignore */ scriptPath);
     const classified = mod.classifyStep(
       'update_device_verify',
       {

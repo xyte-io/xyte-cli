@@ -7,12 +7,12 @@ const scriptPath = pathToFileURL(resolve(__dirname, '../scripts/smoke_external_u
 
 describe('external live smoke script', () => {
   it('fails fast when XYTE_CLI_KEY is missing', async () => {
-    const mod = await import(scriptPath);
+    const mod = await import(/* @vite-ignore */ scriptPath);
     expect(() => mod.resolveSmokeInputs({})).toThrow(/Missing XYTE_CLI_KEY/);
   });
 
   it('runs expected command sequence with provided env', async () => {
-    const mod = await import(scriptPath);
+    const mod = await import(/* @vite-ignore */ scriptPath);
     const calls: Array<{ command: string; args: string[] }> = [];
 
     const run = vi.fn(async (command: string, args: string[]) => {
@@ -84,7 +84,7 @@ describe('external live smoke script', () => {
   });
 
   it('stops on first command failure and does cleanup', async () => {
-    const mod = await import(scriptPath);
+    const mod = await import(/* @vite-ignore */ scriptPath);
     const calls: Array<{ command: string; args: string[] }> = [];
 
     const run = vi.fn(async (command: string, args: string[]) => {
@@ -135,7 +135,7 @@ describe('external live smoke script', () => {
   });
 
   it('fails when skills were not copied to expected locations', async () => {
-    const mod = await import(scriptPath);
+    const mod = await import(/* @vite-ignore */ scriptPath);
 
     const run = vi.fn(async (command: string, args: string[]) => {
       if (command.includes('npm') && args[0] === 'pack') {

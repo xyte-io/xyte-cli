@@ -7,7 +7,7 @@ const scriptPath = pathToFileURL(resolve(__dirname, '../scripts/smoke_pack_insta
 
 describe('pack install smoke script', () => {
   it('runs expected command sequence with provided env', async () => {
-    const mod = await import(scriptPath);
+    const mod = await import(/* @vite-ignore */ scriptPath);
     const calls: Array<{ command: string; args: string[]; cwd?: string; input?: string }> = [];
     const startMockServerFn = vi.fn(async () => ({
       baseUrl: 'http://127.0.0.1:43123',
@@ -138,7 +138,7 @@ describe('pack install smoke script', () => {
   });
 
   it('fails when install doctor reports the wrong target', async () => {
-    const mod = await import(scriptPath);
+    const mod = await import(/* @vite-ignore */ scriptPath);
 
     const run = vi.fn(async (command: string, args: string[]) => {
       if (command.includes('npm') && args[0] === 'pack') {
