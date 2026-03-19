@@ -1,13 +1,8 @@
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-
 import { describe, expect, it, vi } from 'vitest';
-
-const scriptPath = pathToFileURL(resolve(__dirname, '../scripts/smoke_pack_install.mjs')).href;
+import * as smokePackInstall from '../scripts/smoke_pack_install.mjs';
 
 describe('pack install smoke script', () => {
   it('runs expected command sequence with provided env', async () => {
-    const mod = await import(/* @vite-ignore */ scriptPath);
     const calls: Array<{ command: string; args: string[]; cwd?: string; input?: string }> = [];
     const startMockServerFn = vi.fn(async () => ({
       baseUrl: 'http://127.0.0.1:43123',
@@ -81,7 +76,7 @@ describe('pack install smoke script', () => {
       return '# report\n';
     });
 
-    await mod.runPackInstallSmoke({
+    await smokePackInstall.runPackInstallSmoke({
       cwd: '/work/xyte-cli',
       env: {
         PATH: '/usr/bin'
@@ -138,8 +133,6 @@ describe('pack install smoke script', () => {
   });
 
   it('fails when install doctor reports the wrong target', async () => {
-    const mod = await import(/* @vite-ignore */ scriptPath);
-
     const run = vi.fn(async (command: string, args: string[]) => {
       if (command.includes('npm') && args[0] === 'pack') {
         return { code: 0, stdout: '[{"filename":"xyte-cli-0.1.0.tgz"}]', stderr: '' };
@@ -161,7 +154,7 @@ describe('pack install smoke script', () => {
     const unlinkFn = vi.fn(async () => undefined);
 
     await expect(
-      mod.runPackInstallSmoke({
+      smokePackInstall.runPackInstallSmoke({
         cwd: '/work/xyte-cli',
         env: {
           PATH: '/usr/bin'
