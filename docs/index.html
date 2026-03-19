@@ -3,42 +3,45 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>xyte-cli | Deterministic Xyte operations for teams and AI agents</title>
+    <title>Xyte AI CLI | Operate Xyte with command-line clarity</title>
     <meta
       name="description"
-      content="Install xyte-cli, connect a tenant key, inspect fleet state, run console workflows, and export shareable reports with direct commands."
+      content="Install xyte-cli, connect a tenant key, inspect fleet state, open console workflows, and export shareable artifacts inside Xyte's design language."
     />
-    <link rel="icon" href="./media/xyte-logo.jpg" />
+    <link rel="icon" type="image/png" href="./media/xyte-ai-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Public+Sans:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
     <style>
       :root {
-        --paper: #f2ede5;
-        --paper-strong: #fbf8f2;
-        --surface: rgba(255, 251, 245, 0.94);
-        --surface-strong: rgba(255, 252, 247, 0.99);
-        --surface-muted: rgba(241, 235, 225, 0.96);
-        --ink: #152338;
-        --ink-soft: #405169;
-        --ink-faint: #66788f;
-        --accent: #4f74a8;
-        --accent-strong: #244f88;
-        --accent-soft: #dfe8f5;
-        --line: rgba(24, 38, 58, 0.12);
-        --line-strong: rgba(36, 79, 136, 0.22);
-        --shadow-soft: 0 28px 60px rgba(26, 39, 56, 0.08);
-        --shadow-card: 0 16px 34px rgba(22, 34, 50, 0.06);
-        --radius-s: 14px;
-        --radius-m: 24px;
-        --radius-l: 34px;
-        --wrap: min(1180px, calc(100% - 40px));
-        --font-display: "Instrument Serif", Georgia, serif;
-        --font-body: "Public Sans", "Segoe UI", sans-serif;
-        --font-mono: "IBM Plex Mono", Menlo, monospace;
+        --bg: #05020b;
+        --bg-soft: #11071d;
+        --panel: rgba(20, 11, 33, 0.82);
+        --panel-strong: rgba(28, 16, 44, 0.92);
+        --panel-muted: rgba(255, 255, 255, 0.04);
+        --line: rgba(255, 255, 255, 0.1);
+        --line-strong: rgba(255, 255, 255, 0.18);
+        --text: #fcf9ff;
+        --text-soft: rgba(252, 249, 255, 0.76);
+        --text-faint: rgba(252, 249, 255, 0.54);
+        --violet: #7b1fa2;
+        --magenta: #680079;
+        --electric: #7c4dff;
+        --blue: #2979ff;
+        --gold: #ffc107;
+        --teal: #00bfa5;
+        --pink: #ff4081;
+        --navy: #283593;
+        --wrap: min(1240px, calc(100% - 48px));
+        --radius-s: 18px;
+        --radius-m: 26px;
+        --radius-l: 36px;
+        --shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+        --font-body: "Manrope", "Segoe UI", sans-serif;
+        --font-mono: "JetBrains Mono", "SFMono-Regular", monospace;
       }
 
       * {
@@ -51,13 +54,21 @@
 
       body {
         margin: 0;
-        font-family: var(--font-body);
-        color: var(--ink);
+        min-height: 100vh;
+        position: relative;
         background:
-          radial-gradient(circle at top left, rgba(91, 125, 170, 0.16), transparent 34%),
-          radial-gradient(circle at 88% 10%, rgba(226, 209, 172, 0.3), transparent 28%),
-          linear-gradient(180deg, #f8f4ed 0%, #f5f0e8 100%);
+          radial-gradient(ellipse 80% 50% at 12% 18%, rgba(41, 121, 255, 0.15), transparent),
+          radial-gradient(ellipse 60% 40% at 76% 8%, rgba(124, 77, 255, 0.18), transparent),
+          radial-gradient(ellipse 70% 50% at 52% 72%, rgba(255, 64, 129, 0.08), transparent),
+          radial-gradient(ellipse 50% 60% at 90% 50%, rgba(0, 191, 165, 0.07), transparent),
+          radial-gradient(ellipse 40% 30% at 30% 90%, rgba(123, 31, 162, 0.12), transparent),
+          linear-gradient(180deg, #06020e 0%, #0a0318 34%, #100520 100%);
+        color: var(--text);
+        font-family: var(--font-body);
         line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+        overflow-x: hidden;
       }
 
       body::before {
@@ -66,29 +77,34 @@
         inset: 0;
         pointer-events: none;
         background-image:
-          linear-gradient(rgba(24, 38, 58, 0.03) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(24, 38, 58, 0.03) 1px, transparent 1px);
-        background-size: 28px 28px;
-        mask-image: radial-gradient(circle at center, black 25%, transparent 88%);
-        z-index: -2;
+          linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+        background-size: 40px 40px;
+        mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 70%);
+        opacity: 0.32;
+        z-index: 0;
       }
 
       body::after {
         content: "";
         position: fixed;
-        inset: 0;
+        top: -20%;
+        left: -10%;
+        width: 120%;
+        height: 140%;
         pointer-events: none;
         background:
-          linear-gradient(transparent, rgba(255, 255, 255, 0.22)),
-          repeating-linear-gradient(
-            0deg,
-            rgba(255, 255, 255, 0.02) 0,
-            rgba(255, 255, 255, 0.02) 2px,
-            transparent 2px,
-            transparent 4px
-          );
-        opacity: 0.14;
-        z-index: -1;
+          radial-gradient(ellipse 30% 20% at 20% 20%, rgba(41, 121, 255, 0.06), transparent),
+          radial-gradient(ellipse 25% 18% at 80% 15%, rgba(124, 77, 255, 0.05), transparent),
+          radial-gradient(ellipse 35% 25% at 60% 80%, rgba(255, 64, 129, 0.04), transparent);
+        animation: aurora-drift 20s ease-in-out infinite alternate;
+        z-index: 0;
+      }
+
+      @keyframes aurora-drift {
+        0% { transform: translate(0, 0) scale(1); }
+        50% { transform: translate(2%, -1%) scale(1.02); }
+        100% { transform: translate(-1%, 2%) scale(0.98); }
       }
 
       a {
@@ -96,8 +112,8 @@
       }
 
       img {
-        max-width: 100%;
         display: block;
+        max-width: 100%;
       }
 
       button,
@@ -107,42 +123,75 @@
         font: inherit;
       }
 
+      code,
+      pre {
+        font-family: var(--font-mono);
+      }
+
+      :focus-visible {
+        outline: 2px solid #ffe183;
+        outline-offset: 3px;
+      }
+
       .skip-link {
         position: absolute;
         left: -999px;
         top: 0;
         padding: 10px 14px;
-        background: var(--ink);
-        color: #fff;
-        border-radius: 0 0 var(--radius-s) var(--radius-s);
+        border-radius: 0 0 12px 12px;
+        background: #fff;
+        color: #000;
         font-weight: 700;
+        z-index: 100;
       }
 
       .skip-link:focus {
-        left: 18px;
-        z-index: 100;
+        left: 20px;
       }
 
       .wrap {
         width: var(--wrap);
         margin: 0 auto;
+        position: relative;
+        z-index: 1;
       }
+
+      .surface {
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03)),
+          var(--panel);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(20px) saturate(130%);
+        transition:
+          border-color 280ms ease,
+          box-shadow 280ms ease,
+          transform 280ms ease;
+      }
+
+      .surface:hover {
+        border-color: rgba(255, 255, 255, 0.14);
+        box-shadow:
+          0 24px 60px rgba(0, 0, 0, 0.3),
+          0 0 0 1px rgba(124, 77, 255, 0.06);
+      }
+
+      /* ─── Nav ─── */
 
       .site-nav {
         position: sticky;
         top: 0;
-        z-index: 40;
-        backdrop-filter: blur(16px) saturate(120%);
-        background: rgba(248, 244, 237, 0.78);
-        border-bottom: 1px solid var(--line);
+        z-index: 50;
+        background: rgba(6, 2, 12, 0.72);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(20px) saturate(140%);
       }
 
       .nav-row {
-        min-height: 74px;
+        min-height: 76px;
         display: flex;
         align-items: center;
-        gap: 14px;
-        flex-wrap: wrap;
+        gap: 20px;
       }
 
       .brand {
@@ -150,440 +199,647 @@
         display: inline-flex;
         align-items: center;
         gap: 12px;
+        min-height: 44px;
         text-decoration: none;
       }
 
       .brand-mark {
-        width: 40px;
-        height: 40px;
-        border-radius: 12px;
-        background: rgba(255, 255, 255, 0.72);
-        border: 1px solid rgba(24, 38, 58, 0.08);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-        display: grid;
-        place-items: center;
-        overflow: hidden;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
       }
 
-      .brand-mark img {
-        width: 26px;
-        height: 26px;
-        object-fit: cover;
+      .brand-logo-nav {
+        width: 88px;
+        height: auto;
       }
 
       .brand-copy strong {
         display: block;
-        font-size: 18px;
-        letter-spacing: -0.02em;
+        font-size: 12px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
       }
 
       .brand-copy span {
         display: block;
-        color: var(--ink-soft);
-        font-size: 11px;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
+        margin-top: 2px;
+        color: var(--text-faint);
+        font-size: 12px;
       }
 
       .nav-links {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        flex-wrap: wrap;
+        gap: 18px;
       }
 
-      .nav-links a,
-      .nav-link-button {
+      .nav-links a {
+        min-height: 40px;
+        display: inline-flex;
+        align-items: center;
+        color: var(--text-soft);
+        font-size: 14px;
         text-decoration: none;
-        font-size: 13px;
-        color: var(--ink-soft);
-        padding: 8px 12px;
-        border-radius: 999px;
-        border: 1px solid transparent;
-        transition:
-          color 180ms ease,
-          background 180ms ease,
-          border-color 180ms ease;
+        position: relative;
+        transition: color 200ms ease;
       }
 
-      .nav-links a:hover,
-      .nav-link-button:hover {
-        color: var(--ink);
-        background: rgba(255, 255, 255, 0.58);
-        border-color: var(--line);
+      .nav-links a::after {
+        content: "";
+        position: absolute;
+        bottom: 6px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        border-radius: 1px;
+        background: var(--gold);
+        transform: scaleX(0);
+        transform-origin: center;
+        transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .nav-links a:hover {
+        color: var(--text);
+      }
+
+      .nav-links a:hover::after {
+        transform: scaleX(1);
       }
 
       .nav-cta {
-        text-decoration: none;
+        min-height: 42px;
+        padding: 0 18px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         border-radius: 999px;
-        padding: 10px 14px;
-        background: var(--ink);
-        color: #fff;
-        font-size: 13px;
-        font-weight: 700;
-        box-shadow: 0 12px 24px rgba(24, 38, 58, 0.14);
+        background: var(--gold);
+        color: #10090a;
+        font-size: 14px;
+        font-weight: 800;
+        text-decoration: none;
+        box-shadow:
+          0 14px 32px rgba(255, 193, 7, 0.16),
+          0 0 0 0 rgba(255, 193, 7, 0);
+        transition:
+          transform 200ms ease,
+          box-shadow 200ms ease;
       }
+
+      .nav-cta:hover {
+        transform: translateY(-1px);
+        box-shadow:
+          0 18px 40px rgba(255, 193, 7, 0.22),
+          0 0 0 3px rgba(255, 193, 7, 0.1);
+      }
+
+      /* ─── Hero ─── */
 
       .hero {
-        padding: 56px 0 32px;
-      }
-
-      .hero-layout {
-        display: grid;
-        grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
-        gap: 28px;
-        align-items: start;
-      }
-
-      .hero-copy,
-      .hero-panel,
-      .section-card,
-      .workflow-card,
-      .docs-card,
-      .install-shell,
-      .disclosure,
-      .final-card {
-        background: var(--surface);
-        border: 1px solid var(--line);
-        box-shadow: var(--shadow-card);
-        backdrop-filter: blur(8px);
-      }
-
-      .hero-copy {
-        border-radius: var(--radius-l);
-        padding: 36px;
+        padding: 64px 0 40px;
         position: relative;
-        overflow: hidden;
       }
 
-      .hero-copy::before {
-        content: "";
+      .hero-glow {
         position: absolute;
-        inset: 0;
+        top: -80px;
+        right: -120px;
+        width: 600px;
+        height: 600px;
+        border-radius: 50%;
         background:
-          linear-gradient(140deg, rgba(79, 116, 168, 0.12), transparent 48%),
-          radial-gradient(circle at 88% 14%, rgba(255, 255, 255, 0.65), transparent 28%);
+          radial-gradient(circle, rgba(123, 31, 162, 0.18) 0%, rgba(124, 77, 255, 0.08) 40%, transparent 70%);
+        filter: blur(60px);
         pointer-events: none;
+        z-index: 0;
+        animation: hero-pulse 8s ease-in-out infinite alternate;
+      }
+
+      @keyframes hero-pulse {
+        0% { opacity: 0.6; transform: scale(1); }
+        100% { opacity: 1; transform: scale(1.08); }
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(360px, 0.9fr) minmax(520px, 1.1fr);
+        gap: 40px;
+        align-items: center;
+        position: relative;
+        z-index: 1;
       }
 
       .eyebrow {
         margin: 0 0 14px;
-        font-family: var(--font-mono);
-        font-size: 11px;
-        letter-spacing: 0.12em;
+        color: rgba(255, 255, 255, 0.62);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
         text-transform: uppercase;
-        color: var(--accent-strong);
       }
 
       h1,
       h2,
       h3 {
         margin: 0;
-        line-height: 1.05;
+        line-height: 1.02;
+        letter-spacing: -0.04em;
+        text-wrap: balance;
       }
 
       h1 {
-        font-family: var(--font-display);
-        font-size: clamp(3rem, 6vw, 5.5rem);
-        letter-spacing: -0.05em;
-        max-width: 10ch;
+        max-width: 11ch;
+        font-size: clamp(2.6rem, 5.2vw, 4.25rem);
+        font-weight: 800;
       }
 
-      h1 em {
-        font-style: italic;
-        color: var(--accent-strong);
+      h2 {
+        font-size: clamp(2rem, 3.2vw, 3rem);
+        font-weight: 800;
+      }
+
+      h3 {
+        font-size: 24px;
+        font-weight: 700;
+      }
+
+      .gradient-text {
+        background: linear-gradient(120deg, #ffffff 0%, #d4cdff 40%, #83c7ff 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+
+      .hero-copy p,
+      .section-head p,
+      .card-copy,
+      .card-copy p {
+        text-wrap: pretty;
+      }
+
+      .hero-logo {
+        width: min(220px, 56%);
+        margin-bottom: 18px;
       }
 
       .hero-lead {
         margin: 18px 0 0;
-        max-width: 58ch;
-        font-size: 18px;
-        color: var(--ink-soft);
+        max-width: 54ch;
+        color: var(--text-soft);
+        font-size: 16px;
       }
 
       .hero-actions {
         margin-top: 28px;
         display: flex;
-        flex-wrap: wrap;
         gap: 12px;
+        flex-wrap: wrap;
       }
 
       .btn {
+        min-height: 44px;
+        padding: 0 18px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 8px;
-        text-decoration: none;
-        padding: 12px 18px;
         border-radius: 999px;
         border: 1px solid transparent;
+        text-decoration: none;
         font-size: 14px;
-        font-weight: 700;
+        font-weight: 800;
+        cursor: pointer;
         transition:
-          transform 180ms ease,
-          background 180ms ease,
-          border-color 180ms ease;
+          transform 200ms ease,
+          background 200ms ease,
+          border-color 200ms ease,
+          box-shadow 200ms ease;
       }
 
-      .btn:hover {
+      .btn:hover,
+      .copy-btn:hover,
+      .inline-link:hover {
         transform: translateY(-1px);
       }
 
       .btn-primary {
-        background: var(--ink);
-        color: #fff;
-        box-shadow: 0 16px 28px rgba(24, 38, 58, 0.12);
+        background: var(--gold);
+        color: #10090a;
+        box-shadow: 0 8px 28px rgba(255, 193, 7, 0.18);
+      }
+
+      .btn-primary:hover {
+        box-shadow:
+          0 12px 36px rgba(255, 193, 7, 0.28),
+          0 0 0 3px rgba(255, 193, 7, 0.1);
       }
 
       .btn-secondary {
-        color: var(--ink);
-        background: rgba(255, 255, 255, 0.52);
-        border-color: var(--line);
+        background: rgba(255, 255, 255, 0.04);
+        border-color: rgba(255, 255, 255, 0.12);
+        color: var(--text);
       }
 
-      .proof-strip {
-        margin-top: 28px;
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 12px;
+      .btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.2);
       }
 
-      .proof-item {
-        border-radius: 20px;
-        background: rgba(255, 255, 255, 0.74);
-        border: 1px solid rgba(24, 38, 58, 0.08);
-        padding: 14px;
+      .hero-meta {
+        margin-top: 26px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
       }
 
-      .proof-label {
-        display: block;
-        margin-bottom: 8px;
-        font-family: var(--font-mono);
-        font-size: 10px;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: var(--ink-faint);
-      }
-
-      .proof-item strong {
-        display: block;
-        font-size: 15px;
-      }
-
-      .proof-item span:last-child {
-        display: block;
-        margin-top: 6px;
-        color: var(--ink-soft);
+      .hero-meta span {
+        min-height: 38px;
+        padding: 0 14px;
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: var(--text-soft);
         font-size: 13px;
+        font-weight: 600;
       }
 
       .hero-panel {
+        padding: 28px;
         border-radius: var(--radius-l);
-        padding: 26px;
-        position: relative;
-        overflow: hidden;
       }
 
-      .hero-panel::before {
-        content: "";
-        position: absolute;
-        inset: auto -80px -80px auto;
-        width: 220px;
-        height: 220px;
-        border-radius: 50%;
-        background: rgba(79, 116, 168, 0.1);
-        filter: blur(10px);
+      .hero-panel:hover {
+        transform: none;
       }
 
-      .panel-topline {
+      .shell-top {
         display: flex;
+        align-items: center;
         justify-content: space-between;
-        align-items: center;
         gap: 16px;
+        margin-bottom: 18px;
       }
 
-      .panel-kicker {
-        font-family: var(--font-mono);
-        font-size: 11px;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--ink-faint);
-      }
-
-      .panel-pill {
-        display: inline-flex;
+      .shell-title {
+        display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 6px 10px;
-        border-radius: 999px;
-        background: var(--accent-soft);
-        color: var(--accent-strong);
-        font-size: 12px;
+        gap: 12px;
+        font-size: 13px;
         font-weight: 700;
       }
 
-      .panel-title {
-        margin-top: 18px;
-        font-size: 28px;
-        letter-spacing: -0.04em;
+      .shell-dots {
+        display: inline-flex;
+        gap: 6px;
       }
 
-      .panel-lead {
-        margin: 12px 0 0;
-        color: var(--ink-soft);
+      .shell-dots span {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.18);
       }
 
-      .path-list {
-        margin: 22px 0 0;
-        padding: 0;
-        list-style: none;
-        display: grid;
-        gap: 12px;
-      }
-
-      .path-list li {
-        display: grid;
-        grid-template-columns: 44px 1fr;
-        gap: 12px;
-        align-items: start;
-        padding: 12px 0;
-        border-top: 1px solid rgba(24, 38, 58, 0.08);
-      }
-
-      .path-list li:first-child {
-        border-top: 0;
-        padding-top: 0;
-      }
-
-      .path-step {
-        width: 44px;
-        height: 44px;
-        border-radius: 16px;
-        display: grid;
-        place-items: center;
-        background: rgba(255, 255, 255, 0.72);
-        border: 1px solid rgba(24, 38, 58, 0.08);
-        font-family: var(--font-mono);
+      .shell-tag {
+        min-height: 30px;
+        padding: 0 10px;
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        background: rgba(255, 193, 7, 0.12);
+        color: #ffe183;
         font-size: 12px;
-        color: var(--accent-strong);
+        font-weight: 800;
       }
 
-      .path-copy strong {
-        display: block;
-        font-size: 16px;
+      .command-shell {
+        padding: 20px 22px;
+        border-radius: var(--radius-m);
+        background:
+          radial-gradient(ellipse 60% 50% at 100% 0%, rgba(124, 77, 255, 0.1), transparent),
+          linear-gradient(180deg, rgba(6, 2, 13, 0.78), rgba(4, 1, 10, 0.94));
+        border: 1px solid rgba(255, 255, 255, 0.08);
       }
 
-      .path-copy span {
-        display: block;
-        margin-top: 4px;
-        color: var(--ink-soft);
-        font-size: 14px;
-      }
-
-      .meta-grid {
-        margin-top: 24px;
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
-      }
-
-      .meta-grid div {
-        padding: 14px;
-        border-radius: 18px;
-        background: rgba(255, 255, 255, 0.78);
-        border: 1px solid rgba(24, 38, 58, 0.08);
-      }
-
-      .meta-grid dt {
+      .command-shell pre {
         margin: 0;
-        font-family: var(--font-mono);
-        font-size: 10px;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        color: var(--ink-faint);
+        color: #fbf7ff;
+        font-size: 13px;
+        line-height: 1.72;
+        white-space: pre-wrap;
       }
 
-      .meta-grid dd {
-        margin: 8px 0 0;
-        font-size: 15px;
-        color: var(--ink);
+      .command-shell .prompt {
+        color: #ffe183;
       }
+
+      .command-shell .comment {
+        color: #93bfff;
+      }
+
+      .panel-grid {
+        margin-top: 18px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      .panel-card {
+        padding: 18px;
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        transition:
+          background 240ms ease,
+          border-color 240ms ease;
+      }
+
+      .panel-card:hover {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(255, 255, 255, 0.12);
+      }
+
+      .panel-card strong {
+        display: block;
+        font-size: 15px;
+      }
+
+      .panel-card span {
+        display: block;
+        margin-top: 6px;
+        color: var(--text-faint);
+        font-size: 13px;
+      }
+
+      /* ─── Sections ─── */
 
       .section {
-        padding: 34px 0;
+        padding: 40px 0;
       }
 
-      .section-shell {
+      .section-head {
+        max-width: 70ch;
+        margin-bottom: 22px;
+      }
+
+      .section-head p {
+        margin: 12px 0 0;
+        color: var(--text-soft);
+      }
+
+      .section-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 24px;
+        align-items: start;
+      }
+
+      /* ─── Install flow ─── */
+
+      .install-flow {
         display: grid;
         gap: 20px;
       }
 
-      .section-head {
-        display: grid;
-        gap: 10px;
-        max-width: 66ch;
+      .install-sheet {
+        padding: 0;
+        overflow: hidden;
       }
 
-      .section-head h2 {
-        font-size: clamp(2.1rem, 3vw, 3.2rem);
-        letter-spacing: -0.05em;
+      .install-sheet-head {
+        padding: 26px 28px 18px;
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
       }
 
-      .section-head p {
+      .install-sheet-head h3 {
+        margin: 8px 0 0;
+        font-size: clamp(1.2rem, 1.5vw, 1.45rem);
+        line-height: 1.18;
+        text-wrap: balance;
+      }
+
+      .install-sheet-head p {
+        max-width: 34ch;
         margin: 0;
-        color: var(--ink-soft);
+        color: var(--text-soft);
+        font-size: 14px;
+        line-height: 1.55;
+        text-wrap: pretty;
       }
 
-      .install-shell {
-        border-radius: var(--radius-l);
-        padding: 28px;
+      .install-sheet-labels,
+      .install-sheet-row {
         display: grid;
-        grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
-        gap: 22px;
+        grid-template-columns: 72px minmax(0, 0.9fr) minmax(0, 1.2fr);
+        gap: 18px;
+        align-items: start;
       }
 
-      .install-block,
-      .install-notes {
+      .install-sheet-labels {
+        padding: 14px 28px 10px;
+        color: var(--text-faint);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .install-sheet-body {
+        padding: 0 28px 10px;
+      }
+
+      .install-sheet-row {
+        padding: 18px 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .install-sheet-row:first-child {
+        border-top: 0;
+      }
+
+      .sheet-step {
+        min-height: 38px;
+        padding: 0 12px;
+        width: fit-content;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.05);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.05),
+          0 0 0 1px rgba(255, 255, 255, 0.08);
+        color: #d7d0ff;
+        font-size: 13px;
+        font-weight: 800;
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+      }
+
+      .sheet-summary {
+        min-width: 0;
+      }
+
+      .sheet-summary strong {
+        display: block;
+        font-size: 17px;
+        line-height: 1.24;
+        text-wrap: balance;
+      }
+
+      .sheet-summary p {
+        margin: 6px 0 0;
+        color: var(--text-soft);
+        font-size: 15px;
+        line-height: 1.6;
+        text-wrap: pretty;
+      }
+
+      .sheet-command {
+        min-width: 0;
+      }
+
+      .sheet-code,
+      .sheet-subrow code,
+      .mini-list code {
+        display: block;
+        position: relative;
+        width: 100%;
+        padding: 13px 40px 13px 16px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: #d8e8ff;
+        font-size: 12px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        font-family: var(--font-mono);
+      }
+
+      .sheet-actions {
+        margin-top: 12px;
+      }
+
+      .sheet-subrows {
         display: grid;
+        gap: 12px;
+      }
+
+      .sheet-subrow {
+        display: grid;
+        grid-template-columns: 190px minmax(0, 1fr);
+        gap: 14px;
+        align-items: start;
+      }
+
+      .sheet-subrow strong {
+        display: block;
+        padding-top: 10px;
+        font-size: 14px;
+        line-height: 1.35;
+      }
+
+      /* ─── Steps (install step 2) ─── */
+
+      .steps {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 0;
+        counter-reset: none;
+      }
+
+      .steps li {
+        display: grid;
+        grid-template-columns: 52px 1fr;
         gap: 16px;
+        align-items: start;
+        padding: 20px 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
       }
 
-      .section-card {
+      .steps li:first-child {
+        padding-top: 4px;
+        border-top: 0;
+      }
+
+      .step-index {
+        min-height: 42px;
+        width: 42px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 14px;
+        background: rgba(124, 77, 255, 0.1);
+        border: 1px solid rgba(124, 77, 255, 0.18);
+        color: #c9b8ff;
+        font-size: 13px;
+        font-weight: 800;
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+        flex-shrink: 0;
+      }
+
+      .step-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .step-copy strong {
+        font-size: 17px;
+        line-height: 1.3;
+      }
+
+      .step-copy > span {
+        color: var(--text-soft);
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .detail-code {
+        display: block;
+        position: relative;
+        margin-top: 4px;
+        padding: 12px 40px 12px 16px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: #d8e8ff;
+        font-size: 12px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        font-family: var(--font-mono);
+      }
+
+      /* ─── Cards ─── */
+
+      .card {
+        padding: 24px;
         border-radius: var(--radius-m);
-        padding: 22px;
       }
 
       .card-label {
-        margin: 0;
-        font-family: var(--font-mono);
-        font-size: 11px;
-        letter-spacing: 0.1em;
+        margin: 0 0 14px;
+        color: rgba(255, 255, 255, 0.62);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
         text-transform: uppercase;
-        color: var(--ink-faint);
-      }
-
-      .command-shell {
-        margin-top: 12px;
-        padding: 18px;
-        border-radius: 20px;
-        background: rgba(24, 38, 58, 0.96);
-        color: #edf3fb;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-      }
-
-      pre,
-      code {
-        font-family: var(--font-mono);
-      }
-
-      pre {
-        margin: 0;
-        white-space: pre-wrap;
-      }
-
-      .command-shell pre {
-        font-size: 13px;
-        line-height: 1.65;
       }
 
       .action-row {
@@ -596,31 +852,35 @@
 
       .copy-btn,
       .inline-link {
+        min-height: 42px;
+        padding: 0 14px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 8px;
         border-radius: 999px;
-        padding: 10px 14px;
-        border: 1px solid var(--line);
-        background: rgba(255, 255, 255, 0.7);
-        color: var(--ink);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text);
         font-size: 13px;
         font-weight: 700;
-        cursor: pointer;
         text-decoration: none;
+        cursor: pointer;
+        transition:
+          transform 200ms ease,
+          background 200ms ease,
+          border-color 200ms ease;
       }
 
       .copy-btn:hover,
       .inline-link:hover {
-        border-color: var(--line-strong);
-        background: #fff;
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.18);
       }
 
       .toast {
-        min-height: 20px;
+        min-height: 18px;
+        color: #ffe183;
         font-size: 13px;
-        color: var(--accent-strong);
       }
 
       .mini-list {
@@ -628,17 +888,17 @@
         padding: 0;
         list-style: none;
         display: grid;
-        gap: 12px;
+        gap: 14px;
       }
 
       .mini-list li {
-        padding: 14px 0 0;
-        border-top: 1px solid rgba(24, 38, 58, 0.08);
+        padding-top: 14px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
       }
 
       .mini-list li:first-child {
-        border-top: 0;
         padding-top: 0;
+        border-top: 0;
       }
 
       .mini-list strong {
@@ -648,77 +908,12 @@
 
       .mini-list span {
         display: block;
-        margin-top: 4px;
-        color: var(--ink-soft);
+        margin-top: 5px;
+        color: var(--text-soft);
         font-size: 14px;
       }
 
-      .detail-code {
-        margin-top: 8px;
-        display: inline-block;
-        padding: 6px 10px;
-        border-radius: 999px;
-        background: var(--accent-soft);
-        color: var(--accent-strong);
-        font-family: var(--font-mono);
-        font-size: 11px;
-      }
-
-      .disclosure {
-        border-radius: var(--radius-l);
-        padding: 0;
-        overflow: hidden;
-      }
-
-      .disclosure summary {
-        list-style: none;
-        cursor: pointer;
-        padding: 22px 24px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 16px;
-      }
-
-      .disclosure summary::-webkit-details-marker {
-        display: none;
-      }
-
-      .disclosure-title strong {
-        display: block;
-        font-size: 20px;
-        letter-spacing: -0.03em;
-      }
-
-      .disclosure-title span {
-        display: block;
-        margin-top: 4px;
-        color: var(--ink-soft);
-        font-size: 14px;
-      }
-
-      .summary-icon {
-        width: 36px;
-        height: 36px;
-        border-radius: 999px;
-        display: grid;
-        place-items: center;
-        background: rgba(255, 255, 255, 0.8);
-        border: 1px solid var(--line);
-        color: var(--accent-strong);
-        font-size: 20px;
-        transition: transform 180ms ease;
-      }
-
-      details[open] .summary-icon {
-        transform: rotate(45deg);
-      }
-
-      .disclosure-body {
-        border-top: 1px solid var(--line);
-        padding: 24px;
-        background: rgba(255, 255, 255, 0.62);
-      }
+      /* ─── Workflow ─── */
 
       .workflow-grid {
         display: grid;
@@ -727,44 +922,67 @@
       }
 
       .workflow-card {
-        border-radius: 24px;
         padding: 22px;
-        min-height: 220px;
+        border-radius: 24px;
+        position: relative;
+        overflow: hidden;
       }
 
-      .workflow-step {
+      .workflow-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, rgba(124, 77, 255, 0.4), transparent);
+        opacity: 0;
+        transition: opacity 300ms ease;
+      }
+
+      .workflow-card:hover::before {
+        opacity: 1;
+      }
+
+      .workflow-index {
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 36px;
-        height: 36px;
-        border-radius: 12px;
-        background: rgba(79, 116, 168, 0.12);
-        color: var(--accent-strong);
-        font-family: var(--font-mono);
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: #d7d0ff;
         font-size: 12px;
+        font-weight: 800;
+        font-family: var(--font-mono);
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
       }
 
       .workflow-card h3 {
-        margin-top: 18px;
-        font-size: 23px;
-        letter-spacing: -0.04em;
+        margin-top: 16px;
+        font-size: 22px;
       }
 
       .workflow-card p {
         margin: 10px 0 0;
-        color: var(--ink-soft);
+        color: var(--text-soft);
+        font-size: 14px;
       }
 
       .workflow-card code {
-        display: inline-block;
+        display: inline-flex;
         margin-top: 16px;
         padding: 7px 10px;
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.78);
-        color: var(--accent-strong);
+        background: rgba(255, 255, 255, 0.05);
+        color: #d8e8ff;
         font-size: 11px;
       }
+
+      /* ─── Docs grid ─── */
 
       .docs-grid {
         display: grid;
@@ -773,62 +991,97 @@
       }
 
       .docs-card {
-        border-radius: 24px;
         padding: 22px;
+        border-radius: 24px;
         text-decoration: none;
+        position: relative;
+        overflow: hidden;
         transition:
-          transform 180ms ease,
-          border-color 180ms ease,
-          background 180ms ease;
+          transform 240ms ease,
+          border-color 240ms ease,
+          background 240ms ease;
+      }
+
+      .docs-card::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, var(--gold), rgba(255, 193, 7, 0.2));
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
       }
 
       .docs-card:hover {
-        transform: translateY(-1px);
+        transform: translateY(-3px);
         border-color: var(--line-strong);
-        background: rgba(255, 255, 255, 0.92);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04)),
+          var(--panel-strong);
+      }
+
+      .docs-card:hover::after {
+        transform: scaleX(1);
       }
 
       .docs-card strong {
         display: block;
         font-size: 18px;
-        letter-spacing: -0.03em;
       }
 
       .docs-card p {
         margin: 10px 0 0;
-        color: var(--ink-soft);
+        color: var(--text-soft);
         font-size: 14px;
       }
 
       .docs-card span {
         display: inline-flex;
-        margin-top: 18px;
-        color: var(--accent-strong);
-        font-family: var(--font-mono);
-        font-size: 11px;
-        letter-spacing: 0.08em;
+        margin-top: 16px;
+        color: #ffe183;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
       }
 
+      /* ─── Final CTA ─── */
+
       .final-card {
+        padding: 28px;
         border-radius: var(--radius-l);
-        padding: 26px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 20px;
+        gap: 24px;
         flex-wrap: wrap;
+        position: relative;
+        overflow: hidden;
       }
 
-      .final-copy h2 {
-        font-size: clamp(2rem, 3vw, 2.8rem);
-        letter-spacing: -0.05em;
+      .final-card::before {
+        content: "";
+        position: absolute;
+        top: -50%;
+        right: -20%;
+        width: 400px;
+        height: 400px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 193, 7, 0.06), transparent 60%);
+        pointer-events: none;
       }
 
-      .final-copy p {
+      .final-card:hover {
+        transform: none;
+      }
+
+      .final-card p {
         margin: 10px 0 0;
-        color: var(--ink-soft);
-        max-width: 56ch;
+        max-width: 58ch;
+        color: var(--text-soft);
       }
 
       .final-actions {
@@ -837,42 +1090,119 @@
         flex-wrap: wrap;
       }
 
+      /* ─── Footer ─── */
+
       .footer {
         padding: 18px 0 40px;
-        color: var(--ink-faint);
+        color: var(--text-faint);
         font-size: 13px;
       }
 
       .footer-row {
-        display: flex;
-        justify-content: space-between;
-        gap: 14px;
-        flex-wrap: wrap;
-        border-top: 1px solid var(--line);
         padding-top: 18px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
       }
 
       .footer-row a {
-        color: var(--accent-strong);
+        color: #ffe183;
         text-decoration: none;
+        transition: color 200ms ease;
       }
+
+      .footer-row a:hover {
+        color: var(--gold);
+      }
+
+      /* ─── Floating copy icon ─── */
+
+      .has-copy {
+        position: relative;
+      }
+
+      .cp {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(10, 5, 18, 0.7);
+        backdrop-filter: blur(8px);
+        color: var(--text-faint);
+        cursor: pointer;
+        opacity: 0;
+        transition:
+          opacity 180ms ease,
+          color 180ms ease,
+          background 180ms ease,
+          border-color 180ms ease;
+        z-index: 2;
+        padding: 0;
+        line-height: 1;
+      }
+
+      .cp svg {
+        width: 14px;
+        height: 14px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .has-copy:hover .cp,
+      .cp:focus-visible {
+        opacity: 1;
+      }
+
+      .cp:hover {
+        color: var(--text);
+        background: rgba(20, 12, 32, 0.9);
+        border-color: rgba(255, 255, 255, 0.16);
+      }
+
+      .cp.copied {
+        color: var(--teal);
+        opacity: 1;
+      }
+
+      /* ─── Scroll reveal ─── */
 
       .reveal {
-        animation: rise-in 700ms ease both;
+        opacity: 0;
+        transform: translateY(18px);
       }
 
-      .reveal:nth-child(2) {
+      .reveal.in-view {
+        animation: rise-in 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+
+      .reveal.in-view:nth-child(2) {
         animation-delay: 80ms;
       }
 
-      .reveal:nth-child(3) {
-        animation-delay: 140ms;
+      .reveal.in-view:nth-child(3) {
+        animation-delay: 160ms;
+      }
+
+      .reveal.in-view:nth-child(4) {
+        animation-delay: 240ms;
       }
 
       @keyframes rise-in {
         from {
           opacity: 0;
-          transform: translateY(20px);
+          transform: translateY(18px);
         }
         to {
           opacity: 1;
@@ -880,67 +1210,131 @@
         }
       }
 
-      :focus-visible {
-        outline: 2px solid var(--accent-strong);
-        outline-offset: 3px;
+      /* ─── Section glow dividers ─── */
+
+      .section + .section {
+        position: relative;
       }
 
+      .section + .section::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(600px, 80%);
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(124, 77, 255, 0.2), rgba(255, 193, 7, 0.12), transparent);
+      }
+
+      /* ─── Responsive ─── */
+
       @media (max-width: 1100px) {
-        .hero-layout,
-        .install-shell {
+        .hero-grid,
+        .section-grid {
           grid-template-columns: 1fr;
         }
 
-        .proof-strip,
         .workflow-grid,
-        .docs-grid {
+        .docs-grid,
+        .panel-grid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
       }
 
       @media (max-width: 760px) {
         :root {
-          --wrap: min(100% - 24px, 1180px);
+          --wrap: min(100% - 24px, 1240px);
         }
 
         .nav-row {
-          padding: 12px 0;
+          min-height: auto;
+          padding: 14px 0;
+          flex-wrap: wrap;
+        }
+
+        .brand {
+          width: 100%;
+        }
+
+        .nav-links {
+          width: 100%;
+          gap: 16px;
+          flex-wrap: wrap;
         }
 
         .hero {
-          padding-top: 34px;
-        }
-
-        .hero-copy,
-        .hero-panel,
-        .install-shell,
-        .final-card {
-          padding: 22px;
+          padding: 34px 0 26px;
         }
 
         h1 {
-          max-width: none;
-          font-size: clamp(2.6rem, 13vw, 4.5rem);
+          max-width: 11ch;
+          font-size: clamp(2.2rem, 9.6vw, 3.2rem);
         }
 
-        .hero-lead {
-          font-size: 16px;
+        .hero-logo {
+          width: min(176px, 54%);
         }
 
-        .proof-strip,
+        .hero-glow {
+          width: 300px;
+          height: 300px;
+          top: -40px;
+          right: -60px;
+        }
+
+        .hero-panel,
+        .card,
+        .workflow-card,
+        .docs-card,
+        .final-card {
+          padding: 20px;
+        }
+
         .workflow-grid,
         .docs-grid,
-        .meta-grid {
+        .panel-grid {
           grid-template-columns: 1fr;
+        }
+
+        .install-sheet-head,
+        .install-sheet-labels,
+        .install-sheet-body {
+          padding-left: 20px;
+          padding-right: 20px;
+        }
+
+        .install-sheet-head {
+          padding-top: 20px;
+          padding-bottom: 16px;
+          align-items: start;
+        }
+
+        .install-sheet-labels {
+          display: none;
+        }
+
+        .install-sheet-row {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+
+        .sheet-subrow {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+
+        .sheet-subrow strong {
+          padding-top: 0;
+        }
+
+        .steps li {
+          grid-template-columns: 42px 1fr;
+          gap: 12px;
         }
 
         .section {
           padding: 24px 0;
-        }
-
-        .section-head h2,
-        .final-copy h2 {
-          font-size: clamp(1.9rem, 8vw, 2.6rem);
         }
       }
 
@@ -955,6 +1349,11 @@
           animation: none !important;
           transition: none !important;
         }
+
+        .reveal {
+          opacity: 1;
+          transform: none;
+        }
       }
     </style>
   </head>
@@ -965,224 +1364,190 @@
       <div class="wrap nav-row">
         <a class="brand" href="#top" aria-label="xyte-cli home">
           <span class="brand-mark">
-            <img src="./media/xyte-logo.jpg" alt="XYTE" />
+            <img class="brand-logo-nav" src="./media/xyte-ai-logo-white-color.png" alt="XYTE AI" />
           </span>
           <span class="brand-copy">
-            <strong>xyte-cli</strong>
-            <span>deterministic operator tooling</span>
+            <strong>CLI</strong>
+            <span>Operations for teams and AI agents</span>
           </span>
         </a>
 
         <nav class="nav-links" aria-label="Primary">
           <a href="#install">Install</a>
-          <a href="#how-it-works">Workflow</a>
+          <a href="#agents">Agents</a>
+          <a href="#workflow">Workflow</a>
           <a href="#docs">Docs</a>
         </nav>
 
-        <a class="nav-cta" href="https://www.npmjs.com/package/@xyteai/cli">npm package</a>
+        <a class="nav-cta" href="https://www.npmjs.com/package/@xyteai/cli">Install from npm</a>
       </div>
     </header>
 
     <main id="main">
       <section class="hero">
-        <div class="wrap hero-layout">
-          <article class="hero-copy reveal">
-            <p class="eyebrow">Xyte operations for teams and AI agents</p>
-            <h1>Install once. Operate with <em>clarity</em>.</h1>
+        <div class="hero-glow" aria-hidden="true"></div>
+        <div class="wrap hero-grid">
+          <div class="hero-copy reveal">
+            <img class="hero-logo" src="./media/xyte-ai-logo-white-color.png" alt="XYTE AI" />
+            <p class="eyebrow">AI-powered orchestration in the terminal</p>
+            <h1>Operate Xyte with <span class="gradient-text">command-line clarity.</span></h1>
             <p class="hero-lead">
-              <code>@xyteai/cli</code> gives teams a direct path from install to setup, inspection, console use, and
-              report export without hiding the real commands behind a black box.
+              <code>@xyteai/cli</code> exposes the real commands from install to tenant setup, fleet inspection,
+              console workflows, and exportable PDF or JSON handoff artifacts.
             </p>
 
             <div class="hero-actions">
-              <a class="btn btn-primary" href="#install">Install now</a>
-              <a class="btn btn-secondary" href="#docs">Browse docs</a>
+              <a class="btn btn-primary" href="#install">Start installation</a>
+              <a class="btn btn-secondary" href="https://github.com/xyte-io/xyte-cli">View on GitHub</a>
             </div>
 
-            <div class="proof-strip" aria-label="Product proof points">
-              <div class="proof-item">
-                <span class="proof-label">Agent setup</span>
-                <strong>Installs Codex, Claude, and Copilot skill scaffolding.</strong>
-                <span>Built for human operators and agent-assisted workflows.</span>
-              </div>
-              <div class="proof-item">
-                <span class="proof-label">Safety</span>
-                <strong>Read flows stay easy. Writes stay explicit.</strong>
-                <span>Human gates still separate plan mode from write execution.</span>
-              </div>
-              <div class="proof-item">
-                <span class="proof-label">Contracts</span>
-                <strong>Schema-backed JSON outputs ship in <code>docs/schemas</code>.</strong>
-                <span>Useful for automation, validation, and downstream tooling.</span>
-              </div>
-              <div class="proof-item">
-                <span class="proof-label">Operator flow</span>
-                <strong>Watch incidents, inspect deeply, and export a report.</strong>
-                <span>One install path, one operational story, reusable artifacts.</span>
-              </div>
+            <div class="hero-meta" aria-label="Quick facts">
+              <span>Node 22+</span>
+              <span>Read-first operator flows</span>
+              <span>CLI, JSON, and PDF outputs</span>
             </div>
-          </article>
+          </div>
 
-          <aside class="hero-panel reveal" aria-label="Public rollout path">
-            <div class="panel-topline">
-              <span class="panel-kicker">Public rollout</span>
-              <span class="panel-pill">Install-first</span>
+          <aside class="hero-panel surface reveal" aria-label="CLI overview">
+            <div class="shell-top">
+              <div class="shell-title">
+                <span class="shell-dots" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </span>
+                <span>First-run path</span>
+              </div>
+              <span class="shell-tag">Install-first</span>
             </div>
 
-            <h2 class="panel-title">Reach operational value in four moves.</h2>
-            <p class="panel-lead">
-              The landing page stays focused on the real first-run path. Deep docs remain available, but the first
-              screen shows what happens before and after install.
-            </p>
+            <div class="command-shell">
+              <pre id="hero-shell"><code><span class="prompt">$</span> npm install -g @xyteai/cli@latest
+<span class="prompt">$</span> xyte-cli init
+<span class="prompt">$</span> XYTE_CLI_KEY="&lt;key&gt;" xyte-cli setup run --non-interactive --connectivity auto
+<span class="prompt">$</span> xyte-cli setup status --output json
+<span class="comment"># inspect, watch, console, or generate report artifacts next</span></code></pre>
+            </div>
 
-            <ol class="path-list">
-              <li>
-                <span class="path-step">01</span>
-                <span class="path-copy">
-                  <strong>Install the CLI</strong>
-                  <span>Start with the published npm package and confirm the binary is ready.</span>
-                </span>
-              </li>
-              <li>
-                <span class="path-step">02</span>
-                <span class="path-copy">
-                  <strong>Add agent skills</strong>
-                  <span>Prepare Codex, Claude, or Copilot for guided Xyte workflows.</span>
-                </span>
-              </li>
-              <li>
-                <span class="path-step">03</span>
-                <span class="path-copy">
-                  <strong>Connect one tenant key</strong>
-                  <span>Use setup status to verify readiness and surface the active tenant context.</span>
-                </span>
-              </li>
-              <li>
-                <span class="path-step">04</span>
-                <span class="path-copy">
-                  <strong>Run watch plus report</strong>
-                  <span>Inspect the fleet, export deep-dive JSON, and produce a shareable PDF handoff.</span>
-                </span>
-              </li>
-            </ol>
-
-            <dl class="meta-grid">
-              <div>
-                <dt>Package</dt>
-                <dd><code>@xyteai/cli</code></dd>
+            <div class="panel-grid">
+              <div class="panel-card">
+                <strong>Visible commands</strong>
+                <span>Every step is a real command you can copy and run. No hidden abstractions.</span>
               </div>
-              <div>
-                <dt>Runtime</dt>
-                <dd>Node 18+</dd>
+              <div class="panel-card">
+                <strong>Read-first</strong>
+                <span>Inspect fleet state before changing anything. Watch incidents, then act.</span>
               </div>
-              <div>
-                <dt>Outputs</dt>
-                <dd>CLI text, JSON contracts, PDF reports</dd>
+              <div class="panel-card">
+                <strong>Agent-ready</strong>
+                <span>Built-in scaffolding for Codex, Claude, and Copilot agent workflows.</span>
               </div>
-              <div>
-                <dt>Deploy</dt>
-                <dd>Static GitHub Pages from <code>docs/</code></dd>
+              <div class="panel-card">
+                <strong>Portable outputs</strong>
+                <span>Export fleet data as schema-backed JSON or formatted PDF reports.</span>
               </div>
-            </dl>
+            </div>
           </aside>
         </div>
       </section>
 
       <section class="section" id="install" aria-labelledby="install-title">
-        <div class="wrap section-shell">
+        <div class="wrap">
           <header class="section-head reveal">
             <p class="eyebrow">Install</p>
-            <h2 id="install-title">Start with a short, credible path to value.</h2>
+            <h2 id="install-title">Get running in three steps.</h2>
             <p>
-              Lead with the core install commands, then connect the tenant key, verify readiness, and move into
-              inspection, console, or reporting flows. The commands stay visible so users can judge what the tool is
-              actually doing.
+              Install the package globally, initialize your workspace, connect a tenant key, and verify readiness.
+              Then move into fleet inspection, incident watch, or report generation.
             </p>
           </header>
 
-          <div class="install-shell reveal">
-            <div class="install-block">
-              <article class="section-card">
-                <p class="card-label">Core install</p>
-                <div class="command-shell">
-                  <pre id="install-snippet"><code>npm install -g @xyteai/cli@latest
+          <div class="install-flow reveal">
+            <article class="card surface">
+              <p class="card-label">Step 1 · Core install</p>
+              <div class="command-shell">
+                <pre id="install-snippet"><code>npm install -g @xyteai/cli@latest
 xyte-cli init
 xyte-cli --version</code></pre>
-                </div>
-                <div class="action-row">
-                  <button
-                    type="button"
-                    class="copy-btn"
-                    data-copy-target="install-snippet"
-                    data-copy-feedback="install-toast"
-                  >
-                    Copy install commands
-                  </button>
-                  <a class="inline-link" href="https://www.npmjs.com/package/@xyteai/cli">Open npm package</a>
-                  <span class="toast" id="install-toast" role="status" aria-live="polite"></span>
-                </div>
-              </article>
+              </div>
+              <div class="action-row">
+                <button
+                  type="button"
+                  class="copy-btn"
+                  data-copy-target="install-snippet"
+                  data-copy-feedback="install-toast"
+                >
+                  Copy install commands
+                </button>
+                <a class="inline-link" href="https://www.npmjs.com/package/@xyteai/cli">Open npm package</a>
+                <span class="toast" id="install-toast" role="status" aria-live="polite"></span>
+              </div>
+            </article>
 
-              <article class="section-card">
-                <p class="card-label">Then connect and verify</p>
-                <ul class="mini-list">
-                  <li>
-                    <strong>Connect the tenant key once.</strong>
-                    <span>Use the interactive setup path first. Shell-specific automation examples live in the getting-started guide.</span>
-                    <span class="detail-code">xyte-cli setup run</span>
-                  </li>
-                  <li>
-                    <strong>Check readiness in JSON.</strong>
-                    <span>Read the tenant context back out before moving into watch or reporting commands.</span>
-                    <span class="detail-code">xyte-cli setup status --field tenantId</span>
-                  </li>
-                </ul>
-              </article>
-            </div>
+            <article class="card surface">
+              <p class="card-label">Step 2 · Connect and verify</p>
+              <ol class="steps">
+                <li>
+                  <span class="step-index">01</span>
+                  <span class="step-copy">
+                    <strong>Connect the tenant key once</strong>
+                    <span>Pass your API key via environment variable. Non-interactive mode skips prompts for CI and agent use.</span>
+                    <span class="detail-code">XYTE_CLI_KEY="&lt;key&gt;" xyte-cli setup run --non-interactive --connectivity auto</span>
+                  </span>
+                </li>
+                <li>
+                  <span class="step-index">02</span>
+                  <span class="step-copy">
+                    <strong>Read readiness back out</strong>
+                    <span>Confirm the tenant is connected and ready. The JSON output includes your tenant ID for subsequent commands.</span>
+                    <span class="detail-code">xyte-cli setup status --output json</span>
+                  </span>
+                </li>
+                <li>
+                  <span class="step-index">03</span>
+                  <span class="step-copy">
+                    <strong>Start with read-oriented workflows</strong>
+                    <span>Watch incidents, inspect devices, open console screens, or generate PDF reports.</span>
+                  </span>
+                </li>
+              </ol>
+            </article>
 
-            <div class="install-notes">
-              <article class="section-card">
-                <p class="card-label">What public users should see</p>
-                
-                <ul class="mini-list">
-                  <li>
-                    <strong>Install does not hide the real commands.</strong>
-                    <span>The homepage makes the executable path obvious instead of burying it in prose.</span>
-                  </li>
-                  <li>
-                    <strong>Read-oriented workflows are the first experience.</strong>
-                    <span>Inspection, deep-dive export, console access, and PDF reporting are the lead use cases.</span>
-                  </li>
-                  <li>
-                    <strong>Advanced reference still exists.</strong>
-                    <span>Commands, flows, and schemas are linked out instead of taking over the landing page.</span>
-                  </li>
-                </ul>
-              </article>
-
-              <article class="section-card">
-                <p class="card-label">Next commands</p>
-                <div class="command-shell">
-                  <pre><code>xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-active --once
-xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json --out ./artifacts/deep-dive.json
-xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input ./artifacts/deep-dive.json --out ./reports/fleet-report.pdf
-xyte-cli ops console --screen dashboard</code></pre>
-                </div>
-                <p class="card-caption">Terminal watch is human-readable by default. Agents should add <code>--output json --strict-json</code>.</p>
-              </article>
-            </div>
+            <article class="card surface">
+              <p class="card-label">Step 3 · Next commands</p>
+              <ul class="mini-list">
+                <li>
+                  <strong>Watch incidents once</strong>
+                  <span><code>xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-active --once</code></span>
+                </li>
+                <li>
+                  <strong>Export a deep-dive snapshot</strong>
+                  <span><code>xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json &gt; deep-dive.json</code></span>
+                </li>
+                <li>
+                  <strong>Generate a report artifact</strong>
+                  <span><code>xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input deep-dive.json --out fleet-report.pdf</code></span>
+                </li>
+              </ul>
+            </article>
           </div>
+        </div>
+      </section>
 
-          <div id="prompt"></div>
-          <details class="disclosure reveal" aria-labelledby="prompt-title">
-            <summary>
-              <span class="disclosure-title">
-                <strong id="prompt-title">Use with AI agents</strong>
-                <span>The prompt stays available, but it no longer dominates the page.</span>
-              </span>
-              <span class="summary-icon" aria-hidden="true">+</span>
-            </summary>
-            <div class="disclosure-body">
+      <section class="section" id="agents" aria-labelledby="agents-title">
+        <div class="wrap">
+          <header class="section-head reveal">
+            <p class="eyebrow">Agents</p>
+            <h2 id="agents-title">First-class support for AI coding agents.</h2>
+            <p>
+              Drop a structured prompt into Codex, Claude, or Copilot. The CLI provides deterministic,
+              machine-readable outputs that agents can parse and act on.
+            </p>
+          </header>
+
+          <div class="section-grid reveal">
+            <article class="card surface">
+              <p class="card-label">Copyable prompt</p>
               <div class="command-shell">
                 <pre id="agent-prompt"><code>Use @xyteai/cli in this workspace. Keep it concise and safe.
 
@@ -1192,21 +1557,16 @@ Rules:
 
 Run:
 npm install -g @xyteai/cli@latest
-xyte-cli --version
 xyte-cli init
 
-Then connect the tenant:
-xyte-cli setup run
-xyte-cli setup status --field tenantId
+Then ask me for XYTE_CLI_KEY and run:
+XYTE_CLI_KEY="&lt;key&gt;" xyte-cli setup run --non-interactive --connectivity auto
+xyte-cli setup status --output json
 
 Read tenantId from setup status and continue:
-xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-active --once --output json --strict-json
-xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json --out ./artifacts/deep-dive.json
-xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input ./artifacts/deep-dive.json --out ./reports/fleet-report.pdf
-
-Finish with:
-- concise success/failure summary
-- exact failing command (if any)</code></pre>
+xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-active --once --strict-json
+xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json &gt; deep-dive.json
+xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input deep-dive.json --out fleet-report.pdf</code></pre>
               </div>
               <div class="action-row">
                 <button
@@ -1220,45 +1580,63 @@ Finish with:
                 <a class="inline-link" href="./agents.md">Open agent guidance</a>
                 <span class="toast" id="prompt-toast" role="status" aria-live="polite"></span>
               </div>
-            </div>
-          </details>
+            </article>
+
+            <article class="card surface">
+              <p class="card-label">Operator defaults</p>
+              <ul class="mini-list">
+                <li>
+                  <strong>Read-first by default</strong>
+                  <span>Human operators see readable terminal output. Agents add <code>--strict-json</code> when they need machine-parseable results.</span>
+                </li>
+                <li>
+                  <strong>Strict JSON is opt-in</strong>
+                  <span>Machine output is enabled per command, not globally. The boundary between human and agent modes stays clear.</span>
+                </li>
+                <li>
+                  <strong>Copy-paste ready</strong>
+                  <span>One prompt covers install, setup, inspection, and reporting. Paste it into your agent and go.</span>
+                </li>
+              </ul>
+            </article>
+          </div>
         </div>
       </section>
 
-      <section class="section" id="how-it-works" aria-labelledby="how-title">
-        <div class="wrap section-shell">
+      <section class="section" id="workflow" aria-labelledby="workflow-title">
+        <div class="wrap">
           <header class="section-head reveal">
-            <p class="eyebrow">How it works</p>
-            <h2 id="how-title">Keep the operator path explicit from start to handoff.</h2>
+            <p class="eyebrow">Workflow</p>
+            <h2 id="workflow-title">From install to fleet report in four steps.</h2>
             <p>
-              The product story is not just “there is a CLI.” It is a repeatable path: install, prepare the agent
-              environment, connect safely, then move into inspection, console workflows, and reportable artifacts.
+              Install the CLI, connect tenant context, inspect fleet state, and generate artifacts.
+              Each step feeds the next.
             </p>
           </header>
 
           <div class="workflow-grid reveal">
-            <article class="workflow-card">
-              <span class="workflow-step">01</span>
-              <h3>Install for people and agents</h3>
-              <p>Use the npm package directly, then install skills for Codex, Claude, and Copilot in the same workspace.</p>
+            <article class="workflow-card surface">
+              <span class="workflow-index">01</span>
+              <h3>Install and init</h3>
+              <p>Install from npm, then scaffold agent configs for Codex, Claude, and Copilot.</p>
               <code>xyte-cli init</code>
             </article>
-            <article class="workflow-card">
-              <span class="workflow-step">02</span>
-              <h3>Connect tenant context once</h3>
-              <p>Use setup status as the explicit contract for readiness instead of assuming hidden local state.</p>
+            <article class="workflow-card surface">
+              <span class="workflow-index">02</span>
+              <h3>Connect tenant</h3>
+              <p>Provide your API key once. Verify with <code>setup status</code> before running operational commands.</p>
               <code>xyte-cli setup status --output json</code>
             </article>
-            <article class="workflow-card">
-              <span class="workflow-step">03</span>
-              <h3>Inspect the fleet before changing it</h3>
-              <p>Start with inspection and console flows so users understand the read-first posture before any mutation.</p>
+            <article class="workflow-card surface">
+              <span class="workflow-index">03</span>
+              <h3>Inspect fleet state</h3>
+              <p>Watch incidents, inspect devices, and browse console screens before making changes.</p>
               <code>xyte-cli ops inspect fleet --output json</code>
             </article>
-            <article class="workflow-card">
-              <span class="workflow-step">04</span>
-              <h3>Produce artifacts other teams can consume</h3>
-              <p>Deep-dive JSON and PDF reports make the workflow useful outside the terminal, not just inside it.</p>
+            <article class="workflow-card surface">
+              <span class="workflow-index">04</span>
+              <h3>Export artifacts</h3>
+              <p>Generate deep-dive JSON snapshots and PDF reports you can share or feed into other tools.</p>
               <code>xyte-cli ops report generate ...</code>
             </article>
           </div>
@@ -1266,43 +1644,43 @@ Finish with:
       </section>
 
       <section class="section" id="docs" aria-labelledby="docs-title">
-        <div class="wrap section-shell">
+        <div class="wrap">
           <header class="section-head reveal">
             <p class="eyebrow">Docs and contracts</p>
-            <h2 id="docs-title">Reference without the clutter.</h2>
+            <h2 id="docs-title">Reference and contracts.</h2>
             <p>
-              Keep the landing page lean. Use the docs grid for setup detail, command behavior, flow authoring, and
-              schema contracts once someone wants depth.
+              Guides for first-run onboarding, full command reference, agent integration patterns,
+              flow authoring, and machine-readable JSON schemas.
             </p>
           </header>
 
           <div class="docs-grid reveal">
-            <a class="docs-card" href="./getting-started.md">
+            <a class="docs-card surface" href="./getting-started.md">
               <strong>Getting started</strong>
-              <p>First-run setup details, prerequisites, and the recommended onboarding sequence.</p>
+              <p>First-run prerequisites, onboarding order, and the recommended setup sequence.</p>
               <span>Open guide</span>
             </a>
-            <a class="docs-card" href="./commands.md">
+            <a class="docs-card surface" href="./commands.md">
               <strong>Commands reference</strong>
-              <p>Exact command behavior, operator-facing examples, and workflow patterns.</p>
+              <p>Exact command behavior, operator-facing examples, and the practical CLI surface area.</p>
               <span>Open commands</span>
             </a>
-            <a class="docs-card" href="./agents.md">
+            <a class="docs-card surface" href="./agents.md">
               <strong>Agent guidance</strong>
-              <p>Recommended patterns for using xyte-cli from Codex, Claude, or other agent workflows.</p>
-              <span>Open agent docs</span>
+              <p>Patterns for using <code>xyte-cli</code> safely from Codex, Claude, or similar agent workflows.</p>
+              <span>Open agents</span>
             </a>
-            <a class="docs-card" href="./flows/agent-ops.md">
+            <a class="docs-card surface" href="./flows/agent-ops.md">
               <strong>Built-in flows</strong>
-              <p>Deterministic workflow packs for ongoing operator and incident-response scenarios.</p>
+              <p>Deterministic operational flow packs for incident response and repeated operator scenarios.</p>
               <span>Open flows</span>
             </a>
-            <a class="docs-card" href="./flows/custom-workflows.md">
+            <a class="docs-card surface" href="./flows/custom-workflows.md">
               <strong>Custom workflows</strong>
-              <p>Create, edit, share, and import reusable flow definitions for your own environment.</p>
-              <span>Open workflow authoring</span>
+              <p>Create, edit, share, and import reusable workflow definitions for your environment.</p>
+              <span>Open authoring</span>
             </a>
-            <a class="docs-card" href="./schemas/flow-run.v1.schema.json">
+            <a class="docs-card surface" href="./schemas/flow-run.v1.schema.json">
               <strong>Schema contracts</strong>
               <p>Machine-readable JSON contracts in <code>docs/schemas</code> for validation and automation.</p>
               <span>Open schemas</span>
@@ -1313,17 +1691,17 @@ Finish with:
 
       <section class="section">
         <div class="wrap">
-          <div class="final-card reveal">
-            <div class="final-copy">
-              <h2>Start quickly. Keep the deeper material close.</h2>
+          <div class="final-card surface reveal">
+            <div>
+              <p class="eyebrow">Ready to run</p>
+              <h2>Start operating.</h2>
               <p>
-                The homepage now leads with install and operational credibility, while the docs remain one click away
-                for teams that need exact command semantics, flow definitions, or contract schemas.
+                Install the CLI, connect your tenant, and run your first fleet inspection in under five minutes.
               </p>
             </div>
             <div class="final-actions">
               <a class="btn btn-primary" href="#install">Install now</a>
-              <a class="btn btn-secondary" href="https://github.com/xyte-io/xyte-cli">View on GitHub</a>
+              <a class="btn btn-secondary" href="https://github.com/xyte-io/xyte-cli">View repository</a>
             </div>
           </div>
         </div>
@@ -1332,7 +1710,7 @@ Finish with:
 
     <footer class="footer">
       <div class="wrap footer-row">
-        <span>xyte-cli · deterministic Xyte operations for humans and AI agents</span>
+        <span>xyte-cli · Xyte operations for humans and AI agents</span>
         <span>
           <a href="https://github.com/xyte-io/xyte-cli">GitHub</a>
           ·
@@ -1343,31 +1721,79 @@ Finish with:
 
     <script>
       (function () {
-        function wireCopyButtons() {
-          const buttons = document.querySelectorAll('[data-copy-target]');
-          buttons.forEach((button) => {
-            button.addEventListener('click', async () => {
-              const targetId = button.getAttribute('data-copy-target');
-              const feedbackId = button.getAttribute('data-copy-feedback');
-              const target = targetId ? document.getElementById(targetId) : null;
-              const feedback = feedbackId ? document.getElementById(feedbackId) : null;
-              if (!target || !feedback) return;
+        var clipSVG = '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+        var checkSVG = '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
 
-              try {
-                await navigator.clipboard.writeText(target.innerText || '');
-                feedback.textContent = 'Copied.';
-              } catch (error) {
-                feedback.textContent = 'Copy failed. Select and copy manually.';
-              }
+        /* ── Floating copy icons on every code block ── */
+        function wireCopyIcons() {
+          var targets = document.querySelectorAll(".command-shell, .detail-code, .mini-list code");
+          targets.forEach(function (el) {
+            el.classList.add("has-copy");
 
-              window.setTimeout(() => {
-                feedback.textContent = '';
-              }, 2200);
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "cp";
+            btn.setAttribute("aria-label", "Copy to clipboard");
+            btn.innerHTML = clipSVG;
+            el.appendChild(btn);
+
+            btn.addEventListener("click", function (e) {
+              e.stopPropagation();
+              var text = (el.querySelector("pre") || el).innerText || "";
+              navigator.clipboard.writeText(text).then(function () {
+                btn.innerHTML = checkSVG;
+                btn.classList.add("copied");
+                setTimeout(function () {
+                  btn.innerHTML = clipSVG;
+                  btn.classList.remove("copied");
+                }, 1400);
+              });
             });
           });
         }
 
+        /* ── Explicit copy buttons (step 1, agent prompt) ── */
+        function wireCopyButtons() {
+          document.querySelectorAll("[data-copy-target]").forEach(function (button) {
+            button.addEventListener("click", function () {
+              var target = document.getElementById(button.getAttribute("data-copy-target"));
+              var feedback = document.getElementById(button.getAttribute("data-copy-feedback"));
+              if (!target || !feedback) return;
+
+              navigator.clipboard.writeText(target.innerText || "").then(
+                function () { feedback.textContent = "Copied."; },
+                function () { feedback.textContent = "Copy failed."; }
+              );
+              setTimeout(function () { feedback.textContent = ""; }, 2200);
+            });
+          });
+        }
+
+        /* ── Scroll-triggered reveal ── */
+        function wireReveal() {
+          var els = document.querySelectorAll(".reveal");
+          if (!("IntersectionObserver" in window)) {
+            els.forEach(function (el) { el.classList.add("in-view"); });
+            return;
+          }
+
+          var observer = new IntersectionObserver(
+            function (entries) {
+              entries.forEach(function (entry) {
+                if (entry.isIntersecting) {
+                  entry.target.classList.add("in-view");
+                  observer.unobserve(entry.target);
+                }
+              });
+            },
+            { threshold: 0.12, rootMargin: "0px 0px -40px 0px" }
+          );
+          els.forEach(function (el) { observer.observe(el); });
+        }
+
+        wireCopyIcons();
         wireCopyButtons();
+        wireReveal();
       })();
     </script>
   </body>
