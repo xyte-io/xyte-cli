@@ -11,7 +11,7 @@ function normalizeRecipeLine(value: string): string {
 
 function extractFlowSections(markdown: string): Record<string, string> {
   const sections: Record<string, string> = {};
-  const headingPattern = /^##\s+(flow\.[^\n]+)\n/gm;
+  const headingPattern = /^##\s+(flow\.[^\r\n]+)\r?\n/gm;
   const headings: Array<{ flowId: string; headingIndex: number; bodyStartIndex: number }> = [];
 
   for (const match of markdown.matchAll(headingPattern)) {
@@ -31,7 +31,7 @@ function extractFlowSections(markdown: string): Record<string, string> {
 }
 
 function extractRecipeCommands(section: string): string[] {
-  const blockMatch = section.match(/```bash\n([\s\S]*?)\n```/m);
+  const blockMatch = section.match(/```bash\r?\n([\s\S]*?)\r?\n```/m);
   if (!blockMatch) {
     return [];
   }
@@ -39,7 +39,7 @@ function extractRecipeCommands(section: string): string[] {
   const commands: string[] = [];
   let current: string[] = [];
 
-  for (const rawLine of blockMatch[1].split('\n')) {
+  for (const rawLine of blockMatch[1].split(/\r?\n/)) {
     const line = rawLine.trimEnd();
     const trimmed = line.trim();
 

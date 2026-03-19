@@ -1,6 +1,9 @@
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
-const scriptPath = '../scripts/smoke_flow_pack_local.mjs';
+const scriptPath = pathToFileURL(resolve(__dirname, '../scripts/smoke_flow_pack_local.mjs')).href;
 
 describe('local flow-pack smoke classifier', () => {
   it('treats known data-gated sendCommand 422 as pass', async () => {

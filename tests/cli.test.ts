@@ -1047,7 +1047,7 @@ describe('cli integration', () => {
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     const parsed = JSON.parse(output);
     expect(['ok', 'missing', 'mismatch']).toContain(parsed.status);
-    expect(parsed.expectedPath).toContain('dist/bin/xyte-cli.js');
+    expect(String(parsed.expectedPath).replaceAll('\\', '/')).toContain('dist/bin/xyte-cli.js');
   });
 
   it('emits call envelope when output-mode is envelope', async () => {

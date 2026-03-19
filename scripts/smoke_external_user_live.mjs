@@ -92,12 +92,18 @@ export function buildIsolatedEnv(baseEnv, dirs) {
   };
 }
 
+function shouldUseWindowsShell(command) {
+  return process.platform === 'win32' && /\.(cmd|bat)$/i.test(command);
+}
+
 export async function runCommand(command, args, options = {}) {
   return await new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: options.cwd,
       env: options.env,
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'],
+      shell: shouldUseWindowsShell(command),
+      windowsHide: true
     });
 
     let stdout = '';
@@ -121,7 +127,11 @@ export async function runCommand(command, args, options = {}) {
     });
 
     child.stdin.on('error', (error) => reject(error));
-    child.stdin.end(options.input ?? undefined);
+    if (options.input === undefined) {
+      child.stdin.end();
+      return;
+    }
+    child.stdin.end(options.input);
   });
 }
 

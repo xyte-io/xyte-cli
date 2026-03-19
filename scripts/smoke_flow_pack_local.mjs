@@ -9,6 +9,10 @@ import { pathToFileURL } from 'node:url';
 const NPM_COMMAND = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const XYTE_COMMAND = process.platform === 'win32' ? 'xyte-cli.cmd' : 'xyte-cli';
 
+function shouldUseWindowsShell(command) {
+  return process.platform === 'win32' && /\.(cmd|bat)$/i.test(command);
+}
+
 function parseArgs(argv) {
   const parsed = {
     tenant: 'local-flow',
@@ -46,7 +50,9 @@ function runCommand(command, args, options = {}) {
     const child = spawn(command, args, {
       cwd: options.cwd ?? process.cwd(),
       env: options.env ?? process.env,
-      stdio: ['ignore', 'pipe', 'pipe']
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: shouldUseWindowsShell(command),
+      windowsHide: true
     });
 
     let stdout = '';

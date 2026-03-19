@@ -1,6 +1,9 @@
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
 import { describe, expect, it, vi } from 'vitest';
 
-const scriptPath = '../scripts/smoke_pack_install.mjs';
+const scriptPath = pathToFileURL(resolve(__dirname, '../scripts/smoke_pack_install.mjs')).href;
 
 describe('pack install smoke script', () => {
   it('runs expected command sequence with provided env', async () => {

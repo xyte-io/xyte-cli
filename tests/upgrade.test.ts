@@ -32,7 +32,7 @@ describe('upgrade utilities', () => {
 
   it('applies upgrade using install spec and emits skill warning on partial failure', async () => {
     const commandRunner = vi.fn(async (command: string, args: string[]) => {
-      if (command === 'npm') {
+      if (/^npm(?:\.cmd)?$/.test(command)) {
         expect(args).toEqual(['install', '--global', '/artifacts/xyteai-cli-b.tgz']);
         return {
           code: 0,
@@ -40,7 +40,7 @@ describe('upgrade utilities', () => {
           stderr: ''
         };
       }
-      if (command === 'xyte-cli') {
+      if (/^xyte-cli(?:\.cmd)?$/.test(command)) {
         return {
           code: 0,
           stdout: 'xyte-cli 0.5.0\n',

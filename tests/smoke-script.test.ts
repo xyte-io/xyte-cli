@@ -1,6 +1,9 @@
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
 import { describe, expect, it, vi } from 'vitest';
 
-const scriptPath = '../scripts/smoke_external_user_live.mjs';
+const scriptPath = pathToFileURL(resolve(__dirname, '../scripts/smoke_external_user_live.mjs')).href;
 
 describe('external live smoke script', () => {
   it('fails fast when XYTE_CLI_KEY is missing', async () => {

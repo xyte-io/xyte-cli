@@ -125,7 +125,9 @@ export function compareSemver(a: string, b: string): number {
 function defaultRunner(command: string, args: string[]): Promise<CommandResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
-      stdio: ['ignore', 'pipe', 'pipe']
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: process.platform === 'win32' && /\.(cmd|bat)$/i.test(command),
+      windowsHide: true
     });
 
     let stdout = '';
@@ -228,7 +230,7 @@ export async function applyUpgrade(settings: UpgradeSettings, deps: UpgradeDepen
   }
 
   const verifyCommand = {
-    command: 'xyte-cli',
+    command: process.platform === 'win32' ? 'xyte-cli.cmd' : 'xyte-cli',
     args: ['--version']
   };
   const verifyResult = await runner(verifyCommand.command, verifyCommand.args);
