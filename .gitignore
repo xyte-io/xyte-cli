@@ -25,6 +25,9 @@ marketing/
 
 # Local tooling scratch files
 AGENTS.md
+.agents/skills/
+.claude/skills/
+.github/skills/
 apply
 approve
 review
