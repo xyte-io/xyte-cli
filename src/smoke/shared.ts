@@ -1,6 +1,7 @@
 import { access } from 'node:fs/promises';
 import path from 'node:path';
 
+import { getEnvPathValue, setEnvPathValue } from '../utils/env-path';
 import { runProcess } from '../utils/run-command';
 
 export const NPM_COMMAND = process.platform === 'win32' ? 'npm.cmd' : 'npm';
@@ -59,11 +60,15 @@ export function normalizeJsonOutput(raw: unknown): any {
   throw new Error(`Expected JSON output but parsing failed. stdout=${trimmed}`);
 }
 
-export function buildIsolatedEnv(baseEnv: NodeJS.ProcessEnv, dirs: IsolatedEnvDirs): NodeJS.ProcessEnv {
+export function buildIsolatedEnv(
+  baseEnv: NodeJS.ProcessEnv,
+  dirs: IsolatedEnvDirs,
+  platform: NodeJS.Platform = process.platform
+): NodeJS.ProcessEnv {
   const appData = path.join(dirs.homeDir, 'AppData', 'Roaming');
   const xdgConfigHome = path.join(dirs.homeDir, '.config');
 
-  return {
+  return setEnvPathValue({
     ...baseEnv,
     HOME: dirs.homeDir,
     USERPROFILE: dirs.homeDir,
@@ -72,9 +77,8 @@ export function buildIsolatedEnv(baseEnv: NodeJS.ProcessEnv, dirs: IsolatedEnvDi
     XYTE_CLI_CONFIG_DIR: dirs.configDir,
     NPM_CONFIG_PREFIX: dirs.prefixDir,
     npm_config_prefix: dirs.prefixDir,
-    npm_config_cache: dirs.npmCacheDir,
-    PATH: baseEnv.PATH ?? ''
-  };
+    npm_config_cache: dirs.npmCacheDir
+  }, getEnvPathValue(baseEnv, platform), platform);
 }
 
 export async function runCommand(command: string, args: string[], options: RunCommandOptions = {}): Promise<CommandResult> {

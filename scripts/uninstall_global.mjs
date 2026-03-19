@@ -1,18 +1,17 @@
 #!/usr/bin/env node
 
-import { spawn } from 'node:child_process';
+import { runCommand, runOrThrow } from './run_command.mjs';
 
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
-const result = await new Promise((resolve, reject) => {
-  const child = spawn(npmCommand, ['unlink', '-g', '@xyteai/cli'], {
-    stdio: 'inherit'
-  });
-
-  child.on('error', reject);
-  child.on('close', (code) => resolve(code ?? 1));
+const installed = await runCommand(npmCommand, ['ls', '-g', '--depth=0', '@xyteai/cli', '--json'], {
+  stdio: ['ignore', 'pipe', 'pipe']
 });
 
-if (typeof result === 'number' && result !== 0) {
+if (installed.code !== 0) {
   process.exitCode = 0;
+} else {
+  await runOrThrow(npmCommand, ['unlink', '-g', '@xyteai/cli'], 'npm unlink -g @xyteai/cli', {
+    env: process.env
+  });
 }

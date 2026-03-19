@@ -118,6 +118,9 @@ xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/xyte-deep-
 - Prerequisites:
   - triage artifacts exist and identify concrete `<device-id>`, `<ticket-id>`, and `<incident-id>`.
   - human operator approval to execute writes.
+- Shell note:
+  - the raw `api call ... --path-json/--body-json` examples below are Bash/zsh-shaped because inline JSON quoting still differs by shell.
+  - on PowerShell or CMD, prefer `xyte-cli flow run flow.guided-remediation --tenant <tenant-id> --plan` and adapt any copied write commands to your shell.
 - Exact commands:
 
 ```bash

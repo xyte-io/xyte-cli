@@ -1,11 +1,13 @@
 import { accessSync, constants, existsSync } from 'node:fs';
 import path, { delimiter } from 'node:path';
 
-export function resolveCommandFromPath(command: string, envPath = process.env.PATH ?? ''): string | undefined {
+import { getEnvPathValue, getEnvVarCaseInsensitive } from './env-path';
+
+export function resolveCommandFromPath(command: string, envPath = getEnvPathValue(process.env)): string | undefined {
   const pathEntries = envPath.split(delimiter).filter(Boolean);
   const extensions =
     process.platform === 'win32'
-      ? (process.env.PATHEXT ?? '.EXE;.CMD;.BAT;.COM')
+      ? (getEnvVarCaseInsensitive(process.env, 'PATHEXT') ?? '.EXE;.CMD;.BAT;.COM')
           .split(';')
           .filter(Boolean)
           .map((ext) => ext.toLowerCase())

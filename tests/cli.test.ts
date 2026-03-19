@@ -968,7 +968,7 @@ describe('cli integration', () => {
     expect(stored).toBe('new-key');
   });
 
-  it('rejects conflicting stdin and env secret sources during key update', async () => {
+  it('prefers stdin over XYTE_CLI_KEY during key update', async () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });
     const secretStore = new MemorySecretStore();
@@ -989,22 +989,23 @@ describe('cli integration', () => {
       readStdinValue: vi.fn().mockResolvedValue('stdin-key')
     });
 
-    await expect(
-      program.parseAsync([
-        'node',
-        'xyte-cli',
-        'config',
-        'key',
-        'update',
-        '--tenant',
-        'acme',
-        '--provider',
-        'xyte-org',
-        '--slot',
-        slot.slotId,
-        '--key-stdin'
-      ])
-    ).rejects.toThrow('Conflicting API key sources');
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'config',
+      'key',
+      'update',
+      '--tenant',
+      'acme',
+      '--provider',
+      'xyte-org',
+      '--slot',
+      slot.slotId,
+      '--key-stdin'
+    ]);
+
+    const stored = await secretStore.getSlotSecret('acme', 'xyte-org', slot.slotId);
+    expect(stored).toBe('stdin-key');
   });
 
   it('rejects unsupported auth provider', async () => {
@@ -2212,6 +2213,49 @@ describe('cli integration', () => {
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     const parsed = JSON.parse(output);
     expect(parsed.readiness.state).toBe('ready');
+  });
+
+  it('prefers stdin over XYTE_CLI_KEY during setup', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({
+      profileStore,
+      secretStore,
+      stdout,
+      stderr,
+      env: {
+        ...process.env,
+        XYTE_CLI_KEY: 'env-key'
+      },
+      readStdinValue: vi.fn().mockResolvedValue('stdin-key')
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ id: 'org-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+    );
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'setup',
+      'run',
+      '--non-interactive',
+      '--tenant',
+      'playground',
+      '--key-stdin'
+    ]);
+
+    const slots = await profileStore.listKeySlots('playground', 'xyte-org');
+    const stored = await secretStore.getSlotSecret('playground', 'xyte-org', slots[0]!.slotId);
+    expect(stored).toBe('stdin-key');
   });
 
   it('rejects conflicting secret sources during setup', async () => {
@@ -3575,6 +3619,11 @@ describe('cli integration', () => {
       expect(runStepStatus.get('report_daily')).toBe('completed');
       expect(runStepStatus.get('inspect_fleet_daily')).toBe('completed');
       expect(runStepStatus.get('decision_distribute_or_escalate')).toBe('gate_pending');
+
+      const deepDiveStep = runOutput.steps.find((item: any) => item.stepId === 'inspect_deep_dive_daily');
+      expect(typeof deepDiveStep?.artifactPath).toBe('string');
+      const deepDiveArtifact = JSON.parse(readFileSync(deepDiveStep.artifactPath, 'utf8'));
+      expect(deepDiveArtifact.windowHours).toBe(12);
     } finally {
       if (previousConfig === undefined) {
         delete process.env.XYTE_CLI_CONFIG_DIR;

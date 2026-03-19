@@ -49,6 +49,7 @@ Write safety requirements:
 1. Endpoint writes execute only after an explicit human decision.
 2. `xyte-cli util import-tree` is dry-run by default unless `--apply` is provided.
 3. Human decision gates are mandatory before any write or apply loop.
+4. The raw `api call ... --path-json/--body-json` examples below are Bash/zsh-shaped because inline JSON quoting still differs by shell. On PowerShell or CMD, prefer `xyte-cli flow run flow.guided-remediation --tenant <tenant-id> --plan` and adapt copied write commands to your shell.
 
 ```bash
 xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json --out ./artifacts/xyte-watch.before.ndjson

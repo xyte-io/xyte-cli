@@ -13,8 +13,7 @@ This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
 
 - Use `xyte-cli` commands directly.
 - Do not use source/dev entrypoints (`tsx`, `src/*`, `dist/*`, `bin/*`).
-- If `xyte-cli` is unavailable on `PATH`, use `npx @xyteai/cli@latest <command>` or `npm exec @xyteai/cli@latest -- <command>` until `PATH` is fixed.
-- Canonical skill source lives in `skills/xyte-cli`. Sync mirrors with `node scripts/sync_xyte_skill_mirrors.mjs`.
+- If `xyte-cli` is unavailable on `PATH`, use `npx @xyteai/cli@latest <command>` or `npm exec -- @xyteai/cli@latest <command>` until `PATH` is fixed.
 - Command option correctness:
   - `xyte-cli config tenant list` has no `--output`.
   - `xyte-cli setup status`, `xyte-cli config doctor`, `xyte-cli status`, `xyte-cli ops inspect`, and `xyte-cli ops console --headless` accept `--output json|text` where relevant.
@@ -23,7 +22,7 @@ This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
   - `xyte-cli flow run` supports `--inspect-provider-scope organization|partner|auto`.
 - For fresh users in a new environment, verify readiness with:
   - `xyte-cli status --mode fast --output json`
-  - `xyte-cli init --scope both --agents all --force`
+  - `xyte-cli init --scope both --agents all --force --no-setup`
   - for humans: `xyte-cli setup run --tenant <tenant-id> --provider <xyte-org|xyte-partner>`
   - for automation: pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> --provider <xyte-org|xyte-partner> --key-stdin`
   - `xyte-cli setup status --tenant <tenant-id> --field tenantId`
@@ -107,7 +106,7 @@ Provider/report behavior:
 - `xyte-cli util prepare --action <action-key> --input <file> [--tenant <tenant-id>] [--output-dir <dir>]`
 - stop and ask for a user decision before any execution command
 - `xyte-cli util import-tree --tenant <tenant-id> --input <file> [--apply]`
-- preprocessing contract: `/Users/porton/Projects/xyte-cli/docs/ai-utility-preprocessing.md`
+- preprocessing contract: `references/ai-utility-preprocessing.md`
 
 6. Headless snapshots:
 - `xyte-cli ops console --headless --screen <screen> --output json --once --tenant <tenant-id>`
@@ -251,8 +250,8 @@ xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-t
 AI preprocessing prompt templates:
 
 ```bash
-cat scripts/templates/ai-utility-prepare-generic.prompt.md
-cat scripts/templates/ai-space-import.prompt.md
+cat templates/ai-utility-prepare-generic.prompt.md
+cat templates/ai-space-import.prompt.md
 ```
 
 ## Contract IDs And Schemas
@@ -294,15 +293,10 @@ xyte-cli ops console --tenant <tenant-id>
 - Headless errors:
   - ensure `--headless --output json`
   - parse NDJSON and use the last runtime frame (`meta.startup != true`)
-- Local util sandbox:
-
-```bash
-npm run mock:xyte:local -- --port 3001
-npm run smoke:local:utilities -- --base-url http://127.0.0.1:3001 --tenant local
-```
 
 ## References (Load As Needed)
 
+- `references/ai-utility-preprocessing.md`
 - `references/endpoints.md`
 - `references/utilities.md`
 - `references/utility-ai-space-import-tree.md`

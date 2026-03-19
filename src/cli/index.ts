@@ -757,9 +757,6 @@ async function resolveKeyValue(args: {
   if (inlineKey && args.keyStdin) {
     throw createSecretConflictError('Use either --key or --key-stdin, not both.');
   }
-  if (args.keyStdin && envKey) {
-    throw createSecretConflictError('Use either --key-stdin or XYTE_CLI_KEY, not both.');
-  }
   if (inlineKey) {
     return inlineKey;
   }
@@ -2054,10 +2051,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     });
     const strictJson = resolveStrictJson({ strictJson: options.strictJson, settings });
     const outPath = resolveOutPath(options.out);
-    if (outPath) {
-      ensureParentDir(outPath);
-      writeFileSync(outPath, '', 'utf8');
-    }
+    let wroteOutPath = false;
     const client = await withClient(tenantId, undefined, overrides);
     await runWatch({
       client,
@@ -2071,11 +2065,23 @@ export function createCli(runtime: CliRuntime = {}): Command {
           ? (overrides['watch.maxPolls'] as number | undefined)
           : settings.values.watch.maxPolls,
       onFrame: (frame) => {
+        const renderFrame =
+          output === 'text' ? formatWatchFrameText(frame) : renderJsonOutput(frame, { strictJson, compact: true });
         if (output === 'text') {
-          appendRenderedOutput(stdout, formatWatchFrameText(frame), outPath);
+          if (outPath && !wroteOutPath) {
+            writeRenderedOutput(stdout, renderFrame, outPath);
+            wroteOutPath = true;
+            return;
+          }
+          appendRenderedOutput(stdout, renderFrame, outPath);
           return;
         }
-        appendRenderedOutput(stdout, renderJsonOutput(frame, { strictJson, compact: true }), outPath);
+        if (outPath && !wroteOutPath) {
+          writeRenderedOutput(stdout, renderFrame, outPath);
+          wroteOutPath = true;
+          return;
+        }
+        appendRenderedOutput(stdout, renderFrame, outPath);
       }
     });
   };

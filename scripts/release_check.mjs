@@ -1,37 +1,14 @@
 #!/usr/bin/env node
 
-import { spawn } from 'node:child_process';
+import { commandExists, runOrThrow } from './run_command.mjs';
 
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const dockerCommand = process.platform === 'win32' ? 'docker.exe' : 'docker';
 
-function run(command, args, label) {
-  return new Promise((resolve, reject) => {
-    process.stdout.write(`== ${label} ==\n`);
-    const child = spawn(command, args, {
-      stdio: 'inherit',
-      env: process.env
-    });
-
-    child.on('error', reject);
-    child.on('close', (code) => {
-      if ((code ?? 1) !== 0) {
-        reject(new Error(`${label} failed with exit code ${code ?? 1}.`));
-        return;
-      }
-      resolve(undefined);
-    });
-  });
-}
-
-function commandExists(command) {
-  return new Promise((resolve) => {
-    const child = spawn(command, ['--version'], {
-      stdio: 'ignore'
-    });
-
-    child.on('error', () => resolve(false));
-    child.on('close', (code) => resolve((code ?? 1) === 0));
+async function run(command, args, label) {
+  process.stdout.write(`== ${label} ==\n`);
+  await runOrThrow(command, args, label, {
+    env: process.env
   });
 }
 

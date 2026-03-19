@@ -21,8 +21,8 @@ export interface UtilityActionProfile {
   executionSupport: UtilityExecutionSupport;
 }
 
-const GENERIC_PROMPT_TEMPLATE_PATH = 'scripts/templates/ai-utility-prepare-generic.prompt.md';
-const SPACE_IMPORT_PROMPT_TEMPLATE_PATH = 'scripts/templates/ai-space-import.prompt.md';
+const GENERIC_PROMPT_TEMPLATE_PATH = 'skills/xyte-cli/templates/ai-utility-prepare-generic.prompt.md';
+const SPACE_IMPORT_PROMPT_TEMPLATE_PATH = 'skills/xyte-cli/templates/ai-space-import.prompt.md';
 const UTILITIES_SKILL_NODE_PATH = 'skills/xyte-cli/references/utilities.md';
 const SPACE_IMPORT_SKILL_NODE_PATH = 'skills/xyte-cli/references/utility-ai-space-import-tree.md';
 

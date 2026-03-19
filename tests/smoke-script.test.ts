@@ -14,10 +14,10 @@ describe('external live smoke script', () => {
     const workspaceDir = path.join(tempRoot, 'workspace');
     const tarballPath = path.resolve(repoRoot, 'xyte-cli-0.1.0.tgz');
 
-    const calls: Array<{ command: string; args: string[] }> = [];
+    const calls: Array<{ command: string; args: string[]; input?: string }> = [];
 
-    const run = vi.fn(async (command: string, args: string[]) => {
-      calls.push({ command, args });
+    const run = vi.fn(async (command: string, args: string[], options?: { input?: string }) => {
+      calls.push({ command, args, input: options?.input });
 
       if (command.includes('npm') && args[0] === 'pack') {
         return { code: 0, stdout: '[{"filename":"xyte-cli-0.1.0.tgz"}]', stderr: '' };
@@ -76,7 +76,8 @@ describe('external live smoke script', () => {
     );
     expect(calls[4].command).toMatch(/node(\.exe)?/);
     expect(calls[4].args[0]).toBe('-e');
-    expect(calls[5].args.join(' ')).toBe('setup run --non-interactive --tenant acme --key real-key');
+    expect(calls[5].args.join(' ')).toBe('setup run --non-interactive --tenant acme --key-stdin');
+    expect(calls[5].input).toBe('real-key\n');
     expect(calls[6].args.join(' ')).toBe('setup status --tenant acme --output json');
     expect(calls[7].args.join(' ')).toBe('api call organization.devices.getDevices --tenant acme --output-mode envelope --strict-json');
     expect(pathExistsFn).toHaveBeenCalled();

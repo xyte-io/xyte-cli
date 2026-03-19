@@ -38,7 +38,7 @@
     "rejected": "<OUTPUT_DIR>/organization-devices-claimdevice.rejected.csv",
     "notes": "<OUTPUT_DIR>/organization-devices-claimdevice.notes.md"
   },
-  "promptTemplatePath": "scripts/templates/ai-utility-prepare-generic.prompt.md",
+  "promptTemplatePath": "skills/xyte-cli/templates/ai-utility-prepare-generic.prompt.md",
   "skillNodePath": "skills/xyte-cli/references/utilities.md",
   "suggestedCommands": {
     "next": "Review <OUTPUT_DIR>/organization-devices-claimdevice.csv. Preflight gate: validate target space_id rows with organization.spaces.getSpace before write loops. Run one envelope probe row first; if upstream returns \"No device found\", skip bulk claim writes and collect claimable identifiers.",

@@ -32,6 +32,7 @@ This repository ships one npm package: `@xyteai/cli`.
 Recommended branch protection:
 
 - require `CI / validate`
+- require `CI / packaged-install-smoke`
 - require `CI / security`
 - require `CI / upgrade-controlled-smoke`
 - require up-to-date branch before merge

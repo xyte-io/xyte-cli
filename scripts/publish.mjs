@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { spawn } from 'node:child_process';
+import { runOrThrow } from './run_command.mjs';
 
 const mode = process.argv[2] ?? 'all';
 const repo = process.env.GITHUB_REPOSITORY ?? 'xyte-io/xyte-cli';
@@ -20,22 +20,10 @@ function usage() {
   );
 }
 
-function run(command, args, label) {
-  return new Promise((resolve, reject) => {
-    process.stdout.write(`${label}\n`);
-    const child = spawn(command, args, {
-      stdio: 'inherit',
-      env: process.env
-    });
-
-    child.on('error', reject);
-    child.on('close', (code) => {
-      if ((code ?? 1) !== 0) {
-        reject(new Error(`${label} failed with exit code ${code ?? 1}.`));
-        return;
-      }
-      resolve(undefined);
-    });
+async function run(command, args, label) {
+  process.stdout.write(`${label}\n`);
+  await runOrThrow(command, args, label, {
+    env: process.env
   });
 }
 

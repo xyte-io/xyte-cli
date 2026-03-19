@@ -20,7 +20,7 @@ Rules:
 Run:
 npm install -g @xyteai/cli@latest
 xyte-cli --version
-xyte-cli init
+xyte-cli init --no-setup
 
 Then connect the tenant:
 xyte-cli setup run
@@ -51,13 +51,13 @@ If your global npm bin is not on `PATH`, replace `xyte-cli` in the commands belo
 
 ```bash
 npx @xyteai/cli@latest <command>
-npm exec @xyteai/cli@latest -- <command>
+npm exec -- @xyteai/cli@latest <command>
 ```
 
 ### 2) Install agent skills
 
 ```bash
-xyte-cli init
+xyte-cli init --no-setup
 ```
 
 ### 3) Connect with tenant-bound API key

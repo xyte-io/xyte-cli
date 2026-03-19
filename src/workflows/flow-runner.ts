@@ -194,6 +194,20 @@ function buildGuidedRemediationDeviceName(deviceId: string): string {
   return `Remediated ${deviceId}`;
 }
 
+function resolveFlowWindowHours(step: FlowTaskStep, context: Record<string, string>): number {
+  const rawOverride = context.window_hours?.trim();
+  if (!rawOverride) {
+    return step.inspect?.windowHours ?? 24;
+  }
+
+  const parsed = Number.parseInt(rawOverride, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return step.inspect?.windowHours ?? 24;
+  }
+
+  return parsed;
+}
+
 function hydrateDerivedFlowContext(step: FlowTaskStep, ctx: RunContext): void {
   const context = ctx.resolvedContext;
 
@@ -361,7 +375,7 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
       };
     }
     case 'inspect.deep-dive': {
-      const windowHours = step.inspect?.windowHours ?? 24;
+      const windowHours = resolveFlowWindowHours(step, ctx.resolvedContext);
       const tenantProfile = await ctx.args.profileStore.getTenant(ctx.args.tenantId);
       let snapshot;
       try {

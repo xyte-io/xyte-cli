@@ -2,6 +2,7 @@ import { mkdtemp, mkdir, rm, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path, { delimiter } from 'node:path';
 
+import { getEnvPathValue, setEnvPathValue } from '../utils/env-path';
 import {
   NODE_COMMAND,
   NPM_COMMAND,
@@ -118,10 +119,10 @@ export async function runExternalUserLiveSmoke(options: ExternalLiveSmokeOptions
       process.platform === 'win32'
         ? [dirs.prefixDir, path.join(dirs.prefixDir, 'bin')]
         : [path.join(dirs.prefixDir, 'bin'), dirs.prefixDir];
-    const runtimeEnv = {
-      ...isolatedEnv,
-      PATH: `${globalBinCandidates.join(delimiter)}${delimiter}${isolatedEnv.PATH ?? ''}`
-    };
+    const runtimeEnv = setEnvPathValue(
+      isolatedEnv,
+      `${globalBinCandidates.join(delimiter)}${delimiter}${getEnvPathValue(isolatedEnv)}`
+    );
 
     printStep(logger, 4, stepTotal, 'Running fresh-process status check');
     const statusResult = await run(XYTE_COMMAND, ['status', '--mode', 'fast', '--output', 'json'], {
@@ -171,15 +172,20 @@ export async function runExternalUserLiveSmoke(options: ExternalLiveSmokeOptions
     assertSuccess(skillManifestResult, 'xyte-cli skill manifest usability check', NODE_COMMAND, ['-e', 'skill manifest actionable check']);
 
     printStep(logger, 6, stepTotal, 'Running first-time setup with real key');
-    const setupResult = await run(XYTE_COMMAND, ['setup', 'run', '--non-interactive', '--tenant', tenant, '--key', key], {
-      cwd,
-      env: runtimeEnv
-    });
+    const setupResult = await run(
+      XYTE_COMMAND,
+      ['setup', 'run', '--non-interactive', '--tenant', tenant, '--key-stdin'],
+      {
+        cwd,
+        env: runtimeEnv,
+        input: `${key}\n`
+      }
+    );
     assertSuccess(
       setupResult,
       'xyte-cli setup run',
       XYTE_COMMAND,
-      ['setup', 'run', '--non-interactive', '--tenant', tenant, '--key', '<redacted>']
+      ['setup', 'run', '--non-interactive', '--tenant', tenant, '--key-stdin']
     );
 
     printStep(logger, 7, stepTotal, 'Validating persisted key reuse from second process');

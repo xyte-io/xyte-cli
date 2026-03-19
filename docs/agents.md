@@ -5,14 +5,14 @@
 1. Install skill bundle once in your workspace:
 
 ```bash
-xyte-cli init
+xyte-cli init --no-setup
 ```
 
 If your global npm bin is not on `PATH`, replace `xyte-cli` in the commands below with:
 
 ```bash
 npx @xyteai/cli@latest <command>
-npm exec @xyteai/cli@latest -- <command>
+npm exec -- @xyteai/cli@latest <command>
 ```
 
 2. Prompt your coding agent to run `xyte-cli` commands directly.
@@ -50,21 +50,21 @@ Detailed workflow authoring guide:
 ### Claude
 
 ```bash
-xyte-cli init
+xyte-cli init --no-setup
 claude
 ```
 
 ### Codex
 
 ```bash
-xyte-cli init
+xyte-cli init --no-setup
 # in prompts, ask Codex to run xyte-cli commands directly
 ```
 
 ### GitHub Copilot
 
 ```bash
-xyte-cli init
+xyte-cli init --no-setup
 # in prompts, ask Copilot to run xyte-cli commands directly
 ```
 

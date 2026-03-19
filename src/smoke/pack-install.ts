@@ -4,6 +4,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path, { delimiter } from 'node:path';
 
+import { getEnvPathValue, setEnvPathValue } from '../utils/env-path';
 import {
   NPM_COMMAND,
   XYTE_COMMAND,
@@ -203,10 +204,10 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
       process.platform === 'win32'
         ? [dirs.prefixDir, path.join(dirs.prefixDir, 'bin')]
         : [path.join(dirs.prefixDir, 'bin'), dirs.prefixDir];
-    const runtimeEnv = {
-      ...isolatedEnv,
-      PATH: `${globalBinCandidates.join(delimiter)}${delimiter}${isolatedEnv.PATH ?? ''}`
-    };
+    const runtimeEnv = setEnvPathValue(
+      isolatedEnv,
+      `${globalBinCandidates.join(delimiter)}${delimiter}${getEnvPathValue(isolatedEnv)}`
+    );
     const runtimeCwd = dirs.workspaceDir;
 
     printStep(logger, 4, stepTotal, 'Checking help and install doctor');
@@ -252,8 +253,11 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
     const requiredSkillFiles = requiredSkillRoots.flatMap((root) => [
       path.join(root, 'SKILL.md'),
       path.join(root, 'agents', 'openai.yaml'),
+      path.join(root, 'references', 'ai-utility-preprocessing.md'),
       path.join(root, 'references', 'flow-recipes.md'),
       path.join(root, 'scripts', 'check_headless.mjs'),
+      path.join(root, 'templates', 'ai-utility-prepare-generic.prompt.md'),
+      path.join(root, 'templates', 'ai-space-import.prompt.md'),
       path.join(root, 'schemas', 'headless-frame.v1.schema.json'),
       path.join(root, 'data', 'public-endpoints.json')
     ]);

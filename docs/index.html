@@ -1423,9 +1423,9 @@
 
             <div class="command-shell">
               <pre id="hero-shell"><code><span class="prompt">$</span> npm install -g @xyteai/cli@latest
-<span class="prompt">$</span> xyte-cli init
-<span class="prompt">$</span> XYTE_CLI_KEY="&lt;key&gt;" xyte-cli setup run --non-interactive --connectivity auto
-<span class="prompt">$</span> xyte-cli setup status --output json
+<span class="prompt">$</span> xyte-cli init --no-setup
+<span class="prompt">$</span> xyte-cli setup run
+<span class="prompt">$</span> xyte-cli setup status --field tenantId
 <span class="comment"># inspect, watch, console, or generate report artifacts next</span></code></pre>
             </div>
 
@@ -1467,7 +1467,7 @@
               <p class="card-label">Step 1 · Core install</p>
               <div class="command-shell">
                 <pre id="install-snippet"><code>npm install -g @xyteai/cli@latest
-xyte-cli init
+xyte-cli init --no-setup
 xyte-cli --version</code></pre>
               </div>
               <div class="action-row">
@@ -1491,16 +1491,16 @@ xyte-cli --version</code></pre>
                   <span class="step-index">01</span>
                   <span class="step-copy">
                     <strong>Connect the tenant key once</strong>
-                    <span>Pass your API key via environment variable. Non-interactive mode skips prompts for CI and agent use.</span>
-                    <span class="detail-code">XYTE_CLI_KEY="&lt;key&gt;" xyte-cli setup run --non-interactive --connectivity auto</span>
+                    <span>Run interactive setup once, or use the documented stdin flow for automation.</span>
+                    <span class="detail-code">xyte-cli setup run</span>
                   </span>
                 </li>
                 <li>
                   <span class="step-index">02</span>
                   <span class="step-copy">
                     <strong>Read readiness back out</strong>
-                    <span>Confirm the tenant is connected and ready. The JSON output includes your tenant ID for subsequent commands.</span>
-                    <span class="detail-code">xyte-cli setup status --output json</span>
+                    <span>Confirm the tenant is connected and capture the tenant ID for subsequent commands.</span>
+                    <span class="detail-code">xyte-cli setup status --field tenantId</span>
                   </span>
                 </li>
                 <li>
@@ -1522,11 +1522,11 @@ xyte-cli --version</code></pre>
                 </li>
                 <li>
                   <strong>Export a deep-dive snapshot</strong>
-                  <span><code>xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json &gt; deep-dive.json</code></span>
+                  <span><code>xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json --out ./artifacts/deep-dive.json</code></span>
                 </li>
                 <li>
                   <strong>Generate a report artifact</strong>
-                  <span><code>xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input deep-dive.json --out fleet-report.pdf</code></span>
+                  <span><code>xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input ./artifacts/deep-dive.json --out ./reports/fleet-report.pdf</code></span>
                 </li>
               </ul>
             </article>
@@ -1557,16 +1557,16 @@ Rules:
 
 Run:
 npm install -g @xyteai/cli@latest
-xyte-cli init
+xyte-cli init --no-setup
 
-Then ask me for XYTE_CLI_KEY and run:
-XYTE_CLI_KEY="&lt;key&gt;" xyte-cli setup run --non-interactive --connectivity auto
-xyte-cli setup status --output json
+Then connect the tenant:
+xyte-cli setup run
+xyte-cli setup status --field tenantId
 
 Read tenantId from setup status and continue:
-xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-active --once --strict-json
-xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json &gt; deep-dive.json
-xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input deep-dive.json --out fleet-report.pdf</code></pre>
+xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-active --once --output json --strict-json
+xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json --out ./artifacts/deep-dive.json
+xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input ./artifacts/deep-dive.json --out ./reports/fleet-report.pdf</code></pre>
               </div>
               <div class="action-row">
                 <button
@@ -1587,7 +1587,7 @@ xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input deep-dive.json -
               <ul class="mini-list">
                 <li>
                   <strong>Read-first by default</strong>
-                  <span>Human operators see readable terminal output. Agents add <code>--strict-json</code> when they need machine-parseable results.</span>
+                  <span>Human operators see readable terminal output. Agents add <code>--output json --strict-json</code> when they need machine-parseable results.</span>
                 </li>
                 <li>
                   <strong>Strict JSON is opt-in</strong>
@@ -1619,13 +1619,13 @@ xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input deep-dive.json -
               <span class="workflow-index">01</span>
               <h3>Install and init</h3>
               <p>Install from npm, then scaffold agent configs for Codex, Claude, and Copilot.</p>
-              <code>xyte-cli init</code>
+              <code>xyte-cli init --no-setup</code>
             </article>
             <article class="workflow-card surface">
               <span class="workflow-index">02</span>
               <h3>Connect tenant</h3>
               <p>Provide your API key once. Verify with <code>setup status</code> before running operational commands.</p>
-              <code>xyte-cli setup status --output json</code>
+              <code>xyte-cli setup run</code>
             </article>
             <article class="workflow-card surface">
               <span class="workflow-index">03</span>

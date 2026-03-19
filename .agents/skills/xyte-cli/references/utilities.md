@@ -3,9 +3,9 @@
 `xyte-cli` util preprocessing is auth-agnostic. It creates structured files only.
 
 References:
-1. `docs/ai-utility-preprocessing.md`
-2. `scripts/templates/ai-utility-prepare-generic.prompt.md`
-3. `scripts/templates/ai-space-import.prompt.md`
+1. `references/ai-utility-preprocessing.md`
+2. `templates/ai-utility-prepare-generic.prompt.md`
+3. `templates/ai-space-import.prompt.md`
 
 ## Safety Defaults
 
@@ -92,13 +92,3 @@ xyte-cli util prepare \
 
 Generic canonical headers:
 1. `<path params in order>,query_json,body_json`
-
-## Local Util Sandbox
-
-```bash
-# terminal A
-npm run mock:xyte:local -- --port 3001
-
-# terminal B
-npm run smoke:local:utilities -- --base-url http://127.0.0.1:3001 --tenant local
-```

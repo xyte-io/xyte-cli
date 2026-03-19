@@ -18,7 +18,7 @@ If your global npm bin is not on `PATH`, replace `xyte-cli` in the commands belo
 
 ```bash
 npx @xyteai/cli@latest <command>
-npm exec @xyteai/cli@latest -- <command>
+npm exec -- @xyteai/cli@latest <command>
 ```
 
 ## First-Time Setup
@@ -33,7 +33,7 @@ Non-interactive:
 
 Primary automation contract:
 
-Provide the API key on stdin to `xyte-cli setup run --non-interactive --tenant acme --key-stdin`.
+Pipe the API key on stdin into `xyte-cli setup run --non-interactive --tenant acme --key-stdin`. `--key-stdin` alone waits for stdin; it does not fetch a key by itself.
 
 Check readiness:
 
@@ -66,16 +66,16 @@ printf '%s\n' '<your-key>' | xyte-cli setup run --non-interactive --tenant acme 
 ## Install Skills (Recommended)
 
 ```bash
-xyte-cli init
+xyte-cli init --no-setup
 ```
 
 Useful options:
 
 ```bash
 xyte-cli init --no-setup
-xyte-cli init --scope project --agents codex,claude
-xyte-cli init --scope both --agents all --force
-xyte-cli init --target /path/to/workspace
+xyte-cli init --scope project --agents codex,claude --no-setup
+xyte-cli init --scope both --agents all --force --no-setup
+xyte-cli init --target /path/to/workspace --no-setup
 ```
 
 Default non-interactive behavior:
