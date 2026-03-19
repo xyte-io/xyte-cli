@@ -1,5 +1,5 @@
 import { createInterface } from 'node:readline/promises';
-import { appendFileSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Writable } from 'node:stream';
@@ -42,9 +42,9 @@ import { FileProfileStore, type ProfileStore } from '../secure/profile-store';
 import type { SecretProvider } from '../types/profile';
 import { SUPPORTED_SECRET_PROVIDERS, isSecretProvider } from '../types/profile';
 import { parseJsonObject } from '../utils/json';
+import { buildInstallDoctorReport, type InstallDoctorResult } from '../utils/install-doctor';
 import { stringifyJsonOutput } from '../utils/json-output';
 import type { UtilityInputFormat } from '../utils/input-parser';
-import { resolveCommandFromPath } from '../utils/resolve-command-path';
 import { getCliVersion } from '../utils/version';
 import {
   installSkills,
@@ -103,17 +103,6 @@ interface SetupStep {
   key: SetupStepKey;
   status: 'ok' | 'skipped';
   detail?: string;
-}
-
-interface InstallDoctorResult {
-  status: 'ok' | 'missing' | 'mismatch';
-  commandOnPath: boolean;
-  commandPath?: string;
-  commandRealPath?: string;
-  expectedPath: string;
-  expectedRealPath: string;
-  sameTarget: boolean;
-  suggestions: string[];
 }
 
 interface CliGlobalOptions {
@@ -656,44 +645,9 @@ function formatSlotListText(slots: SlotView[]): string {
   return `${lines.join('\n')}\n`;
 }
 
-function getRealPath(value: string): string {
-  try {
-    return realpathSync(value);
-  } catch {
-    return path.resolve(value);
-  }
-}
-
 function runInstallDoctor(): InstallDoctorResult {
   const expectedPath = path.resolve(__dirname, '../../dist/bin/xyte-cli.js');
-  const expectedRealPath = getRealPath(expectedPath);
-  const commandPath = resolveCommandFromPath('xyte-cli');
-  const commandOnPath = Boolean(commandPath);
-  const commandRealPath = commandPath ? getRealPath(commandPath) : undefined;
-  const sameTarget = Boolean(commandRealPath && commandRealPath === expectedRealPath);
-
-  const suggestions: string[] = [];
-  if (!commandOnPath) {
-    suggestions.push('Run: npm run install:global');
-    suggestions.push('Then verify from a different directory: xyte-cli --help');
-  } else if (!sameTarget) {
-    suggestions.push(`xyte-cli currently points to: ${commandPath}`);
-    suggestions.push('Relink this repo globally: npm run reinstall:global');
-  } else {
-    suggestions.push('Global command wiring looks correct.');
-  }
-
-  const status: InstallDoctorResult['status'] = !commandOnPath ? 'missing' : sameTarget ? 'ok' : 'mismatch';
-  return {
-    status,
-    commandOnPath,
-    commandPath,
-    commandRealPath,
-    expectedPath,
-    expectedRealPath,
-    sameTarget,
-    suggestions
-  };
+  return buildInstallDoctorReport(expectedPath);
 }
 
 async function promptValue(args: { question: string; initial?: string; stdout: OutputStream; secret?: boolean }): Promise<string> {

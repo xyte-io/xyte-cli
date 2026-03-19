@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import { describe, expect, it, vi } from 'vitest';
 import * as smokeExternalUserLive from '../src/smoke/external-user-live';
 
@@ -7,6 +9,11 @@ describe('external live smoke script', () => {
   });
 
   it('runs expected command sequence with provided env', async () => {
+    const repoRoot = '/work/xyte-cli';
+    const tempRoot = '/tmp/xyte-smoke-test';
+    const workspaceDir = path.join(tempRoot, 'workspace');
+    const tarballPath = path.resolve(repoRoot, 'xyte-cli-0.1.0.tgz');
+
     const calls: Array<{ command: string; args: string[] }> = [];
 
     const run = vi.fn(async (command: string, args: string[]) => {
@@ -45,7 +52,7 @@ describe('external live smoke script', () => {
     const pathExistsFn = vi.fn(async () => true);
 
     await smokeExternalUserLive.runExternalUserLiveSmoke({
-      cwd: '/work/xyte-cli',
+      cwd: repoRoot,
       env: {
         XYTE_CLI_KEY: 'real-key',
         XYTE_E2E_TENANT: 'acme',
@@ -53,7 +60,7 @@ describe('external live smoke script', () => {
       },
       run,
       logger: { log: vi.fn() },
-      mkdtempFn: vi.fn(async () => '/tmp/xyte-smoke-test'),
+      mkdtempFn: vi.fn(async () => tempRoot),
       mkdirFn: vi.fn(async () => undefined),
       rmFn,
       unlinkFn,
@@ -62,10 +69,10 @@ describe('external live smoke script', () => {
 
     expect(calls.map((item) => item.args.join(' '))).toHaveLength(8);
     expect(calls[0].args.join(' ')).toBe('pack --json');
-    expect(calls[1].args.join(' ')).toBe('install --global /work/xyte-cli/xyte-cli-0.1.0.tgz');
+    expect(calls[1].args.join(' ')).toBe(`install --global ${tarballPath}`);
     expect(calls[2].args.join(' ')).toBe('status --mode fast --output json');
     expect(calls[3].args.join(' ')).toBe(
-      'init --scope both --agents all --target /tmp/xyte-smoke-test/workspace --force --no-setup'
+      `init --scope both --agents all --target ${workspaceDir} --force --no-setup`
     );
     expect(calls[4].command).toMatch(/node(\.exe)?/);
     expect(calls[4].args[0]).toBe('-e');
@@ -73,11 +80,14 @@ describe('external live smoke script', () => {
     expect(calls[6].args.join(' ')).toBe('setup status --tenant acme --output json');
     expect(calls[7].args.join(' ')).toBe('api call organization.devices.getDevices --tenant acme --output-mode envelope --strict-json');
     expect(pathExistsFn).toHaveBeenCalled();
-    expect(rmFn).toHaveBeenCalledWith('/tmp/xyte-smoke-test', { recursive: true, force: true });
-    expect(unlinkFn).toHaveBeenCalledWith('/work/xyte-cli/xyte-cli-0.1.0.tgz');
+    expect(rmFn).toHaveBeenCalledWith(tempRoot, { recursive: true, force: true });
+    expect(unlinkFn).toHaveBeenCalledWith(tarballPath);
   });
 
   it('stops on first command failure and does cleanup', async () => {
+    const repoRoot = '/work/xyte-cli';
+    const tarballPath = path.resolve(repoRoot, 'xyte-cli-0.1.0.tgz');
+
     const calls: Array<{ command: string; args: string[] }> = [];
 
     const run = vi.fn(async (command: string, args: string[]) => {
@@ -102,7 +112,7 @@ describe('external live smoke script', () => {
 
     await expect(
       smokeExternalUserLive.runExternalUserLiveSmoke({
-        cwd: '/work/xyte-cli',
+        cwd: repoRoot,
         env: {
           XYTE_CLI_KEY: 'real-key',
           XYTE_E2E_TENANT: 'acme',
@@ -120,14 +130,17 @@ describe('external live smoke script', () => {
 
     expect(calls.map((item) => item.args.join(' '))).toEqual([
       'pack --json',
-      'install --global /work/xyte-cli/xyte-cli-0.1.0.tgz',
+      `install --global ${tarballPath}`,
       'status --mode fast --output json'
     ]);
     expect(rmFn).toHaveBeenCalledWith('/tmp/xyte-smoke-fail', { recursive: true, force: true });
-    expect(unlinkFn).toHaveBeenCalledWith('/work/xyte-cli/xyte-cli-0.1.0.tgz');
+    expect(unlinkFn).toHaveBeenCalledWith(tarballPath);
   });
 
   it('fails when skills were not copied to expected locations', async () => {
+    const repoRoot = '/work/xyte-cli';
+    const tarballPath = path.resolve(repoRoot, 'xyte-cli-0.1.0.tgz');
+
     const run = vi.fn(async (command: string, args: string[]) => {
       if (command.includes('npm') && args[0] === 'pack') {
         return { code: 0, stdout: '[{"filename":"xyte-cli-0.1.0.tgz"}]', stderr: '' };
@@ -149,7 +162,7 @@ describe('external live smoke script', () => {
 
     await expect(
       smokeExternalUserLive.runExternalUserLiveSmoke({
-        cwd: '/work/xyte-cli',
+        cwd: repoRoot,
         env: {
           XYTE_CLI_KEY: 'real-key',
           PATH: '/usr/bin'
@@ -165,6 +178,6 @@ describe('external live smoke script', () => {
     ).rejects.toThrow(/Skills install verification failed/);
 
     expect(rmFn).toHaveBeenCalledWith('/tmp/xyte-smoke-skill-miss', { recursive: true, force: true });
-    expect(unlinkFn).toHaveBeenCalledWith('/work/xyte-cli/xyte-cli-0.1.0.tgz');
+    expect(unlinkFn).toHaveBeenCalledWith(tarballPath);
   });
 });

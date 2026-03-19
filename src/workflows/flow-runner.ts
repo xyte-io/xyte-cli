@@ -20,7 +20,7 @@ import { evaluateReadiness } from '../config/readiness';
 import type { ProfileStore } from '../secure/profile-store';
 import type { SecretStore } from '../secure/secret-store';
 import type { XyteClient } from '../types/client';
-import { resolveCommandFromPath } from '../utils/resolve-command-path';
+import { buildInstallDoctorReport } from '../utils/install-doctor';
 import { runWatch } from './watch';
 import { buildUtilityPrepare } from './utility-prepare';
 import { runSpaceImportTree } from './utility-commands';
@@ -215,16 +215,7 @@ function hydrateDerivedFlowContext(step: FlowTaskStep, ctx: RunContext): void {
 
 function runInstallDoctorLite() {
   const expectedPath = path.resolve(__dirname, '../../dist/bin/xyte-cli.js');
-  const commandPath = resolveCommandFromPath('xyte-cli');
-  const commandOnPath = Boolean(commandPath);
-  return {
-    status: commandOnPath ? 'ok' : 'missing',
-    commandOnPath,
-    commandPath,
-    expectedPath,
-    sameTarget: commandPath ? path.resolve(commandPath).includes('xyte-cli') : false,
-    suggestions: commandOnPath ? ['Global command wiring appears available.'] : ['Run: npm run install:global']
-  };
+  return buildInstallDoctorReport(expectedPath);
 }
 
 function classifyFailure(problem: ReturnType<typeof toProblemDetails>): FlowRunClassification {

@@ -1,8 +1,17 @@
+import path from 'node:path';
+
 import { describe, expect, it, vi } from 'vitest';
 import * as smokePackInstall from '../src/smoke/pack-install';
 
 describe('pack install smoke script', () => {
   it('runs expected command sequence with provided env', async () => {
+    const repoRoot = '/work/xyte-cli';
+    const tempRoot = '/tmp/xyte-pack-install-test';
+    const workspaceDir = path.join(tempRoot, 'workspace');
+    const artifactsDir = path.join(workspaceDir, 'artifacts');
+    const reportsDir = path.join(workspaceDir, 'reports');
+    const tarballPath = path.resolve(repoRoot, 'xyte-cli-0.1.0.tgz');
+
     const calls: Array<{ command: string; args: string[]; cwd?: string; input?: string }> = [];
     const startMockServerFn = vi.fn(async () => ({
       baseUrl: 'http://127.0.0.1:43123',
@@ -77,13 +86,13 @@ describe('pack install smoke script', () => {
     });
 
     await smokePackInstall.runPackInstallSmoke({
-      cwd: '/work/xyte-cli',
+      cwd: repoRoot,
       env: {
         PATH: '/usr/bin'
       },
       run,
       logger: { log: vi.fn() },
-      mkdtempFn: vi.fn(async () => '/tmp/xyte-pack-install-test'),
+      mkdtempFn: vi.fn(async () => tempRoot),
       mkdirFn,
       rmFn,
       unlinkFn,
@@ -94,11 +103,11 @@ describe('pack install smoke script', () => {
 
     expect(calls).toHaveLength(13);
     expect(calls[0].args.join(' ')).toBe('pack --json');
-    expect(calls[1].args.join(' ')).toBe('install --global /work/xyte-cli/xyte-cli-0.1.0.tgz');
+    expect(calls[1].args.join(' ')).toBe(`install --global ${tarballPath}`);
     expect(calls[2].args.join(' ')).toBe('--help');
     expect(calls[3].args.join(' ')).toBe('doctor install --format json');
     expect(calls[4].args.join(' ')).toBe('status --mode fast --output json');
-    expect(calls[5].args.join(' ')).toBe('init --scope both --agents all --target /tmp/xyte-pack-install-test/workspace --force');
+    expect(calls[5].args.join(' ')).toBe(`init --scope both --agents all --target ${workspaceDir} --force`);
     expect(calls[6].args.join(' ')).toBe(
       'setup run --non-interactive --tenant acme --key-stdin --connectivity never --output json'
     );
@@ -108,31 +117,34 @@ describe('pack install smoke script', () => {
       'config tenant add acme --name Acme Mock --hub-url http://127.0.0.1:43123 --entry-url http://127.0.0.1:43123'
     );
     expect(calls[9].args.join(' ')).toBe(
-      'ops watch incidents --tenant acme --profile incidents-active --once --output json --strict-json --out /tmp/xyte-pack-install-test/workspace/artifacts/xyte-watch.incidents.ndjson'
+      `ops watch incidents --tenant acme --profile incidents-active --once --output json --strict-json --out ${path.join(artifactsDir, 'xyte-watch.incidents.ndjson')}`
     );
     expect(calls[10].args.join(' ')).toBe(
-      'ops inspect fleet --tenant acme --output json --out /tmp/xyte-pack-install-test/workspace/artifacts/xyte-fleet.json'
+      `ops inspect fleet --tenant acme --output json --out ${path.join(artifactsDir, 'xyte-fleet.json')}`
     );
     expect(calls[11].args.join(' ')).toBe(
-      'ops inspect deep-dive --tenant acme --window 24 --output json --out /tmp/xyte-pack-install-test/workspace/artifacts/xyte-deep-dive.json'
+      `ops inspect deep-dive --tenant acme --window 24 --output json --out ${path.join(artifactsDir, 'xyte-deep-dive.json')}`
     );
     expect(calls[12].args.join(' ')).toBe(
-      'ops report generate --tenant acme --input /tmp/xyte-pack-install-test/workspace/artifacts/xyte-deep-dive.json --out /tmp/xyte-pack-install-test/workspace/reports/fleet-report.md --render markdown'
+      `ops report generate --tenant acme --input ${path.join(artifactsDir, 'xyte-deep-dive.json')} --out ${path.join(reportsDir, 'fleet-report.md')} --render markdown`
     );
-    expect(calls.slice(2).every((call) => call.cwd === '/tmp/xyte-pack-install-test/workspace')).toBe(true);
+    expect(calls.slice(2).every((call) => call.cwd === workspaceDir)).toBe(true);
     expect(startMockServerFn).toHaveBeenCalledWith({
-      cwd: '/work/xyte-cli',
+      cwd: repoRoot,
       env: expect.objectContaining({
         PATH: expect.any(String)
       }),
       authToken: 'smoke-test-key'
     });
     expect(pathExistsFn).toHaveBeenCalled();
-    expect(rmFn).toHaveBeenCalledWith('/tmp/xyte-pack-install-test', { recursive: true, force: true });
-    expect(unlinkFn).toHaveBeenCalledWith('/work/xyte-cli/xyte-cli-0.1.0.tgz');
+    expect(rmFn).toHaveBeenCalledWith(tempRoot, { recursive: true, force: true });
+    expect(unlinkFn).toHaveBeenCalledWith(tarballPath);
   });
 
   it('fails when install doctor reports the wrong target', async () => {
+    const repoRoot = '/work/xyte-cli';
+    const tarballPath = path.resolve(repoRoot, 'xyte-cli-0.1.0.tgz');
+
     const run = vi.fn(async (command: string, args: string[]) => {
       if (command.includes('npm') && args[0] === 'pack') {
         return { code: 0, stdout: '[{"filename":"xyte-cli-0.1.0.tgz"}]', stderr: '' };
@@ -155,7 +167,7 @@ describe('pack install smoke script', () => {
 
     await expect(
       smokePackInstall.runPackInstallSmoke({
-        cwd: '/work/xyte-cli',
+        cwd: repoRoot,
         env: {
           PATH: '/usr/bin'
         },
@@ -170,6 +182,6 @@ describe('pack install smoke script', () => {
     ).rejects.toThrow(/Install doctor did not report the packaged binary as active/);
 
     expect(rmFn).toHaveBeenCalledWith('/tmp/xyte-pack-install-fail', { recursive: true, force: true });
-    expect(unlinkFn).toHaveBeenCalledWith('/work/xyte-cli/xyte-cli-0.1.0.tgz');
+    expect(unlinkFn).toHaveBeenCalledWith(tarballPath);
   });
 });
