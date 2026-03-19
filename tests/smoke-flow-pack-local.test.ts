@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import * as smokeFlowPackLocal from '../scripts/smoke_flow_pack_local.mjs';
+import * as smokeFlowPackLocal from '../src/smoke/flow-pack-local';
 
 describe('local flow-pack smoke classifier', () => {
   it('treats known data-gated sendCommand 422 as pass', async () => {

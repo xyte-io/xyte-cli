@@ -1,14 +1,21 @@
-#!/usr/bin/env node
-
-import { spawn } from 'node:child_process';
-import { access, mkdtemp, mkdir, rm, unlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path, { delimiter } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const NPM_COMMAND = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-const XYTE_COMMAND = process.platform === 'win32' ? 'xyte-cli.cmd' : 'xyte-cli';
-const NODE_COMMAND = process.platform === 'win32' ? 'node.exe' : 'node';
+import {
+  NODE_COMMAND,
+  NPM_COMMAND,
+  XYTE_COMMAND,
+  assertSuccess,
+  buildIsolatedEnv,
+  normalizeJsonOutput,
+  parsePackFilename,
+  pathExists,
+  printStep,
+  runCommand,
+  type LoggerLike,
+  type RunCommandOptions
+} from './shared';
 
 const SKILL_MANIFEST_VALIDATION_SCRIPT = [
   'const fs = require("node:fs");',
@@ -36,35 +43,24 @@ const SKILL_MANIFEST_VALIDATION_SCRIPT = [
   'console.log("Skill manifests are present and actionable for xyte-cli automation.");'
 ].join(' ');
 
-function normalizeJsonOutput(raw) {
-  const trimmed = String(raw ?? '').trim();
-  if (!trimmed) {
-    throw new Error('Expected JSON output but got empty stdout.');
-  }
-
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    // fall back to scanning trailing lines for JSON payloads
-  }
-
-  const lines = trimmed
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    try {
-      return JSON.parse(lines[index]);
-    } catch {
-      // continue scanning
-    }
-  }
-
-  throw new Error(`Expected JSON output but parsing failed. stdout=${trimmed}`);
+export interface SmokeInputs {
+  key: string;
+  tenant: string;
 }
 
-export function resolveSmokeInputs(env = process.env) {
+export interface ExternalLiveSmokeOptions {
+  cwd?: string;
+  logger?: LoggerLike;
+  env?: NodeJS.ProcessEnv;
+  run?: (command: string, args: string[], options?: RunCommandOptions) => Promise<{ code: number; stdout: string; stderr: string }>;
+  pathExistsFn?: typeof pathExists;
+  mkdtempFn?: (prefix: string) => Promise<string>;
+  mkdirFn?: (path: string, options?: { recursive?: boolean }) => Promise<unknown>;
+  rmFn?: (path: string, options?: { recursive?: boolean; force?: boolean }) => Promise<unknown>;
+  unlinkFn?: (path: string) => Promise<unknown>;
+}
+
+export function resolveSmokeInputs(env: NodeJS.ProcessEnv = process.env): SmokeInputs {
   const key = env.XYTE_CLI_KEY?.trim();
   if (!key) {
     throw new Error('Missing XYTE_CLI_KEY. Set a real key before running smoke:external-live.');
@@ -74,122 +70,7 @@ export function resolveSmokeInputs(env = process.env) {
   return { key, tenant };
 }
 
-export function buildIsolatedEnv(baseEnv, dirs) {
-  const appData = path.join(dirs.homeDir, 'AppData', 'Roaming');
-  const xdgConfigHome = path.join(dirs.homeDir, '.config');
-
-  return {
-    ...baseEnv,
-    HOME: dirs.homeDir,
-    USERPROFILE: dirs.homeDir,
-    APPDATA: appData,
-    XDG_CONFIG_HOME: xdgConfigHome,
-    XYTE_CLI_CONFIG_DIR: dirs.configDir,
-    NPM_CONFIG_PREFIX: dirs.prefixDir,
-    npm_config_prefix: dirs.prefixDir,
-    npm_config_cache: dirs.npmCacheDir,
-    PATH: baseEnv.PATH ?? ''
-  };
-}
-
-function shouldUseWindowsShell(command) {
-  return process.platform === 'win32' && /\.(cmd|bat)$/i.test(command);
-}
-
-export async function runCommand(command, args, options = {}) {
-  return await new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      env: options.env,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      shell: shouldUseWindowsShell(command),
-      windowsHide: true
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout.on('data', (chunk) => {
-      stdout += chunk.toString();
-    });
-
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    child.on('error', (error) => reject(error));
-    child.on('close', (code) => {
-      resolve({
-        code: code ?? 1,
-        stdout,
-        stderr
-      });
-    });
-
-    child.stdin.on('error', (error) => reject(error));
-    if (options.input === undefined) {
-      child.stdin.end();
-      return;
-    }
-    child.stdin.end(options.input);
-  });
-}
-
-function assertSuccess(result, label, command, args) {
-  if (result.code === 0) {
-    return;
-  }
-
-  const rendered = [
-    `${command} ${args.join(' ')}`.trim(),
-    result.stdout ? `stdout:\n${result.stdout.trim()}` : '',
-    result.stderr ? `stderr:\n${result.stderr.trim()}` : ''
-  ]
-    .filter(Boolean)
-    .join('\n\n');
-
-  throw new Error(`${label} failed with exit code ${result.code}.\n${rendered}`);
-}
-
-function parsePackFilename(packStdout) {
-  const trimmed = String(packStdout ?? '').trim();
-  if (!trimmed) {
-    throw new Error('npm pack returned empty stdout.');
-  }
-
-  try {
-    const payload = JSON.parse(trimmed);
-    if (Array.isArray(payload) && payload[0]?.filename) {
-      return String(payload[0].filename);
-    }
-    if (payload?.filename) {
-      return String(payload.filename);
-    }
-  } catch {
-    // fallback to final line mode
-  }
-
-  const lines = trimmed
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-  return lines[lines.length - 1];
-}
-
-function printStep(logger, index, total, label) {
-  logger.log(`[${index}/${total}] ${label}`);
-}
-
-async function pathExists(targetPath) {
-  try {
-    await access(targetPath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export async function runExternalUserLiveSmoke(options = {}) {
+export async function runExternalUserLiveSmoke(options: ExternalLiveSmokeOptions = {}): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
   const logger = options.logger ?? console;
   const env = options.env ?? process.env;
@@ -199,7 +80,7 @@ export async function runExternalUserLiveSmoke(options = {}) {
   const { key, tenant } = resolveSmokeInputs(env);
   const stepTotal = 8;
 
-  let tarballPath;
+  let tarballPath: string | undefined;
   const tempRoot = await (options.mkdtempFn ?? mkdtemp)(path.join(tmpdir(), 'xyte-cli-smoke-'));
   const dirs = {
     homeDir: path.join(tempRoot, 'home'),
@@ -233,8 +114,6 @@ export async function runExternalUserLiveSmoke(options = {}) {
     const installResult = await run(NPM_COMMAND, ['install', '--global', tarballPath], { cwd, env: isolatedEnv });
     assertSuccess(installResult, 'npm install -g', NPM_COMMAND, ['install', '--global', tarballPath]);
 
-    // Some npm versions no longer support `npm bin --global`.
-    // Resolve executable lookup via the isolated prefix directly.
     const globalBinCandidates =
       process.platform === 'win32'
         ? [dirs.prefixDir, path.join(dirs.prefixDir, 'bin')]
@@ -281,31 +160,21 @@ export async function runExternalUserLiveSmoke(options = {}) {
         throw new Error(`Skills install verification failed. Missing file: ${skillFile}`);
       }
     }
-    const skillManifestResult = await run(
-      NODE_COMMAND,
-      ['-e', SKILL_MANIFEST_VALIDATION_SCRIPT],
-      {
-        cwd,
-        env: {
-          ...runtimeEnv,
-          XYTE_SMOKE_WORKSPACE: dirs.workspaceDir,
-          XYTE_SMOKE_HOME: dirs.homeDir
-        }
+    const skillManifestResult = await run(NODE_COMMAND, ['-e', SKILL_MANIFEST_VALIDATION_SCRIPT], {
+      cwd,
+      env: {
+        ...runtimeEnv,
+        XYTE_SMOKE_WORKSPACE: dirs.workspaceDir,
+        XYTE_SMOKE_HOME: dirs.homeDir
       }
-    );
-    assertSuccess(
-      skillManifestResult,
-      'xyte-cli skill manifest usability check',
-      NODE_COMMAND,
-      ['-e', 'skill manifest actionable check']
-    );
+    });
+    assertSuccess(skillManifestResult, 'xyte-cli skill manifest usability check', NODE_COMMAND, ['-e', 'skill manifest actionable check']);
 
     printStep(logger, 6, stepTotal, 'Running first-time setup with real key');
-    const setupResult = await run(
-      XYTE_COMMAND,
-      ['setup', 'run', '--non-interactive', '--tenant', tenant, '--key', key],
-      { cwd, env: runtimeEnv }
-    );
+    const setupResult = await run(XYTE_COMMAND, ['setup', 'run', '--non-interactive', '--tenant', tenant, '--key', key], {
+      cwd,
+      env: runtimeEnv
+    });
     assertSuccess(
       setupResult,
       'xyte-cli setup run',
@@ -328,10 +197,7 @@ export async function runExternalUserLiveSmoke(options = {}) {
     const callResult = await run(
       XYTE_COMMAND,
       ['api', 'call', 'organization.devices.getDevices', '--tenant', tenant, '--output-mode', 'envelope', '--strict-json'],
-      {
-        cwd,
-        env: runtimeEnv
-      }
+      { cwd, env: runtimeEnv }
     );
     assertSuccess(
       callResult,
@@ -360,15 +226,12 @@ export async function runExternalUserLiveSmoke(options = {}) {
   }
 }
 
-const isEntrypoint = (() => {
-  if (!process.argv[1]) {
-    return false;
-  }
-  return fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
-})();
+export async function main(): Promise<void> {
+  await runExternalUserLiveSmoke();
+}
 
-if (isEntrypoint) {
-  runExternalUserLiveSmoke().catch((error) => {
+if (require.main === module) {
+  void main().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(message);
     process.exitCode = 1;

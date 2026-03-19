@@ -1,100 +1,43 @@
-#!/usr/bin/env node
-
 import { spawn } from 'node:child_process';
-import { access, mkdtemp, mkdir, readFile, rm, unlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, unlink } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path, { delimiter } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-import { buildIsolatedEnv, runCommand } from './smoke_external_user_live.mjs';
+import {
+  NPM_COMMAND,
+  XYTE_COMMAND,
+  assertSuccess,
+  buildIsolatedEnv,
+  normalizeJsonOutput,
+  parsePackFilename,
+  pathExists,
+  printStep,
+  runCommand,
+  type LoggerLike,
+  type RunCommandOptions
+} from './shared';
 
-const NPM_COMMAND = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-const XYTE_COMMAND = process.platform === 'win32' ? 'xyte-cli.cmd' : 'xyte-cli';
-
-function normalizeJsonOutput(raw) {
-  const trimmed = String(raw ?? '').trim();
-  if (!trimmed) {
-    throw new Error('Expected JSON output but got empty stdout.');
-  }
-
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    // fall back to scanning trailing lines for JSON payloads
-  }
-
-  const lines = trimmed
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    try {
-      return JSON.parse(lines[index]);
-    } catch {
-      // continue scanning
-    }
-  }
-
-  throw new Error(`Expected JSON output but parsing failed. stdout=${trimmed}`);
+interface MockServerHandle {
+  baseUrl: string;
+  close: () => Promise<void>;
 }
 
-function assertSuccess(result, label, command, args) {
-  if (result.code === 0) {
-    return;
-  }
-
-  const rendered = [
-    `${command} ${args.join(' ')}`.trim(),
-    result.stdout ? `stdout:\n${result.stdout.trim()}` : '',
-    result.stderr ? `stderr:\n${result.stderr.trim()}` : ''
-  ]
-    .filter(Boolean)
-    .join('\n\n');
-
-  throw new Error(`${label} failed with exit code ${result.code}.\n${rendered}`);
+export interface PackInstallSmokeOptions {
+  cwd?: string;
+  logger?: LoggerLike;
+  env?: NodeJS.ProcessEnv;
+  run?: (command: string, args: string[], options?: RunCommandOptions) => Promise<{ code: number; stdout: string; stderr: string }>;
+  pathExistsFn?: typeof pathExists;
+  readFileFn?: (path: string, encoding: BufferEncoding) => Promise<string>;
+  mkdtempFn?: (prefix: string) => Promise<string>;
+  mkdirFn?: (path: string, options?: { recursive?: boolean }) => Promise<unknown>;
+  rmFn?: (path: string, options?: { recursive?: boolean; force?: boolean }) => Promise<unknown>;
+  unlinkFn?: (path: string) => Promise<unknown>;
+  startMockServerFn?: (options?: { cwd?: string; env?: NodeJS.ProcessEnv; authToken?: string }) => Promise<MockServerHandle>;
 }
 
-function parsePackFilename(packStdout) {
-  const trimmed = String(packStdout ?? '').trim();
-  if (!trimmed) {
-    throw new Error('npm pack returned empty stdout.');
-  }
-
-  try {
-    const payload = JSON.parse(trimmed);
-    if (Array.isArray(payload) && payload[0]?.filename) {
-      return String(payload[0].filename);
-    }
-    if (payload?.filename) {
-      return String(payload.filename);
-    }
-  } catch {
-    // fallback to final line mode
-  }
-
-  const lines = trimmed
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
-  return lines[lines.length - 1];
-}
-
-function printStep(logger, index, total, label) {
-  logger.log(`[${index}/${total}] ${label}`);
-}
-
-async function pathExists(targetPath) {
-  try {
-    await access(targetPath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function reserveFreePort(host = '127.0.0.1') {
+async function reserveFreePort(host = '127.0.0.1'): Promise<number> {
   return await new Promise((resolve, reject) => {
     const server = createServer();
 
@@ -117,17 +60,17 @@ async function reserveFreePort(host = '127.0.0.1') {
   });
 }
 
-async function waitForMockServerReady(child, timeoutMs = 10_000) {
+async function waitForMockServerReady(child: ReturnType<typeof spawn>, timeoutMs = 10_000): Promise<void> {
   const start = Date.now();
   return await new Promise((resolve, reject) => {
     let settled = false;
 
-    const onData = (chunk) => {
+    const onData = (chunk: Buffer | string) => {
       const text = String(chunk);
       if (text.includes('mock_xyte_local running')) {
         settled = true;
         cleanup();
-        resolve(undefined);
+        resolve();
       }
     };
 
@@ -148,16 +91,16 @@ async function waitForMockServerReady(child, timeoutMs = 10_000) {
 
     const cleanup = () => {
       clearInterval(timer);
-      child.stdout.off('data', onData);
+      child.stdout?.off('data', onData);
       child.off('exit', onExit);
     };
 
-    child.stdout.on('data', onData);
+    child.stdout?.on('data', onData);
     child.on('exit', onExit);
   });
 }
 
-async function stopMockServer(child) {
+async function stopMockServer(child: ReturnType<typeof spawn>): Promise<void> {
   if (child.exitCode !== null || child.killed) {
     return;
   }
@@ -176,7 +119,7 @@ async function stopMockServer(child) {
   });
 }
 
-async function startMockServer(options = {}) {
+async function startMockServer(options: { cwd?: string; env?: NodeJS.ProcessEnv; authToken?: string } = {}): Promise<MockServerHandle> {
   const cwd = options.cwd ?? process.cwd();
   const env = options.env ?? process.env;
   const port = await reserveFreePort();
@@ -191,7 +134,7 @@ async function startMockServer(options = {}) {
   });
 
   let stderr = '';
-  child.stderr.on('data', (chunk) => {
+  child.stderr?.on('data', (chunk) => {
     stderr += String(chunk);
   });
 
@@ -200,9 +143,7 @@ async function startMockServer(options = {}) {
   } catch (error) {
     await stopMockServer(child);
     const details = stderr.trim();
-    throw new Error(
-      details ? `${error instanceof Error ? error.message : String(error)}\n${details}` : String(error)
-    );
+    throw new Error(details ? `${error instanceof Error ? error.message : String(error)}\n${details}` : String(error));
   }
 
   return {
@@ -213,7 +154,7 @@ async function startMockServer(options = {}) {
   };
 }
 
-export async function runPackInstallSmoke(options = {}) {
+export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {}): Promise<void> {
   const cwd = options.cwd ?? process.cwd();
   const logger = options.logger ?? console;
   const env = options.env ?? process.env;
@@ -223,8 +164,8 @@ export async function runPackInstallSmoke(options = {}) {
   const startMockServerFn = options.startMockServerFn ?? startMockServer;
 
   const stepTotal = 13;
-  let tarballPath;
-  let mockServer;
+  let tarballPath: string | undefined;
+  let mockServer: MockServerHandle | undefined;
   const tempRoot = await (options.mkdtempFn ?? mkdtemp)(path.join(tmpdir(), 'xyte-cli-pack-install-'));
   const dirs = {
     homeDir: path.join(tempRoot, 'home'),
@@ -298,12 +239,7 @@ export async function runPackInstallSmoke(options = {}) {
       ['init', '--scope', 'both', '--agents', 'all', '--target', dirs.workspaceDir, '--force'],
       { cwd: runtimeCwd, env: runtimeEnv }
     );
-    assertSuccess(
-      initResult,
-      'xyte-cli init',
-      XYTE_COMMAND,
-      ['init', '--scope', 'both', '--agents', 'all', '--target', dirs.workspaceDir, '--force']
-    );
+    assertSuccess(initResult, 'xyte-cli init', XYTE_COMMAND, ['init', '--scope', 'both', '--agents', 'all', '--target', dirs.workspaceDir, '--force']);
 
     const requiredSkillRoots = [
       path.join(dirs.workspaceDir, '.claude', 'skills', 'xyte-cli'),
@@ -353,14 +289,7 @@ export async function runPackInstallSmoke(options = {}) {
       cwd: runtimeCwd,
       env: runtimeEnv
     });
-    assertSuccess(fieldResult, 'xyte-cli setup status --field tenantId', XYTE_COMMAND, [
-      'setup',
-      'status',
-      '--tenant',
-      'acme',
-      '--field',
-      'tenantId'
-    ]);
+    assertSuccess(fieldResult, 'xyte-cli setup status --field tenantId', XYTE_COMMAND, ['setup', 'status', '--tenant', 'acme', '--field', 'tenantId']);
     if (String(fieldResult.stdout).trim() !== 'acme') {
       throw new Error(`Field extraction returned an unexpected value: ${fieldResult.stdout}`);
     }
@@ -374,10 +303,7 @@ export async function runPackInstallSmoke(options = {}) {
     const tenantConfigResult = await run(
       XYTE_COMMAND,
       ['config', 'tenant', 'add', 'acme', '--name', 'Acme Mock', '--hub-url', mockServer.baseUrl, '--entry-url', mockServer.baseUrl],
-      {
-        cwd: runtimeCwd,
-        env: runtimeEnv
-      }
+      { cwd: runtimeCwd, env: runtimeEnv }
     );
     assertSuccess(
       tenantConfigResult,
@@ -391,10 +317,7 @@ export async function runPackInstallSmoke(options = {}) {
     const watchResult = await run(
       XYTE_COMMAND,
       ['ops', 'watch', 'incidents', '--tenant', 'acme', '--profile', 'incidents-active', '--once', '--output', 'json', '--strict-json', '--out', watchPath],
-      {
-        cwd: runtimeCwd,
-        env: runtimeEnv
-      }
+      { cwd: runtimeCwd, env: runtimeEnv }
     );
     assertSuccess(
       watchResult,
@@ -420,20 +343,11 @@ export async function runPackInstallSmoke(options = {}) {
 
     printStep(logger, 11, stepTotal, 'Checking inspect fleet --out with nested JSON output');
     const fleetPath = path.join(dirs.workspaceDir, 'artifacts', 'xyte-fleet.json');
-    const fleetResult = await run(
-      XYTE_COMMAND,
-      ['ops', 'inspect', 'fleet', '--tenant', 'acme', '--output', 'json', '--out', fleetPath],
-      {
-        cwd: runtimeCwd,
-        env: runtimeEnv
-      }
-    );
-    assertSuccess(
-      fleetResult,
-      'xyte-cli ops inspect fleet',
-      XYTE_COMMAND,
-      ['ops', 'inspect', 'fleet', '--tenant', 'acme', '--output', 'json', '--out', fleetPath]
-    );
+    const fleetResult = await run(XYTE_COMMAND, ['ops', 'inspect', 'fleet', '--tenant', 'acme', '--output', 'json', '--out', fleetPath], {
+      cwd: runtimeCwd,
+      env: runtimeEnv
+    });
+    assertSuccess(fleetResult, 'xyte-cli ops inspect fleet', XYTE_COMMAND, ['ops', 'inspect', 'fleet', '--tenant', 'acme', '--output', 'json', '--out', fleetPath]);
     if (!(await pathExistsFn(fleetPath))) {
       throw new Error(`Fleet inspect did not create the nested output path: ${fleetPath}`);
     }
@@ -447,10 +361,7 @@ export async function runPackInstallSmoke(options = {}) {
     const deepDiveResult = await run(
       XYTE_COMMAND,
       ['ops', 'inspect', 'deep-dive', '--tenant', 'acme', '--window', '24', '--output', 'json', '--out', deepDivePath],
-      {
-        cwd: runtimeCwd,
-        env: runtimeEnv
-      }
+      { cwd: runtimeCwd, env: runtimeEnv }
     );
     assertSuccess(
       deepDiveResult,
@@ -471,10 +382,7 @@ export async function runPackInstallSmoke(options = {}) {
     const reportResult = await run(
       XYTE_COMMAND,
       ['ops', 'report', 'generate', '--tenant', 'acme', '--input', deepDivePath, '--out', reportPath, '--render', 'markdown'],
-      {
-        cwd: runtimeCwd,
-        env: runtimeEnv
-      }
+      { cwd: runtimeCwd, env: runtimeEnv }
     );
     assertSuccess(
       reportResult,
@@ -506,15 +414,12 @@ export async function runPackInstallSmoke(options = {}) {
   }
 }
 
-const isEntrypoint = (() => {
-  if (!process.argv[1]) {
-    return false;
-  }
-  return fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
-})();
+export async function main(): Promise<void> {
+  await runPackInstallSmoke();
+}
 
-if (isEntrypoint) {
-  runPackInstallSmoke().catch((error) => {
+if (require.main === module) {
+  void main().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(message);
     process.exitCode = 1;

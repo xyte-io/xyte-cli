@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import * as smokePackInstall from '../scripts/smoke_pack_install.mjs';
+import * as smokePackInstall from '../src/smoke/pack-install';
 
 describe('pack install smoke script', () => {
   it('runs expected command sequence with provided env', async () => {

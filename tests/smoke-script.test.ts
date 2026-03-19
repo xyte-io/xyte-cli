@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import * as smokeExternalUserLive from '../scripts/smoke_external_user_live.mjs';
+import * as smokeExternalUserLive from '../src/smoke/external-user-live';
 
 describe('external live smoke script', () => {
   it('fails fast when XYTE_CLI_KEY is missing', async () => {

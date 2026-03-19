@@ -1,20 +1,36 @@
-#!/usr/bin/env node
-
-import { spawn } from 'node:child_process';
-import { mkdtempSync, mkdirSync, existsSync } from 'node:fs';
-import path from 'node:path';
+import { existsSync, mkdtempSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { pathToFileURL } from 'node:url';
+import path from 'node:path';
 
-const NPM_COMMAND = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-const XYTE_COMMAND = process.platform === 'win32' ? 'xyte-cli.cmd' : 'xyte-cli';
+import { NPM_COMMAND, XYTE_COMMAND, runCommand } from './shared';
 
-function shouldUseWindowsShell(command) {
-  return process.platform === 'win32' && /\.(cmd|bat)$/i.test(command);
+interface ParsedArgs {
+  tenant: string;
+  baseUrl: string;
+  skipBuild: boolean;
+  skipTest: boolean;
 }
 
-function parseArgs(argv) {
-  const parsed = {
+interface CommandOutcome {
+  code: number;
+  stdout: string;
+  stderr: string;
+}
+
+interface FlowStepResult {
+  status: string;
+  reason: string;
+}
+
+interface SmokeSummaryStep {
+  id: string;
+  status: 'pass' | 'fail' | 'skip';
+  reason: string;
+  [key: string]: unknown;
+}
+
+function parseArgs(argv: string[]): ParsedArgs {
+  const parsed: ParsedArgs = {
     tenant: 'local-flow',
     baseUrl: 'http://127.0.0.1:3001',
     skipBuild: false,
@@ -45,36 +61,7 @@ function parseArgs(argv) {
   return parsed;
 }
 
-function runCommand(command, args, options = {}) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd: options.cwd ?? process.cwd(),
-      env: options.env ?? process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: shouldUseWindowsShell(command),
-      windowsHide: true
-    });
-
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk) => {
-      stdout += chunk.toString();
-    });
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk.toString();
-    });
-    child.on('error', (error) => reject(error));
-    child.on('close', (code) => {
-      resolve({
-        code: code ?? 1,
-        stdout,
-        stderr
-      });
-    });
-  });
-}
-
-function parseJsonSafe(raw) {
+function parseJsonSafe(raw: unknown): any {
   const trimmed = String(raw ?? '').trim();
   if (!trimmed) {
     return null;
@@ -99,7 +86,7 @@ function parseJsonSafe(raw) {
   return null;
 }
 
-function parseNdjson(raw) {
+function parseNdjson(raw: unknown): any[] {
   return String(raw ?? '')
     .split('\n')
     .map((line) => line.trim())
@@ -107,7 +94,7 @@ function parseNdjson(raw) {
     .map((line) => JSON.parse(line));
 }
 
-function parseEnvelopeUpstreamError(result) {
+function parseEnvelopeUpstreamError(result: CommandOutcome): string {
   const payload = parseJsonSafe(result.stdout);
   if (!payload || typeof payload !== 'object') {
     return '';
@@ -125,7 +112,7 @@ function parseEnvelopeUpstreamError(result) {
   return '';
 }
 
-function parseEnvelopeStatus(result) {
+function parseEnvelopeStatus(result: CommandOutcome): number | null {
   const payload = parseJsonSafe(result.stdout);
   if (!payload || typeof payload !== 'object') {
     return null;
@@ -139,7 +126,11 @@ function parseEnvelopeStatus(result) {
   return null;
 }
 
-export function classifyStep(stepId, result, context = {}) {
+export function classifyStep(
+  stepId: string,
+  result: CommandOutcome,
+  context: { updateVerified?: boolean; readBackSucceeded?: boolean } = {}
+): FlowStepResult {
   if (stepId === 'send_command_write') {
     if (result.code === 0) {
       return { status: 'pass', reason: 'Command dispatch succeeded.' };
@@ -178,13 +169,13 @@ export function classifyStep(stepId, result, context = {}) {
   return { status: 'fail', reason: result.stderr.trim() || 'Command failed.' };
 }
 
-function ensure(condition, message) {
+function ensure(condition: unknown, message: string): asserts condition {
   if (!condition) {
     throw new Error(message);
   }
 }
 
-function pushStep(steps, id, status, reason, extra = {}) {
+function pushStep(steps: SmokeSummaryStep[], id: string, status: SmokeSummaryStep['status'], reason: string, extra: Record<string, unknown> = {}): void {
   steps.push({
     id,
     status,
@@ -193,7 +184,7 @@ function pushStep(steps, id, status, reason, extra = {}) {
   });
 }
 
-function renderSummary(steps) {
+function renderSummary(steps: SmokeSummaryStep[]): string {
   const totals = {
     pass: 0,
     fail: 0,
@@ -215,21 +206,25 @@ function renderSummary(steps) {
   return lines.join('\n');
 }
 
-async function resetMock(baseUrl) {
+async function resetMock(baseUrl: string): Promise<void> {
   const response = await fetch(`${baseUrl}/_mock/reset`, {
     method: 'POST'
   });
   ensure(response.ok, `Failed to reset mock server (${response.status}).`);
 }
 
-async function getMockState(baseUrl) {
+async function getMockState(baseUrl: string): Promise<any> {
   const response = await fetch(`${baseUrl}/_mock/state`);
   ensure(response.ok, `Failed to read mock state (${response.status}).`);
   return await response.json();
 }
 
-async function runChecked(command, args, options = {}) {
-  const result = await runCommand(command, args, options);
+async function runChecked(command: string, args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): Promise<CommandOutcome> {
+  const result = await runCommand(command, args, {
+    cwd: options.cwd ?? process.cwd(),
+    env: options.env ?? process.env,
+    stdinMode: 'ignore'
+  });
   if (result.code !== 0) {
     const detail = [
       `${command} ${args.join(' ')}`,
@@ -243,16 +238,16 @@ async function runChecked(command, args, options = {}) {
   return result;
 }
 
-async function runFlow(env, outDir, flowId, extraArgs = []) {
-  const args = ['flow', 'run', flowId, '--tenant', env.XYTE_FLOW_TENANT, '--out-dir', outDir, '--strict-json', ...extraArgs];
+async function runFlow(env: NodeJS.ProcessEnv, outDir: string, flowId: string, extraArgs: string[] = []): Promise<any> {
+  const args = ['flow', 'run', flowId, '--tenant', env.XYTE_FLOW_TENANT ?? '', '--out-dir', outDir, '--strict-json', ...extraArgs];
   const result = await runChecked(XYTE_COMMAND, args, { env });
   const payload = parseJsonSafe(result.stdout);
   ensure(payload?.schemaVersion === 'xyte.flow.run.v1', `Unexpected flow output for ${flowId}.`);
   return payload;
 }
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
+export async function main(argv = process.argv.slice(2)): Promise<void> {
+  const args = parseArgs(argv);
   const root = mkdtempSync(path.join(tmpdir(), 'xyte-flow-pack-smoke-'));
   const configDir = path.join(root, 'config');
   const outDir = path.join(root, 'flow-runs');
@@ -265,7 +260,7 @@ async function main() {
     XYTE_FLOW_TENANT: args.tenant
   };
 
-  const steps = [];
+  const steps: SmokeSummaryStep[] = [];
 
   if (!args.skipBuild) {
     await runChecked(NPM_COMMAND, ['run', 'build'], { env });
@@ -280,11 +275,7 @@ async function main() {
   await resetMock(args.baseUrl);
   pushStep(steps, 'mock_reset', 'pass', 'Mock state reset.');
 
-  await runChecked(
-    XYTE_COMMAND,
-    ['config', 'tenant', 'add', args.tenant, '--hub-url', args.baseUrl, '--entry-url', args.baseUrl],
-    { env }
-  );
+  await runChecked(XYTE_COMMAND, ['config', 'tenant', 'add', args.tenant, '--hub-url', args.baseUrl, '--entry-url', args.baseUrl], { env });
   pushStep(steps, 'tenant_add', 'pass', `Tenant ${args.tenant} added for ${args.baseUrl}.`);
 
   await runChecked(
@@ -296,15 +287,11 @@ async function main() {
 
   const setupFlow = await runFlow(env, outDir, 'flow.setup-readiness-10m');
   ensure(setupFlow.outcome === 'completed', 'flow.setup-readiness-10m did not complete.');
-  ensure(setupFlow.steps.every((step) => step.status === 'completed'), 'setup flow had non-completed steps.');
+  ensure(setupFlow.steps.every((step: { status: string }) => step.status === 'completed'), 'setup flow had non-completed steps.');
   ensure(existsSync(setupFlow.bundleDir), 'setup flow bundle was not created.');
   pushStep(steps, 'flow_setup', 'pass', 'Setup readiness flow completed.');
 
-  const watchOnce = await runChecked(
-    XYTE_COMMAND,
-    ['ops', 'watch', 'incidents', '--tenant', args.tenant, '--profile', 'incidents-active', '--once', '--strict-json'],
-    { env }
-  );
+  const watchOnce = await runChecked(XYTE_COMMAND, ['ops', 'watch', 'incidents', '--tenant', args.tenant, '--profile', 'incidents-active', '--once', '--strict-json'], { env });
   const watchOnceFrame = parseJsonSafe(watchOnce.stdout);
   ensure(watchOnceFrame?.schemaVersion === 'xyte.watch.frame.v1', 'watch once did not emit xyte.watch.frame.v1.');
   ensure(watchOnceFrame?.eventType === 'snapshot', 'watch once did not emit a snapshot frame.');
@@ -324,7 +311,7 @@ async function main() {
 
   const watchFlow = await runFlow(env, outDir, 'flow.incidents-delta-watch', ['--once']);
   ensure(watchFlow.outcome === 'completed', 'flow.incidents-delta-watch did not complete.');
-  ensure(watchFlow.steps.every((step) => step.status === 'completed'), 'watch flow had non-completed steps.');
+  ensure(watchFlow.steps.every((step: { status: string }) => step.status === 'completed'), 'watch flow had non-completed steps.');
   pushStep(steps, 'flow_watch', 'pass', 'Incidents delta watch flow completed.');
 
   const triagePlan = await runFlow(env, outDir, 'flow.watch-to-triage', ['--once']);
@@ -345,11 +332,7 @@ async function main() {
   ensure(remediation.outcome === 'pending_gate', 'flow.guided-remediation did not stop at the first gate.');
   ensure(remediation.nextResumeStepId === 'gate_send_command', 'Guided remediation did not stop at send-command gate first.');
 
-  const remediationGateOrder = [
-    'gate_update_device',
-    'gate_ticket_message',
-    'gate_close_incident'
-  ];
+  const remediationGateOrder = ['gate_update_device', 'gate_ticket_message', 'gate_close_incident'];
   for (const expectedGate of remediationGateOrder) {
     remediation = await runFlow(env, outDir, 'flow.guided-remediation', ['--apply', '--resume', remediation.runId]);
     ensure(remediation.outcome === 'pending_gate', `Guided remediation did not stop at ${expectedGate}.`);
@@ -360,23 +343,21 @@ async function main() {
   ensure(remediation.outcome === 'completed', 'Guided remediation did not complete after final approval.');
 
   const state = await getMockState(args.baseUrl);
-  const activeIncidents = (state.incidents ?? []).filter((incident) => incident.status === 'active');
-  const deviceTwo = (state.devices ?? []).find((device) => device.id === 'd2');
-  const ticket = (state.tickets ?? []).find((item) => item.id === 't1');
+  const activeIncidents = (state.incidents ?? []).filter((incident: { status: string }) => incident.status === 'active');
+  const deviceTwo = (state.devices ?? []).find((device: { id: string }) => device.id === 'd2');
+  const ticket = (state.tickets ?? []).find((item: { id: string }) => item.id === 't1');
   const commands = Array.isArray(state.commands?.d2) ? state.commands.d2 : [];
   ensure(activeIncidents.length === 0, 'Guided remediation did not clear the active incident in mock state.');
   ensure(deviceTwo?.name === 'Remediated d2', `Guided remediation did not update device name, got ${deviceTwo?.name ?? 'missing'}.`);
   ensure(ticket?.messages?.length === 1, 'Guided remediation did not send a ticket message.');
-  ensure(commands.some((item) => item.command === 'restart'), 'Guided remediation did not record the restart command.');
+  ensure(commands.some((item: { command?: string }) => item.command === 'restart'), 'Guided remediation did not record the restart command.');
   pushStep(steps, 'flow_guided', 'pass', 'Guided remediation completed and mutated mock state as expected.');
 
   process.stdout.write(`${renderSummary(steps)}\n`);
 }
 
-const isDirectExecution = process.argv[1] ? import.meta.url === pathToFileURL(process.argv[1]).href : false;
-
-if (isDirectExecution) {
-  main().catch((error) => {
+if (require.main === module) {
+  void main().catch((error: unknown) => {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;
   });
