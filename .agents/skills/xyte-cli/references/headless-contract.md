@@ -93,4 +93,4 @@ By kind:
 
 ## JSON Schema
 
-- Schema file: `docs/schemas/headless-frame.v1.schema.json`
+- Schema file: `schemas/headless-frame.v1.schema.json`

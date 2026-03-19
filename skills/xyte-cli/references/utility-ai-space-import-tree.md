@@ -9,16 +9,16 @@ Decode a messy source hierarchy into canonical space-import artifacts for `xyte-
 ## Canonical Output Artifacts
 
 1. Primary CSV:
-- `/Users/porton/Projects/xyte-cli/tmp/space-import-tree.csv`
+- `./prepared/space-import-tree.csv`
 - exact header:
   - `path,space_type,config`
 
 2. Rejected CSV:
-- `/Users/porton/Projects/xyte-cli/tmp/space-import-tree.rejected.csv`
+- `./prepared/space-import-tree.rejected.csv`
 - include original row/object and `reject_reason`
 
 3. Notes:
-- `/Users/porton/Projects/xyte-cli/tmp/space-import-tree.notes.md`
+- `./prepared/space-import-tree.notes.md`
 - include normalization assumptions and ambiguity handling
 
 ## Decode Rules
@@ -41,8 +41,8 @@ Dry-run:
 ```bash
 xyte-cli util import-tree \
   --tenant <tenant-id> \
-  --input /Users/porton/Projects/xyte-cli/tmp/space-import-tree.csv \
-  --report /Users/porton/Projects/xyte-cli/tmp/space-import-tree.dryrun.ndjson
+  --input ./prepared/space-import-tree.csv \
+  --report ./artifacts/space-import-tree.dryrun.ndjson
 ```
 
 Apply:
@@ -50,9 +50,9 @@ Apply:
 ```bash
 xyte-cli util import-tree \
   --tenant <tenant-id> \
-  --input /Users/porton/Projects/xyte-cli/tmp/space-import-tree.csv \
+  --input ./prepared/space-import-tree.csv \
   --apply \
-  --report /Users/porton/Projects/xyte-cli/tmp/space-import-tree.apply.ndjson
+  --report ./artifacts/space-import-tree.apply.ndjson
 ```
 
 Verify:

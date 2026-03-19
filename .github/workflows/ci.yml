@@ -19,8 +19,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
-        node: ["18", "22"]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: ["22"]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,6 +45,28 @@ jobs:
 
       - name: Validate package contents
         run: npm pack --dry-run
+
+  packaged-install-smoke:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Secretless packaged install smoke
+        run: npm run smoke:pack-install
 
   security:
     runs-on: ubuntu-latest

@@ -36,10 +36,10 @@ xyte-cli flow import --file <path> [--force]
 ## Core
 
 ```bash
-xyte-cli init [--scope project|user|both] [--agents all|claude|copilot|codex] [--force] [--no-setup]
+xyte-cli init [--scope project|user|both] [--agents all|claude|copilot|codex] [--force] [--no-setup] [--require-setup]
 xyte-cli status [--tenant <tenant-id>] [--mode fast|full] [--output json|text]
-xyte-cli setup status --tenant <tenant-id> --output json
-xyte-cli setup run [--non-interactive] [--tenant <tenant-id>] [--name <display-name>] [--provider xyte-org|xyte-partner] [--key <value>] [--connectivity auto|always|never]
+xyte-cli setup status [--tenant <tenant-id>] [--output json] [--field tenantId]
+xyte-cli setup run [--non-interactive] [--tenant <tenant-id>] [--name <display-name>] [--provider xyte-org|xyte-partner] [--key <value>|--key-stdin] [--connectivity auto|always|never]
 xyte-cli config doctor --tenant <tenant-id> --output json
 xyte-cli upgrade --check --output json
 xyte-cli upgrade --yes --output json
@@ -51,6 +51,9 @@ xyte-cli logs view [--path <path>] [--limit <n>]
 ```
 
 Setup notes:
+- Interactive `xyte-cli setup run` is the primary human onboarding path.
+- Piping a key on stdin into `xyte-cli setup run --key-stdin` is the primary shell-neutral automation path.
+- `xyte-cli setup status --field tenantId` is the primary shell-neutral extractor for follow-up commands.
 - Use `--provider xyte-partner` for partner-only tenants.
 - For `xyte-org`, when `--name` is omitted, setup attempts to populate tenant display name from `organization.getOrganizationInfo`.
 - Explicit `--name` always takes precedence over auto-detected names.
@@ -71,6 +74,9 @@ xyte-cli config key test --tenant <tenant-id> --provider xyte-org --slot prod-pr
 xyte-cli config key remove --tenant <tenant-id> --provider xyte-org --slot prod-primary --confirm
 ```
 
+Auth note:
+- Inline `--key "<value>"` examples are shell-sensitive. Prefer `setup run --key-stdin` for cross-platform onboarding and automation.
+
 ## Endpoint Operations
 
 ```bash
@@ -86,9 +92,11 @@ Watch guardrails:
 - `--interval-ms` minimum is `1000`.
 - default watch loops are bounded when `--max-polls` is omitted.
 - `--max-polls` hard cap is `3600`.
-- terminal output is text by default; add `--strict-json` when you want machine-readable frames.
+- terminal output is text by default; add `--output json --strict-json` when you want machine-readable frames.
 
 Reliable incident fetch:
+
+Advanced shell-specific fallback. The integer timestamp expression varies by shell; use a native equivalent in PowerShell or CMD.
 
 ```bash
 NOW=$(date +%s)
@@ -102,7 +110,7 @@ Incident delta watch:
 ```bash
 xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once
 xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 10
-xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --strict-json
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json
 ```
 
 Frame event types:
@@ -113,6 +121,8 @@ Frame event types:
 - `error`: poll failed; baseline is preserved for the next successful poll.
 
 ## Write Examples
+
+These raw API examples are shell-specific because inline JSON quoting differs across shells.
 
 ```bash
 xyte-cli api call organization.commands.sendCommand \
@@ -133,23 +143,23 @@ xyte-cli util list-actions --output text
 xyte-cli util prepare \
   --action organization.devices.claimDevice \
   --input ./raw-claims.xlsx \
-  --output-dir ./tmp
+  --output-dir ./prepared
 
 xyte-cli util prepare \
   --action space.import-tree \
   --input ./raw-hierarchy.pdf \
-  --output-dir ./tmp
+  --output-dir ./prepared
 
-xyte-cli util import-tree --tenant <tenant-id> --input ./tmp/space-import-tree.csv
-xyte-cli util import-tree --tenant <tenant-id> --input ./tmp/space-import-tree.csv --apply --report ./space-import.apply.ndjson
+xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv
+xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv --apply --report ./reports/space-import.apply.ndjson
 ```
 
 ## Insights And Reports
 
 ```bash
 xyte-cli ops inspect fleet --tenant <tenant-id> --provider-scope auto --output json
-xyte-cli ops inspect deep-dive --tenant <tenant-id> --provider-scope auto --window 24 --output json > /tmp/deep-dive.json
-xyte-cli ops report generate --tenant <tenant-id> --input /tmp/deep-dive.json --out /tmp/xyte-report.pdf
+xyte-cli ops inspect deep-dive --tenant <tenant-id> --provider-scope auto --window 24 --output json --out ./artifacts/deep-dive.json
+xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/deep-dive.json --out ./reports/xyte-report.pdf
 ```
 
 Provider scope behavior:
@@ -169,13 +179,23 @@ xyte-cli ops console --headless --screen spaces --output json --follow --interva
 
 ## Action Log Environment Flags
 
+Primary explicit-path workflow:
+
+```bash
+xyte-cli --log-actions --log-actions-path ./logs/xyte-cli.actions.ndjson status --tenant <tenant-id>
+xyte-cli logs list --path ./logs/xyte-cli.actions.ndjson --limit 200
+xyte-cli logs stats --path ./logs/xyte-cli.actions.ndjson
+```
+
+Advanced shell-specific environment flags:
+
 `XYTE_LOG_ACTIONS` enables NDJSON logging.
 `XYTE_LOG_ACTIONS_STDERR` independently controls stderr mirroring.
 Set `XYTE_LOG_ACTIONS_MAX_FILES=1` to keep only the active file (no rotated history).
 
 ```bash
 XYTE_LOG_ACTIONS=1
-XYTE_LOG_ACTIONS_PATH=/tmp/xyte-cli.actions.ndjson
+XYTE_LOG_ACTIONS_PATH=./logs/xyte-cli.actions.ndjson
 XYTE_LOG_ACTIONS_STDERR=1
 XYTE_LOG_ACTIONS_VERBOSE=1
 XYTE_LOG_ACTIONS_MAX_FILE_BYTES=10485760

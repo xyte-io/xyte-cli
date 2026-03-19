@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xyte.dev/schemas/headless-frame.v1.schema.json",
+  "title": "Xyte Headless Frame V1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schemaVersion",
+    "timestamp",
+    "sessionId",
+    "sequence",
+    "mode",
+    "screen",
+    "title",
+    "status",
+    "motionEnabled",
+    "motionPhase",
+    "logo",
+    "panels",
+    "meta"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "xyte.headless.frame.v1"
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "sessionId": {
+      "type": "string"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "headless",
+        "interactive"
+      ]
+    },
+    "screen": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string"
+    },
+    "motionEnabled": {
+      "type": "boolean"
+    },
+    "motionPhase": {
+      "type": "integer"
+    },
+    "logo": {
+      "type": "string"
+    },
+    "panels": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "meta": {
+      "type": "object",
+      "required": [
+        "inputState",
+        "queueDepth",
+        "droppedEvents",
+        "transitionState",
+        "refreshState",
+        "navigationMode",
+        "activePane",
+        "availablePanes",
+        "tabId",
+        "tabOrder",
+        "tabNavBoundary",
+        "renderSafety",
+        "tableFormat",
+        "contract"
+      ],
+      "properties": {
+        "inputState": {
+          "type": "string"
+        },
+        "queueDepth": {
+          "type": "integer"
+        },
+        "droppedEvents": {
+          "type": "integer"
+        },
+        "transitionState": {
+          "type": "string"
+        },
+        "refreshState": {
+          "type": "string"
+        },
+        "navigationMode": {
+          "type": "string"
+        },
+        "activePane": {
+          "type": "string"
+        },
+        "availablePanes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "tabOrder": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tabNavBoundary": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "renderSafety": {
+          "type": "string"
+        },
+        "tableFormat": {
+          "type": "string"
+        },
+        "contract": {
+          "type": "object",
+          "required": [
+            "frameVersion",
+            "tableFormat",
+            "navigationMode"
+          ],
+          "properties": {
+            "frameVersion": {
+              "const": "xyte.headless.frame.v1"
+            },
+            "tableFormat": {
+              "type": "string"
+            },
+            "navigationMode": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

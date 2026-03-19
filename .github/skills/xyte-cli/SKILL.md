@@ -5,24 +5,28 @@ description: "Use for @xyteai/cli operations: first-run setup, config/tenant/key
 
 # XYTE Skill Router (One-Stop, Agent-Native)
 
-Last updated: 2026-03-06
+Last updated: 2026-03-19
 
 This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
 
 ## Invocation Rules
 
 - Use `xyte-cli` commands directly.
-- Do not use source/dev entrypoints (`npx`, `tsx`, `src/*`, `dist/*`, `bin/*`).
-- If `xyte-cli` is unavailable, ask the user to install `@xyteai/cli` globally instead of improvising an entrypoint.
+- Do not use source/dev entrypoints (`tsx`, `src/*`, `dist/*`, `bin/*`).
+- If `xyte-cli` is unavailable on `PATH`, use `npx @xyteai/cli@latest <command>` or `npm exec @xyteai/cli@latest -- <command>` until `PATH` is fixed.
+- Canonical skill source lives in `skills/xyte-cli`. Sync mirrors with `node scripts/sync_xyte_skill_mirrors.mjs`.
 - Command option correctness:
   - `xyte-cli config tenant list` has no `--output`.
   - `xyte-cli setup status`, `xyte-cli config doctor`, `xyte-cli status`, `xyte-cli ops inspect`, and `xyte-cli ops console --headless` accept `--output json|text` where relevant.
   - `xyte-cli ops inspect fleet|deep-dive` support `--provider-scope organization|partner|auto`.
+  - `xyte-cli ops inspect fleet|deep-dive` and `xyte-cli ops watch incidents` support `--out <path>`.
   - `xyte-cli flow run` supports `--inspect-provider-scope organization|partner|auto`.
 - For fresh users in a new environment, verify readiness with:
   - `xyte-cli status --mode fast --output json`
   - `xyte-cli init --scope both --agents all --force`
-  - `xyte-cli setup run --non-interactive --tenant <tenant-id> --provider <xyte-org|xyte-partner> --key <value>`
+  - for humans: `xyte-cli setup run --tenant <tenant-id> --provider <xyte-org|xyte-partner>`
+  - for automation: pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> --provider <xyte-org|xyte-partner> --key-stdin`
+  - `xyte-cli setup status --tenant <tenant-id> --field tenantId`
 
 ## Purpose And Trigger Conditions
 
@@ -77,7 +81,9 @@ Rules:
 - `xyte-cli config doctor --tenant <tenant-id> --output json`
 
 2. Auth/tenant (if missing or incomplete):
-- `xyte-cli setup run --non-interactive --tenant <tenant-id> --provider <xyte-org|xyte-partner> --key <value>`
+- human-guided setup: `xyte-cli setup run --tenant <tenant-id> --provider <xyte-org|xyte-partner>`
+- automation setup: pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> --provider <xyte-org|xyte-partner> --key-stdin`
+- `xyte-cli setup status --tenant <tenant-id> --field tenantId`
 - `xyte-cli config tenant use <tenant-id>`
 - `xyte-cli config key list --tenant <tenant-id> --output json`
 
@@ -112,16 +118,18 @@ Provider/report behavior:
 | --- | --- |
 | Deterministic multi-step ops | `xyte-cli flow run <flow-id> --tenant <tenant-id> --plan` |
 | First-time onboarding (interactive) | `xyte-cli` |
-| Setup non-interactive | `xyte-cli setup run --non-interactive --tenant <tenant-id> --provider <xyte-org\|xyte-partner> --key <value>` |
+| Setup interactive | `xyte-cli setup run --tenant <tenant-id> --provider <xyte-org\|xyte-partner>` |
+| Setup non-interactive | `pipe key on stdin -> xyte-cli setup run --non-interactive --tenant <tenant-id> --provider <xyte-org\|xyte-partner> --key-stdin` |
 | Readiness snapshot | `xyte-cli setup status --tenant <tenant-id> --output json` |
+| Tenant ID extraction | `xyte-cli setup status --tenant <tenant-id> --field tenantId` |
 | Connectivity diagnostics | `xyte-cli config doctor --tenant <tenant-id> --output json` |
 | Read endpoint call + envelope | `xyte-cli api call <endpoint-key> --tenant <tenant-id> --output-mode envelope --strict-json` |
 | Write endpoint call | `xyte-cli api call <endpoint-key> --tenant <tenant-id> ...` |
-| Fleet summary | `xyte-cli ops inspect fleet --tenant <tenant-id> --output json` |
-| Deep-dive analytics | `xyte-cli ops inspect deep-dive --tenant <tenant-id> --window <hours> --output json` |
+| Fleet summary | `xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/fleet.json` |
+| Deep-dive analytics | `xyte-cli ops inspect deep-dive --tenant <tenant-id> --window <hours> --output json --out ./artifacts/deep-dive.json` |
 | PDF report generation | `xyte-cli ops report generate --tenant <tenant-id> --input <deep-dive.json> --out <path>.pdf` |
 | Util action catalog | `xyte-cli util list-actions --output text` |
-| Util prepare scaffold | `xyte-cli util prepare --action <action-key> --input <file> --output-dir ./tmp` |
+| Util prepare scaffold | `xyte-cli util prepare --action <action-key> --input <file> --output-dir ./prepared` |
 | Space tree import | `xyte-cli util import-tree --tenant <tenant-id> --input <file> [--apply]` |
 | Interactive console | `xyte-cli ops console` |
 | Headless snapshot | `xyte-cli ops console --headless --screen <screen> --output json --once --tenant <tenant-id>` |
@@ -134,9 +142,9 @@ Use this selector when the user asks for repeatable operator workflows. Full rec
 | Intent | Flow ID | First command |
 | --- | --- | --- |
 | Readiness check in a new or stale environment | `flow.setup-readiness-10m` | `xyte-cli status --mode fast --output json` |
-| Continuous incident monitoring | `flow.incidents-delta-watch` | `xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --strict-json` |
-| Convert watch deltas into triage artifacts | `flow.watch-to-triage` | `xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --strict-json` |
-| Operator-approved remediation writes | `flow.guided-remediation` | `xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --strict-json` |
+| Continuous incident monitoring | `flow.incidents-delta-watch` | `xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json` |
+| Convert watch deltas into triage artifacts | `flow.watch-to-triage` | `xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json` |
+| Operator-approved remediation writes | `flow.guided-remediation` | `xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json` |
 | Daily analytics summary and report artifact | `flow.daily-deep-dive-report` | `xyte-cli setup status --tenant <tenant-id> --output json` |
 
 ## Agent-Only Flow Authoring
@@ -177,11 +185,12 @@ Read call:
 xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --output-mode envelope --strict-json
 ```
 
-Incident read call (reliable time window):
+Incident read call (reliable time window; replace `1710000000` with the current Unix timestamp in your shell or runtime):
 
 ```bash
-NOW=$(date +%s)
-xyte-cli api call organization.incidents.getIncidents --tenant <tenant-id> --query-json "{\"status\":\"active\",\"from\":0,\"to\":$NOW,\"page\":1,\"per_page\":100}"
+xyte-cli api call organization.incidents.getIncidents \
+  --tenant <tenant-id> \
+  --query-json '{"status":"active","from":0,"to":1710000000,"page":1,"per_page":100}'
 ```
 
 Write call:
@@ -221,29 +230,29 @@ xyte-cli ops console
 Inspect + report:
 
 ```bash
-xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json > /tmp/deep-dive.json
-xyte-cli ops report generate --tenant <tenant-id> --input /tmp/deep-dive.json --out /tmp/xyte-findings.pdf
+xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json --out ./artifacts/deep-dive.json
+xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/deep-dive.json --out ./artifacts/xyte-findings.pdf
 ```
 
 Util prepare then execute:
 
 ```bash
 xyte-cli util list-actions --output text
-xyte-cli util prepare --action organization.devices.claimDevice --input ./raw-source.xlsx --tenant <tenant-id> --output-dir ./tmp
+xyte-cli util prepare --action organization.devices.claimDevice --input ./raw-source.xlsx --tenant <tenant-id> --output-dir ./prepared
 
 xyte-cli api call organization.spaces.getSpace --tenant <tenant-id> --path-json '{"space_id":"<space-id>"}'
 xyte-cli api call organization.devices.claimDevice --tenant <tenant-id> --output-mode envelope --body-json '{"name":"<name>","space_id":<space-id>,"sn":"<sn>","mac":"<mac>","cloud_id":"<cloud-id>"}'
 
-xyte-cli util prepare --action space.import-tree --input ./raw-tree.pdf --tenant <tenant-id> --output-dir ./tmp
-xyte-cli util import-tree --tenant <tenant-id> --input ./space-import-tree.csv
-xyte-cli util import-tree --tenant <tenant-id> --input ./space-import-tree.csv --apply --report ./space-import-report.ndjson
+xyte-cli util prepare --action space.import-tree --input ./raw-tree.pdf --tenant <tenant-id> --output-dir ./prepared
+xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv
+xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv --apply --report ./artifacts/space-import-report.ndjson
 ```
 
 AI preprocessing prompt templates:
 
 ```bash
-cat /Users/porton/Projects/xyte-cli/scripts/templates/ai-utility-prepare-generic.prompt.md
-cat /Users/porton/Projects/xyte-cli/scripts/templates/ai-space-import.prompt.md
+cat scripts/templates/ai-utility-prepare-generic.prompt.md
+cat scripts/templates/ai-space-import.prompt.md
 ```
 
 ## Contract IDs And Schemas
@@ -258,26 +267,28 @@ Schema/version IDs:
 - utility prepare: `xyte.utility.prepare.v1`
 
 Canonical schemas:
-- `docs/schemas/call-envelope.v1.schema.json`
-- `docs/schemas/headless-frame.v1.schema.json`
-- `docs/schemas/inspect-fleet.v1.schema.json`
-- `docs/schemas/inspect-deep-dive.v1.schema.json`
-- `docs/schemas/report.v1.schema.json`
-- `docs/schemas/utility-batch.v1.schema.json`
-- `docs/schemas/utility-prepare.v1.schema.json`
+- `schemas/call-envelope.v1.schema.json`
+- `schemas/headless-frame.v1.schema.json`
+- `schemas/inspect-fleet.v1.schema.json`
+- `schemas/inspect-deep-dive.v1.schema.json`
+- `schemas/report.v1.schema.json`
+- `schemas/utility-batch.v1.schema.json`
+- `schemas/utility-prepare.v1.schema.json`
 
 ## Troubleshooting Entrypoints
 
 - First-run/setup issues:
   - `xyte-cli`
-  - `xyte-cli setup run --non-interactive --tenant <tenant-id> --key <value>`
+  - `xyte-cli setup run --tenant <tenant-id> --provider <xyte-org|xyte-partner>`
+  - for automation, pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> --provider <xyte-org|xyte-partner> --key-stdin`
 - Readiness/connectivity:
   - `xyte-cli setup status --tenant <tenant-id> --output json`
+  - `xyte-cli setup status --tenant <tenant-id> --field tenantId`
   - `xyte-cli config doctor --tenant <tenant-id> --output json`
 - Console crash diagnostics:
 
 ```bash
-XYTE_TUI_DEBUG=1 XYTE_TUI_DEBUG_LOG=/tmp/xyte-tui-debug.log xyte-cli ops console --tenant <tenant-id>
+xyte-cli ops console --tenant <tenant-id>
 ```
 
 - Headless errors:

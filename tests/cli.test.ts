@@ -404,7 +404,7 @@ describe('cli integration', () => {
       'Console / Headless',
       'Examples'
     ]);
-    expect(parsed.sections[0].commands[0]).toContain('xyte-cli setup run --non-interactive');
+    expect(parsed.sections[0].commands[0]).toBe('xyte-cli setup run --tenant default');
   });
 
   it('prints launcher text on TTY when bare xyte-cli is not configured', async () => {
@@ -471,7 +471,7 @@ describe('cli integration', () => {
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     expect(output).toContain('Readiness: ready');
     expect(output).toContain('Everyday Ops');
-    expect(output).toContain('xyte-cli ops watch incidents --tenant acme --once --strict-json');
+    expect(output).toContain('xyte-cli ops watch incidents --tenant acme --once --output json --strict-json');
     expect(output).toContain('xyte-cli ops console --screen dashboard');
   });
 
@@ -645,6 +645,21 @@ describe('cli integration', () => {
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     const parsed = JSON.parse(output);
     expect(parsed.state).toBe('needs_setup');
+  });
+
+  it('prints setup status scalar fields directly', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    await program.parseAsync(['node', 'xyte-cli', 'setup', 'status', '--tenant', 'acme', '--field', 'tenantId']);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(output).toBe('acme\n');
   });
 
   it('manages user and workspace settings through config commands', async () => {
@@ -879,6 +894,119 @@ describe('cli integration', () => {
     expect(parsed.slots[0].hasSecret).toBe(true);
   });
 
+  it('adds key slots from stdin without exposing the key on argv', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+
+    const program = createCli({
+      profileStore,
+      secretStore,
+      stdout,
+      stderr,
+      readStdinValue: vi.fn().mockResolvedValue('org-key')
+    });
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'config',
+      'key',
+      'add',
+      '--tenant',
+      'acme',
+      '--provider',
+      'xyte-org',
+      '--name',
+      'primary',
+      '--key-stdin'
+    ]);
+
+    const [slot] = await profileStore.listKeySlots('acme', 'xyte-org');
+    const stored = await secretStore.getSlotSecret('acme', 'xyte-org', slot!.slotId);
+    expect(stored).toBe('org-key');
+  });
+
+  it('updates key slots from stdin without exposing the key on argv', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    const secretStore = new MemorySecretStore();
+    const slot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-org',
+      name: 'primary',
+      fingerprint: 'sha256:old'
+    });
+    await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'old-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+
+    const program = createCli({
+      profileStore,
+      secretStore,
+      stdout,
+      stderr,
+      readStdinValue: vi.fn().mockResolvedValue('new-key')
+    });
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'config',
+      'key',
+      'update',
+      '--tenant',
+      'acme',
+      '--provider',
+      'xyte-org',
+      '--slot',
+      slot.slotId,
+      '--key-stdin'
+    ]);
+
+    const stored = await secretStore.getSlotSecret('acme', 'xyte-org', slot.slotId);
+    expect(stored).toBe('new-key');
+  });
+
+  it('rejects conflicting stdin and env secret sources during key update', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    const secretStore = new MemorySecretStore();
+    const slot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-org',
+      name: 'primary',
+      fingerprint: 'sha256:old'
+    });
+    const program = createCli({
+      profileStore,
+      secretStore,
+      stdout: { write: vi.fn() },
+      stderr: { write: vi.fn() },
+      env: {
+        ...process.env,
+        XYTE_CLI_KEY: 'env-key'
+      },
+      readStdinValue: vi.fn().mockResolvedValue('stdin-key')
+    });
+
+    await expect(
+      program.parseAsync([
+        'node',
+        'xyte-cli',
+        'config',
+        'key',
+        'update',
+        '--tenant',
+        'acme',
+        '--provider',
+        'xyte-org',
+        '--slot',
+        slot.slotId,
+        '--key-stdin'
+      ])
+    ).rejects.toThrow('Conflicting API key sources');
+  });
+
   it('rejects unsupported auth provider', async () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });
@@ -1000,6 +1128,41 @@ describe('cli integration', () => {
     expect(frame.summary.total).toBe(1);
     expect(Array.isArray(frame.items)).toBe(true);
     expect(frame.items[0].id).toBe('inc-1');
+  });
+
+  it('tees watch output to --out as ndjson', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const outPath = join(mkdtempSync(join(tmpdir(), 'xyte-watch-out-')), 'artifacts', 'incidents.ndjson');
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ items: [{ id: 'inc-1', status: 'active' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ items: [{ id: 'inc-1', status: 'active' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync(['node', 'xyte-cli', 'ops', 'watch', 'incidents', '--tenant', 'acme', '--once', '--out', outPath]);
+
+    const stdoutOutput = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(readFileSync(outPath, 'utf8')).toBe(stdoutOutput);
+    const frame = JSON.parse(stdoutOutput.trim());
+    expect(frame.schemaVersion).toBe('xyte.watch.frame.v1');
   });
 
   it('renders watch frames as text on tty by default', async () => {
@@ -1300,6 +1463,59 @@ describe('cli integration', () => {
     expect(parsed.tenantId).toBe('acme');
   });
 
+  it('tees inspect fleet output to --out', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const outPath = join(mkdtempSync(join(tmpdir(), 'xyte-fleet-out-')), 'artifacts', 'fleet.json');
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url.includes('/devices')) {
+          return new Response(JSON.stringify({ items: [{ id: 'd1', status: 'offline' }] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/spaces')) {
+          return new Response(JSON.stringify({ items: [{ id: 's1', name: 'Room A', space_type: 'room' }] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/incidents')) {
+          return new Response(JSON.stringify({ items: [{ id: 'i1', status: 'active', created_at: new Date().toISOString() }] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/tickets')) {
+          return new Response(JSON.stringify({ items: [{ id: 't1', status: 'open', created_at: new Date().toISOString() }] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        return new Response(JSON.stringify({}), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      })
+    );
+
+    await program.parseAsync(['node', 'xyte-cli', 'ops', 'inspect', 'fleet', '--tenant', 'acme', '--render', 'json', '--out', outPath]);
+
+    const stdoutOutput = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(readFileSync(outPath, 'utf8')).toBe(stdoutOutput);
+    const parsed = JSON.parse(stdoutOutput);
+    expect(parsed.schemaVersion).toBe('xyte.inspect.fleet.v1');
+  });
+
   it('runs inspect fleet in partner-only auto scope without organization calls', async () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });
@@ -1443,6 +1659,87 @@ describe('cli integration', () => {
     expect(calledUrls.every((url) => url.includes('/partner/'))).toBe(true);
     expect(calledUrls.some((url) => url.includes('/organization/'))).toBe(false);
     expect(calledUrls.some((url) => url.includes('/partner/devices/histories'))).toBe(false);
+  });
+
+  it('tees deep-dive markdown output to --out', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-partner', 'partner-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const outPath = join(mkdtempSync(join(tmpdir(), 'xyte-deep-dive-out-')), 'reports', 'deep-dive.md');
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/partner/devices/') && url.includes('/commands')) {
+        return new Response(JSON.stringify({ commands: [{ id: 'c1', status: 'sent' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/devices/') && url.includes('/telemetries')) {
+        return new Response(JSON.stringify({ telemetries: [{ id: 'tm1', timestamp: new Date().toISOString() }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/devices/') && url.includes('/history')) {
+        return new Response(JSON.stringify({ history: [{ id: 'h1', status: 'online' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/devices/')) {
+        return new Response(
+          JSON.stringify({ device: { id: 'pd1', model: 'Model-X', firmware_version: '1.0.0', last_seen_at: new Date().toISOString() } }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
+      }
+      if (url.includes('/partner/devices')) {
+        return new Response(JSON.stringify({ items: [{ id: 'pd1', status: 'offline', name: 'Partner Device' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/partner/tickets')) {
+        return new Response(
+          JSON.stringify({ items: [{ id: 'pt1', status: 'open', title: 'Partner ticket', created_at: new Date().toISOString() }] }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
+      }
+      throw new Error(`Unexpected URL in test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'ops',
+      'inspect',
+      'deep-dive',
+      '--tenant',
+      'acme',
+      '--provider-scope',
+      'auto',
+      '--window',
+      '24',
+      '--render',
+      'markdown',
+      '--out',
+      outPath
+    ]);
+
+    const stdoutOutput = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(readFileSync(outPath, 'utf8')).toBe(stdoutOutput);
+    expect(stdoutOutput).toContain('# Xyte Fleet Deep Dive');
   });
 
   it('keeps partner deep-dive and PDF report generation unblocked when optional enrichment endpoints fail', async () => {
@@ -1878,6 +2175,107 @@ describe('cli integration', () => {
     expect(parsed.readiness.state).toBe('ready');
   });
 
+  it('reads setup keys from stdin in non-interactive mode', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({
+      profileStore,
+      secretStore,
+      stdout,
+      stderr,
+      readStdinValue: vi.fn().mockResolvedValue('org-key')
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ id: 'org-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+    );
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'setup',
+      'run',
+      '--non-interactive',
+      '--tenant',
+      'playground',
+      '--key-stdin'
+    ]);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    const parsed = JSON.parse(output);
+    expect(parsed.readiness.state).toBe('ready');
+  });
+
+  it('rejects conflicting secret sources during setup', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const program = createCli({
+      profileStore,
+      secretStore,
+      stdout: { write: vi.fn() },
+      stderr: { write: vi.fn() },
+      readStdinValue: vi.fn().mockResolvedValue('org-key')
+    });
+
+    await expect(
+      program.parseAsync([
+        'node',
+        'xyte-cli',
+        'setup',
+        'run',
+        '--non-interactive',
+        '--tenant',
+        'playground',
+        '--key',
+        'inline-key',
+        '--key-stdin'
+      ])
+    ).rejects.toThrow('Conflicting API key sources');
+  });
+
+  it('marks prompted setup keys as secret input', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const promptValue = vi.fn().mockResolvedValueOnce('org-key').mockResolvedValueOnce('playground');
+    const program = createCli({
+      profileStore,
+      secretStore,
+      stdout,
+      stderr,
+      isTTY: true,
+      promptValue
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ id: 'org-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+    );
+
+    await program.parseAsync(['node', 'xyte-cli', 'setup', 'run']);
+
+    expect(promptValue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        question: 'XYTE API key',
+        secret: true
+      })
+    );
+  });
+
   it('auto-populates tenant display name from organization key when name is not provided', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();
@@ -2027,6 +2425,9 @@ describe('cli integration', () => {
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
     const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const fetchMock = vi.fn();
+
+    vi.stubGlobal('fetch', fetchMock);
 
     await program.parseAsync([
       'node',
@@ -2048,6 +2449,38 @@ describe('cli integration', () => {
     const step = parsed.steps.find((item: any) => item.key === 'connectivity_checked');
     expect(step.status).toBe('skipped');
     expect(parsed.readiness.connectionState).toBe('not_checked');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('skips tenant-name lookup in advanced setup when connectivity mode is never', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const fetchMock = vi.fn();
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'setup',
+      'run',
+      '--non-interactive',
+      '--tenant',
+      'acme-advanced',
+      '--provider',
+      'xyte-org',
+      '--key',
+      'org-key',
+      '--connectivity',
+      'never'
+    ]);
+
+    const tenant = await profileStore.getTenant('acme-advanced');
+    expect(tenant?.name).toBe('acme-advanced');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('runs setup with connectivity mode always and marks connectivity step as ok', async () => {
@@ -2151,6 +2584,34 @@ describe('cli integration', () => {
     expect(existsSync(join(target, '.agents', 'skills', 'xyte-cli', 'SKILL.md'))).toBe(true);
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     expect(output).toContain('Setup complete');
+  });
+
+  it('keeps init successful when setup credentials are missing', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const target = mkdtempSync(join(tmpdir(), 'xyte-cli-install-soft-init-'));
+
+    await program.parseAsync(['node', 'xyte-cli', 'init', '--target', target]);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(output).toContain('Skill install summary');
+    expect(output).toContain('Setup skipped: no API key was provided.');
+    expect(output).toContain('Run xyte-cli setup run --tenant <tenant-id>');
+    expect(output).not.toContain('--key-stdin --tenant');
+  });
+
+  it('fails init when --require-setup is used without credentials', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
+    const target = mkdtempSync(join(tmpdir(), 'xyte-cli-install-strict-init-'));
+
+    await expect(program.parseAsync(['node', 'xyte-cli', 'init', '--target', target, '--require-setup'])).rejects.toThrow(
+      'Missing API key for init setup'
+    );
   });
 
   it('installs only codex skill in user scope when requested', async () => {

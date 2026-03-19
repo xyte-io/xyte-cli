@@ -1,4 +1,5 @@
-import { writeFileSync, appendFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 
 import { UTILITY_BATCH_SCHEMA_VERSION } from '../contracts/versions';
 import type { XyteClient, XyteCallResult } from '../types/client';
@@ -47,10 +48,15 @@ function stringifyError(error: unknown): string {
   return String(error);
 }
 
+function ensureParentDir(filePath: string): void {
+  mkdirSync(dirname(resolve(filePath)), { recursive: true });
+}
+
 function writeReportLine(reportPath: string | undefined, payload: Record<string, unknown>): void {
   if (!reportPath) {
     return;
   }
+  ensureParentDir(reportPath);
   appendFileSync(reportPath, `${JSON.stringify(payload)}\n`, 'utf8');
 }
 
@@ -74,6 +80,7 @@ export async function runUtilityBatch(args: {
   let firstError: UtilityBatchResult['firstError'] | undefined;
 
   if (args.reportPath) {
+    ensureParentDir(args.reportPath);
     writeFileSync(args.reportPath, '', 'utf8');
   }
 

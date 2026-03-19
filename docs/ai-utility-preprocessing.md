@@ -55,9 +55,9 @@ Prepare claim action:
 ```bash
 xyte-cli util prepare \
   --action organization.devices.claimDevice \
-  --input /path/to/raw-source.xlsx \
+  --input ./input/raw-source.xlsx \
   --tenant <tenant-id> \
-  --output-dir ./tmp
+  --output-dir ./prepared
 ```
 
 Prepare space import action:
@@ -65,9 +65,9 @@ Prepare space import action:
 ```bash
 xyte-cli util prepare \
   --action space.import-tree \
-  --input /path/to/raw-hierarchy.pdf \
+  --input ./input/raw-hierarchy.pdf \
   --tenant <tenant-id> \
-  --output-dir ./tmp
+  --output-dir ./prepared
 ```
 
 Execute prepared space import (dry-run then apply):
@@ -75,11 +75,11 @@ Execute prepared space import (dry-run then apply):
 ```bash
 xyte-cli util import-tree \
   --tenant <tenant-id> \
-  --input ./tmp/space-import-tree.csv
+  --input ./prepared/space-import-tree.csv
 
 xyte-cli util import-tree \
   --tenant <tenant-id> \
-  --input ./tmp/space-import-tree.csv \
+  --input ./prepared/space-import-tree.csv \
   --apply
 ```
 

@@ -15,16 +15,16 @@ For incident operations, run this sequence before any optional writes:
 1. Watch snapshot and short delta loop:
 
 ```bash
-xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --strict-json
-xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 30 --strict-json
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 30 --output json --strict-json
 ```
 
 2. Triage artifacts:
 
 ```bash
-xyte-cli ops inspect fleet --tenant <tenant-id> --output json > /tmp/xyte-fleet.triage.json
-xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json > /tmp/xyte-deep-dive.triage.json
-xyte-cli ops report generate --tenant <tenant-id> --input /tmp/xyte-deep-dive.triage.json --out /tmp/xyte-triage.md --render markdown
+xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/xyte-fleet.triage.json
+xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json --out ./artifacts/xyte-deep-dive.triage.json
+xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/xyte-deep-dive.triage.json --out ./artifacts/xyte-triage.md --render markdown
 ```
 
 3. Optional write handoff:
@@ -59,13 +59,16 @@ Supported screens:
 xyte-cli ops console --headless --screen setup --output json --once --tenant <tenant-id>
 ```
 
-2. If auth is missing, run CLI key-slot operations:
+2. If auth is missing, use the setup flow or CLI key-slot operations:
 
 ```bash
-xyte-cli config key add --tenant <tenant-id> --provider xyte-org --name primary --key <value> --set-active
+xyte-cli setup run --tenant <tenant-id> --provider <xyte-org|xyte-partner>
+xyte-cli setup status --tenant <tenant-id> --field tenantId
 xyte-cli config key list --tenant <tenant-id> --output json
 xyte-cli config doctor --tenant <tenant-id> --output json
 ```
+
+For non-interactive automation, pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> --provider <xyte-org|xyte-partner> --key-stdin`.
 
 3. Re-request the operational headless frame.
 

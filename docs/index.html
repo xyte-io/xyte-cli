@@ -1128,13 +1128,13 @@ xyte-cli --version</code></pre>
                 <ul class="mini-list">
                   <li>
                     <strong>Connect the tenant key once.</strong>
-                    <span>Use the current non-interactive setup path so the environment is ready for future runs.</span>
-                    <span class="detail-code">XYTE_CLI_KEY="&lt;key&gt;" xyte-cli setup run --non-interactive --connectivity auto</span>
+                    <span>Use the interactive setup path first. Shell-specific automation examples live in the getting-started guide.</span>
+                    <span class="detail-code">xyte-cli setup run</span>
                   </li>
                   <li>
                     <strong>Check readiness in JSON.</strong>
                     <span>Read the tenant context back out before moving into watch or reporting commands.</span>
-                    <span class="detail-code">xyte-cli setup status --output json</span>
+                    <span class="detail-code">xyte-cli setup status --field tenantId</span>
                   </li>
                 </ul>
               </article>
@@ -1164,11 +1164,11 @@ xyte-cli --version</code></pre>
                 <p class="card-label">Next commands</p>
                 <div class="command-shell">
                   <pre><code>xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-active --once
-xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json &gt; deep-dive.json
-xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input deep-dive.json --out fleet-report.pdf
+xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json --out ./artifacts/deep-dive.json
+xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input ./artifacts/deep-dive.json --out ./reports/fleet-report.pdf
 xyte-cli ops console --screen dashboard</code></pre>
                 </div>
-                <p class="card-caption">Terminal watch is human-readable by default. Agents should add <code>--strict-json</code>.</p>
+                <p class="card-caption">Terminal watch is human-readable by default. Agents should add <code>--output json --strict-json</code>.</p>
               </article>
             </div>
           </div>
@@ -1192,16 +1192,17 @@ Rules:
 
 Run:
 npm install -g @xyteai/cli@latest
+xyte-cli --version
 xyte-cli init
 
-Then ask me for XYTE_CLI_KEY and run:
-XYTE_CLI_KEY="&lt;key&gt;" xyte-cli setup run --non-interactive --connectivity auto
-xyte-cli setup status --output json
+Then connect the tenant:
+xyte-cli setup run
+xyte-cli setup status --field tenantId
 
 Read tenantId from setup status and continue:
-xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-active --once --strict-json
-xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json &gt; deep-dive.json
-xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input deep-dive.json --out fleet-report.pdf
+xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-active --once --output json --strict-json
+xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json --out ./artifacts/deep-dive.json
+xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input ./artifacts/deep-dive.json --out ./reports/fleet-report.pdf
 
 Finish with:
 - concise success/failure summary

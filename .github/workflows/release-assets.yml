@@ -20,14 +20,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  meta:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Resolve tag
         id: meta
         shell: bash
@@ -51,12 +49,41 @@ jobs:
           echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
 
+  packaged-install-smoke:
+    needs: meta
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
       - name: Checkout tag
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch --force --tags origin
-          git checkout --detach "refs/tags/${{ steps.meta.outputs.tag }}"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: refs/tags/${{ needs.meta.outputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Secretless packaged install smoke
+        run: npm run smoke:pack-install
+
+  release:
+    needs: [meta, packaged-install-smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: refs/tags/${{ needs.meta.outputs.tag }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -72,7 +99,7 @@ jobs:
         run: |
           set -euo pipefail
           PACKAGE_VERSION="$(node -p "require('./package.json').version")"
-          TAG_VERSION="${{ steps.meta.outputs.version }}"
+          TAG_VERSION="${{ needs.meta.outputs.version }}"
           if [[ "${PACKAGE_VERSION}" != "${TAG_VERSION}" ]]; then
             echo "::error::package.json version (${PACKAGE_VERSION}) does not match tag (${TAG_VERSION})."
             exit 1
@@ -97,7 +124,7 @@ jobs:
       - name: Publish GitHub release assets
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.meta.outputs.tag }}
+          tag_name: ${{ needs.meta.outputs.tag }}
           generate_release_notes: true
           files: |
             *.tgz

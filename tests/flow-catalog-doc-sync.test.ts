@@ -35,10 +35,34 @@ function extractRecipeCommands(section: string): string[] {
   if (!blockMatch) {
     return [];
   }
-  return blockMatch[1]
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
+
+  const commands: string[] = [];
+  let current: string[] = [];
+
+  for (const rawLine of blockMatch[1].split('\n')) {
+    const line = rawLine.trimEnd();
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      if (current.length > 0) {
+        commands.push(current.join('\n'));
+        current = [];
+      }
+      continue;
+    }
+
+    current.push(line);
+    if (!trimmed.endsWith('\\')) {
+      commands.push(current.join('\n'));
+      current = [];
+    }
+  }
+
+  if (current.length > 0) {
+    commands.push(current.join('\n'));
+  }
+
+  return commands;
 }
 
 describe('flow catalog recipe parity', () => {

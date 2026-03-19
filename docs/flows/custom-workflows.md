@@ -85,19 +85,19 @@ xyte-cli flow edit flow.local-watch-triage \
 Export:
 
 ```bash
-xyte-cli flow share flow.local-watch-triage --out ./tmp/flow.local-watch-triage.json
+xyte-cli flow share flow.local-watch-triage --out ./artifacts/flow.local-watch-triage.json
 ```
 
 Import:
 
 ```bash
-xyte-cli flow import --file ./tmp/flow.local-watch-triage.json
+xyte-cli flow import --file ./artifacts/flow.local-watch-triage.json
 ```
 
 Overwrite existing on import:
 
 ```bash
-xyte-cli flow import --file ./tmp/flow.local-watch-triage.json --force
+xyte-cli flow import --file ./artifacts/flow.local-watch-triage.json --force
 ```
 
 <details>

@@ -15,6 +15,10 @@ tmp/poc-incident-watch/
 tmp/poc-incident-watch-recordings/
 artifacts/
 **/artifacts/
+reports/
+**/reports/
+output/
+**/output/
 demo/
 marketing/
 .desloppify/

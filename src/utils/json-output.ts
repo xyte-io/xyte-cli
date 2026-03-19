@@ -25,7 +25,7 @@ function safeStringify(value: unknown, spacing: number): string {
   );
 }
 
-function stringifyForOutput(value: unknown, options: JsonWriteOptions = {}): string {
+export function stringifyJsonOutput(value: unknown, options: JsonWriteOptions = {}): string {
   const spacing = options.compact ? 0 : 2;
   if (options.strictJson) {
     return JSON.stringify(value, null, spacing);
@@ -38,6 +38,6 @@ export function writeJsonLine(
   value: unknown,
   options: JsonWriteOptions = {}
 ): void {
-  const text = stringifyForOutput(value, options);
+  const text = stringifyJsonOutput(value, options);
   stream.write(`${text}\n`);
 }

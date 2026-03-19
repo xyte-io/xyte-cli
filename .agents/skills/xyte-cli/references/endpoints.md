@@ -79,13 +79,12 @@ xyte-cli api call organization.devices.getHistories \
 ### `organization.incidents.getIncidents`
 
 ```bash
-NOW=$(date +%s)
 xyte-cli api call organization.incidents.getIncidents \
   --tenant <tenant-id> \
-  --query-json "{\"status\":\"active\",\"from\":0,\"to\":$NOW,\"page\":1,\"per_page\":100}"
+  --query-json '{"status":"active","from":0,"to":1710000000,"page":1,"per_page":100}'
 ```
 
-Use explicit integer Unix timestamps for `from` and `to`. In some environments, omitted or `null` bounds can return empty results.
+Replace `1710000000` with the current Unix timestamp in your shell or runtime. Use explicit integer Unix timestamps for `from` and `to`. In some environments, omitted or `null` bounds can return empty results.
 
 ## Concrete Write/Delete Examples
 
@@ -128,12 +127,12 @@ Partner:
 xyte-cli util list-actions --output text
 
 # scaffold canonical files for one action
-xyte-cli util prepare --action organization.devices.claimDevice --input ./raw-source.xlsx --output-dir ./tmp
+xyte-cli util prepare --action organization.devices.claimDevice --input ./raw-source.xlsx --output-dir ./prepared
 
 # scaffold and execute the dedicated import-tree utility
-xyte-cli util prepare --action space.import-tree --input ./raw-tree.pdf --output-dir ./tmp
-xyte-cli util import-tree --tenant <tenant-id> --input ./tmp/space-import-tree.csv
-xyte-cli util import-tree --tenant <tenant-id> --input ./tmp/space-import-tree.csv --apply --report ./space-import.ndjson
+xyte-cli util prepare --action space.import-tree --input ./raw-tree.pdf --output-dir ./prepared
+xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv
+xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv --apply --report ./artifacts/space-import.ndjson
 ```
 
 Supported prepare output formats:
@@ -157,3 +156,4 @@ Prepare output contract:
 
 - Keep endpoint exploration and invocation on `xyte-cli` commands.
 - Do not rely on repo-local script paths for agent operation.
+- Examples that pass `--path-json`, `--query-json`, or `--body-json` use inline JSON strings. If the host shell has different quoting rules, construct the JSON string in that shell or runtime before calling `xyte-cli`.

@@ -97,7 +97,7 @@ export async function runCommand(command, args, options = {}) {
     const child = spawn(command, args, {
       cwd: options.cwd,
       env: options.env,
-      stdio: ['ignore', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe']
     });
 
     let stdout = '';
@@ -119,6 +119,9 @@ export async function runCommand(command, args, options = {}) {
         stderr
       });
     });
+
+    child.stdin.on('error', (error) => reject(error));
+    child.stdin.end(options.input ?? undefined);
   });
 }
 

@@ -3,9 +3,9 @@
 `xyte-cli` util preprocessing is auth-agnostic. It creates structured files only.
 
 References:
-1. `/Users/porton/Projects/xyte-cli/docs/ai-utility-preprocessing.md`
-2. `/Users/porton/Projects/xyte-cli/scripts/templates/ai-utility-prepare-generic.prompt.md`
-3. `/Users/porton/Projects/xyte-cli/scripts/templates/ai-space-import.prompt.md`
+1. `docs/ai-utility-preprocessing.md`
+2. `scripts/templates/ai-utility-prepare-generic.prompt.md`
+3. `scripts/templates/ai-space-import.prompt.md`
 
 ## Safety Defaults
 
@@ -20,13 +20,13 @@ xyte-cli util prepare \
   --action organization.devices.claimDevice \
   --input /path/to/raw-source.xlsx \
   --tenant <tenant-id> \
-  --output-dir /Users/porton/Projects/xyte-cli/tmp
+  --output-dir ./prepared
 ```
 
 Expected files:
-1. `/Users/porton/Projects/xyte-cli/tmp/organization-devices-claimdevice.csv`
-2. `/Users/porton/Projects/xyte-cli/tmp/organization-devices-claimdevice.rejected.csv`
-3. `/Users/porton/Projects/xyte-cli/tmp/organization-devices-claimdevice.notes.md`
+1. `./prepared/organization-devices-claimdevice.csv`
+2. `./prepared/organization-devices-claimdevice.rejected.csv`
+3. `./prepared/organization-devices-claimdevice.notes.md`
 
 Decision gate:
 1. Validate each target `space_id` with `organization.spaces.getSpace` before write loops.
@@ -42,7 +42,7 @@ xyte-cli util prepare \
   --action space.import-tree \
   --input /path/to/raw-hierarchy.pdf \
   --tenant <tenant-id> \
-  --output-dir /Users/porton/Projects/xyte-cli/tmp
+  --output-dir ./prepared
 ```
 
 Dry-run:
@@ -50,8 +50,8 @@ Dry-run:
 ```bash
 xyte-cli util import-tree \
   --tenant <tenant-id> \
-  --input /Users/porton/Projects/xyte-cli/tmp/space-import-tree.csv \
-  --report /Users/porton/Projects/xyte-cli/tmp/space-import-tree.dryrun.ndjson
+  --input ./prepared/space-import-tree.csv \
+  --report ./artifacts/space-import-tree.dryrun.ndjson
 ```
 
 Apply:
@@ -59,9 +59,9 @@ Apply:
 ```bash
 xyte-cli util import-tree \
   --tenant <tenant-id> \
-  --input /Users/porton/Projects/xyte-cli/tmp/space-import-tree.csv \
+  --input ./prepared/space-import-tree.csv \
   --apply \
-  --report /Users/porton/Projects/xyte-cli/tmp/space-import-tree.apply.ndjson
+  --report ./artifacts/space-import-tree.apply.ndjson
 ```
 
 Verify:
@@ -87,7 +87,7 @@ xyte-cli util prepare \
   --action organization.tickets.updateTicket \
   --input /path/to/raw-ticket-updates.csv \
   --tenant <tenant-id> \
-  --output-dir /Users/porton/Projects/xyte-cli/tmp
+  --output-dir ./prepared
 ```
 
 Generic canonical headers:
