@@ -1,3 +1,11 @@
+## Node.js versions and CI support
+
+This project targets **Node.js 22** as its primary runtime environment.
+
+- The `engines` field in `package.json` requires **Node.js >=22**.
+- Our CI workflow currently runs the test suite on **Node.js 22.x** only.
+
+Earlier Node.js releases (such as **Node 18**) are no longer part of the CI matrix and are not supported for running this project.
 # Release Guide
 
 This repository ships one npm package: `@xyteai/cli`.
