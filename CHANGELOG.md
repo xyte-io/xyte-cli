@@ -6,6 +6,27 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-03-20
+
+### Added
+- `--out` support for `xyte-cli ops inspect deep-dive`, `xyte-cli ops inspect fleet`, and `xyte-cli ops watch incidents` so report inputs and watch streams can be written directly as UTF-8 files.
+- Shell-neutral setup flows with hidden key prompts, `setup run --key-stdin`, and `setup status --field tenantId`.
+- Bundled schemas, templates, and reference data in the shipped `skills/xyte-cli` package so helper scripts can run from the installed package instead of a repo checkout.
+- Cross-platform packaged-install smoke coverage for the published tarball on Ubuntu, macOS, and Windows.
+
+### Changed
+- Switched the published npm entrypoint to the direct Node launcher and raised the supported runtime floor to Node.js 22.
+- Made `xyte-cli init` install skills first and treat missing credentials/setup as a next-step condition unless `--require-setup` is requested.
+- Replaced Unix-only release helpers and shipped skill helper scripts with cross-platform Node-based implementations.
+- Updated README, getting-started docs, flow recipes, and GitHub Pages to use the new `--out`, `--output json --strict-json`, and PATH-fallback guidance.
+
+### Fixed
+- Fixed global Windows installs so `xyte-cli` works in PowerShell and `cmd.exe` without Bash, Git Bash, or WSL.
+- Fixed packaged-install smoke, `.cmd` spawning, and install verification on Windows by handling npm shim paths correctly.
+- Fixed report-generation flows on Windows by removing shell-redirection dependence and preserving UTF-8 output files.
+- Fixed `setup run --connectivity never` so it no longer performs tenant-name network inference before offline setup.
+- Fixed broken GitHub Pages logo asset references so the docs site loads its brand images again.
+
 ## [0.6.0] - 2026-03-06
 
 ### Added
