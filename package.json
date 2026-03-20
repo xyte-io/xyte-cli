@@ -20,14 +20,14 @@
   ],
   "type": "commonjs",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "publishConfig": {
     "access": "public",
     "provenance": true
   },
   "bin": {
-    "xyte-cli": "bin/xyte-cli"
+    "xyte-cli": "dist/bin/xyte-cli.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -37,27 +37,28 @@
     "docs/schemas"
   ],
   "scripts": {
-    "clean": "rm -rf dist coverage",
+    "clean": "node scripts/clean.mjs",
     "build": "npm run clean && tsc -p tsconfig.build.json",
     "prepare": "npm run build",
-    "prepublishOnly": "npm run typecheck && npm test && npm run build",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build && npm run smoke:pack-install",
     "install:global": "npm run build && npm link",
-    "uninstall:global": "npm unlink -g @xyteai/cli || true",
+    "uninstall:global": "node scripts/uninstall_global.mjs",
     "reinstall:global": "npm run uninstall:global && npm run install:global",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "mock:xyte:local": "node scripts/mock_xyte_local.mjs",
     "smoke:local:utilities": "node scripts/smoke_local_utilities.mjs",
-    "smoke:local:flow-pack": "node scripts/smoke_flow_pack_local.mjs",
-    "smoke:external-live": "node scripts/smoke_external_user_live.mjs",
+    "smoke:local:flow-pack": "tsx src/smoke/flow-pack-local.ts",
+    "smoke:pack-install": "tsx src/smoke/pack-install.ts",
+    "smoke:external-live": "tsx src/smoke/external-user-live.ts",
     "smoke:upgrade:controlled": "node scripts/smoke_upgrade_controlled.mjs",
-    "test:commit": "npm run typecheck && npm test && npm run smoke:external-live",
-    "release:check": "bash scripts/release_check.sh",
+    "test:commit": "npm run typecheck && npm test && npm run smoke:pack-install",
+    "release:check": "node scripts/release_check.mjs",
     "tui": "tsx src/bin/xyte-cli.ts tui",
-    "release:publish": "bash scripts/publish.sh all",
-    "release:publish:cli": "bash scripts/publish.sh cli",
-    "release:publish:pages": "bash scripts/publish.sh pages"
+    "release:publish": "node scripts/publish.mjs all",
+    "release:publish:cli": "node scripts/publish.mjs cli",
+    "release:publish:pages": "node scripts/publish.mjs pages"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
@@ -66,12 +67,14 @@
     "ajv": "^8.18.0",
     "blessed": "^0.1.81",
     "commander": "^14.0.3",
+    "cross-spawn": "^7.0.6",
     "pdfkit": "^0.17.2",
     "pino": "^10.3.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/blessed": "^0.1.25",
+    "@types/cross-spawn": "^6.0.6",
     "@types/node": "^22.13.4",
     "tsx": "^4.19.3",
     "typescript": "^5.7.3",

@@ -1,5 +1,13 @@
 # Release Guide
 
+## Node.js versions and CI support
+
+This project targets **Node.js 22** as its primary runtime environment.
+
+- The `engines` field in `package.json` requires **Node.js >=22**.
+- Our CI workflow currently runs the test suite on **Node.js 22.x** only.
+- Earlier Node.js releases, including **Node 18**, are no longer supported.
+
 This repository ships one npm package: `@xyteai/cli`.
 
 ## Governance
@@ -12,18 +20,19 @@ This repository ships one npm package: `@xyteai/cli`.
 
 `.github/workflows/ci.yml` runs on pushes and pull requests:
 
-- matrix validation on `ubuntu-latest` and `macos-latest`, Node `18` and `22`
+- matrix validation on `ubuntu-latest`, `macos-latest`, and `windows-latest`, Node `22`
 - `npm ci`
 - `npm run typecheck`
 - `npm test`
 - `npm run build`
-- `npm pack --dry-run`
+- packaged-install smoke from the built tarball (`npm run smoke:pack-install`)
 - separate security job: `npm audit --audit-level=high`
 - controlled upgrade smoke job: `npm run smoke:upgrade:controlled` on `ubuntu-latest`
 
 Recommended branch protection:
 
 - require `CI / validate`
+- require `CI / packaged-install-smoke`
 - require `CI / security`
 - require `CI / upgrade-controlled-smoke`
 - require up-to-date branch before merge
@@ -36,7 +45,7 @@ Run the full local gate:
 npm run release:check
 ```
 
-This script runs install, typecheck, tests, build, dry-run pack, audit, and optional external smoke (`XYTE_CLI_KEY` required).
+This script runs install, typecheck, tests, build, packaged-install smoke, audit, and optional external smoke (`XYTE_CLI_KEY` required).
 
 ## Publish Workflow
 
@@ -47,7 +56,7 @@ Workflow gates:
 1. Resolve and validate semver tag.
 2. Checkout the exact tag commit.
 3. Validate `package.json` version matches tag version.
-4. Run `typecheck`, `test`, `build`, and `npm pack --dry-run`.
+4. Run `typecheck`, `test`, `build`, and the same packaged-install smoke used in CI.
 5. Publish to npm with provenance on Node `22` + npm `11.5.1`.
 
 Prerequisites:
@@ -59,6 +68,7 @@ Prerequisites:
 
 `.github/workflows/release-assets.yml` runs on the same tags (or manually) and attaches release artifacts to GitHub Releases:
 
+- the same packaged-install smoke validates the tarball before attach/upload steps
 - built npm tarball (`*.tgz`)
 - CycloneDX SBOM (`sbom.cdx.json`)
 - SHA-256 checksums (`checksums.txt`)

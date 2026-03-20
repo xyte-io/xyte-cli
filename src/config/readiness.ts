@@ -63,7 +63,7 @@ export async function evaluateReadiness(options: ReadinessOptions): Promise<Read
 
   if (!tenantId) {
     missingItems.push('No active tenant is configured.');
-    recommendedActions.push('Run "xyte-cli" for guided first-run setup, or "xyte-cli setup run --non-interactive --tenant default --key <value>".');
+    recommendedActions.push('Run "xyte-cli" for guided first-run setup, or "xyte-cli setup run --tenant default".');
     return {
       state: 'needs_setup',
       missingItems,
@@ -109,7 +109,7 @@ export async function evaluateReadiness(options: ReadinessOptions): Promise<Read
   const hasXyteCredential = providers.some((provider) => XYTE_PROVIDERS.includes(provider.provider) && provider.hasActiveSecret);
   if (!hasXyteCredential) {
     missingItems.push('No active Xyte API key slot is configured (xyte-org / xyte-partner).');
-    recommendedActions.push('Run "xyte-cli setup run --tenant <tenant-id> --key <value>" or review "xyte-cli config doctor".');
+    recommendedActions.push('Run "xyte-cli setup run --tenant <tenant-id>" or review "xyte-cli config doctor".');
   }
 
   let connectivity = defaultConnectivity();

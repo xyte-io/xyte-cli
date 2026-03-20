@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
-
-const scriptPath = '../scripts/smoke_flow_pack_local.mjs';
+import * as smokeFlowPackLocal from '../src/smoke/flow-pack-local';
 
 describe('local flow-pack smoke classifier', () => {
   it('treats known data-gated sendCommand 422 as pass', async () => {
-    const mod = await import(scriptPath);
-    const classified = mod.classifyStep('send_command_write', {
+    const classified = smokeFlowPackLocal.classifyStep('send_command_write', {
       code: 1,
       stdout: JSON.stringify({
         error: {
@@ -19,8 +17,7 @@ describe('local flow-pack smoke classifier', () => {
   });
 
   it('fails update-device verify when read-back did not match expected values', async () => {
-    const mod = await import(scriptPath);
-    const classified = mod.classifyStep(
+    const classified = smokeFlowPackLocal.classifyStep(
       'update_device_verify',
       {
         code: 1,
@@ -33,8 +30,7 @@ describe('local flow-pack smoke classifier', () => {
   });
 
   it('passes update-device verify when read-back succeeds but fields are unchanged', async () => {
-    const mod = await import(scriptPath);
-    const classified = mod.classifyStep(
+    const classified = smokeFlowPackLocal.classifyStep(
       'update_device_verify',
       {
         code: 1,

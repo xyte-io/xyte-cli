@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xyte.dev/schemas/utility-batch.v1.schema.json",
+  "title": "Xyte Utility Batch V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generatedAtUtc",
+    "tenantId",
+    "command",
+    "mode",
+    "totals",
+    "stoppedEarly"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "xyte.utility.batch.v1"
+    },
+    "generatedAtUtc": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string"
+    },
+    "command": {
+      "type": "string",
+      "enum": [
+        "space.import-tree"
+      ]
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "dry-run",
+        "apply"
+      ]
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rows",
+        "succeeded",
+        "failed",
+        "skipped"
+      ],
+      "properties": {
+        "rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "succeeded": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "stoppedEarly": {
+      "type": "boolean"
+    },
+    "firstError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rowIndex",
+        "message"
+      ],
+      "properties": {
+        "rowIndex": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "reportPath": {
+      "type": "string"
+    }
+  }
+}

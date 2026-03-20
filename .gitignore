@@ -15,12 +15,19 @@ tmp/poc-incident-watch/
 tmp/poc-incident-watch-recordings/
 artifacts/
 **/artifacts/
+reports/
+**/reports/
+output/
+**/output/
 demo/
 marketing/
 .desloppify/
 
 # Local tooling scratch files
 AGENTS.md
+.agents/skills/
+.claude/skills/
+.github/skills/
 apply
 approve
 review

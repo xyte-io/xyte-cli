@@ -4,13 +4,20 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('package scripts', () => {
-  it('enforces the commit gate chain with live external smoke', () => {
+  it('enforces packaged-artifact smoke in the local ship gates', () => {
     const pkg = JSON.parse(readFileSync(resolve(__dirname, '../package.json'), 'utf8')) as {
+      bin?: Record<string, string>;
       scripts?: Record<string, string>;
     };
 
-    expect(pkg.scripts?.['smoke:external-live']).toBe('node scripts/smoke_external_user_live.mjs');
-    expect(pkg.scripts?.['test:commit']).toBe('npm run typecheck && npm test && npm run smoke:external-live');
-    expect(pkg.scripts?.['release:check']).toBe('bash scripts/release_check.sh');
+    expect(pkg.bin?.['xyte-cli']).toBe('dist/bin/xyte-cli.js');
+    expect(pkg.scripts?.clean).toBe('node scripts/clean.mjs');
+    expect(pkg.scripts?.['smoke:local:flow-pack']).toBe('tsx src/smoke/flow-pack-local.ts');
+    expect(pkg.scripts?.['smoke:pack-install']).toBe('tsx src/smoke/pack-install.ts');
+    expect(pkg.scripts?.['smoke:external-live']).toBe('tsx src/smoke/external-user-live.ts');
+    expect(pkg.scripts?.prepublishOnly).toBe('npm run typecheck && npm test && npm run build && npm run smoke:pack-install');
+    expect(pkg.scripts?.['test:commit']).toBe('npm run typecheck && npm test && npm run smoke:pack-install');
+    expect(pkg.scripts?.['release:check']).toBe('node scripts/release_check.mjs');
+    expect(pkg.scripts?.['release:publish']).toBe('node scripts/publish.mjs all');
   });
 });

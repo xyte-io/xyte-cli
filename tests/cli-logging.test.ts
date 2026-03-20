@@ -1,8 +1,8 @@
-import { appendFileSync, mkdtempSync, rmSync, statSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createCli } from '../src/cli/index';
 import { createCliActionLogger, listCliActionLogFiles, sanitizeArgvForLog } from '../src/cli/action-logger';
@@ -15,6 +15,11 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 describe('cli action logging', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
   it('sanitizes sensitive argv tokens', () => {
     const sanitized = sanitizeArgvForLog([
       'call',
@@ -103,7 +108,11 @@ describe('cli action logging', () => {
     expect(files.some((file) => file.kind === 'rotated')).toBe(true);
 
     const mode = statSync(logPath).mode & 0o777;
-    expect(mode).toBe(0o600);
+    if (process.platform === 'win32') {
+      expect(mode).toBeGreaterThan(0);
+    } else {
+      expect(mode).toBe(0o600);
+    }
 
     rmSync(dir, { recursive: true, force: true });
   });
@@ -213,6 +222,159 @@ describe('cli action logging', () => {
     const verboseData = asRecord(verboseResult.entries[0]?.data);
     expect(Array.isArray(verboseData.argv)).toBe(true);
     expect(verboseData.options).toBeDefined();
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('does not log API keys read from stdin', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-stdin-log-'));
+    const logPath = join(dir, 'stdin.ndjson');
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({
+      profileStore,
+      secretStore,
+      stdout,
+      stderr,
+      readStdinValue: vi.fn().mockResolvedValue('super-secret-key')
+    });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ id: 'org-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+    );
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      '--log-actions',
+      '--log-actions-verbose',
+      '--log-actions-path',
+      logPath,
+      'setup',
+      'run',
+      '--non-interactive',
+      '--tenant',
+      'acme',
+      '--key-stdin'
+    ]);
+
+    const rawLog = readFileSync(logPath, 'utf8');
+    expect(rawLog).not.toContain('super-secret-key');
+
+    const result = readCliActionLog({ path: logPath, event: 'command.start', limit: 1 });
+    const data = asRecord(result.entries[0]?.data);
+    const argv = (data.argv ?? []) as string[];
+    expect(argv).toContain('--key-stdin');
+    expect(argv).not.toContain('super-secret-key');
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('does not log API keys read from stdin for config key add', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-key-add-log-'));
+    const logPath = join(dir, 'key-add.ndjson');
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({
+      profileStore,
+      secretStore,
+      stdout,
+      stderr,
+      readStdinValue: vi.fn().mockResolvedValue('super-secret-key')
+    });
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      '--log-actions',
+      '--log-actions-verbose',
+      '--log-actions-path',
+      logPath,
+      'config',
+      'key',
+      'add',
+      '--tenant',
+      'acme',
+      '--provider',
+      'xyte-org',
+      '--name',
+      'primary',
+      '--key-stdin'
+    ]);
+
+    const rawLog = readFileSync(logPath, 'utf8');
+    expect(rawLog).not.toContain('super-secret-key');
+
+    const result = readCliActionLog({ path: logPath, event: 'command.start', limit: 1 });
+    const data = asRecord(result.entries[0]?.data);
+    const argv = (data.argv ?? []) as string[];
+    expect(argv).toContain('--key-stdin');
+    expect(argv).not.toContain('super-secret-key');
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('does not log API keys read from stdin for config key update', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-key-update-log-'));
+    const logPath = join(dir, 'key-update.ndjson');
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+
+    await profileStore.upsertTenant({ id: 'acme' });
+    const slot = await profileStore.addKeySlot('acme', {
+      provider: 'xyte-org',
+      name: 'primary',
+      fingerprint: 'old-fingerprint'
+    });
+    await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'old-key');
+
+    const program = createCli({
+      profileStore,
+      secretStore,
+      stdout,
+      stderr,
+      readStdinValue: vi.fn().mockResolvedValue('super-secret-key')
+    });
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      '--log-actions',
+      '--log-actions-verbose',
+      '--log-actions-path',
+      logPath,
+      'config',
+      'key',
+      'update',
+      '--tenant',
+      'acme',
+      '--provider',
+      'xyte-org',
+      '--slot',
+      slot.slotId,
+      '--key-stdin'
+    ]);
+
+    const rawLog = readFileSync(logPath, 'utf8');
+    expect(rawLog).not.toContain('super-secret-key');
+
+    const result = readCliActionLog({ path: logPath, event: 'command.start', limit: 1 });
+    const data = asRecord(result.entries[0]?.data);
+    const argv = (data.argv ?? []) as string[];
+    expect(argv).toContain('--key-stdin');
+    expect(argv).not.toContain('super-secret-key');
 
     rmSync(dir, { recursive: true, force: true });
   });

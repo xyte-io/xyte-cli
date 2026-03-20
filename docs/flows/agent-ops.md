@@ -2,6 +2,8 @@
 
 Deterministic operator flows for AI-agent usage on top of existing `xyte-cli` commands.
 
+Primary setup, watch, inspect, and report commands below use the cross-platform CLI contract. Advanced raw API examples that embed JSON remain shell-specific because quoting still differs across PowerShell, CMD, Bash, and zsh.
+
 ## Shared Safety Rules
 
 1. Non-read endpoint calls execute directly once the operator chooses the write step.
@@ -42,13 +44,13 @@ Runner behavior:
 xyte-cli setup status --tenant <tenant-id> --output json
 xyte-cli config doctor --tenant <tenant-id> --output json
 xyte-cli status --tenant <tenant-id> --mode fast --output json
-xyte-cli ops inspect fleet --tenant <tenant-id> --output json > /tmp/xyte-fleet.setup.json
+xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/xyte-fleet.setup.json
 ```
 
 - Expected artifacts:
   - readiness JSON from setup status.
   - connectivity diagnostics JSON from config doctor.
-  - fleet snapshot JSON at `/tmp/xyte-fleet.setup.json`.
+  - fleet snapshot JSON at `./artifacts/xyte-fleet.setup.json`.
 - Stop/decision gates:
   - Stop if setup status is not ready.
   - Stop if config doctor reports failed connectivity.
@@ -60,30 +62,26 @@ xyte-cli ops inspect fleet --tenant <tenant-id> --output json > /tmp/xyte-fleet.
 ## flow.incidents-delta-watch
 
 - Flow ID: `flow.incidents-delta-watch`
-- Intent: stream deterministic incident deltas. Use terminal text for operators and `--strict-json` for `xyte.watch.frame.v1` frames.
+- Intent: stream deterministic incident deltas. Use terminal text for operators and `--output json --strict-json` for `xyte.watch.frame.v1` frames.
 - Prerequisites:
   - `flow.setup-readiness-10m` completed.
   - `<tenant-id>` is active and authorized.
 - Exact commands:
 
 ```bash
-xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --strict-json
-xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 30 --strict-json > /tmp/xyte-watch.incidents.ndjson
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 30 --output json --strict-json --out ./artifacts/xyte-watch.incidents.ndjson
 ```
 
 - Expected artifacts:
   - first snapshot frame from `--once`.
-  - continuous watch frames at `/tmp/xyte-watch.incidents.ndjson` with `snapshot|delta|heartbeat|error` events.
+  - continuous watch frames at `./artifacts/xyte-watch.incidents.ndjson` with `snapshot|delta|heartbeat|error` events.
 - Stop/decision gates:
   - Stop and open triage if any `delta` frame contains added/updated incidents.
   - Stop if repeated `error` frames occur.
 - Failure fallback:
-  - Run a bounded read call:
-
-```bash
-NOW=$(date +%s)
-xyte-cli api call organization.incidents.getIncidents --tenant <tenant-id> --query-json "{\"status\":\"active\",\"from\":0,\"to\":$NOW,\"page\":1,\"per_page\":100}"
-```
+  - Run `xyte-cli api endpoints describe organization.incidents.getIncidents`.
+  - Re-run `organization.incidents.getIncidents` with explicit integer `from`, `to`, `page`, and `per_page` values using native shell syntax for your environment.
 
 ## flow.watch-to-triage
 
@@ -95,17 +93,17 @@ xyte-cli api call organization.incidents.getIncidents --tenant <tenant-id> --que
 - Exact commands:
 
 ```bash
-xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --strict-json > /tmp/xyte-watch.triage.ndjson
-xyte-cli ops inspect fleet --tenant <tenant-id> --output json > /tmp/xyte-fleet.triage.json
-xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json > /tmp/xyte-deep-dive.triage.json
-xyte-cli ops report generate --tenant <tenant-id> --input /tmp/xyte-deep-dive.triage.json --out /tmp/xyte-triage.md --render markdown
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json --out ./artifacts/xyte-watch.triage.ndjson
+xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/xyte-fleet.triage.json
+xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json --out ./artifacts/xyte-deep-dive.triage.json
+xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/xyte-deep-dive.triage.json --out ./reports/xyte-triage.md --render markdown
 ```
 
 - Expected artifacts:
-  - watch snapshot for triage at `/tmp/xyte-watch.triage.ndjson`.
-  - fleet context at `/tmp/xyte-fleet.triage.json`.
-  - deep-dive JSON at `/tmp/xyte-deep-dive.triage.json`.
-  - triage markdown report at `/tmp/xyte-triage.md`.
+  - watch snapshot for triage at `./artifacts/xyte-watch.triage.ndjson`.
+  - fleet context at `./artifacts/xyte-fleet.triage.json`.
+  - deep-dive JSON at `./artifacts/xyte-deep-dive.triage.json`.
+  - triage markdown report at `./reports/xyte-triage.md`.
 - Stop/decision gates:
   - Human decision gate: choose read-only monitoring or switch to `flow.guided-remediation`.
   - Stop if deep-dive/report generation fails validation.
@@ -120,10 +118,13 @@ xyte-cli ops report generate --tenant <tenant-id> --input /tmp/xyte-deep-dive.tr
 - Prerequisites:
   - triage artifacts exist and identify concrete `<device-id>`, `<ticket-id>`, and `<incident-id>`.
   - human operator approval to execute writes.
+- Shell note:
+  - the raw `api call ... --path-json/--body-json` examples below are Bash/zsh-shaped because inline JSON quoting still differs by shell.
+  - on PowerShell or CMD, prefer `xyte-cli flow run flow.guided-remediation --tenant <tenant-id> --plan` and adapt any copied write commands to your shell.
 - Exact commands:
 
 ```bash
-xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --strict-json > /tmp/xyte-watch.before.ndjson
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json --out ./artifacts/xyte-watch.before.ndjson
 
 xyte-cli api call organization.commands.getCommands \
   --tenant <tenant-id> \
@@ -153,7 +154,7 @@ xyte-cli api call organization.incidents.closeIncident \
   --tenant <tenant-id> \
   --path-json '{"incident_id":"<incident-id>"}'
 
-xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --strict-json > /tmp/xyte-watch.after.ndjson
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json --out ./artifacts/xyte-watch.after.ndjson
 ```
 
 - Expected artifacts:
@@ -196,15 +197,15 @@ xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --o
 
 ```bash
 xyte-cli setup status --tenant <tenant-id> --output json
-xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json > /tmp/xyte-deep-dive.daily.json
-xyte-cli ops report generate --tenant <tenant-id> --input /tmp/xyte-deep-dive.daily.json --out /tmp/xyte-daily.md --render markdown
-xyte-cli ops inspect fleet --tenant <tenant-id> --output json > /tmp/xyte-fleet.daily.json
+xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json --out ./artifacts/xyte-deep-dive.daily.json
+xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/xyte-deep-dive.daily.json --out ./reports/xyte-daily.md --render markdown
+xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/xyte-fleet.daily.json
 ```
 
 - Expected artifacts:
-  - deep-dive JSON at `/tmp/xyte-deep-dive.daily.json` (`xyte.inspect.deep-dive.v1`).
-  - markdown report at `/tmp/xyte-daily.md`.
-  - fleet summary JSON at `/tmp/xyte-fleet.daily.json`.
+  - deep-dive JSON at `./artifacts/xyte-deep-dive.daily.json` (`xyte.inspect.deep-dive.v1`).
+  - markdown report at `./reports/xyte-daily.md`.
+  - fleet summary JSON at `./artifacts/xyte-fleet.daily.json`.
 - Stop/decision gates:
   - Stop if setup status is not ready.
   - Human decision gate: approve report distribution or escalate to `flow.watch-to-triage`.

@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -115,7 +115,8 @@ describe('space import workflow', () => {
       })
     } as unknown as XyteClient;
 
-    const reportPath = tempPath('report.ndjson');
+    const reportRoot = mkdtempSync(join(tmpdir(), 'xyte-utility-report-'));
+    const reportPath = join(reportRoot, 'reports', 'report.ndjson');
     const result = await runSpaceImportTree({
       client,
       tenantId: 'acme',
@@ -140,6 +141,7 @@ describe('space import workflow', () => {
       space_type: 'building',
       config: { zone: 'north' }
     });
+    expect(existsSync(reportPath)).toBe(true);
     const report = readFileSync(reportPath, 'utf8').trim().split('\n');
     expect(report.length).toBe(1);
   });

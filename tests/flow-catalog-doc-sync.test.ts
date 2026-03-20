@@ -11,7 +11,7 @@ function normalizeRecipeLine(value: string): string {
 
 function extractFlowSections(markdown: string): Record<string, string> {
   const sections: Record<string, string> = {};
-  const headingPattern = /^##\s+(flow\.[^\n]+)\n/gm;
+  const headingPattern = /^##\s+(flow\.[^\r\n]+)\r?\n/gm;
   const headings: Array<{ flowId: string; headingIndex: number; bodyStartIndex: number }> = [];
 
   for (const match of markdown.matchAll(headingPattern)) {
@@ -31,14 +31,38 @@ function extractFlowSections(markdown: string): Record<string, string> {
 }
 
 function extractRecipeCommands(section: string): string[] {
-  const blockMatch = section.match(/```bash\n([\s\S]*?)\n```/m);
+  const blockMatch = section.match(/```bash\r?\n([\s\S]*?)\r?\n```/m);
   if (!blockMatch) {
     return [];
   }
-  return blockMatch[1]
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
+
+  const commands: string[] = [];
+  let current: string[] = [];
+
+  for (const rawLine of blockMatch[1].split(/\r?\n/)) {
+    const line = rawLine.trimEnd();
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      if (current.length > 0) {
+        commands.push(current.join('\n'));
+        current = [];
+      }
+      continue;
+    }
+
+    current.push(line);
+    if (!trimmed.endsWith('\\')) {
+      commands.push(current.join('\n'));
+      current = [];
+    }
+  }
+
+  if (current.length > 0) {
+    commands.push(current.join('\n'));
+  }
+
+  return commands;
 }
 
 describe('flow catalog recipe parity', () => {

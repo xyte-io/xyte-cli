@@ -42,12 +42,14 @@ function normalizeUtilityPrepare(
   }
 ) {
   const result = JSON.parse(JSON.stringify(value)) as Record<string, any>;
+  const normalizePath = (input: string) => input.replaceAll('\\', '/');
+  const outputDir = normalizePath(paths.outputDir);
   result.generatedAtUtc = '<ISO_TIMESTAMP>';
   result.input.path = '<INPUT_PATH>';
-  result.artifacts.primary = result.artifacts.primary.replace(paths.outputDir, '<OUTPUT_DIR>');
-  result.artifacts.rejected = result.artifacts.rejected.replace(paths.outputDir, '<OUTPUT_DIR>');
-  result.artifacts.notes = result.artifacts.notes.replace(paths.outputDir, '<OUTPUT_DIR>');
-  result.suggestedCommands.next = String(result.suggestedCommands.next).replace(paths.outputDir, '<OUTPUT_DIR>');
+  result.artifacts.primary = normalizePath(String(result.artifacts.primary)).replace(outputDir, '<OUTPUT_DIR>');
+  result.artifacts.rejected = normalizePath(String(result.artifacts.rejected)).replace(outputDir, '<OUTPUT_DIR>');
+  result.artifacts.notes = normalizePath(String(result.artifacts.notes)).replace(outputDir, '<OUTPUT_DIR>');
+  result.suggestedCommands.next = normalizePath(String(result.suggestedCommands.next)).replace(outputDir, '<OUTPUT_DIR>');
   return result;
 }
 

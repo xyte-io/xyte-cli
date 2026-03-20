@@ -19,16 +19,17 @@ Rules:
 
 Run:
 npm install -g @xyteai/cli@latest
-xyte-cli init
+xyte-cli --version
+xyte-cli init --no-setup
 
-Then ask me for XYTE_CLI_KEY and run:
-XYTE_CLI_KEY="<key>" xyte-cli setup run --non-interactive --connectivity auto
-xyte-cli setup status --output json
+Then connect the tenant:
+xyte-cli setup run
+xyte-cli setup status --field tenantId
 
 Read tenantId from setup status and continue:
-xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --strict-json
-xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json > deep-dive.json
-xyte-cli ops report generate --tenant <tenant-id> --input deep-dive.json --out fleet-report.pdf
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json
+xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json --out ./artifacts/deep-dive.json
+xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/deep-dive.json --out ./reports/fleet-report.pdf
 
 Finish with:
 - concise success/failure summary
@@ -46,26 +47,27 @@ npm install -g @xyteai/cli@latest
 xyte-cli --version
 ```
 
+If your global npm bin is not on `PATH`, replace `xyte-cli` in the commands below with one of these published-package fallbacks:
+
+```bash
+npx @xyteai/cli@latest <command>
+npm exec -- @xyteai/cli@latest <command>
+```
+
 ### 2) Install agent skills
 
 ```bash
-xyte-cli init
+xyte-cli init --no-setup
 ```
 
 ### 3) Connect with tenant-bound API key
 
 ```bash
-XYTE_CLI_KEY="<key>" xyte-cli setup run --non-interactive --connectivity auto
-xyte-cli setup status --output json
+xyte-cli setup run
+xyte-cli setup status --field tenantId
 ```
 
-### 4) Extract active tenant id from setup status (optional helper)
-
-```bash
-xyte-cli setup status --output json | jq -r '.tenantId'
-```
-
-Use that value as `<tenant-id>` in the examples below.
+Use that value as `<tenant-id>` in the examples below. For non-interactive automation, use the shell-neutral `--key-stdin` path documented in [`docs/getting-started.md`](./docs/getting-started.md).
 
 ---
 
@@ -100,7 +102,7 @@ xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --i
 ```
 
 Key params:
-- terminal output is human-readable by default; add `--strict-json` for machine parsing
+- terminal output is human-readable by default; add `--output json --strict-json` for machine parsing
 - `--once` one snapshot poll and exit
 - `--interval-ms` minimum `1000`
 - `--max-polls` bounded polling
@@ -108,12 +110,7 @@ Key params:
 ### 4) Guided remediation plan (no writes)
 
 ```bash
-xyte-cli flow run flow.guided-remediation \
-  --tenant <tenant-id> \
-  --var incident_id=<incident-id> \
-  --var device_id=<device-id> \
-  --var command=reboot \
-  --var updated_device_name=<device-name>
+xyte-cli flow run flow.guided-remediation --tenant <tenant-id> --var incident_id=<incident-id> --var device_id=<device-id> --var command=reboot --var updated_device_name=<device-name>
 ```
 
 Key params:
@@ -122,6 +119,8 @@ Key params:
 - `--resume <run-id-or-path>` for follow-up runs
 
 ### 5) Write example
+
+Primary read/setup/reporting workflows are shell-neutral. Advanced raw API examples like this one remain shell-specific because inline JSON quoting differs across PowerShell, CMD, Bash, and zsh.
 
 ```bash
 xyte-cli api call organization.commands.sendCommand \
@@ -137,7 +136,7 @@ Behavior:
 
 ```bash
 xyte-cli ops inspect fleet --tenant <tenant-id> --provider-scope auto --output json
-xyte-cli ops inspect deep-dive --tenant <tenant-id> --provider-scope auto --window 24 --output json > deep-dive.json
+xyte-cli ops inspect deep-dive --tenant <tenant-id> --provider-scope auto --window 24 --output json --out ./artifacts/deep-dive.json
 ```
 
 Key params:
@@ -148,7 +147,7 @@ Key params:
 ### 7) Generate PDF report
 
 ```bash
-xyte-cli ops report generate --tenant <tenant-id> --input deep-dive.json --out fleet-report.pdf
+xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/deep-dive.json --out ./reports/fleet-report.pdf
 ```
 
 Key params:
@@ -178,7 +177,7 @@ xyte-cli util prepare \
   --output-dir ./prepared
 
 xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv
-xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv --apply --report ./space-import.apply.ndjson
+xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv --apply --report ./reports/space-import.apply.ndjson
 ```
 
 Key params:
@@ -200,9 +199,9 @@ Key params:
 ### 11) Action logs and diagnostics
 
 ```bash
-xyte-cli --log-actions --log-actions-path /tmp/xyte-cli.actions.ndjson status --tenant <tenant-id>
-xyte-cli logs list --path /tmp/xyte-cli.actions.ndjson --limit 200
-xyte-cli logs stats --path /tmp/xyte-cli.actions.ndjson
+xyte-cli --log-actions --log-actions-path ./logs/xyte-cli.actions.ndjson status --tenant <tenant-id>
+xyte-cli logs list --path ./logs/xyte-cli.actions.ndjson --limit 200
+xyte-cli logs stats --path ./logs/xyte-cli.actions.ndjson
 ```
 
 Key params:

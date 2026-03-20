@@ -1,7 +1,8 @@
 import { createInterface } from 'node:readline/promises';
-import { readFileSync, realpathSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { Writable } from 'node:stream';
 
 import { Command } from 'commander';
 
@@ -41,9 +42,9 @@ import { FileProfileStore, type ProfileStore } from '../secure/profile-store';
 import type { SecretProvider } from '../types/profile';
 import { SUPPORTED_SECRET_PROVIDERS, isSecretProvider } from '../types/profile';
 import { parseJsonObject } from '../utils/json';
-import { writeJsonLine } from '../utils/json-output';
+import { buildInstallDoctorReport, type InstallDoctorResult } from '../utils/install-doctor';
+import { stringifyJsonOutput } from '../utils/json-output';
 import type { UtilityInputFormat } from '../utils/input-parser';
-import { resolveCommandFromPath } from '../utils/resolve-command-path';
 import { getCliVersion } from '../utils/version';
 import {
   installSkills,
@@ -88,7 +89,7 @@ import { CliUserError } from './user-error';
 type OutputStream = Pick<typeof process.stdout, 'write'>;
 type ErrorStream = Pick<typeof process.stderr, 'write'>;
 type OutputFormat = 'json' | 'text';
-type PromptValueFn = (args: { question: string; initial?: string; stdout: OutputStream }) => Promise<string>;
+type PromptValueFn = (args: { question: string; initial?: string; stdout: OutputStream; secret?: boolean }) => Promise<string>;
 type SetupConnectivityMode = 'auto' | 'always' | 'never';
 type SetupStepKey =
   | 'tenant_upserted'
@@ -102,17 +103,6 @@ interface SetupStep {
   key: SetupStepKey;
   status: 'ok' | 'skipped';
   detail?: string;
-}
-
-interface InstallDoctorResult {
-  status: 'ok' | 'missing' | 'mismatch';
-  commandOnPath: boolean;
-  commandPath?: string;
-  commandRealPath?: string;
-  expectedPath: string;
-  expectedRealPath: string;
-  sameTarget: boolean;
-  suggestions: string[];
 }
 
 interface CliGlobalOptions {
@@ -147,6 +137,7 @@ interface CliRuntime {
   stderr?: ErrorStream;
   runTui?: typeof runTuiApp;
   promptValue?: PromptValueFn;
+  readStdinValue?: () => Promise<string>;
   isTTY?: boolean;
   stdoutIsTTY?: boolean;
   upgradeDependencies?: UpgradeDependencies;
@@ -336,8 +327,70 @@ function resolveSkillSourceDir(): string {
   return path.resolve(__dirname, '../../skills/xyte-cli');
 }
 
+function renderJsonOutput(value: unknown, options: { strictJson?: boolean; compact?: boolean } = {}): string {
+  return `${stringifyJsonOutput(value, { strictJson: options.strictJson, compact: options.compact })}\n`;
+}
+
 function printJson(stream: OutputStream, value: unknown, options: { strictJson?: boolean; compact?: boolean } = {}) {
-  writeJsonLine(stream, value, { strictJson: options.strictJson, compact: options.compact });
+  stream.write(renderJsonOutput(value, options));
+}
+
+function resolveOutPath(out: string | undefined): string | undefined {
+  return out ? path.resolve(out) : undefined;
+}
+
+function ensureParentDir(filePath: string): void {
+  mkdirSync(path.dirname(filePath), { recursive: true });
+}
+
+function writeRenderedOutput(stream: OutputStream, text: string, outPath?: string): void {
+  stream.write(text);
+  if (outPath) {
+    ensureParentDir(outPath);
+    writeFileSync(outPath, text, 'utf8');
+  }
+}
+
+function appendRenderedOutput(stream: OutputStream, text: string, outPath?: string): void {
+  stream.write(text);
+  if (outPath) {
+    ensureParentDir(outPath);
+    appendFileSync(outPath, text, 'utf8');
+  }
+}
+
+function resolveFieldValue(value: unknown, field: string): unknown {
+  const segments = field
+    .split('.')
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  let current = value;
+  for (const segment of segments) {
+    if (!isRecord(current) || !(segment in current)) {
+      return undefined;
+    }
+    current = current[segment];
+  }
+  return current;
+}
+
+function formatScalarFieldValue(value: unknown, field: string): string {
+  if (value === undefined || Array.isArray(value) || isRecord(value)) {
+    throw new CliUserError({
+      summary: 'Invalid setup status field.',
+      cause: `Field "${field}" is missing or not a scalar value.`,
+      suggestedCommands: ['Use --field tenantId', 'Omit --field to print the full status payload']
+    });
+  }
+  return value === null ? 'null' : String(value);
+}
+
+function createSecretConflictError(cause: string): CliUserError {
+  return new CliUserError({
+    summary: 'Conflicting API key sources.',
+    cause,
+    suggestedCommands: ['Use exactly one of --key, --key-stdin, or XYTE_CLI_KEY']
+  });
 }
 
 function parseProvider(value: string): SecretProvider {
@@ -592,58 +645,44 @@ function formatSlotListText(slots: SlotView[]): string {
   return `${lines.join('\n')}\n`;
 }
 
-function getRealPath(value: string): string {
-  try {
-    return realpathSync(value);
-  } catch {
-    return path.resolve(value);
-  }
-}
-
 function runInstallDoctor(): InstallDoctorResult {
   const expectedPath = path.resolve(__dirname, '../../dist/bin/xyte-cli.js');
-  const expectedRealPath = getRealPath(expectedPath);
-  const commandPath = resolveCommandFromPath('xyte-cli');
-  const commandOnPath = Boolean(commandPath);
-  const commandRealPath = commandPath ? getRealPath(commandPath) : undefined;
-  const sameTarget = Boolean(commandRealPath && commandRealPath === expectedRealPath);
-
-  const suggestions: string[] = [];
-  if (!commandOnPath) {
-    suggestions.push('Run: npm run install:global');
-    suggestions.push('Then verify from a different directory: xyte-cli --help');
-  } else if (!sameTarget) {
-    suggestions.push(`xyte-cli currently points to: ${commandPath}`);
-    suggestions.push('Relink this repo globally: npm run reinstall:global');
-  } else {
-    suggestions.push('Global command wiring looks correct.');
-  }
-
-  const status: InstallDoctorResult['status'] = !commandOnPath ? 'missing' : sameTarget ? 'ok' : 'mismatch';
-  return {
-    status,
-    commandOnPath,
-    commandPath,
-    commandRealPath,
-    expectedPath,
-    expectedRealPath,
-    sameTarget,
-    suggestions
-  };
+  return buildInstallDoctorReport(expectedPath);
 }
 
-async function promptValue(args: { question: string; initial?: string; stdout: OutputStream }): Promise<string> {
+async function promptValue(args: { question: string; initial?: string; stdout: OutputStream; secret?: boolean }): Promise<string> {
+  const mutedOutput = new Writable({
+    write(_chunk, _encoding, callback) {
+      callback();
+    }
+  });
   const rl = createInterface({
     input: process.stdin,
-    output: process.stdout
+    output: args.secret ? mutedOutput : process.stdout,
+    terminal: true
   });
   try {
     const suffix = args.initial ? ` [${args.initial}]` : '';
-    const answer = (await rl.question(`${args.question}${suffix}: `)).trim();
+    if (args.secret) {
+      args.stdout.write(`${args.question}${suffix}: `);
+    }
+    const answer = (await rl.question(args.secret ? '' : `${args.question}${suffix}: `)).trim();
+    if (args.secret) {
+      args.stdout.write('\n');
+    }
     return answer || args.initial || '';
   } finally {
     rl.close();
   }
+}
+
+async function readStdinValue(): Promise<string> {
+  const chunks: string[] = [];
+  process.stdin.setEncoding('utf8');
+  for await (const chunk of process.stdin) {
+    chunks.push(chunk);
+  }
+  return chunks.join('').trim();
 }
 
 function normalizeTenantId(value: string): string {
@@ -702,12 +741,41 @@ async function collectSlotViews(args: {
   return views;
 }
 
-function requireKeyValue(value: string | undefined): string {
-  const resolved = value ?? process.env.XYTE_CLI_KEY;
-  if (!resolved) {
-    throw new Error('Missing key value. Use --key or set XYTE_CLI_KEY environment variable.');
+async function resolveKeyValue(args: {
+  key?: string;
+  keyStdin?: boolean;
+  envKey?: string;
+  allowPrompt?: boolean;
+  prompt: PromptValueFn;
+  readStdin: () => Promise<string>;
+  promptQuestion: string;
+  stdout: OutputStream;
+}): Promise<string | undefined> {
+  const inlineKey = args.key?.trim();
+  const envKey = args.envKey?.trim();
+
+  if (inlineKey && args.keyStdin) {
+    throw createSecretConflictError('Use either --key or --key-stdin, not both.');
   }
-  return resolved;
+  if (inlineKey) {
+    return inlineKey;
+  }
+  if (args.keyStdin) {
+    const stdinValue = (await args.readStdin()).trim();
+    return stdinValue || undefined;
+  }
+  if (envKey) {
+    return envKey;
+  }
+  if (args.allowPrompt) {
+    const prompted = await args.prompt({
+      question: args.promptQuestion,
+      stdout: args.stdout,
+      secret: true
+    });
+    return prompted.trim() || undefined;
+  }
+  return undefined;
 }
 
 function parseCliTextJsonOutputMode(value: string | undefined): CliTextJsonOutputMode | undefined {
@@ -877,7 +945,7 @@ function buildRootLauncherPayload(args: {
           title: 'Everyday Ops',
           description: 'Operator flows and fleet visibility.',
           commands: [
-            `xyte-cli ops watch incidents --tenant ${tenantId} --once --strict-json`,
+            `xyte-cli ops watch incidents --tenant ${tenantId} --once --output json --strict-json`,
             `xyte-cli ops inspect fleet --tenant ${tenantId} --output json`,
             `xyte-cli ops inspect deep-dive --tenant ${tenantId} --render markdown`
           ]
@@ -922,7 +990,7 @@ function buildRootLauncherPayload(args: {
           title: 'Setup',
           description: 'First-run onboarding and readiness checks.',
           commands: [
-            `xyte-cli setup run --non-interactive --tenant ${tenantId} --key "$XYTE_CLI_KEY"`,
+            `xyte-cli setup run --tenant ${tenantId}`,
             `xyte-cli setup status --tenant ${tenantId}`,
             `xyte-cli config doctor --tenant ${tenantId}`
           ]
@@ -943,7 +1011,7 @@ function buildRootLauncherPayload(args: {
           commands: [
             'xyte-cli config show --scope resolved',
             `xyte-cli config tenant add ${tenantId}`,
-            `xyte-cli config key add --tenant ${tenantId} --provider xyte-org --name primary --key "$XYTE_CLI_KEY"`
+            `xyte-cli config key add --tenant ${tenantId} --provider xyte-org --name primary`
           ]
         },
         {
@@ -1035,6 +1103,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
   const stdout = runtime.stdout ?? process.stdout;
   const stderr = runtime.stderr ?? process.stderr;
   const prompt = runtime.promptValue ?? promptValue;
+  const readStdin = runtime.readStdinValue ?? readStdinValue;
   const isInteractive = runtime.isTTY ?? Boolean(process.stdin.isTTY);
   const stdoutIsTTY =
     runtime.stdoutIsTTY ??
@@ -1228,6 +1297,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     agents?: string;
     force?: boolean;
     setup?: boolean;
+    requireSetup?: boolean;
   }) => {
     let scope = parseSkillInstallScope(options.scope);
     let agents = parseSkillAgents(options.agents);
@@ -1286,11 +1356,17 @@ export function createCli(runtime: CliRuntime = {}): Command {
       return;
     }
 
-    let keyValue = env.XYTE_CLI_KEY?.trim();
+    let keyValue = await resolveKeyValue({
+      envKey: env.XYTE_CLI_KEY,
+      allowPrompt: isInteractive,
+      prompt,
+      readStdin,
+      promptQuestion: 'XYTE API key',
+      stdout
+    });
     let tenantLabel = SIMPLE_SETUP_DEFAULT_TENANT;
 
     if (isInteractive) {
-      keyValue = keyValue || (await prompt({ question: 'XYTE API key', stdout })).trim();
       tenantLabel =
         (await prompt({
           question: 'Tenant label (optional)',
@@ -1300,11 +1376,18 @@ export function createCli(runtime: CliRuntime = {}): Command {
     }
 
     if (!keyValue) {
-      throw new CliUserError({
-        summary: 'Missing API key for init setup.',
-        cause: 'Neither XYTE_CLI_KEY nor --no-setup was supplied.',
-        suggestedCommands: ['Set XYTE_CLI_KEY and re-run xyte-cli init', 'Re-run xyte-cli init --no-setup']
-      });
+      if (options.requireSetup === true) {
+        throw new CliUserError({
+          summary: 'Missing API key for init setup.',
+          cause: 'Neither XYTE_CLI_KEY nor interactive input supplied a key.',
+          suggestedCommands: ['Run xyte-cli setup run --tenant <tenant-id>', 'Re-run xyte-cli init --no-setup']
+        });
+      }
+      stdout.write('Setup skipped: no API key was provided.\n');
+      stdout.write('Next steps:\n');
+      stdout.write('- Run xyte-cli setup run --tenant <tenant-id>\n');
+      stdout.write('- Or re-run xyte-cli init --require-setup after setting XYTE_CLI_KEY\n');
+      return;
     }
 
     const tenantId = normalizeTenantId(tenantLabel);
@@ -1317,17 +1400,23 @@ export function createCli(runtime: CliRuntime = {}): Command {
     });
 
     if (setupResult.readiness.state !== 'ready') {
-      throw new CliUserError({
-        summary: 'Init setup did not complete.',
-        cause: setupResult.readiness.connectivity.message || 'Connectivity validation failed.',
-        suggestedCommands: [`xyte-cli setup status --tenant ${tenantId}`, `xyte-cli config doctor --tenant ${tenantId}`]
-      });
+      if (options.requireSetup === true) {
+        throw new CliUserError({
+          summary: 'Init setup did not complete.',
+          cause: setupResult.readiness.connectivity.message || 'Connectivity validation failed.',
+          suggestedCommands: [`xyte-cli setup status --tenant ${tenantId}`, `xyte-cli config doctor --tenant ${tenantId}`]
+        });
+      }
+      stdout.write(`Setup needs follow-up for tenant \`${tenantId}\`.\n`);
+      stdout.write(`Next steps: xyte-cli setup status --tenant ${tenantId}\n`);
+      stdout.write(`            xyte-cli config doctor --tenant ${tenantId}\n`);
+      return;
     }
 
     stdout.write(`✅ Setup complete for tenant \`${tenantId}\`.\n`);
   };
 
-  const handleSetupStatus = async (options: { tenant?: string; output?: string; format?: OutputFormat }) => {
+  const handleSetupStatus = async (options: { tenant?: string; output?: string; format?: OutputFormat; field?: string }) => {
     const settings = await resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
     const secretStore = await getSecretStore();
     const tenantId = options.tenant ?? settings.values.defaults.tenant;
@@ -1339,6 +1428,12 @@ export function createCli(runtime: CliRuntime = {}): Command {
       client,
       checkConnectivity: true
     });
+
+    if (options.field) {
+      const fieldValue = resolveFieldValue(readiness, options.field);
+      stdout.write(`${formatScalarFieldValue(fieldValue, options.field)}\n`);
+      return;
+    }
 
     if (
       resolveTextJsonOutput({
@@ -1361,6 +1456,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     provider?: string;
     slotName?: string;
     key?: string;
+    keyStdin?: boolean;
     setActive?: boolean;
     connectivity?: string;
     nonInteractive?: boolean;
@@ -1370,7 +1466,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     if (!options.nonInteractive && !isInteractive) {
       throw new CliUserError({
         summary: 'Interactive setup requires a TTY.',
-        suggestedCommands: ['Use xyte-cli setup run --non-interactive --tenant <tenant-id> --key <value>']
+        suggestedCommands: ['Use xyte-cli setup run --non-interactive --tenant <tenant-id> --key-stdin']
       });
     }
 
@@ -1388,10 +1484,18 @@ export function createCli(runtime: CliRuntime = {}): Command {
       let tenantLabel =
         (options.name ?? options.tenant ?? settings.values.defaults.tenant ?? SIMPLE_SETUP_DEFAULT_TENANT).trim() ||
         SIMPLE_SETUP_DEFAULT_TENANT;
-      let keyValue = options.key ?? env.XYTE_CLI_KEY;
+      let keyValue = await resolveKeyValue({
+        key: options.key,
+        keyStdin: options.keyStdin,
+        envKey: env.XYTE_CLI_KEY,
+        allowPrompt: !options.nonInteractive,
+        prompt,
+        readStdin,
+        promptQuestion: 'XYTE API key',
+        stdout
+      });
 
       if (!options.nonInteractive) {
-        keyValue = keyValue || (await prompt({ question: 'XYTE API key', stdout }));
         tenantLabel =
           (await prompt({
             question: 'Tenant label (optional)',
@@ -1403,15 +1507,15 @@ export function createCli(runtime: CliRuntime = {}): Command {
       if (!keyValue) {
         throw new CliUserError({
           summary: 'Missing API key.',
-          cause: 'Setup needs --key or XYTE_CLI_KEY.',
-          suggestedCommands: ['Use xyte-cli setup run --non-interactive --tenant <tenant-id> --key <value>']
+          cause: 'Setup needs --key, --key-stdin, XYTE_CLI_KEY, or interactive input.',
+          suggestedCommands: ['Use xyte-cli setup run --tenant <tenant-id>']
         });
       }
 
       const tenantId = normalizeTenantId(options.tenant?.trim() || tenantLabel);
       const tenantName = tenantLabel.trim() || tenantId;
       const resolvedTenantName =
-        !explicitTenantName && tenantName === tenantId
+        connectivityMode !== 'never' && !explicitTenantName && tenantName === tenantId
           ? await resolveTenantNameFromKey({
               tenantId,
               provider: SIMPLE_SETUP_AUTH_PROVIDER,
@@ -1439,7 +1543,16 @@ export function createCli(runtime: CliRuntime = {}): Command {
     let tenantName = options.name;
     let provider = options.provider ? parseProvider(options.provider) : undefined;
     let slotName = options.slotName ?? 'primary';
-    let keyValue = options.key ?? env.XYTE_CLI_KEY;
+    let keyValue = await resolveKeyValue({
+      key: options.key,
+      keyStdin: options.keyStdin,
+      envKey: env.XYTE_CLI_KEY,
+      allowPrompt: !options.nonInteractive,
+      prompt,
+      readStdin,
+      promptQuestion: 'API key',
+      stdout
+    });
     const steps: SetupStep[] = [];
 
     if (!options.nonInteractive) {
@@ -1448,13 +1561,12 @@ export function createCli(runtime: CliRuntime = {}): Command {
       const providerAnswer = provider || parseProvider(await prompt({ question: 'Provider', initial: 'xyte-org', stdout }));
       provider = providerAnswer;
       slotName = await prompt({ question: 'Slot name', initial: slotName, stdout });
-      keyValue = keyValue || (await prompt({ question: 'API key', stdout }));
     }
 
     if (!tenantId) {
       throw new CliUserError({
         summary: 'Missing tenant id.',
-        suggestedCommands: ['Use xyte-cli setup run --advanced --tenant <tenant-id> --provider xyte-org --key <value>']
+        suggestedCommands: ['Use xyte-cli setup run --advanced --tenant <tenant-id> --provider xyte-org']
       });
     }
     if (!provider) {
@@ -1466,13 +1578,13 @@ export function createCli(runtime: CliRuntime = {}): Command {
     if (!keyValue) {
       throw new CliUserError({
         summary: 'Missing API key.',
-        suggestedCommands: ['Use xyte-cli setup run --advanced --tenant <tenant-id> --provider xyte-org --key <value>']
+        suggestedCommands: ['Use xyte-cli setup run --advanced --tenant <tenant-id> --provider xyte-org']
       });
     }
 
     const candidateTenantName = (tenantName?.trim() || tenantId).trim() || tenantId;
     const resolvedTenantName =
-      !explicitTenantName && candidateTenantName === tenantId
+      connectivityMode !== 'never' && !explicitTenantName && candidateTenantName === tenantId
         ? await resolveTenantNameFromKey({
             tenantId,
             provider,
@@ -1913,6 +2025,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     maxPolls?: string;
     once?: boolean;
     output?: string;
+    out?: string;
     strictJson?: boolean;
   }) => {
     const overrides: Partial<Record<SettingKey, unknown>> = {};
@@ -1937,6 +2050,8 @@ export function createCli(runtime: CliRuntime = {}): Command {
       settings
     });
     const strictJson = resolveStrictJson({ strictJson: options.strictJson, settings });
+    const outPath = resolveOutPath(options.out);
+    let wroteOutPath = false;
     const client = await withClient(tenantId, undefined, overrides);
     await runWatch({
       client,
@@ -1950,11 +2065,23 @@ export function createCli(runtime: CliRuntime = {}): Command {
           ? (overrides['watch.maxPolls'] as number | undefined)
           : settings.values.watch.maxPolls,
       onFrame: (frame) => {
+        const renderFrame =
+          output === 'text' ? formatWatchFrameText(frame) : renderJsonOutput(frame, { strictJson, compact: true });
         if (output === 'text') {
-          stdout.write(formatWatchFrameText(frame));
+          if (outPath && !wroteOutPath) {
+            writeRenderedOutput(stdout, renderFrame, outPath);
+            wroteOutPath = true;
+            return;
+          }
+          appendRenderedOutput(stdout, renderFrame, outPath);
           return;
         }
-        printJson(stdout, frame, { strictJson, compact: true });
+        if (outPath && !wroteOutPath) {
+          writeRenderedOutput(stdout, renderFrame, outPath);
+          wroteOutPath = true;
+          return;
+        }
+        appendRenderedOutput(stdout, renderFrame, outPath);
       }
     });
   };
@@ -1965,6 +2092,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     render?: string;
     format?: string;
     output?: string;
+    out?: string;
     strictJson?: boolean;
   }) => {
     const overrides: Partial<Record<SettingKey, unknown>> = {};
@@ -1996,9 +2124,10 @@ export function createCli(runtime: CliRuntime = {}): Command {
     const tenantProfile = await profileStore.getTenant(tenantId);
     const snapshot = await collectFleetSnapshot(client, tenantId, tenantProfile?.name, providerScope);
     const result = buildFleetInspect(snapshot);
+    const outPath = resolveOutPath(options.out);
 
     if (render === 'ascii') {
-      stdout.write(`${formatFleetInspectAscii(result)}\n`);
+      writeRenderedOutput(stdout, `${formatFleetInspectAscii(result)}\n`, outPath);
       return;
     }
 
@@ -2008,10 +2137,14 @@ export function createCli(runtime: CliRuntime = {}): Command {
       settings
     });
     if (output === 'text') {
-      stdout.write(`${formatFleetInspectAscii(result)}\n`);
+      writeRenderedOutput(stdout, `${formatFleetInspectAscii(result)}\n`, outPath);
       return;
     }
-    printJson(stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+    writeRenderedOutput(
+      stdout,
+      renderJsonOutput(result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) }),
+      outPath
+    );
   };
 
   const handleOpsInspectDeepDive = async (options: {
@@ -2021,6 +2154,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     render?: string;
     format?: string;
     output?: string;
+    out?: string;
     strictJson?: boolean;
   }) => {
     const overrides: Partial<Record<SettingKey, unknown>> = {};
@@ -2053,13 +2187,14 @@ export function createCli(runtime: CliRuntime = {}): Command {
     const tenantProfile = await profileStore.getTenant(tenantId);
     const snapshot = await collectFleetSnapshot(client, tenantId, tenantProfile?.name, providerScope);
     const result = buildDeepDive(snapshot, Number.isFinite(windowHours) ? windowHours : 24);
+    const outPath = resolveOutPath(options.out);
 
     if (render === 'ascii') {
-      stdout.write(`${formatDeepDiveAscii(result)}\n`);
+      writeRenderedOutput(stdout, `${formatDeepDiveAscii(result)}\n`, outPath);
       return;
     }
     if (render === 'markdown') {
-      stdout.write(`${formatDeepDiveMarkdown(result, false)}\n`);
+      writeRenderedOutput(stdout, `${formatDeepDiveMarkdown(result, false)}\n`, outPath);
       return;
     }
 
@@ -2069,10 +2204,14 @@ export function createCli(runtime: CliRuntime = {}): Command {
       settings
     });
     if (output === 'text') {
-      stdout.write(`${formatDeepDiveMarkdown(result, false)}\n`);
+      writeRenderedOutput(stdout, `${formatDeepDiveMarkdown(result, false)}\n`, outPath);
       return;
     }
-    printJson(stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+    writeRenderedOutput(
+      stdout,
+      renderJsonOutput(result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) }),
+      outPath
+    );
   };
 
   const handleOpsReportGenerate = async (options: {
@@ -2359,10 +2498,10 @@ export function createCli(runtime: CliRuntime = {}): Command {
       '',
       'Setup:',
       '  xyte-cli init --scope both --agents all',
-      '  xyte-cli setup run --non-interactive --tenant <tenant-id> --key <value>',
+      '  xyte-cli setup run --non-interactive --tenant <tenant-id> --key-stdin',
       '',
       'Everyday Ops:',
-      '  xyte-cli ops watch incidents --tenant <tenant-id> --once --strict-json',
+      '  xyte-cli ops watch incidents --tenant <tenant-id> --once --output json --strict-json',
       '  xyte-cli ops inspect fleet --tenant <tenant-id> --output json',
       '',
       'Raw API:',
@@ -2391,6 +2530,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .option('--agents <agents>', 'all|claude|copilot|codex[,..]')
     .option('--force', 'Overwrite existing skill install')
     .option('--no-setup', 'Skip guided setup after installing skills')
+    .option('--require-setup', 'Fail if guided setup cannot complete')
     .addHelpText(
       'after',
       [
@@ -2642,7 +2782,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       '',
       'Examples:',
       '  xyte-cli ops watch incidents --tenant <tenant-id> --once',
-      '  xyte-cli ops watch incidents --tenant <tenant-id> --once --strict-json',
+      '  xyte-cli ops watch incidents --tenant <tenant-id> --once --output json --strict-json',
       '  xyte-cli ops inspect fleet --tenant <tenant-id> --output json',
       '  xyte-cli ops console --screen dashboard'
     ].join('\n')
@@ -2657,6 +2797,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .option('--interval-ms <ms>', 'Polling interval in ms (minimum 1000)')
     .option('--max-polls <n>', 'Stop after N polls (maximum 3600)')
     .option('--once', 'Run one poll and exit')
+    .option('--out <path>', 'Write the rendered output to a UTF-8 file')
     .option('--strict-json', 'Fail on non-serializable output')
     .action(async function (options: Record<string, unknown>) {
       await handleOpsWatchIncidents({
@@ -2672,11 +2813,13 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .option('--tenant <tenantId>', 'Tenant id override')
     .option('--provider-scope <scope>', 'organization|partner|auto')
     .option('--render <render>', 'json|ascii', 'json')
+    .option('--out <path>', 'Write the rendered output to a UTF-8 file')
     .option('--strict-json', 'Fail on non-serializable output')
     .action(async function (options: {
       tenant?: string;
       providerScope?: string;
       render?: string;
+      out?: string;
       strictJson?: boolean;
     }) {
       await handleOpsInspectFleet({
@@ -2692,12 +2835,14 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .option('--provider-scope <scope>', 'organization|partner|auto')
     .option('--window <hours>', 'Window in hours', '24')
     .option('--render <render>', 'json|ascii|markdown', 'json')
+    .option('--out <path>', 'Write the rendered output to a UTF-8 file')
     .option('--strict-json', 'Fail on non-serializable output')
     .action(async function (options: {
       tenant?: string;
       providerScope?: string;
       window?: string;
       render?: string;
+      out?: string;
       strictJson?: boolean;
     }) {
       await handleOpsInspectDeepDive({
@@ -3034,10 +3179,11 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .command('status')
     .description('Show setup/readiness status')
     .option('--tenant <tenantId>', 'Tenant id override')
+    .option('--field <name>', 'Print a single scalar field (for example tenantId)')
     .option('--format <format>', 'json|text', 'json')
-    .action(async (options: { tenant?: string; format?: OutputFormat }, command: Command) => {
+    .action(async (options: { tenant?: string; field?: string; format?: OutputFormat }, command: Command) => {
       const globals = command.optsWithGlobals() as { output?: string };
-      await handleSetupStatus({ tenant: options.tenant, format: options.format, output: globals.output });
+      await handleSetupStatus({ tenant: options.tenant, field: options.field, format: options.format, output: globals.output });
     });
 
   setup
@@ -3049,6 +3195,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .option('--provider <provider>', 'Primary provider for key setup')
     .option('--slot-name <name>', 'Key slot name', 'primary')
     .option('--key <value>', 'API key value')
+    .option('--key-stdin', 'Read API key value from stdin')
     .option('--set-active', 'Set slot active (default true in setup flow)')
     .option('--connectivity <mode>', 'auto|always|never', 'auto')
     .option('--non-interactive', 'Disable prompts and require needed options')
@@ -3062,6 +3209,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
           provider?: string;
           slotName?: string;
           key?: string;
+          keyStdin?: boolean;
           setActive?: boolean;
           connectivity?: string;
           nonInteractive?: boolean;
@@ -3187,10 +3335,26 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .requiredOption('--name <name>', 'Slot display name')
     .option('--slot-id <slotId>', 'Optional explicit slot id')
     .option('--key <value>', 'API key value')
+    .option('--key-stdin', 'Read API key value from stdin')
     .option('--set-active', 'Set as active slot for provider')
-    .action(async (options: { tenant: string; provider: string; name: string; slotId?: string; key?: string; setActive?: boolean }) => {
+    .action(async (options: { tenant: string; provider: string; name: string; slotId?: string; key?: string; keyStdin?: boolean; setActive?: boolean }) => {
       const provider = parseProvider(options.provider);
-      const value = requireKeyValue(options.key);
+      const value = await resolveKeyValue({
+        key: options.key,
+        keyStdin: options.keyStdin,
+        envKey: env.XYTE_CLI_KEY,
+        prompt,
+        readStdin,
+        promptQuestion: 'API key',
+        stdout
+      });
+      if (!value) {
+        throw new CliUserError({
+          summary: 'Missing key value.',
+          cause: 'Use --key, --key-stdin, or XYTE_CLI_KEY.',
+          suggestedCommands: ['Use xyte-cli config key add --tenant <tenant-id> --provider xyte-org --name primary']
+        });
+      }
       await profileStore.upsertTenant({ id: options.tenant });
       const secretStore = await getSecretStore();
       const slot = await profileStore.addKeySlot(options.tenant, {
@@ -3279,10 +3443,26 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .requiredOption('--provider <provider>', 'Provider')
     .requiredOption('--slot <slotRef>', 'Slot id or name')
     .option('--key <value>', 'API key value')
-    .action(async (options: { tenant: string; provider: string; slot: string; key?: string }) => {
+    .option('--key-stdin', 'Read API key value from stdin')
+    .action(async (options: { tenant: string; provider: string; slot: string; key?: string; keyStdin?: boolean }) => {
       const provider = parseProvider(options.provider);
       const slot = await resolveSlotByRef(profileStore, options.tenant, provider, options.slot);
-      const value = requireKeyValue(options.key);
+      const value = await resolveKeyValue({
+        key: options.key,
+        keyStdin: options.keyStdin,
+        envKey: env.XYTE_CLI_KEY,
+        prompt,
+        readStdin,
+        promptQuestion: 'API key',
+        stdout
+      });
+      if (!value) {
+        throw new CliUserError({
+          summary: 'Missing key value.',
+          cause: 'Use --key, --key-stdin, or XYTE_CLI_KEY.',
+          suggestedCommands: ['Use xyte-cli config key update --tenant <tenant-id> --provider xyte-org --slot <slot-id>']
+        });
+      }
       const secretStore = await getSecretStore();
       await secretStore.setSlotSecret(options.tenant, provider, slot.slotId, value);
       const updated = await profileStore.updateKeySlot(options.tenant, provider, slot.slotId, {
@@ -3334,7 +3514,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
         throw new CliUserError({
           summary: 'No secret found for selected key slot.',
           cause: `Slot "${slot.slotId}" has no stored secret.`,
-          suggestedCommands: [`xyte-cli config key update --tenant ${options.tenant} --provider ${provider} --slot ${slot.slotId} --key <value>`]
+          suggestedCommands: [`xyte-cli config key update --tenant ${options.tenant} --provider ${provider} --slot ${slot.slotId}`]
         });
       }
       const probe = await runSlotConnectivityTest({

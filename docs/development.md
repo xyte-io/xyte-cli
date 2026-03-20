@@ -14,10 +14,10 @@ npm run release:check
 ## Commit Gate (Fresh External User Flow)
 
 ```bash
-XYTE_CLI_KEY="<real-key>" \
-XYTE_E2E_TENANT="<tenant-id-or-default>" \
 npm run test:commit
 ```
+
+Before running the commit gate, set `XYTE_CLI_KEY` in your current shell and optionally set `XYTE_E2E_TENANT`.
 
 `test:commit` runs:
 
@@ -66,8 +66,8 @@ See [`release.md`](release.md) for publish and release-asset workflows.
 ## Manual Check: Interactive Logs Viewer
 
 ```bash
-xyte-cli --log-actions --log-actions-path /tmp/xyte-cli.actions.ndjson status --tenant acme
-xyte-cli logs view --path /tmp/xyte-cli.actions.ndjson
+xyte-cli --log-actions --log-actions-path ./logs/xyte-cli.actions.ndjson status --tenant acme
+xyte-cli logs view --path ./logs/xyte-cli.actions.ndjson
 ```
 
 Quick verification:
