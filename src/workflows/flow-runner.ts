@@ -104,12 +104,12 @@ function isInspectProviderScopeError(error: unknown): boolean {
 async function collectSnapshotWithGuard(ctx: RunContext): Promise<ReturnType<typeof collectFleetSnapshot>> {
   const tenantProfile = await ctx.args.profileStore.getTenant(ctx.args.tenantId);
   try {
-    return await collectFleetSnapshot(
-      ctx.args.client,
-      ctx.args.tenantId,
-      tenantProfile?.name,
-      ctx.args.inspectProviderScope ?? 'auto'
-    );
+    return await collectFleetSnapshot({
+      client: ctx.args.client,
+      tenantId: ctx.args.tenantId,
+      tenantName: tenantProfile?.name,
+      providerScope: ctx.args.inspectProviderScope ?? 'auto'
+    });
   } catch (error) {
     if (isInspectProviderScopeError(error)) {
       throw new FlowNeedsInputError((error as Error).message);

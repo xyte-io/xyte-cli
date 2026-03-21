@@ -2097,7 +2097,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       (overrides['ops.providerScope'] as InspectProviderScope | undefined) ?? settings.values.ops.providerScope;
     const client = await withClient(tenantId, undefined, overrides);
     const tenantProfile = await profileStore.getTenant(tenantId);
-    const snapshot = await collectFleetSnapshot(client, tenantId, tenantProfile?.name, providerScope);
+    const snapshot = await collectFleetSnapshot({ client, tenantId, tenantName: tenantProfile?.name, providerScope });
     const result = buildFleetInspect(snapshot);
     const outPath = resolveOutPath(options.out);
 
@@ -2160,7 +2160,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     const windowHours = Number.parseInt(options.window ?? '24', 10);
     const client = await withClient(tenantId, undefined, overrides);
     const tenantProfile = await profileStore.getTenant(tenantId);
-    const snapshot = await collectFleetSnapshot(client, tenantId, tenantProfile?.name, providerScope);
+    const snapshot = await collectFleetSnapshot({ client, tenantId, tenantName: tenantProfile?.name, providerScope });
     const result = buildDeepDive(snapshot, Number.isFinite(windowHours) ? windowHours : 24);
     const outPath = resolveOutPath(options.out);
 

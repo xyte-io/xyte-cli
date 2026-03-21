@@ -805,12 +805,13 @@ async function resolveInspectProviderScope(
   return 'organization';
 }
 
-export async function collectFleetSnapshot(
-  client: XyteClient,
-  tenantId: string,
-  tenantName?: string,
-  providerScope: InspectProviderScope = 'auto'
-): Promise<FleetSnapshot> {
+export async function collectFleetSnapshot(args: {
+  client: XyteClient;
+  tenantId: string;
+  tenantName?: string;
+  providerScope?: InspectProviderScope;
+}): Promise<FleetSnapshot> {
+  const { client, tenantId, tenantName, providerScope = 'auto' } = args;
   return withSpan('xyte.inspect.collect_snapshot', { 'xyte.tenant.id': tenantId }, async () => {
     const resolvedScope = await resolveInspectProviderScope(client, tenantId, providerScope);
     let devices: any[];
