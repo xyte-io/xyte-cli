@@ -162,8 +162,9 @@ export class FileProfileStore implements ProfileStore {
       let parsed: ProfileStoreData;
       try {
         parsed = JSON.parse(content) as ProfileStoreData;
-      } catch {
-        throw new Error(`Profile store is invalid at ${this.filePath}. Delete or fix this file and rerun setup.`);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        throw new Error(`Profile store is invalid at ${this.filePath}: ${detail}. Delete or fix this file and rerun setup.`);
       }
       const normalized = this.normalize(parsed);
       if (normalized.changed) {

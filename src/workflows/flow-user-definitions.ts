@@ -90,8 +90,9 @@ export async function listFlowDefinitions(): Promise<Array<FlowDefinitionV1 & { 
   let entries;
   try {
     entries = await readdir(root, { withFileTypes: true });
-  } catch {
-    return [];
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
   }
   const defs: Array<FlowDefinitionV1 & { path: string }> = [];
 

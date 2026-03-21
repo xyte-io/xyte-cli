@@ -6,14 +6,15 @@ import type { XyteClient } from '../types/client';
 import { asRecord, extractArray, extractHasNextPage } from '../utils/json';
 import { INSPECT_DEEP_DIVE_SCHEMA_VERSION, INSPECT_FLEET_SCHEMA_VERSION, REPORT_SCHEMA_VERSION } from '../contracts/versions';
 import { withSpan } from '../observability/tracing';
-import { renderBrandedPdfReport } from './report/pdf-render';
+// Dynamic import: pdfkit is ~5.9MB and only needed for PDF generation.
+// import { renderBrandedPdfReport } from './report/pdf-render';
 import { parseTimestamp } from './report/time-format';
 
 interface StatusCounts {
   [key: string]: number;
 }
 
-export { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';
+export type { InspectProviderScope } from '../types/settings-enums';
 import type { InspectProviderScope } from '../types/settings-enums';
 type ResolvedInspectProviderScope = Exclude<InspectProviderScope, 'auto'>;
 
@@ -1226,6 +1227,7 @@ export async function generateFleetReport(args: {
   if (args.format === 'markdown') {
     writeFileSync(args.outPath, markdown, 'utf8');
   } else {
+    const { renderBrandedPdfReport } = await import('./report/pdf-render');
     await renderBrandedPdfReport(args.deepDive, args.outPath, args.includeSensitive);
   }
 
