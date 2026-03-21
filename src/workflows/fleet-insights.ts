@@ -431,16 +431,17 @@ async function mapWithConcurrency<T>(items: T[], concurrency: number, operation:
   );
 }
 
-async function loadAllOrganizationDevices(client: XyteClient, tenantId: string): Promise<any[]> {
+async function paginateAll(args: {
+  fetch: (query: { page: number; per_page: number }) => Promise<unknown>;
+  fetchSingle: () => Promise<unknown>;
+  extractionKeys: string[];
+}): Promise<any[]> {
   const perPage = 100;
   const all: any[] = [];
 
   for (let page = 1; page <= 50; page += 1) {
-    const raw = await client.organization.getDevices({
-      tenantId,
-      query: { page, per_page: perPage }
-    });
-    const pageItems = extractArray(raw, ['devices', 'data', 'items']);
+    const raw = await args.fetch({ page, per_page: perPage });
+    const pageItems = extractArray(raw, args.extractionKeys);
     if (!pageItems.length) {
       break;
     }
@@ -454,62 +455,32 @@ async function loadAllOrganizationDevices(client: XyteClient, tenantId: string):
     return all;
   }
 
-  const single = await client.organization.getDevices({ tenantId });
-  return extractArray(single, ['devices', 'data', 'items']);
+  const single = await args.fetchSingle();
+  return extractArray(single, args.extractionKeys);
+}
+
+async function loadAllOrganizationDevices(client: XyteClient, tenantId: string): Promise<any[]> {
+  return paginateAll({
+    fetch: (query) => client.organization.getDevices({ tenantId, query }),
+    fetchSingle: () => client.organization.getDevices({ tenantId }),
+    extractionKeys: ['devices', 'data', 'items']
+  });
 }
 
 async function loadAllPartnerDevices(client: XyteClient, tenantId: string): Promise<any[]> {
-  const perPage = 100;
-  const all: any[] = [];
-
-  for (let page = 1; page <= 50; page += 1) {
-    const raw = await client.partner.getDevices({
-      tenantId,
-      query: { page, per_page: perPage }
-    });
-    const pageItems = extractArray(raw, ['devices', 'data', 'items']);
-    if (!pageItems.length) {
-      break;
-    }
-    all.push(...pageItems);
-    if (pageItems.length < perPage) {
-      break;
-    }
-  }
-
-  if (all.length > 0) {
-    return all;
-  }
-
-  const single = await client.partner.getDevices({ tenantId });
-  return extractArray(single, ['devices', 'data', 'items']);
+  return paginateAll({
+    fetch: (query) => client.partner.getDevices({ tenantId, query }),
+    fetchSingle: () => client.partner.getDevices({ tenantId }),
+    extractionKeys: ['devices', 'data', 'items']
+  });
 }
 
 async function loadAllSpaces(client: XyteClient, tenantId: string): Promise<any[]> {
-  const perPage = 100;
-  const all: any[] = [];
-
-  for (let page = 1; page <= 50; page += 1) {
-    const raw = await client.organization.getSpaces({
-      tenantId,
-      query: { page, per_page: perPage }
-    });
-    const pageItems = extractArray(raw, ['spaces', 'data', 'items']);
-    if (!pageItems.length) {
-      break;
-    }
-    all.push(...pageItems);
-    if (pageItems.length < perPage) {
-      break;
-    }
-  }
-
-  if (all.length > 0) {
-    return all;
-  }
-
-  const single = await client.organization.getSpaces({ tenantId });
-  return extractArray(single, ['spaces', 'data', 'items']);
+  return paginateAll({
+    fetch: (query) => client.organization.getSpaces({ tenantId, query }),
+    fetchSingle: () => client.organization.getSpaces({ tenantId }),
+    extractionKeys: ['spaces', 'data', 'items']
+  });
 }
 
 
