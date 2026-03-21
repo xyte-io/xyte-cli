@@ -242,11 +242,6 @@ function hydrateDerivedFlowContext(_step: FlowTaskStep, ctx: RunContext): void {
   }
 }
 
-function runInstallDoctorLite() {
-  const expectedPath = path.resolve(__dirname, '../../dist/bin/xyte-cli.js');
-  return buildInstallDoctorReport(expectedPath);
-}
-
 function classifyFailure(problem: ReturnType<typeof toProblemDetails>): FlowRunClassification {
   const detail = `${problem.detail} ${JSON.stringify(problem.upstream ?? {})}`.toLowerCase();
   if (problem.status === 422 && (/valid command/.test(detail) || /friendly_name/.test(detail) || /no device found/.test(detail))) {
@@ -319,7 +314,7 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
   switch (step.task) {
     case 'doctor.install': {
       return {
-        output: runInstallDoctorLite()
+        output: buildInstallDoctorReport(path.resolve(__dirname, '../../dist/bin/xyte-cli.js'))
       };
     }
     case 'setup.status': {
