@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildDeepDive, formatDeepDiveMarkdown, formatUtcForReport, getWindowFocus } from '../src/workflows/fleet-insights';
+import { buildDeepDive, formatDeepDiveMarkdown } from '../src/workflows/fleet-insights';
 import { buildDeepDiveOverviewPlan, buildDeepDiveReportSectionPlan, buildDeepDiveSummaryPlan } from '../src/workflows/report/pdf-render';
-import { formatWindowLabel } from '../src/workflows/report/time-format';
+import { formatUtcForReport, formatWindowLabel } from '../src/workflows/report/time-format';
+import { getWindowFocus } from '../src/workflows/report/theme';
 
 describe('report layout helpers', () => {
   it('formats UTC timestamps into compact readable form', () => {

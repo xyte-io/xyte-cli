@@ -4,6 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { toProblemDetails } from '../contracts/problem';
 import { buildWatchFrame, type WatchDelta, type WatchFrameV1, type WatchProfile } from '../contracts/watch-frame';
 import type { XyteClient } from '../types/client';
+import { asRecord, extractArray, extractIncidentsArray } from '../utils/json';
 
 type QueryValue = string | number | boolean | null | undefined;
 
@@ -16,52 +17,6 @@ interface NormalizedIncident {
   id: string;
   raw: unknown;
   stable: string;
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return {};
-  }
-  return value as Record<string, unknown>;
-}
-
-function extractArray(value: unknown, preferredKeys: string[] = ['data', 'items']): unknown[] {
-  if (Array.isArray(value)) {
-    return value;
-  }
-
-  const record = asRecord(value);
-  for (const key of preferredKeys) {
-    if (Array.isArray(record[key])) {
-      return record[key] as unknown[];
-    }
-  }
-
-  for (const key of Object.keys(record)) {
-    if (Array.isArray(record[key])) {
-      return record[key] as unknown[];
-    }
-  }
-
-  return [];
-}
-
-function extractIncidentsArray(value: unknown): unknown[] {
-  const primary = extractArray(value, ['incidents', 'data', 'items']);
-  if (primary.length > 0) {
-    return primary;
-  }
-
-  const record = asRecord(value);
-  const wrappers = ['payload', 'result', 'response', 'body'];
-  for (const wrapper of wrappers) {
-    const nested = extractArray(record[wrapper], ['incidents', 'data', 'items']);
-    if (nested.length > 0) {
-      return nested;
-    }
-  }
-
-  return primary;
 }
 
 function stableNormalize(value: unknown): unknown {

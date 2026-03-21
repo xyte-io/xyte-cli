@@ -21,6 +21,7 @@ import type { ProfileStore } from '../secure/profile-store';
 import type { SecretStore } from '../secure/secret-store';
 import type { XyteClient } from '../types/client';
 import { buildInstallDoctorReport } from '../utils/install-doctor';
+import { isRecord } from '../utils/json';
 import { runWatch } from './watch';
 import { buildUtilityPrepare } from './utility-prepare';
 import { runSpaceImportTree } from './utility-commands';
@@ -97,10 +98,6 @@ interface RunDeterministicFlowArgs {
 
 function isInspectProviderScopeError(error: unknown): boolean {
   return error instanceof Error && /inspect provider scope/i.test(error.message);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function toStringRecord(value: unknown): Record<string, string> {

@@ -3,64 +3,9 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { classifyConnectivityError, type ConnectivityResult, type ConnectionState } from '../config/connectivity';
 import { computeRetryDelayMs, DEFAULT_RETRY_POLICY, isRetryableErrorClass, type RetryPolicyOptions, type RetryState } from '../config/retry-policy';
 import type { XyteClient } from '../types/client';
+import { asRecord, extractArray, extractHasNextPage, extractIncidentsArray } from '../utils/json';
 
-function asRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return {};
-  }
-  return value as Record<string, unknown>;
-}
-
-export function extractArray(value: unknown, preferredKeys: string[] = ['data', 'items']): any[] {
-  if (Array.isArray(value)) {
-    return value;
-  }
-
-  const record = asRecord(value);
-  for (const key of preferredKeys) {
-    if (Array.isArray(record[key])) {
-      return record[key] as any[];
-    }
-  }
-
-  for (const key of Object.keys(record)) {
-    if (Array.isArray(record[key])) {
-      return record[key] as any[];
-    }
-  }
-
-  return [];
-}
-
-function extractIncidentsArray(value: unknown): any[] {
-  const primary = extractArray(value, ['incidents', 'data', 'items']);
-  if (primary.length > 0) {
-    return primary;
-  }
-
-  const record = asRecord(value);
-  const wrappers = ['payload', 'result', 'response', 'body'];
-  for (const wrapper of wrappers) {
-    const nested = extractArray(record[wrapper], ['incidents', 'data', 'items']);
-    if (nested.length > 0) {
-      return nested;
-    }
-  }
-
-  return primary;
-}
-
-function extractHasNextPage(value: unknown): boolean | undefined {
-  const record = asRecord(value);
-  if (typeof record.has_next_page === 'boolean') {
-    return record.has_next_page;
-  }
-  const data = asRecord(record.data);
-  if (typeof data.has_next_page === 'boolean') {
-    return data.has_next_page;
-  }
-  return undefined;
-}
+export { extractArray };
 
 interface LoadOutcome<T> {
   data: T;

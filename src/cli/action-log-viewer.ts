@@ -1,14 +1,11 @@
 import blessed from 'blessed';
 
 import { extractCommandPathFromLogEntry, type CliActionLogEntry } from './action-logger';
+import { isRecord } from '../utils/json';
 
 interface ActionLogViewerOptions {
   entries: CliActionLogEntry[];
   title?: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function extractDurationMs(entry: CliActionLogEntry): number | undefined {

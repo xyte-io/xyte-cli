@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import type { ProfileStore } from '../secure/profile-store';
 import { getXyteConfigDir } from '../utils/config-dir';
+import { isRecord } from '../utils/json';
 import type { TuiScreenId } from '../tui/types';
 import type { InspectProviderScope } from '../workflows/fleet-insights';
 
@@ -168,10 +169,6 @@ type SourceValue = {
   value: unknown;
   source: 'default' | 'profile' | 'user' | 'workspace' | 'env' | 'flag';
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function cloneSettings<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;

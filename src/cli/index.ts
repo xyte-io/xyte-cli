@@ -41,7 +41,7 @@ import { makeKeyFingerprint, matchesSlotRef } from '../secure/key-slots';
 import { FileProfileStore, type ProfileStore } from '../secure/profile-store';
 import type { SecretProvider } from '../types/profile';
 import { SUPPORTED_SECRET_PROVIDERS, isSecretProvider } from '../types/profile';
-import { parseJsonObject } from '../utils/json';
+import { isRecord, parseJsonObject } from '../utils/json';
 import { buildInstallDoctorReport, type InstallDoctorResult } from '../utils/install-doctor';
 import { stringifyJsonOutput } from '../utils/json-output';
 import type { UtilityInputFormat } from '../utils/input-parser';
@@ -161,10 +161,6 @@ const SIMPLE_SETUP_SLOT_NAME = 'primary';
 const SIMPLE_SETUP_DEFAULT_TENANT = 'default';
 const SKILL_AGENTS: SkillAgent[] = ['claude', 'copilot', 'codex'];
 const SKILL_SCOPES: SkillInstallScope[] = ['project', 'user', 'both'];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function parseBooleanEnvFlag(value: string | undefined): boolean {
   if (!value) {

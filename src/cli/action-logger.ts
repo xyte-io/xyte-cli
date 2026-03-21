@@ -12,6 +12,7 @@ import {
 import { basename, dirname, join, resolve as resolvePath } from 'node:path';
 
 import { getXyteConfigDir } from '../utils/config-dir';
+import { isRecord } from '../utils/json';
 import { redactSensitiveData, redactSensitiveText } from '../utils/redact';
 
 export type CliActionLogLevel = 'info' | 'error';
@@ -110,10 +111,6 @@ const SENSITIVE_OPTION_FIELDS = new Set([
   'authorization',
   'bearer'
 ]);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function normalizeSensitiveKey(key: string): string {
   return key.replace(/[^a-z0-9]/gi, '').toLowerCase();

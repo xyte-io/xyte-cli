@@ -1,15 +1,13 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { isRecord } from './json';
+
 export type UtilityInputFormat = 'auto' | 'csv' | 'json' | 'jsonl';
 
 interface LoadedUtilityInputRows {
   format: Exclude<UtilityInputFormat, 'auto'>;
   rows: Array<Record<string, unknown>>;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function detectInputFormat(inputPath: string, raw: string): Exclude<UtilityInputFormat, 'auto'> {
