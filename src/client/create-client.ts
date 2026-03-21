@@ -70,16 +70,16 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
       retryBackoffMs: options.retryBackoffMs
     });
 
-  let secretStorePromise: Promise<SecretStore> | undefined;
+  let cachedSecretStore: SecretStore | undefined;
 
-  const getSecretStore = async (): Promise<SecretStore> => {
+  const getSecretStore = (): SecretStore => {
     if (options.secretStore) {
       return options.secretStore;
     }
-    if (!secretStorePromise) {
-      secretStorePromise = createSecretStore();
+    if (!cachedSecretStore) {
+      cachedSecretStore = createSecretStore();
     }
-    return secretStorePromise;
+    return cachedSecretStore;
   };
 
   const resolveTenant = async (requestedTenantId?: string) => {
@@ -116,7 +116,7 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
 
     const activeSlot = await profileStore.getActiveKeySlot(tenantId, provider);
     const slotId = activeSlot?.slotId ?? 'default';
-    const secretStore = await getSecretStore();
+    const secretStore = getSecretStore();
     const value = await secretStore.getSlotSecret(tenantId, provider, slotId);
     if (!value) {
       throw new XyteAuthError(
@@ -200,7 +200,7 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
     describeEndpoint: (key) => getEndpoint(key),
     listEndpoints: () => listEndpoints(),
     listTenantEndpoints: async (tenantId: string) => {
-      const secretStore = await getSecretStore();
+      const secretStore = getSecretStore();
       const [orgSlot, partnerSlot] = await Promise.all([
         profileStore.getActiveKeySlot(tenantId, 'xyte-org'),
         profileStore.getActiveKeySlot(tenantId, 'xyte-partner')

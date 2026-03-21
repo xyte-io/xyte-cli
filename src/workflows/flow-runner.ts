@@ -574,12 +574,18 @@ async function findRunBundle(outDir: string, resumeRef: string): Promise<string>
   }
 
   const root = path.resolve(outDir);
-  const flowDirs = await readdir(root, { withFileTypes: true }).catch(() => []);
+  const flowDirs = await readdir(root, { withFileTypes: true }).catch((err: NodeJS.ErrnoException) => {
+    if (err.code === 'ENOENT') return [];
+    throw err;
+  });
   for (const flowDir of flowDirs) {
     if (!flowDir.isDirectory()) {
       continue;
     }
-    const runDirs = await readdir(path.join(root, flowDir.name), { withFileTypes: true }).catch(() => []);
+    const runDirs = await readdir(path.join(root, flowDir.name), { withFileTypes: true }).catch((err: NodeJS.ErrnoException) => {
+      if (err.code === 'ENOENT') return [];
+      throw err;
+    });
     for (const runDir of runDirs) {
       if (!runDir.isDirectory()) {
         continue;

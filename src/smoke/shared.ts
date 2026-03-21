@@ -81,8 +81,8 @@ export function buildIsolatedEnv(
   }, getEnvPathValue(baseEnv, platform), platform);
 }
 
-export async function runCommand(command: string, args: string[], options: RunCommandOptions = {}): Promise<CommandResult> {
-  return await runProcess(command, args, options);
+export function runCommand(command: string, args: string[], options: RunCommandOptions = {}): Promise<CommandResult> {
+  return runProcess(command, args, options);
 }
 
 export function assertSuccess(result: CommandResult, label: string, command: string, args: string[]): void {

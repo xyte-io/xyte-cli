@@ -504,10 +504,6 @@ export async function runHeadlessRenderer(options: HeadlessRenderOptions): Promi
     stream.on?.('error', onStreamError);
   }
 
-  if (options.format !== 'json') {
-    throw new Error('Headless renderer only supports json format.');
-  }
-
   writeStartup(write, options.format, options.motionEnabled, sessionId, nextSequence);
 
   let phase = 0;

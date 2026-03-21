@@ -141,10 +141,8 @@ export class FileSecretStore implements SecretStore {
     try {
       parsed = JSON.parse(content) as PersistedSecrets;
     } catch (error) {
-      if (error instanceof Error) {
-        throw new Error(`Secret store is invalid at ${this.filePath}. Delete or fix this file and rerun setup.`);
-      }
-      throw new Error(`Secret store at ${this.filePath} contains unreadable data.`);
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(`Secret store is invalid at ${this.filePath}: ${detail}. Delete or fix this file and rerun setup.`);
     }
 
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -230,6 +228,6 @@ export class MemorySecretStore implements SecretStore {
   }
 }
 
-export async function createSecretStore(): Promise<SecretStore> {
+export function createSecretStore(): SecretStore {
   return new FileSecretStore();
 }

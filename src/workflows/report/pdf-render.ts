@@ -4,7 +4,7 @@ import { mkdirSync } from 'node:fs';
 
 import PDFDocument from 'pdfkit';
 
-import type { DeepDiveResult } from '../fleet-insights';
+import type { DeepDiveResult } from '../../types/deep-dive';
 import { drawTable } from './pdf-table';
 import {
   PDF_LAYOUT,

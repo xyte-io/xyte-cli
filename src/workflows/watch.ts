@@ -257,7 +257,7 @@ export async function runWatch(options: RunWatchOptions): Promise<void> {
 
       sequence += 1;
 
-      if ((maxPolls !== undefined && pollIndex >= maxPolls) || !running) {
+      if (pollIndex >= maxPolls || !running) {
         break;
       }
 

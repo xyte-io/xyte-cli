@@ -394,6 +394,10 @@ function getEnvValue(env: NodeJS.ProcessEnv, keyPath: SettingPath): unknown {
       return env.XYTE_CLI_LOGS_MAX_FILES ?? env.XYTE_LOG_ACTIONS_MAX_FILES;
     case 'report.includeSensitive':
       return env.XYTE_CLI_REPORT_INCLUDE_SENSITIVE;
+    default: {
+      const _exhaustive: never = keyPath;
+      return undefined;
+    }
   }
 }
 

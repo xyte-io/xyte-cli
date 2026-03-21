@@ -174,7 +174,13 @@ export async function loadDevicesData(
       const query = compactQuery(options.query as QueryShape | undefined);
       const raw = await client.organization
         .getDevices({ tenantId, ...(query ? { query } : {}) })
-        .catch(() => client.partner.getDevices({ tenantId }));
+        .catch((orgError: unknown) => {
+          if (process.env.DEBUG) {
+            const msg = orgError instanceof Error ? orgError.message : String(orgError);
+            process.stderr.write(`[data-loaders] org getDevices failed, falling back to partner: ${msg}\n`);
+          }
+          return client.partner.getDevices({ tenantId });
+        });
       const devices = extractArray(raw, ['devices', 'data', 'items']);
       const spaceId = String(options.query?.space_id ?? '').trim();
       if (!spaceId) {

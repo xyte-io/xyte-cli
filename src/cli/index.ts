@@ -1067,11 +1067,8 @@ async function runSlotConnectivityTest(args: {
     };
   }
 
-  return {
-    strategy: 'local-only',
-    ok: true,
-    note: 'Provider key presence verified locally.'
-  };
+  const _exhaustive: never = args.provider;
+  throw new Error(`Unhandled provider: ${_exhaustive}`);
 }
 
 export function createCli(runtime: CliRuntime = {}): Command {
@@ -1088,15 +1085,15 @@ export function createCli(runtime: CliRuntime = {}): Command {
   const cwd = runtime.cwd ?? process.cwd();
   const env = runtime.env ?? process.env;
 
-  let secretStorePromise: Promise<SecretStore> | undefined;
-  const getSecretStore = async () => {
+  let cachedSecretStore: SecretStore | undefined;
+  const getSecretStore = () => {
     if (runtime.secretStore) {
       return runtime.secretStore;
     }
-    if (!secretStorePromise) {
-      secretStorePromise = createSecretStore();
+    if (!cachedSecretStore) {
+      cachedSecretStore = createSecretStore();
     }
-    return secretStorePromise;
+    return cachedSecretStore;
   };
 
   const resolveSettings = async (flagOverrides: Partial<Record<SettingKey, unknown>> = {}) => {
@@ -1114,7 +1111,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     retry?: { attempts?: number; backoffMs?: number },
     flagOverrides: Partial<Record<SettingKey, unknown>> = {}
   ) => {
-    const secretStore = await getSecretStore();
+    const secretStore = getSecretStore();
     const settings = await resolveSettings(flagOverrides);
     const resolvedTenantId = tenantId ?? settings.values.defaults.tenant;
     return createXyteClient({
@@ -1136,7 +1133,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     }
 
     try {
-      const secretStore = await getSecretStore();
+      const secretStore = getSecretStore();
       const client = createXyteClient({
         profileStore,
         secretStore,
@@ -1173,7 +1170,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       detail: args.tenantId
     });
 
-    const secretStore = await getSecretStore();
+    const secretStore = getSecretStore();
     const slots = await profileStore.listKeySlots(args.tenantId, SIMPLE_SETUP_AUTH_PROVIDER);
     const existing = slots.find((slot) => slot.name.toLowerCase() === SIMPLE_SETUP_SLOT_NAME);
 
@@ -1242,7 +1239,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
   const handleRootLauncher = async (options: { output?: string } = {}) => {
     const settings = await resolveSettings();
     const tenantId = settings.values.defaults.tenant;
-    const secretStore = await getSecretStore();
+    const secretStore = getSecretStore();
     const client = tenantId ? await withClient(tenantId) : undefined;
     const readiness = await evaluateReadiness({
       profileStore,
@@ -1393,7 +1390,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
   const handleSetupStatus = async (options: { tenant?: string; output?: string; format?: OutputFormat; field?: string }) => {
     const settings = await resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
-    const secretStore = await getSecretStore();
+    const secretStore = getSecretStore();
     const tenantId = options.tenant ?? settings.values.defaults.tenant;
     const client = tenantId ? await withClient(tenantId) : undefined;
     const readiness = await evaluateReadiness({
@@ -1583,7 +1580,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       status: 'ok',
       detail: tenantId
     });
-    const secretStore = await getSecretStore();
+    const secretStore = getSecretStore();
 
     let slot;
     try {
@@ -1682,7 +1679,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     }
     const settings = await resolveSettings(overrides);
     const tenantId = options.tenant ?? settings.values.defaults.tenant;
-    const secretStore = await getSecretStore();
+    const secretStore = getSecretStore();
     const client = await withClient(tenantId, undefined, overrides);
     const readiness = await evaluateReadiness({
       profileStore,
@@ -2287,7 +2284,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       overrides['console.debugLogPath'] = options.debugLog;
     }
     const settings = await resolveSettings(overrides);
-    const secretStore = await getSecretStore();
+    const secretStore = getSecretStore();
     const client = createXyteClient({
       profileStore,
       secretStore,
@@ -2580,7 +2577,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       const mode = parseStatusMode(options.mode);
       const checkConnectivity = mode === 'full';
       const tenantId = options.tenant ?? settings.values.defaults.tenant;
-      const secretStore = await getSecretStore();
+      const secretStore = getSecretStore();
       const client = checkConnectivity ? await withClient(tenantId) : undefined;
       const readiness = await evaluateReadiness({
         profileStore,
@@ -3137,7 +3134,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
           once: options.once === true,
           strictJson: options.strictJson === true,
           profileStore,
-          secretStore: await getSecretStore(),
+          secretStore: getSecretStore(),
           client: await withClient(options.tenant)
         });
 
@@ -3331,7 +3328,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
         });
       }
       await profileStore.upsertTenant({ id: options.tenant });
-      const secretStore = await getSecretStore();
+      const secretStore = getSecretStore();
       const slot = await profileStore.addKeySlot(options.tenant, {
         provider,
         name: options.name,
@@ -3357,7 +3354,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .action(async (options: { tenant: string; provider?: string; format?: OutputFormat }, command: Command) => {
       const globals = command.optsWithGlobals() as { output?: string };
       const settings = await resolveSettings({ 'defaults.tenant': options.tenant });
-      const secretStore = await getSecretStore();
+      const secretStore = getSecretStore();
       const provider = options.provider ? parseProvider(options.provider) : undefined;
       const slots = await collectSlotViews({
         profileStore,
@@ -3438,7 +3435,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
           suggestedCommands: ['Use xyte-cli config key update --tenant <tenant-id> --provider xyte-org --slot <slot-id>']
         });
       }
-      const secretStore = await getSecretStore();
+      const secretStore = getSecretStore();
       await secretStore.setSlotSecret(options.tenant, provider, slot.slotId, value);
       const updated = await profileStore.updateKeySlot(options.tenant, provider, slot.slotId, {
         fingerprint: makeKeyFingerprint(value)
@@ -3465,7 +3462,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       }
       const provider = parseProvider(options.provider);
       const slot = await resolveSlotByRef(profileStore, options.tenant, provider, options.slot);
-      const secretStore = await getSecretStore();
+      const secretStore = getSecretStore();
       await secretStore.clearSlotSecret(options.tenant, provider, slot.slotId);
       await profileStore.removeKeySlot(options.tenant, provider, slot.slotId);
       printJson(stdout, {
@@ -3483,7 +3480,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .action(async (options: { tenant: string; provider: string; slot: string }) => {
       const provider = parseProvider(options.provider);
       const slot = await resolveSlotByRef(profileStore, options.tenant, provider, options.slot);
-      const secretStore = await getSecretStore();
+      const secretStore = getSecretStore();
       const secret = await secretStore.getSlotSecret(options.tenant, provider, slot.slotId);
       if (!secret) {
         throw new CliUserError({
