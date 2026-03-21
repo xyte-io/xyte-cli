@@ -1,5 +1,5 @@
 import { XyteAuthError, XyteHttpError, XyteValidationError } from '../http/errors';
-import { isCliUserError } from '../cli/user-error';
+import { isCliUserError } from './user-error';
 import { redactSensitiveData, redactSensitiveText } from '../utils/redact';
 
 export interface ProblemDetails {

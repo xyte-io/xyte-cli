@@ -84,7 +84,7 @@ import { runWatch } from '../workflows/watch';
 import { buildUtilityPrepare, listUtilityPrepareActions } from '../workflows/utility-prepare';
 import type { UtilityPreparePrimaryFormat } from '../workflows/utility-action-profiles';
 import { runSpaceImportTree } from '../workflows/utility-commands';
-import { CliUserError } from './user-error';
+import { CliUserError } from '../contracts/user-error';
 
 type OutputStream = Pick<typeof process.stdout, 'write'>;
 type ErrorStream = Pick<typeof process.stderr, 'write'>;

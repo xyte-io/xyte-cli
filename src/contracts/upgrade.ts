@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { compareSemver } from '../utils/upgrade';
+import { compareSemver } from '../utils/semver';
 import { UPGRADE_CHECK_SCHEMA_VERSION, UPGRADE_RESULT_SCHEMA_VERSION } from './versions';
 
 export const UpgradeCheckSchema = z.object({
