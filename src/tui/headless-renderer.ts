@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { randomUUID } from 'node:crypto';
 
+import type { ConnectionState } from '../config/connectivity';
 import { evaluateReadiness, type ReadinessCheck } from '../config/readiness';
 import type { SecretStore } from '../secure/secret-store';
 import type { ProfileStore } from '../secure/profile-store';
@@ -236,6 +237,60 @@ async function buildConfigFrame(args: {
   });
 }
 
+interface ScreenLoadResult {
+  panels: ScenePanel[];
+  connectionState: ConnectionState;
+  error?: { message: string };
+  retry: unknown;
+  extraMeta?: Record<string, unknown>;
+}
+
+function buildFrameFromLoad(
+  options: {
+    sessionId: string;
+    sequence: number;
+    tenantId?: string;
+    motionEnabled: boolean;
+    motionPhase: number;
+    readiness: ReadinessCheck;
+  },
+  screen: TuiScreenId,
+  title: string,
+  load: ScreenLoadResult
+): HeadlessFrame {
+  return createHeadlessFrame({
+    sessionId: options.sessionId,
+    sequence: options.sequence,
+    screen,
+    title,
+    status: load.error ? `${title} ${load.connectionState}: ${load.error.message}` : `${title} snapshot`,
+    tenantId: options.tenantId,
+    motionEnabled: options.motionEnabled,
+    motionPhase: options.motionPhase,
+    logo: XYTE_LOGO_COMPACT,
+    panels: load.panels,
+    meta: {
+      ...withNavigationMeta(screen, {
+        renderSafety: inferRenderSafety(load.panels),
+        readiness: options.readiness.state,
+        connection: {
+          state: load.connectionState,
+          error: load.error?.message
+        },
+        actionsHint: 'interactive-only writes (organization-only)',
+        writePolicy: 'organization-only',
+        headlessWrite: false,
+        retry: load.retry,
+        refreshState: getRefreshState({
+          connectionState: load.connectionState,
+          retried: (load.retry as { retried?: boolean })?.retried
+        }),
+        ...load.extraMeta
+      })
+    }
+  });
+}
+
 async function buildOperationalFrame(options: {
   sessionId: string;
   sequence: number;
@@ -255,32 +310,11 @@ async function buildOperationalFrame(options: {
         incidents: data.data.incidents,
         tickets: data.data.tickets
       });
-      return createHeadlessFrame({
-        sessionId: options.sessionId,
-        sequence: options.sequence,
-        screen: 'dashboard',
-        title: 'Dashboard',
-        status: data.error ? `Dashboard ${data.connectionState}: ${data.error.message}` : 'Dashboard snapshot',
-        tenantId: options.tenantId,
-        motionEnabled: options.motionEnabled,
-        motionPhase: options.motionPhase,
-        logo: XYTE_LOGO_COMPACT,
+      return buildFrameFromLoad(options, 'dashboard', 'Dashboard', {
         panels,
-        meta: {
-          ...withNavigationMeta('dashboard', {
-            renderSafety: inferRenderSafety(panels),
-            readiness: options.readiness.state,
-            connection: {
-              state: data.connectionState,
-              error: data.error?.message
-            },
-            retry: data.retry,
-            refreshState: getRefreshState({
-              connectionState: data.connectionState,
-              retried: data.retry.retried
-            })
-          })
-        }
+        connectionState: data.connectionState,
+        error: data.error,
+        retry: data.retry
       });
     }
 
@@ -294,35 +328,11 @@ async function buildOperationalFrame(options: {
         spaceFilter: '',
         actionsHint: 'interactive-only: a send-command, f space_id filter'
       });
-      return createHeadlessFrame({
-        sessionId: options.sessionId,
-        sequence: options.sequence,
-        screen: 'devices',
-        title: 'Devices',
-        status: devices.error ? `Devices ${devices.connectionState}: ${devices.error.message}` : 'Devices snapshot',
-        tenantId: options.tenantId,
-        motionEnabled: options.motionEnabled,
-        motionPhase: options.motionPhase,
-        logo: XYTE_LOGO_COMPACT,
+      return buildFrameFromLoad(options, 'devices', 'Devices', {
         panels,
-        meta: {
-          ...withNavigationMeta('devices', {
-            renderSafety: inferRenderSafety(panels),
-            readiness: options.readiness.state,
-            connection: {
-              state: devices.connectionState,
-              error: devices.error?.message
-            },
-            actionsHint: 'interactive-only writes (organization-only)',
-            writePolicy: 'organization-only',
-            headlessWrite: false,
-            retry: devices.retry,
-            refreshState: getRefreshState({
-              connectionState: devices.connectionState,
-              retried: devices.retry.retried
-            })
-          })
-        }
+        connectionState: devices.connectionState,
+        error: devices.error,
+        retry: devices.retry
       });
     }
 
@@ -338,35 +348,11 @@ async function buildOperationalFrame(options: {
         perPage: 100,
         actionsHint: 'interactive-only: a close-incident, f filters, [ ] pages, p per-page'
       });
-      return createHeadlessFrame({
-        sessionId: options.sessionId,
-        sequence: options.sequence,
-        screen: 'incidents',
-        title: 'Incidents',
-        status: incidents.error ? `Incidents ${incidents.connectionState}: ${incidents.error.message}` : 'Incidents snapshot',
-        tenantId: options.tenantId,
-        motionEnabled: options.motionEnabled,
-        motionPhase: options.motionPhase,
-        logo: XYTE_LOGO_COMPACT,
+      return buildFrameFromLoad(options, 'incidents', 'Incidents', {
         panels,
-        meta: {
-          ...withNavigationMeta('incidents', {
-            renderSafety: inferRenderSafety(panels),
-            readiness: options.readiness.state,
-            connection: {
-              state: incidents.connectionState,
-              error: incidents.error?.message
-            },
-            actionsHint: 'interactive-only writes (organization-only)',
-            writePolicy: 'organization-only',
-            headlessWrite: false,
-            retry: incidents.retry,
-            refreshState: getRefreshState({
-              connectionState: incidents.connectionState,
-              retried: incidents.retry.retried
-            })
-          })
-        }
+        connectionState: incidents.connectionState,
+        error: incidents.error,
+        retry: incidents.retry
       });
     }
 
@@ -385,35 +371,11 @@ async function buildOperationalFrame(options: {
           ? 'interactive-only: a resolve/message, f local filters, [ ] pages, p per-page'
           : 'interactive-only: ticket writes disabled in partner mode'
       });
-      return createHeadlessFrame({
-        sessionId: options.sessionId,
-        sequence: options.sequence,
-        screen: 'tickets',
-        title: 'Tickets',
-        status: tickets.error ? `Tickets ${tickets.connectionState}: ${tickets.error.message}` : 'Tickets snapshot',
-        tenantId: options.tenantId,
-        motionEnabled: options.motionEnabled,
-        motionPhase: options.motionPhase,
-        logo: XYTE_LOGO_COMPACT,
+      return buildFrameFromLoad(options, 'tickets', 'Tickets', {
         panels,
-        meta: {
-          ...withNavigationMeta('tickets', {
-            renderSafety: inferRenderSafety(panels),
-            readiness: options.readiness.state,
-            connection: {
-              state: tickets.connectionState,
-              error: tickets.error?.message
-            },
-            actionsHint: 'interactive-only writes (organization-only)',
-            writePolicy: 'organization-only',
-            headlessWrite: false,
-            retry: tickets.retry,
-            refreshState: getRefreshState({
-              connectionState: tickets.connectionState,
-              retried: tickets.retry.retried
-            })
-          })
-        }
+        connectionState: tickets.connectionState,
+        error: tickets.error,
+        retry: tickets.retry
       });
     }
 
@@ -448,39 +410,12 @@ async function buildOperationalFrame(options: {
         endpointFilterSummary: '',
         actionsHint: 'interactive-only: a claim/create/rename, f endpoint filters'
       });
-      return createHeadlessFrame({
-        sessionId: options.sessionId,
-        sequence: options.sequence,
-        screen: 'spaces',
-        title: 'Spaces',
-        status: spaces.error ? `Spaces ${spaces.connectionState}: ${spaces.error.message}` : 'Spaces snapshot',
-        tenantId: options.tenantId,
-        motionEnabled: options.motionEnabled,
-        motionPhase: options.motionPhase,
-        logo: XYTE_LOGO_COMPACT,
+      return buildFrameFromLoad(options, 'spaces', 'Spaces', {
         panels,
-        meta: {
-          ...withNavigationMeta('spaces', {
-            renderSafety: inferRenderSafety(panels),
-            readiness: options.readiness.state,
-            connection: {
-              state: spaces.connectionState,
-              error: spaces.error?.message,
-              drilldownError
-            },
-            actionsHint: 'interactive-only writes (organization-only)',
-            writePolicy: 'organization-only',
-            headlessWrite: false,
-            retry: {
-              spaces: spaces.retry,
-              drilldown: drilldownRetry
-            },
-            refreshState: getRefreshState({
-              connectionState: spaces.connectionState,
-              retried: spaces.retry.retried
-            })
-          })
-        }
+        connectionState: spaces.connectionState,
+        error: spaces.error,
+        retry: { spaces: spaces.retry, drilldown: drilldownRetry },
+        extraMeta: { connection: { state: spaces.connectionState, error: spaces.error?.message, drilldownError } }
       });
     }
 
