@@ -4,7 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { toProblemDetails } from '../contracts/problem';
 import { buildWatchFrame, type WatchDelta, type WatchFrameV1, type WatchProfile } from '../contracts/watch-frame';
 import type { XyteClient } from '../types/client';
-import { asRecord, extractArray, extractIncidentsArray } from '../utils/json';
+import { asRecord, extractIncidentsArray } from '../utils/json';
 
 type QueryValue = string | number | boolean | null | undefined;
 

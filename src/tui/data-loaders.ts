@@ -7,7 +7,7 @@ import type { SecretStore } from '../secure/secret-store';
 import type { XyteClient } from '../types/client';
 import type { SecretProvider } from '../types/profile';
 import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
-import { asRecord, extractArray, extractHasNextPage, extractIncidentsArray } from '../utils/json';
+import { extractArray, extractHasNextPage, extractIncidentsArray } from '../utils/json';
 
 export { extractArray };
 

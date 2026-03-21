@@ -822,24 +822,6 @@ function resolveStrictJson(args: { strictJson?: boolean; settings: ResolvedCliSe
   return args.settings.values.output.strictJson;
 }
 
-function formatProblemForText(error: unknown): string {
-  const problem = toProblemDetails(error);
-  const lines = [problem.title];
-  if (problem.cause) {
-    lines.push(`Cause: ${problem.cause}`);
-  }
-  if (problem.suggestedCommands?.length) {
-    lines.push('Next commands:');
-    for (const command of problem.suggestedCommands) {
-      lines.push(`- ${command}`);
-    }
-  }
-  if (lines.length === 1 && problem.detail !== problem.title) {
-    lines.push(problem.detail);
-  }
-  return `${lines.join('\n')}\n`;
-}
-
 function stringifyWatchValue(value: unknown, fallback = '-'): string {
   if (typeof value === 'string' && value.trim()) {
     return value.trim();

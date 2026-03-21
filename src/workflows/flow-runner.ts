@@ -205,7 +205,7 @@ function resolveFlowWindowHours(step: FlowTaskStep, context: Record<string, stri
   return parsed;
 }
 
-function hydrateDerivedFlowContext(step: FlowTaskStep, ctx: RunContext): void {
+function hydrateDerivedFlowContext(_step: FlowTaskStep, ctx: RunContext): void {
   const context = ctx.resolvedContext;
 
   if (!context.device_id && context.watch_device_id) {
