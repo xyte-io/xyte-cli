@@ -131,9 +131,9 @@ function compactQuery(query: QueryShape | undefined): Record<string, string | nu
 }
 
 interface DashboardLoadResult {
-  devices: any[];
-  incidents: any[];
-  tickets: any[];
+  devices: unknown[];
+  incidents: unknown[];
+  tickets: unknown[];
 }
 
 export async function loadDashboardData(client: XyteClient, tenantId?: string): Promise<LoadOutcome<DashboardLoadResult>> {
@@ -168,7 +168,7 @@ export async function loadDevicesData(
   client: XyteClient,
   tenantId?: string,
   options: DevicesLoadOptions = {}
-): Promise<LoadOutcome<any[]>> {
+): Promise<LoadOutcome<unknown[]>> {
   const result = await loadWithOutcome(
     async () => {
       const query = compactQuery(options.query as QueryShape | undefined);
@@ -210,15 +210,15 @@ interface IncidentsLoadOptions {
   paginateAll?: boolean;
 }
 
-function normalizeIncidentItem(incident: unknown): any {
-  return incident && typeof incident === 'object' ? incident : { value: incident };
+function normalizeIncidentItem(incident: unknown): Record<string, unknown> {
+  return incident && typeof incident === 'object' ? (incident as Record<string, unknown>) : { value: incident };
 }
 
 export function loadIncidentsData(
   client: XyteClient,
   tenantId?: string,
   options: IncidentsLoadOptions = {}
-): Promise<LoadOutcome<any[]>> {
+): Promise<LoadOutcome<unknown[]>> {
   return loadWithOutcome(
     async () => {
       const nowUnix = Math.floor(Date.now() / 1000);
@@ -257,7 +257,7 @@ export function loadIncidentsData(
         return extractIncidentsArray(raw).map(normalizeIncidentItem);
       }
 
-      const all: any[] = [];
+      const all: unknown[] = [];
 
       for (let page = initialPage; page <= 50; page += 1) {
         const query = buildQuery(page);
@@ -289,7 +289,7 @@ export function loadIncidentsData(
 
 interface TicketsLoadResult {
   mode: 'organization' | 'partner';
-  tickets: any[];
+  tickets: unknown[];
 }
 
 export async function loadTicketsData(client: XyteClient, tenantId?: string): Promise<LoadOutcome<TicketsLoadResult>> {
@@ -351,7 +351,7 @@ export function loadSpacesData(
   client: XyteClient,
   tenantId?: string,
   options: SpacesLoadOptions = {}
-): Promise<LoadOutcome<any[]>> {
+): Promise<LoadOutcome<unknown[]>> {
   return loadWithOutcome(
     async () => {
       const query = compactQuery(options.query as QueryShape | undefined);
@@ -368,13 +368,14 @@ export interface CommandTemplate {
   label: string;
 }
 
-function normalizeCommandTemplates(items: any[]): CommandTemplate[] {
+function normalizeCommandTemplates(items: unknown[]): CommandTemplate[] {
   const dedupe = new Set<string>();
   const templates: CommandTemplate[] = [];
 
   for (const item of items) {
-    const command = String(item?.command ?? '').trim();
-    const friendlyName = String(item?.friendly_name ?? '').trim();
+    const rec = item && typeof item === 'object' ? (item as Record<string, unknown>) : undefined;
+    const command = String(rec?.command ?? '').trim();
+    const friendlyName = String(rec?.friendly_name ?? '').trim();
 
     if (command) {
       const key = `command:${command}`;
@@ -424,14 +425,16 @@ export async function loadCommandTemplates(
 
 interface SpaceDrilldownResult {
   spaceDetail?: unknown;
-  devicesInSpace: any[];
+  devicesInSpace: unknown[];
   paneStatus: string;
 }
 
-function matchesSpace(device: any, spaceId: string): boolean {
-  const direct = String(device?.space_id ?? '') === spaceId;
-  const nested = String(device?.space?.id ?? '') === spaceId;
-  const alternate = String(device?.spaceId ?? '') === spaceId;
+function matchesSpace(device: unknown, spaceId: string): boolean {
+  const rec = device && typeof device === 'object' ? (device as Record<string, unknown>) : undefined;
+  const direct = String(rec?.space_id ?? '') === spaceId;
+  const spaceObj = rec?.space && typeof rec.space === 'object' ? (rec.space as Record<string, unknown>) : undefined;
+  const nested = String(spaceObj?.id ?? '') === spaceId;
+  const alternate = String(rec?.spaceId ?? '') === spaceId;
   return direct || nested || alternate;
 }
 
@@ -439,7 +442,7 @@ export async function loadSpaceDrilldownData(
   client: XyteClient,
   tenantId: string | undefined,
   spaceId: string,
-  allDevicesCache: any[]
+  allDevicesCache: unknown[]
 ): Promise<LoadOutcome<SpaceDrilldownResult>> {
   const [detailOutcome, queriedDevicesOutcome] = await Promise.all([
     loadWithOutcome(() => client.organization.getSpace({ tenantId, path: { space_id: spaceId } }), undefined),
@@ -454,7 +457,7 @@ export async function loadSpaceDrilldownData(
 
   let devicesInSpace = queriedDevicesOutcome.data;
   let paneStatus = 'Loaded space detail and device listing.';
-  let fallbackOutcome: LoadOutcome<any[]> | undefined;
+  let fallbackOutcome: LoadOutcome<unknown[]> | undefined;
 
   if (!devicesInSpace.length) {
     if (allDevicesCache.length) {
@@ -482,12 +485,14 @@ export async function loadSpaceDrilldownData(
   };
 }
 
-export function getSpaceId(space: any): string {
-  return String(space?.id ?? space?._id ?? space?.space_id ?? '');
+export function getSpaceId(space: unknown): string {
+  const rec = space && typeof space === 'object' ? (space as Record<string, unknown>) : undefined;
+  return String(rec?.id ?? rec?._id ?? rec?.space_id ?? '');
 }
 
-export function getSpaceName(space: any): string {
-  return String(space?.name ?? space?.title ?? space?.path ?? 'n/a');
+export function getSpaceName(space: unknown): string {
+  const rec = space && typeof space === 'object' ? (space as Record<string, unknown>) : undefined;
+  return String(rec?.name ?? rec?.title ?? rec?.path ?? 'n/a');
 }
 
 const CONFIG_PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];

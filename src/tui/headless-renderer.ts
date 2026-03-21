@@ -380,7 +380,7 @@ async function buildOperationalFrame(options: {
       const selected = spaces.data[0];
       const selectedSpaceId = selected ? getSpaceId(selected) : '';
       let detail: unknown;
-      let devicesInSpace: any[] = [];
+      let devicesInSpace: unknown[] = [];
       let paneStatus = selected ? 'Loading selected space...' : 'No spaces found for tenant.';
       let drilldownError: string | undefined;
       let drilldownRetry: unknown;

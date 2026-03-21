@@ -132,7 +132,7 @@ describe('tui data loaders', () => {
 
     const devices = await loadDevicesData(client, 'acme', { query: { space_id: 's1' } });
     expect(devices.connectionState).toBe('connected');
-    expect(devices.data.map((item) => item.id)).toEqual(['d1']);
+    expect(devices.data.map((item) => (item as Record<string, unknown>).id)).toEqual(['d1']);
   });
 
   it('passes structured spaces query fields', async () => {

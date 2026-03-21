@@ -18,12 +18,13 @@ import { sceneFromIncidentsState } from '../scene';
 import { payloadSummary } from '../serialize';
 import { confirmWriteWithToken, openActionPalette } from '../actions';
 
-function incidentIdOf(incident: any): string {
-  return String(incident?.id ?? incident?._id ?? incident?.uuid ?? '');
+function incidentIdOf(incident: unknown): string {
+  const rec = incident && typeof incident === 'object' ? (incident as Record<string, unknown>) : undefined;
+  return String(rec?.id ?? rec?._id ?? rec?.uuid ?? '');
 }
 
 interface CloseIncidentWithGuardArgs {
-  incident: any;
+  incident: unknown;
   context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;
 }
 
@@ -54,13 +55,13 @@ export async function closeIncidentWithGuard(args: CloseIncidentWithGuardArgs): 
   }
 }
 
-export function normalizeIncidents(items: unknown): any[] {
+export function normalizeIncidents(items: unknown): Record<string, unknown>[] {
   if (!Array.isArray(items)) {
     return [];
   }
   return items
     .filter((incident) => incident !== null && incident !== undefined)
-    .map((incident) => (typeof incident === 'object' ? incident : { value: incident }));
+    .map((incident) => (typeof incident === 'object' ? (incident as Record<string, unknown>) : { value: incident }));
 }
 
 export function createIncidentsScreen(): TuiScreen {
@@ -68,8 +69,8 @@ export function createIncidentsScreen(): TuiScreen {
   let list: blessed.Widgets.ListTableElement | undefined;
   let detailBox: blessed.Widgets.BoxElement | undefined;
   let context: TuiContext;
-  let incidents: any[] = [];
-  let filtered: any[] = [];
+  let incidents: Record<string, unknown>[] = [];
+  let filtered: Record<string, unknown>[] = [];
   let severityFilter = '';
   let selectedIndex = 0;
   let statusFilter = 'active';
@@ -123,12 +124,15 @@ export function createIncidentsScreen(): TuiScreen {
       if (renderErrors.frozen) {
         setListTableData(list, [
           ['ID', 'Severity', 'State', 'Device'],
-          ...filtered.map((incident, index) => [
-            String(incident?.id ?? incident?._id ?? incident?.uuid ?? `row-${index + 1}`),
-            String(incident?.severity ?? incident?.priority ?? 'unknown'),
-            String(incident?.status ?? incident?.state ?? 'unknown'),
-            String(incident?.device_id ?? incident?.device?.id ?? 'n/a')
-          ])
+          ...filtered.map((incident, index) => {
+            const deviceObj = incident.device && typeof incident.device === 'object' ? (incident.device as Record<string, unknown>) : undefined;
+            return [
+              String(incident.id ?? incident._id ?? incident.uuid ?? `row-${index + 1}`),
+              String(incident.severity ?? incident.priority ?? 'unknown'),
+              String(incident.status ?? incident.state ?? 'unknown'),
+              String(incident.device_id ?? deviceObj?.id ?? 'n/a')
+            ];
+          })
         ], selectionSync);
         detailBox?.setContent('Render fallback mode enabled for incident details.');
       } else {
@@ -170,12 +174,15 @@ export function createIncidentsScreen(): TuiScreen {
       });
       setListTableData(list, [
         ['ID', 'Severity', 'State', 'Device'],
-        ...filtered.map((incident, index) => [
-          String(incident?.id ?? incident?._id ?? incident?.uuid ?? `row-${index + 1}`),
-          String(incident?.severity ?? incident?.priority ?? 'unknown'),
-          String(incident?.status ?? incident?.state ?? 'unknown'),
-          String(incident?.device_id ?? incident?.device?.id ?? 'n/a')
-        ])
+        ...filtered.map((incident, index) => {
+          const deviceObj = incident.device && typeof incident.device === 'object' ? (incident.device as Record<string, unknown>) : undefined;
+          return [
+            String(incident.id ?? incident._id ?? incident.uuid ?? `row-${index + 1}`),
+            String(incident.severity ?? incident.priority ?? 'unknown'),
+            String(incident.status ?? incident.state ?? 'unknown'),
+            String(incident.device_id ?? deviceObj?.id ?? 'n/a')
+          ];
+        })
       ], selectionSync);
       detailBox?.setContent(`Unable to render incident detail safely.\nReason: ${message}`);
     }

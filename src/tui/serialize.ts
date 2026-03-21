@@ -183,16 +183,12 @@ function summarizeObject(value: unknown): string[] {
   return lines;
 }
 
-function safeLines(value: unknown, options: SafeInspectOptions = {}): { lines: string[]; truncated: boolean } {
+export function safePreviewLines(value: unknown, options: SafeInspectOptions = {}): { lines: string[]; truncated: boolean } {
   const inspected = safeInspect(value, options);
-  return {
+  const result = {
     lines: inspected.text.split('\n'),
     truncated: inspected.truncated
   };
-}
-
-export function safePreviewLines(value: unknown, options: SafeInspectOptions = {}): { lines: string[]; truncated: boolean } {
-  const result = safeLines(value, options);
   if (!result.truncated) {
     return result;
   }

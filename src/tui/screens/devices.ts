@@ -19,12 +19,13 @@ import { sceneFromDevicesState } from '../scene';
 import { payloadSummary, safeSearchText } from '../serialize';
 import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, promptChoice } from '../actions';
 
-function deviceIdOf(device: any): string {
-  return String(device?.id ?? device?._id ?? device?.device_id ?? '');
+function deviceIdOf(device: unknown): string {
+  const rec = device && typeof device === 'object' ? (device as Record<string, unknown>) : undefined;
+  return String(rec?.id ?? rec?._id ?? rec?.device_id ?? '');
 }
 
 interface SendCommandWithGuardArgs {
-  device: any;
+  device: unknown;
   template: CommandTemplate;
   params: Record<string, unknown> | undefined;
   context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;
@@ -70,8 +71,8 @@ export function createDevicesScreen(): TuiScreen {
   let table: blessed.Widgets.ListTableElement | undefined;
   let detail: blessed.Widgets.BoxElement | undefined;
   let context: TuiContext;
-  let devices: any[] = [];
-  let filtered: any[] = [];
+  let devices: unknown[] = [];
+  let filtered: unknown[] = [];
   let searchText = '';
   let selectedIndex = 0;
   let selectionSync: SelectionSyncState = {
@@ -120,12 +121,15 @@ export function createDevicesScreen(): TuiScreen {
       if (renderErrors.frozen) {
         setListTableData(table, [
           ['ID', 'Name', 'Status', 'Space'],
-          ...filtered.map((device, index) => [
-            String(device?.id ?? device?._id ?? `row-${index + 1}`),
-            String(device?.name ?? device?.title ?? 'n/a'),
-            String(device?.status ?? device?.state ?? 'unknown'),
-            String(device?.space_name ?? device?.space_id ?? 'n/a')
-          ])
+          ...filtered.map((device, index) => {
+            const d = device && typeof device === 'object' ? (device as Record<string, unknown>) : {} as Record<string, unknown>;
+            return [
+              String(d.id ?? d._id ?? `row-${index + 1}`),
+              String(d.name ?? d.title ?? 'n/a'),
+              String(d.status ?? d.state ?? 'unknown'),
+              String(d.space_name ?? d.space_id ?? 'n/a')
+            ];
+          })
         ], selectionSync);
         detail?.setContent(
           [
@@ -171,12 +175,15 @@ export function createDevicesScreen(): TuiScreen {
 
       setListTableData(table, [
         ['ID', 'Name', 'Status', 'Space'],
-        ...filtered.map((device, index) => [
-          String(device?.id ?? device?._id ?? `row-${index + 1}`),
-          String(device?.name ?? device?.title ?? 'n/a'),
-          String(device?.status ?? device?.state ?? 'unknown'),
-          String(device?.space_name ?? device?.space_id ?? 'n/a')
-        ])
+        ...filtered.map((device, index) => {
+          const d = device && typeof device === 'object' ? (device as Record<string, unknown>) : {} as Record<string, unknown>;
+          return [
+            String(d.id ?? d._id ?? `row-${index + 1}`),
+            String(d.name ?? d.title ?? 'n/a'),
+            String(d.status ?? d.state ?? 'unknown'),
+            String(d.space_name ?? d.space_id ?? 'n/a')
+          ];
+        })
       ], selectionSync);
       detail?.setContent(
         ['Unable to render device detail safely.', `Reason: ${message}`, 'Try narrowing search/filter and refresh.'].join('\n')

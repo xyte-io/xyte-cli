@@ -192,20 +192,20 @@ export function createSpacesScreen(): TuiScreen {
   let statusBox: blessed.Widgets.BoxElement | undefined;
   let context: TuiContext;
 
-  let spaces: any[] = [];
-  let filtered: any[] = [];
+  let spaces: unknown[] = [];
+  let filtered: unknown[] = [];
   let searchText = '';
   let selectedIndex = 0;
   let selectedSpaceId: string | undefined;
   let selectedSpaceDetail: unknown;
-  let devicesInSpace: any[] = [];
+  let devicesInSpace: unknown[] = [];
   let selectedDeviceIndex = 0;
   let paneStatus = 'No space selected.';
   let loading = false;
   let spinnerPhase = 0;
   let spinnerTimer: NodeJS.Timeout | undefined;
   let selectionDebounceTimer: NodeJS.Timeout | undefined;
-  let allDevicesCache: any[] = [];
+  let allDevicesCache: unknown[] = [];
   let activeTenantId: string | undefined;
   let spaceSelectionSync: SelectionSyncState = {
     syncing: false,
@@ -318,7 +318,7 @@ export function createSpacesScreen(): TuiScreen {
   const staleSafeDrilldown = createStaleSafeSelectionLoader<{ index: number; tenantId?: string }, {
     selectedSpaceId: string;
     selectedSpaceDetail: unknown;
-    devicesInSpace: any[];
+    devicesInSpace: unknown[];
     paneStatus: string;
     index: number;
   }>({
@@ -782,7 +782,7 @@ export function createSpacesScreen(): TuiScreen {
                   return;
                 }
                 const spaceId = getSpaceId(space);
-                const currentName = String(space?.name ?? '');
+                const currentName = getSpaceName(space);
                 const nextName = await context.prompt('New space name:', currentName);
                 if (nextName === undefined || !isMounted) {
                   context.setStatus('Rename space canceled.');

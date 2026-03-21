@@ -80,18 +80,20 @@ export interface HeadlessFrame {
   meta?: HeadlessFrameMeta;
 }
 
+type ApiRecord = Record<string, unknown>;
+
 interface DashboardSceneState {
   tenantId?: string;
-  devices: any[];
-  incidents: any[];
-  tickets: any[];
+  devices: unknown[];
+  incidents: unknown[];
+  tickets: unknown[];
 }
 
 interface DevicesSceneState {
   tenantId?: string;
   searchText: string;
   selectedIndex: number;
-  devices: any[];
+  devices: unknown[];
   spaceFilter?: string;
   actionsHint?: string;
 }
@@ -100,7 +102,7 @@ interface IncidentsSceneState {
   tenantId?: string;
   severityFilter: string;
   selectedIndex: number;
-  incidents: any[];
+  incidents: unknown[];
   statusFilter?: string;
   priorityFilter?: string;
   page?: number;
@@ -113,7 +115,7 @@ interface TicketsSceneState {
   mode: 'organization' | 'partner';
   searchText: string;
   selectedIndex: number;
-  tickets: any[];
+  tickets: unknown[];
   detailText?: string;
   statusFilter?: string;
   priorityFilter?: string;
@@ -129,9 +131,9 @@ interface SpacesSceneState {
   selectedIndex: number;
   loading: boolean;
   paneStatus: string;
-  spaces: any[];
+  spaces: unknown[];
   spaceDetail?: unknown;
-  devicesInSpace: any[];
+  devicesInSpace: unknown[];
   endpointFilterSummary?: string;
   actionsHint?: string;
 }
@@ -154,24 +156,32 @@ interface ConfigSceneState {
   doctorStatus?: string;
 }
 
-function sampleRows(items: any[], count = 6): any[] {
+function asRec(item: unknown): ApiRecord {
+  return item && typeof item === 'object' ? (item as ApiRecord) : {};
+}
+
+function sampleRows(items: unknown[], count = 6): unknown[] {
   return items.slice(0, count);
 }
 
-function safeId(item: any, index: number): string {
-  return String(item?.id ?? item?._id ?? item?.uuid ?? item?.device_id ?? `row-${index + 1}`);
+function safeId(item: unknown, index: number): string {
+  const rec = asRec(item);
+  return String(rec.id ?? rec._id ?? rec.uuid ?? rec.device_id ?? `row-${index + 1}`);
 }
 
-function safeName(item: any): string {
-  return String(item?.name ?? item?.title ?? item?.subject ?? item?.status ?? 'n/a');
+function safeName(item: unknown): string {
+  const rec = asRec(item);
+  return String(rec.name ?? rec.title ?? rec.subject ?? rec.status ?? 'n/a');
 }
 
-function safeStatus(item: any): string {
-  return String(item?.status ?? item?.state ?? item?.online_status ?? 'unknown');
+function safeStatus(item: unknown): string {
+  const rec = asRec(item);
+  return String(rec.status ?? rec.state ?? rec.online_status ?? 'unknown');
 }
 
-function safeSpaceId(item: any, index: number): string {
-  return String(item?.id ?? item?.space_id ?? item?._id ?? item?.uuid ?? `space-${index + 1}`);
+function safeSpaceId(item: unknown, index: number): string {
+  const rec = asRec(item);
+  return String(rec.id ?? rec.space_id ?? rec._id ?? rec.uuid ?? `space-${index + 1}`);
 }
 
 function detailBlock(lines: string[], preview?: { lines: string[] }): string[] {
@@ -244,14 +254,15 @@ export function sceneFromDashboardState(state: DashboardSceneState): ScenePanel[
 export function sceneFromDevicesState(state: DevicesSceneState): ScenePanel[] {
   const selectedIndex = clampSelection(state.selectedIndex, state.devices.length);
   const selected = state.devices[selectedIndex];
+  const sel = asRec(selected);
   const preview = selected ? safePreviewLines(selected) : undefined;
   const detailLines = selected
     ? detailBlock(
         [
-          `ID: ${sanitizePrintable(selected?.id ?? selected?._id ?? selected?.uuid ?? 'n/a')}`,
-          `Name: ${sanitizePrintable(selected?.name ?? selected?.title ?? 'n/a')}`,
-          `State: ${sanitizePrintable(selected?.status ?? selected?.state ?? selected?.online_status ?? 'unknown')}`,
-          `Space: ${sanitizePrintable(selected?.space_name ?? selected?.space_id ?? 'n/a')}`
+          `ID: ${sanitizePrintable(sel.id ?? sel._id ?? sel.uuid ?? 'n/a')}`,
+          `Name: ${sanitizePrintable(sel.name ?? sel.title ?? 'n/a')}`,
+          `State: ${sanitizePrintable(sel.status ?? sel.state ?? sel.online_status ?? 'unknown')}`,
+          `Space: ${sanitizePrintable(sel.space_name ?? sel.space_id ?? 'n/a')}`
         ],
         preview
       )
@@ -264,12 +275,15 @@ export function sceneFromDevicesState(state: DevicesSceneState): ScenePanel[] {
       kind: 'table',
       table: {
         columns: ['ID', 'Name', 'State', 'Space'],
-        rows: state.devices.map((item, index) => [
-          shortId(safeId(item, index)),
-          fitCell(safeName(item), 24, 'end'),
-          fitCell(safeStatus(item), 10, 'end'),
-          fitCell(item?.space_name ?? item?.space_id ?? 'n/a', 20, 'end')
-        ])
+        rows: state.devices.map((item, index) => {
+          const r = asRec(item);
+          return [
+            shortId(safeId(item, index)),
+            fitCell(safeName(item), 24, 'end'),
+            fitCell(safeStatus(item), 10, 'end'),
+            fitCell(r.space_name ?? r.space_id ?? 'n/a', 20, 'end')
+          ];
+        })
       },
       status: [
         state.searchText ? `search=${state.searchText}` : 'search=none',
@@ -291,14 +305,16 @@ export function sceneFromDevicesState(state: DevicesSceneState): ScenePanel[] {
 export function sceneFromIncidentsState(state: IncidentsSceneState): ScenePanel[] {
   const selectedIndex = clampSelection(state.selectedIndex, state.incidents.length);
   const selected = state.incidents[selectedIndex];
+  const sel = asRec(selected);
   const preview = selected ? safePreviewLines(selected) : undefined;
+  const selDevice = sel.device && typeof sel.device === 'object' ? (sel.device as ApiRecord) : undefined;
   const detailLines = selected
     ? detailBlock(
         [
-          `ID: ${sanitizePrintable(selected?.id ?? selected?._id ?? selected?.uuid ?? 'n/a')}`,
-          `Sev: ${sanitizePrintable(selected?.severity ?? selected?.priority ?? 'unknown')}`,
-          `State: ${sanitizePrintable(selected?.status ?? selected?.state ?? 'unknown')}`,
-          `Device: ${sanitizePrintable(selected?.device_id ?? selected?.device?.id ?? 'n/a')}`
+          `ID: ${sanitizePrintable(sel.id ?? sel._id ?? sel.uuid ?? 'n/a')}`,
+          `Sev: ${sanitizePrintable(sel.severity ?? sel.priority ?? 'unknown')}`,
+          `State: ${sanitizePrintable(sel.status ?? sel.state ?? 'unknown')}`,
+          `Device: ${sanitizePrintable(sel.device_id ?? selDevice?.id ?? 'n/a')}`
         ],
         preview
       )
@@ -311,12 +327,16 @@ export function sceneFromIncidentsState(state: IncidentsSceneState): ScenePanel[
       kind: 'table',
       table: {
         columns: ['ID', 'Sev', 'State', 'Device'],
-        rows: state.incidents.map((item, index) => [
-          shortId(safeId(item, index)),
-          fitCell(item?.severity ?? item?.priority ?? 'unknown', 7, 'end'),
-          fitCell(safeStatus(item), 10, 'end'),
-          shortId(item?.device_id ?? item?.device?.id ?? 'n/a')
-        ])
+        rows: state.incidents.map((item, index) => {
+          const r = asRec(item);
+          const rDevice = r.device && typeof r.device === 'object' ? (r.device as ApiRecord) : undefined;
+          return [
+            shortId(safeId(item, index)),
+            fitCell(r.severity ?? r.priority ?? 'unknown', 7, 'end'),
+            fitCell(safeStatus(item), 10, 'end'),
+            shortId(r.device_id ?? rDevice?.id ?? 'n/a')
+          ];
+        })
       },
       status: [
         state.severityFilter ? `severity=${state.severityFilter}` : 'severity=all',
@@ -341,13 +361,14 @@ export function sceneFromIncidentsState(state: IncidentsSceneState): ScenePanel[
 export function sceneFromTicketsState(state: TicketsSceneState): ScenePanel[] {
   const selectedIndex = clampSelection(state.selectedIndex, state.tickets.length);
   const selected = state.tickets[selectedIndex];
+  const sel = asRec(selected);
   const preview = selected ? safePreviewLines(selected) : undefined;
   const selectedSummary = selected
     ? [
-        `ID: ${sanitizePrintable(selected?.id ?? selected?._id ?? 'n/a')}`,
-        `State: ${sanitizePrintable(selected?.status ?? selected?.state ?? 'unknown')}`,
-        `Pri: ${sanitizePrintable(selected?.priority ?? 'n/a')}`,
-        `Subject: ${sanitizePrintable(selected?.subject ?? selected?.title ?? 'n/a')}`,
+        `ID: ${sanitizePrintable(sel.id ?? sel._id ?? 'n/a')}`,
+        `State: ${sanitizePrintable(sel.status ?? sel.state ?? 'unknown')}`,
+        `Pri: ${sanitizePrintable(sel.priority ?? 'n/a')}`,
+        `Subject: ${sanitizePrintable(sel.subject ?? sel.title ?? 'n/a')}`,
         ''
       ]
     : [];
@@ -364,12 +385,15 @@ export function sceneFromTicketsState(state: TicketsSceneState): ScenePanel[] {
       kind: 'table',
       table: {
         columns: ['ID', 'State', 'Pri', 'Subject'],
-        rows: state.tickets.map((item, index) => [
-          shortId(safeId(item, index)),
-          fitCell(safeStatus(item), 10, 'end'),
-          fitCell(item?.priority ?? 'n/a', 6, 'end'),
-          fitCell(item?.subject ?? item?.title ?? 'n/a', 28, 'end')
-        ])
+        rows: state.tickets.map((item, index) => {
+          const r = asRec(item);
+          return [
+            shortId(safeId(item, index)),
+            fitCell(safeStatus(item), 10, 'end'),
+            fitCell(r.priority ?? 'n/a', 6, 'end'),
+            fitCell(r.subject ?? r.title ?? 'n/a', 28, 'end')
+          ];
+        })
       },
       status: [
         `mode=${state.mode}`,
@@ -396,14 +420,15 @@ export function sceneFromTicketsState(state: TicketsSceneState): ScenePanel[] {
 export function sceneFromSpacesState(state: SpacesSceneState): ScenePanel[] {
   const selectedIndex = clampSelection(state.selectedIndex, state.spaces.length);
   const selected = state.spaces[selectedIndex];
+  const sel = asRec(selected);
   const detailPreview = state.spaceDetail ? safePreviewLines(state.spaceDetail) : selected ? safePreviewLines(selected) : undefined;
   const detailLines = selected
     ? detailBlock(
         [
           `ID: ${sanitizePrintable(safeSpaceId(selected, selectedIndex))}`,
-          `Name: ${sanitizePrintable(selected?.name ?? selected?.title ?? 'n/a')}`,
-          `Type: ${sanitizePrintable(selected?.space_type ?? selected?.type ?? 'n/a')}`,
-          `Path: ${sanitizePrintable(selected?.path ?? selected?.full_path ?? 'n/a')}`
+          `Name: ${sanitizePrintable(sel.name ?? sel.title ?? 'n/a')}`,
+          `Type: ${sanitizePrintable(sel.space_type ?? sel.type ?? 'n/a')}`,
+          `Path: ${sanitizePrintable(sel.path ?? sel.full_path ?? 'n/a')}`
         ],
         detailPreview
       )
@@ -416,12 +441,15 @@ export function sceneFromSpacesState(state: SpacesSceneState): ScenePanel[] {
       kind: 'table',
       table: {
         columns: ['ID', 'Name', 'Type', 'Path'],
-        rows: state.spaces.map((item, index) => [
-          shortId(safeId(item, index)),
-          fitCell(safeName(item), 22, 'end'),
-          fitCell(item?.space_type ?? item?.type ?? 'n/a', 10, 'end'),
-          fitCell(item?.path ?? item?.full_path ?? 'n/a', 28, 'end')
-        ])
+        rows: state.spaces.map((item, index) => {
+          const r = asRec(item);
+          return [
+            shortId(safeId(item, index)),
+            fitCell(safeName(item), 22, 'end'),
+            fitCell(r.space_type ?? r.type ?? 'n/a', 10, 'end'),
+            fitCell(r.path ?? r.full_path ?? 'n/a', 28, 'end')
+          ];
+        })
       },
       status: [
         state.searchText ? `search=${state.searchText}` : 'search=none',

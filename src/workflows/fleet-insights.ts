@@ -425,7 +425,7 @@ async function paginateAll(args: {
   return extractArray(single, args.extractionKeys);
 }
 
-async function loadAllOrganizationDevices(client: XyteClient, tenantId: string): Promise<any[]> {
+function loadAllOrganizationDevices(client: XyteClient, tenantId: string): Promise<any[]> {
   return paginateAll({
     fetch: (query) => client.organization.getDevices({ tenantId, query }),
     fetchSingle: () => client.organization.getDevices({ tenantId }),
@@ -433,7 +433,7 @@ async function loadAllOrganizationDevices(client: XyteClient, tenantId: string):
   });
 }
 
-async function loadAllPartnerDevices(client: XyteClient, tenantId: string): Promise<any[]> {
+function loadAllPartnerDevices(client: XyteClient, tenantId: string): Promise<any[]> {
   return paginateAll({
     fetch: (query) => client.partner.getDevices({ tenantId, query }),
     fetchSingle: () => client.partner.getDevices({ tenantId }),
@@ -441,7 +441,7 @@ async function loadAllPartnerDevices(client: XyteClient, tenantId: string): Prom
   });
 }
 
-async function loadAllSpaces(client: XyteClient, tenantId: string): Promise<any[]> {
+function loadAllSpaces(client: XyteClient, tenantId: string): Promise<any[]> {
   return paginateAll({
     fetch: (query) => client.organization.getSpaces({ tenantId, query }),
     fetchSingle: () => client.organization.getSpaces({ tenantId }),
@@ -742,7 +742,7 @@ async function resolveInspectProviderScope(
   return 'organization';
 }
 
-export async function collectFleetSnapshot(args: {
+export function collectFleetSnapshot(args: {
   client: XyteClient;
   tenantId: string;
   tenantName?: string;
