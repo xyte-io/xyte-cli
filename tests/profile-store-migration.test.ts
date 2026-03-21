@@ -57,6 +57,7 @@ describe('profile store migration', () => {
     expect(tenant.keyRegistry.activeSlotByProvider['xyte-org']).toBe('org-primary');
     expect((tenant.keyRegistry.activeSlotByProvider as Record<string, string>)['xyte-device']).toBeUndefined();
 
+    await store.migrateIfNeeded();
     const persisted = JSON.parse(await readFile(filePath, 'utf8')) as any;
     const providers = persisted.tenants[0].keyRegistry.slots.map((slot: { provider: string }) => slot.provider);
     expect(providers).toEqual(['xyte-org']);

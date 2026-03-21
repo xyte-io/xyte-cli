@@ -19,6 +19,7 @@ const DEFAULT_DATA: ProfileStoreData = {
 
 export interface ProfileStore {
   getData(): Promise<ProfileStoreData>;
+  migrateIfNeeded(): Promise<void>;
   listTenants(): Promise<TenantProfile[]>;
   getTenant(tenantId: string): Promise<TenantProfile | undefined>;
   upsertTenant(input: {
@@ -166,25 +167,25 @@ export class FileProfileStore implements ProfileStore {
         const detail = error instanceof Error ? error.message : String(error);
         throw new Error(`Profile store is invalid at ${this.filePath}: ${detail}. Delete or fix this file and rerun setup.`);
       }
-      const normalized = this.normalize(parsed);
-      if (normalized.changed) {
-        try {
-          await this.writeData(normalized.data);
-        } catch (writeError) {
-          // Best-effort migration: return normalized data even if persistence fails.
-          // eslint-disable-next-line no-console
-          console.warn(
-            `Failed to persist normalized profile data to ${this.filePath}:`,
-            writeError
-          );
-        }
-      }
-      return normalized.data;
+      return this.normalize(parsed).data;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return structuredClone(DEFAULT_DATA);
       }
       throw error;
+    }
+  }
+
+  async migrateIfNeeded(): Promise<void> {
+    try {
+      const content = await fs.readFile(this.filePath, 'utf8');
+      const parsed = JSON.parse(content) as ProfileStoreData;
+      const normalized = this.normalize(parsed);
+      if (normalized.changed) {
+        await this.writeData(normalized.data);
+      }
+    } catch {
+      // No file or invalid file — nothing to migrate.
     }
   }
 

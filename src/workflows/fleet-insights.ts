@@ -786,11 +786,18 @@ export function collectFleetSnapshot(args: {
   });
 }
 
+function fieldCounter(items: unknown[], field: string): Record<string, number> {
+  return toCounter(items.map((item) => {
+    const r = asRecord(item);
+    return safeString(typeof r[field] === 'string' ? r[field] : 'unknown');
+  }));
+}
+
 export function buildFleetInspect(snapshot: FleetSnapshot): FleetInspectResult {
-  const deviceStatus = toCounter(snapshot.devices.map((item) => { const r = asRecord(item); return safeString(typeof r.status === 'string' ? r.status : 'unknown'); }));
-  const incidentStatus = toCounter(snapshot.incidents.map((item) => { const r = asRecord(item); return safeString(typeof r.status === 'string' ? r.status : 'unknown'); }));
-  const ticketStatus = toCounter(snapshot.tickets.map((item) => { const r = asRecord(item); return safeString(typeof r.status === 'string' ? r.status : 'unknown'); }));
-  const spaceTypes = toCounter(snapshot.spaces.map((item) => { const r = asRecord(item); return safeString(typeof r.space_type === 'string' ? r.space_type : 'unknown'); }));
+  const deviceStatus = fieldCounter(snapshot.devices, 'status');
+  const incidentStatus = fieldCounter(snapshot.incidents, 'status');
+  const ticketStatus = fieldCounter(snapshot.tickets, 'status');
+  const spaceTypes = fieldCounter(snapshot.spaces, 'space_type');
 
   const offlineDevices = deviceStatus.offline ?? 0;
   const activeIncidents = incidentStatus.active ?? 0;

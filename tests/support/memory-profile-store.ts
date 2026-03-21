@@ -25,6 +25,10 @@ export class MemoryProfileStore implements ProfileStore {
     return structuredClone(this.data);
   }
 
+  async migrateIfNeeded(): Promise<void> {
+    // No-op for in-memory store.
+  }
+
   async listTenants(): Promise<TenantProfile[]> {
     return structuredClone(this.data.tenants);
   }
