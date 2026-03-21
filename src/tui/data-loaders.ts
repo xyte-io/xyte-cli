@@ -9,8 +9,6 @@ import type { SecretProvider } from '../types/profile';
 import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
 import { extractArray, extractHasNextPage, extractIncidentsArray } from '../utils/json';
 
-export { extractArray };
-
 interface LoadOutcome<T> {
   data: T;
   connectionState: ConnectionState;

@@ -87,8 +87,12 @@ function getFlowDefinitionPath(flowId: string): string {
 
 export async function listFlowDefinitions(): Promise<Array<FlowDefinitionV1 & { path: string }>> {
   const root = getFlowDefinitionsDir();
-  await mkdir(root, { recursive: true });
-  const entries = await readdir(root, { withFileTypes: true });
+  let entries;
+  try {
+    entries = await readdir(root, { withFileTypes: true });
+  } catch {
+    return [];
+  }
   const defs: Array<FlowDefinitionV1 & { path: string }> = [];
 
   for (const entry of entries) {
