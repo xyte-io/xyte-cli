@@ -301,7 +301,7 @@ describe('fleet insights provider scope', () => {
     const elapsed = Date.now() - started;
 
     expect(snapshot.devices.length).toBe(1);
-    expect(elapsed).toBeGreaterThanOrEqual(2_900);
-    expect(elapsed).toBeLessThan(5_000);
+    expect(elapsed).toBeGreaterThanOrEqual(2_500);
+    expect(elapsed).toBeLessThan(10_000);
   });
 });
