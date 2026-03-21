@@ -99,10 +99,10 @@ describe('fleet insights provider scope', () => {
     const snapshot = await collectFleetSnapshot(fixture.client, 'acme', 'Acme', 'auto');
 
     expect(snapshot.providerScope).toBe('organization');
-    expect(snapshot.devices.map((item) => item.id)).toEqual(['od1']);
-    expect(snapshot.spaces.map((item) => item.id)).toEqual(['os1']);
-    expect(snapshot.incidents.map((item) => item.id)).toEqual(['oi1']);
-    expect(snapshot.tickets.map((item) => item.id)).toEqual(['ot1']);
+    expect(snapshot.devices.map((item) => (item as Record<string, unknown>).id)).toEqual(['od1']);
+    expect(snapshot.spaces.map((item) => (item as Record<string, unknown>).id)).toEqual(['os1']);
+    expect(snapshot.incidents.map((item) => (item as Record<string, unknown>).id)).toEqual(['oi1']);
+    expect(snapshot.tickets.map((item) => (item as Record<string, unknown>).id)).toEqual(['ot1']);
     expect(fixture.organization.getDevices).toHaveBeenCalledTimes(1);
     expect(fixture.organization.getSpaces).toHaveBeenCalledTimes(1);
     expect(fixture.organization.getIncidents).toHaveBeenCalledTimes(2);
@@ -134,10 +134,10 @@ describe('fleet insights provider scope', () => {
     const snapshot = await collectFleetSnapshot(fixture.client, 'acme', 'Acme', providerScope);
 
     expect(snapshot.providerScope).toBe(providerScope);
-    expect(snapshot.devices.map((item) => item.id)).toEqual(expectedIds.devices);
-    expect(snapshot.spaces.map((item) => item.id)).toEqual(expectedIds.spaces);
-    expect(snapshot.incidents.map((item) => item.id)).toEqual(expectedIds.incidents);
-    expect(snapshot.tickets.map((item) => item.id)).toEqual(expectedIds.tickets);
+    expect(snapshot.devices.map((item) => (item as Record<string, unknown>).id)).toEqual(expectedIds.devices);
+    expect(snapshot.spaces.map((item) => (item as Record<string, unknown>).id)).toEqual(expectedIds.spaces);
+    expect(snapshot.incidents.map((item) => (item as Record<string, unknown>).id)).toEqual(expectedIds.incidents);
+    expect(snapshot.tickets.map((item) => (item as Record<string, unknown>).id)).toEqual(expectedIds.tickets);
 
     if (expectOrganizationCalls) {
       expect(fixture.organization.getDevices).toHaveBeenCalledTimes(1);

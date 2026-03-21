@@ -47,8 +47,8 @@ export interface FlowTaskStep extends FlowStepBase {
   };
   call?: {
     endpointKey: string;
-    path?: Record<string, unknown>;
-    query?: Record<string, unknown>;
+    path?: Record<string, string | number>;
+    query?: Record<string, string | number | boolean | null | undefined>;
     body?: unknown;
     outputMode?: 'raw' | 'envelope';
   };

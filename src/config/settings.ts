@@ -5,10 +5,11 @@ import path from 'node:path';
 import type { ProfileStore } from '../secure/profile-store';
 import { getXyteConfigDir } from '../utils/config-dir';
 import { isRecord } from '../utils/json';
-import type { TuiScreenId } from '../tui/types';
-import type { InspectProviderScope } from '../workflows/fleet-insights';
+import { TUI_SCREEN_IDS, type TuiScreenId } from '../tui/types';
+import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../workflows/fleet-insights';
 
-export type CliOutputMode = 'auto' | 'json' | 'text';
+export const CLI_OUTPUT_MODES = ['auto', 'json', 'text'] as const;
+export type CliOutputMode = (typeof CLI_OUTPUT_MODES)[number];
 export type CliTextJsonOutputMode = CliOutputMode;
 export type CliSettingsScope = 'user' | 'workspace' | 'resolved';
 export type SettingsScope = CliSettingsScope;
@@ -313,7 +314,7 @@ function validateSettingValue(keyPath: SettingPath, value: unknown): unknown {
     case 'logs.path':
       return parseOptionalString(value);
     case 'output.mode':
-      return parseEnum(value, keyPath, ['auto', 'json', 'text']);
+      return parseEnum(value, keyPath, [...CLI_OUTPUT_MODES]);
     case 'output.strictJson':
     case 'console.motion':
     case 'console.follow':
@@ -322,7 +323,7 @@ function validateSettingValue(keyPath: SettingPath, value: unknown): unknown {
     case 'report.includeSensitive':
       return parseBoolean(value, keyPath);
     case 'ops.providerScope':
-      return parseEnum(value, keyPath, ['organization', 'partner', 'auto']);
+      return parseEnum(value, keyPath, [...INSPECT_PROVIDER_SCOPES]);
     case 'watch.profile':
       return parseEnum(value, keyPath, ['incidents-active']);
     case 'watch.intervalMs':
@@ -335,7 +336,7 @@ function validateSettingValue(keyPath: SettingPath, value: unknown): unknown {
     case 'watch.maxPolls':
       return parseOptionalPositiveInteger(value, keyPath);
     case 'console.screen':
-      return parseEnum(value, keyPath, ['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets']);
+      return parseEnum(value, keyPath, [...TUI_SCREEN_IDS]);
     default: {
       const _exhaustive: never = keyPath;
       throw new Error(`Unhandled setting key: ${_exhaustive}`);

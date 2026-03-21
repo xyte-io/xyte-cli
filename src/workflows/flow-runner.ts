@@ -476,8 +476,8 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
       const result = await ctx.args.client.callWithMeta(step.call.endpointKey, {
         requestId,
         tenantId: ctx.args.tenantId,
-        ...(pathPayload ? { path: pathPayload as Record<string, string | number> } : {}),
-        ...(queryPayload ? { query: queryPayload as Record<string, string | number | boolean | null | undefined> } : {}),
+        ...(pathPayload ? { path: pathPayload } : {}),
+        ...(queryPayload ? { query: queryPayload } : {}),
         ...(bodyPayload !== undefined ? { body: bodyPayload } : {})
       });
 
@@ -490,8 +490,8 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
           allowWrite: isWrite
         },
         request: {
-          path: pathPayload as any,
-          query: queryPayload as any,
+          path: pathPayload,
+          query: queryPayload,
           body: bodyPayload
         },
         response: {

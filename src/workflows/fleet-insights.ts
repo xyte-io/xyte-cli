@@ -14,7 +14,8 @@ interface StatusCounts {
   [key: string]: number;
 }
 
-export type InspectProviderScope = 'organization' | 'partner' | 'auto';
+export const INSPECT_PROVIDER_SCOPES = ['organization', 'partner', 'auto'] as const;
+export type InspectProviderScope = (typeof INSPECT_PROVIDER_SCOPES)[number];
 type ResolvedInspectProviderScope = Exclude<InspectProviderScope, 'auto'>;
 
 export interface FleetSnapshot {
@@ -22,10 +23,10 @@ export interface FleetSnapshot {
   tenantId: string;
   tenantName?: string;
   providerScope?: ResolvedInspectProviderScope;
-  devices: any[];
-  spaces: any[];
-  incidents: any[];
-  tickets: any[];
+  devices: unknown[];
+  spaces: unknown[];
+  incidents: unknown[];
+  tickets: unknown[];
   partnerEnrichment?: PartnerEnrichmentSnapshot;
 }
 
@@ -257,12 +258,16 @@ function identifier(value: unknown): string {
   return String(value);
 }
 
-function safeSpacePath(value: any): string {
-  return identifier(value?.space_tree_path_name ?? value?.space?.full_path ?? value?.space?.name ?? value?.space_id ?? 'unknown');
+function safeSpacePath(value: unknown): string {
+  const r = asRecord(value);
+  const space = asRecord(r.space);
+  return identifier(r.space_tree_path_name ?? space.full_path ?? space.name ?? r.space_id ?? 'unknown');
 }
 
-function safeDeviceName(value: any): string {
-  return identifier(value?.device_name ?? value?.name ?? value?.device?.name ?? value?.device_id ?? 'unknown');
+function safeDeviceName(value: unknown): string {
+  const r = asRecord(value);
+  const device = asRecord(r.device);
+  return identifier(r.device_name ?? r.name ?? device.name ?? r.device_id ?? 'unknown');
 }
 
 function redactSensitive(value: string, includeSensitive: boolean): string {
@@ -850,10 +855,10 @@ export async function collectFleetSnapshot(
 }
 
 export function buildFleetInspect(snapshot: FleetSnapshot): FleetInspectResult {
-  const deviceStatus = toCounter(snapshot.devices.map((item) => identifier(item?.status ?? 'unknown')));
-  const incidentStatus = toCounter(snapshot.incidents.map((item) => identifier(item?.status ?? 'unknown')));
-  const ticketStatus = toCounter(snapshot.tickets.map((item) => identifier(item?.status ?? 'unknown')));
-  const spaceTypes = toCounter(snapshot.spaces.map((item) => identifier(item?.space_type ?? 'unknown')));
+  const deviceStatus = toCounter(snapshot.devices.map((item) => { const r = asRecord(item); return identifier(typeof r.status === 'string' ? r.status : 'unknown'); }));
+  const incidentStatus = toCounter(snapshot.incidents.map((item) => { const r = asRecord(item); return identifier(typeof r.status === 'string' ? r.status : 'unknown'); }));
+  const ticketStatus = toCounter(snapshot.tickets.map((item) => { const r = asRecord(item); return identifier(typeof r.status === 'string' ? r.status : 'unknown'); }));
+  const spaceTypes = toCounter(snapshot.spaces.map((item) => { const r = asRecord(item); return identifier(typeof r.space_type === 'string' ? r.space_type : 'unknown'); }));
 
   const offlineDevices = deviceStatus.offline ?? 0;
   const activeIncidents = incidentStatus.active ?? 0;
@@ -914,32 +919,33 @@ export function formatFleetInspectAscii(result: FleetInspectResult): string {
 }
 
 export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDiveResult {
-  const offlineDevices = snapshot.devices.filter((item) => identifier(item?.status) === 'offline');
-  const activeIncidents = snapshot.incidents.filter((item) => identifier(item?.status) === 'active');
-  const openTickets = snapshot.tickets.filter((item) => identifier(item?.status) === 'open');
+  const offlineDevices = snapshot.devices.filter((item) => identifier(asRecord(item).status) === 'offline');
+  const activeIncidents = snapshot.incidents.filter((item) => identifier(asRecord(item).status) === 'active');
+  const openTickets = snapshot.tickets.filter((item) => identifier(asRecord(item).status) === 'open');
 
   const offlineBySpace = toCounter(offlineDevices.map((item) => safeSpacePath(item)));
   const incidentsByDevice = toCounter(snapshot.incidents.map((item) => safeDeviceName(item)));
   const activeByDevice = toCounter(activeIncidents.map((item) => safeDeviceName(item)));
 
-  const incidentsWithAge = snapshot.incidents.map((item) => ({ item, age: ageHours(item?.created_at) }));
+  const incidentsWithAge = snapshot.incidents.map((item) => ({ item, age: ageHours(asRecord(item).created_at) }));
   const recentIncidents = incidentsWithAge
-    .filter((entry): entry is { item: any; age: number } => entry.age !== undefined && entry.age <= windowHours)
+    .filter((entry): entry is { item: unknown; age: number } => entry.age !== undefined && entry.age <= windowHours)
     .map((entry) => entry.item);
   const unknownIncidentAgeCount = incidentsWithAge.filter((entry) => entry.age === undefined).length;
   const recentSpace = toCounter(recentIncidents.map((item) => safeSpacePath(item)));
   const recentDevice = toCounter(recentIncidents.map((item) => safeDeviceName(item)));
 
-  const activeDeviceIds = new Set(activeIncidents.map((item) => identifier(item?.device_id ?? item?.device?.id)));
-  const overlapDevices = new Set(openTickets.map((item) => identifier(item?.device_id)).filter((id) => activeDeviceIds.has(id)));
+  const activeDeviceIds = new Set(activeIncidents.map((item) => { const r = asRecord(item); return identifier(r.device_id ?? asRecord(r.device).id); }));
+  const overlapDevices = new Set(openTickets.map((item) => identifier(asRecord(item).device_id)).filter((id) => activeDeviceIds.has(id)));
 
   const mismatches = snapshot.devices
     .map((item) => {
-      const nestedState = asRecord(item?.state).status;
+      const r = asRecord(item);
+      const nestedState = asRecord(r.state).status;
       if (nestedState === undefined) {
         return undefined;
       }
-      const topLevel = identifier(item?.status);
+      const topLevel = identifier(r.status);
       const nested = identifier(nestedState);
       if (topLevel === nested) {
         return undefined;
@@ -948,7 +954,7 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
         device: safeDeviceName(item),
         status: topLevel,
         stateStatus: nested,
-        lastSeen: identifier(item?.last_seen_at),
+        lastSeen: identifier(r.last_seen_at),
         space: safeSpacePath(item)
       };
     })
@@ -968,26 +974,29 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
   }));
 
   const activeIncidentAging = activeIncidents
-    .map((item) => ({ item, age: ageHours(item?.created_at) }))
-    .filter((entry): entry is { item: any; age: number } => entry.age !== undefined)
+    .map((item) => ({ item, age: ageHours(asRecord(item).created_at) }))
+    .filter((entry): entry is { item: unknown; age: number } => entry.age !== undefined)
     .map((entry) => ({
       device: safeDeviceName(entry.item),
       space: safeSpacePath(entry.item),
       ageHours: entry.age,
-      createdAtUtc: identifier(entry.item?.created_at)
+      createdAtUtc: identifier(asRecord(entry.item).created_at)
     }))
     .sort((a, b) => b.ageHours - a.ageHours);
 
-  const ticketsWithAge = openTickets.map((item) => ({ item, age: ageHours(item?.created_at) }));
+  const ticketsWithAge = openTickets.map((item) => ({ item, age: ageHours(asRecord(item).created_at) }));
   const oldestOpenTickets = ticketsWithAge
-    .filter((entry): entry is { item: any; age: number } => entry.age !== undefined)
-    .map((entry) => ({
-      ticketId: identifier(entry.item?.id),
-      title: identifier(entry.item?.title ?? entry.item?.subject),
-      ageHours: entry.age,
-      deviceId: identifier(entry.item?.device_id),
-      createdAtUtc: identifier(entry.item?.created_at)
-    }))
+    .filter((entry): entry is { item: unknown; age: number } => entry.age !== undefined)
+    .map((entry) => {
+      const r = asRecord(entry.item);
+      return {
+        ticketId: identifier(r.id),
+        title: identifier(r.title ?? r.subject),
+        ageHours: entry.age,
+        deviceId: identifier(r.device_id),
+        createdAtUtc: identifier(r.created_at)
+      };
+    })
     .sort((a, b) => b.ageHours - a.ageHours)
     .slice(0, 20);
   const unknownOpenTicketAgeCount = ticketsWithAge.filter((entry) => entry.age === undefined).length;
