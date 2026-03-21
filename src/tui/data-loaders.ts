@@ -2,7 +2,11 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 import { classifyConnectivityError, type ConnectivityResult, type ConnectionState } from '../config/connectivity';
 import { computeRetryDelayMs, DEFAULT_RETRY_POLICY, isRetryableErrorClass, type RetryPolicyOptions, type RetryState } from '../config/retry-policy';
+import type { ProfileStore } from '../secure/profile-store';
+import type { SecretStore } from '../secure/secret-store';
 import type { XyteClient } from '../types/client';
+import type { SecretProvider } from '../types/profile';
+import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
 import { asRecord, extractArray, extractHasNextPage, extractIncidentsArray } from '../utils/json';
 
 export { extractArray };
@@ -487,4 +491,74 @@ export function getSpaceId(space: any): string {
 
 export function getSpaceName(space: any): string {
   return String(space?.name ?? space?.title ?? space?.path ?? 'n/a');
+}
+
+const CONFIG_PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
+
+export interface ConfigProviderRow {
+  provider: SecretProvider;
+  slotCount: number;
+  activeSlot: string;
+  hasSecret: string;
+  lastValidatedAt?: string;
+}
+
+export interface ConfigSlotRow {
+  provider: SecretProvider;
+  slotId: string;
+  name: string;
+  active: string;
+  hasSecret: string;
+  fingerprint: string;
+}
+
+export interface ConfigData {
+  providerRows: ConfigProviderRow[];
+  selectedProvider: SecretProvider;
+  slotRows: ConfigSlotRow[];
+}
+
+export async function loadConfigData(
+  profileStore: ProfileStore,
+  secretStore: SecretStore,
+  tenantId: string | undefined
+): Promise<ConfigData> {
+  const allSlots = tenantId ? await profileStore.listKeySlots(tenantId) : [];
+
+  const providerRows: ConfigProviderRow[] = await Promise.all(
+    CONFIG_PROVIDERS.map(async (provider) => {
+      const providerSlots = allSlots.filter((slot) => slot.provider === provider);
+      const activeSlot = tenantId ? await profileStore.getActiveKeySlot(tenantId, provider) : undefined;
+      const hasActiveSecret =
+        tenantId && activeSlot ? Boolean(await secretStore.getSlotSecret(tenantId, provider, activeSlot.slotId)) : false;
+      return {
+        provider,
+        slotCount: providerSlots.length,
+        activeSlot: activeSlot?.slotId ?? 'none',
+        hasSecret: hasActiveSecret ? 'yes' : 'no',
+        lastValidatedAt: activeSlot?.lastValidatedAt
+      };
+    })
+  );
+
+  const selectedProvider = providerRows.find((row) => row.slotCount > 0)?.provider ?? 'xyte-org';
+
+  const slotRows: ConfigSlotRow[] = await Promise.all(
+    allSlots
+      .filter((slot) => slot.provider === selectedProvider)
+      .map(async (slot) => {
+        const active = tenantId ? await profileStore.getActiveKeySlot(tenantId, slot.provider) : undefined;
+        const hasSecret = tenantId ? Boolean(await secretStore.getSlotSecret(tenantId, slot.provider, slot.slotId)) : false;
+        return {
+          provider: slot.provider,
+          slotId: slot.slotId,
+          name: slot.name,
+          active: active?.slotId === slot.slotId ? 'yes' : 'no',
+          hasSecret: hasSecret ? 'yes' : 'no',
+          fingerprint: slot.fingerprint
+        };
+      })
+  );
+
+  return { providerRows, selectedProvider, slotRows };
 }

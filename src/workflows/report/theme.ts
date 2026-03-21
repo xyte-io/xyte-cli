@@ -128,10 +128,6 @@ const PANEL_TONES: Record<ReportTone, MetricTone> = {
   }
 };
 
-export function getMetricTone(tone: 'normal' | 'warn' | 'bad'): MetricTone {
-  return PANEL_TONES[tone];
-}
-
 export function getPanelTone(tone: ReportTone): MetricTone {
   return PANEL_TONES[tone];
 }

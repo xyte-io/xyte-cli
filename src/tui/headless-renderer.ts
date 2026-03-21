@@ -4,13 +4,12 @@ import { randomUUID } from 'node:crypto';
 import { evaluateReadiness, type ReadinessCheck } from '../config/readiness';
 import type { SecretStore } from '../secure/secret-store';
 import type { ProfileStore } from '../secure/profile-store';
-import type { SecretProvider } from '../types/profile';
-import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
 import type { XyteClient } from '../types/client';
 import { startupFrames } from './animation';
 import { XYTE_LOGO_COMPACT } from './assets/logo';
 import {
   getSpaceId,
+  loadConfigData,
   loadDashboardData,
   loadDevicesData,
   loadIncidentsData,
@@ -48,8 +47,6 @@ interface HeadlessRenderOptions {
 }
 
 type SafeWrite = (text: string) => boolean;
-
-const PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
 
 function getRefreshState(args: { connectionState: ReadinessCheck['connectionState']; retried?: boolean }): 'idle' | 'retrying' | 'error' {
   if (args.connectionState === 'connected' || args.connectionState === 'not_checked') {
@@ -198,41 +195,10 @@ async function buildConfigFrame(args: {
   motionPhase: number;
   doctorStatus?: string;
 }): Promise<HeadlessFrame> {
-  const tenantId = args.readiness.tenantId;
-  const allSlots = tenantId ? await args.profileStore.listKeySlots(tenantId) : [];
-
-  const providerRows = await Promise.all(
-    PROVIDERS.map(async (provider) => {
-      const providerSlots = allSlots.filter((slot) => slot.provider === provider);
-      const activeSlot = tenantId ? await args.profileStore.getActiveKeySlot(tenantId, provider) : undefined;
-      const hasActiveSecret =
-        tenantId && activeSlot ? Boolean(await args.secretStore.getSlotSecret(tenantId, provider, activeSlot.slotId)) : false;
-      return {
-        provider,
-        slotCount: providerSlots.length,
-        activeSlot: activeSlot?.slotId ?? 'none',
-        hasSecret: hasActiveSecret ? 'yes' : 'no',
-        lastValidatedAt: activeSlot?.lastValidatedAt
-      };
-    })
-  );
-
-  const selectedProvider = providerRows.find((row) => row.slotCount > 0)?.provider ?? 'xyte-org';
-  const slotRows = await Promise.all(
-    allSlots
-      .filter((slot) => slot.provider === selectedProvider)
-      .map(async (slot) => {
-        const active = tenantId ? await args.profileStore.getActiveKeySlot(tenantId, slot.provider) : undefined;
-        const hasSecret = tenantId ? Boolean(await args.secretStore.getSlotSecret(tenantId, slot.provider, slot.slotId)) : false;
-        return {
-          provider: slot.provider,
-          slotId: slot.slotId,
-          name: slot.name,
-          active: active?.slotId === slot.slotId ? 'yes' : 'no',
-          hasSecret: hasSecret ? 'yes' : 'no',
-          fingerprint: slot.fingerprint
-        };
-      })
+  const { providerRows, selectedProvider, slotRows } = await loadConfigData(
+    args.profileStore,
+    args.secretStore,
+    args.readiness.tenantId
   );
 
   const panels = sceneFromConfigState({
