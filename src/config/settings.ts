@@ -2,7 +2,6 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import path from 'node:path';
 
-import type { ProfileStore } from '../secure/profile-store';
 import { getXyteConfigDir } from '../utils/config-dir';
 import { isRecord } from '../utils/json';
 import { TUI_SCREEN_IDS, type TuiScreenId } from '../tui/types';
@@ -456,71 +455,23 @@ function buildResolvedSettings(values: Record<SettingPath, SourceValue>): Resolv
   return resolved as unknown as ResolvedCliSettings;
 }
 
-export function listSupportedSettings(): readonly SettingPath[] {
-  return SETTING_PATHS;
-}
-
 export const SUPPORTED_SETTING_KEYS = SETTING_PATHS;
 
-export function getUserSettingsPath(env: NodeJS.ProcessEnv = process.env): string {
+function getUserSettingsPath(env: NodeJS.ProcessEnv = process.env): string {
   return path.join(getXyteConfigDir(env), 'settings.json');
 }
 
-export function getWorkspaceSettingsPath(cwd = process.cwd()): string {
+function getWorkspaceSettingsPath(cwd = process.cwd()): string {
   return path.join(cwd, '.xyte', 'config.json');
 }
 
-export function readCliSettingsFile(
+function readCliSettingsFile(
   scope: Exclude<CliSettingsScope, 'resolved'>,
   cwd = process.cwd(),
   env: NodeJS.ProcessEnv = process.env
 ): CliSettingsFile {
   const filePath = scope === 'user' ? getUserSettingsPath(env) : getWorkspaceSettingsPath(cwd);
   return readSettingsFile(filePath);
-}
-
-export function writeCliSettingsFile(
-  scope: Exclude<CliSettingsScope, 'resolved'>,
-  settings: CliSettingsFile,
-  cwd = process.cwd(),
-  env: NodeJS.ProcessEnv = process.env
-): void {
-  const filePath = scope === 'user' ? getUserSettingsPath(env) : getWorkspaceSettingsPath(cwd);
-  writeSettingsFile(filePath, settings);
-}
-
-export function setCliSetting(
-  scope: Exclude<CliSettingsScope, 'resolved'>,
-  keyPath: string,
-  rawValue: string,
-  cwd = process.cwd(),
-  env: NodeJS.ProcessEnv = process.env
-): void {
-  if (!SETTING_PATHS.includes(keyPath as SettingPath)) {
-    throw new Error(`Unknown config key: ${keyPath}.`);
-  }
-  const settings = readCliSettingsFile(scope, cwd, env);
-  const next = cloneSettings(settings) as Record<string, unknown>;
-  const value = validateSettingValue(keyPath as SettingPath, rawValue);
-  setPathValue(next, keyPath as SettingPath, value);
-  next.version = 'settings.v1';
-  writeCliSettingsFile(scope, next as CliSettingsFile, cwd, env);
-}
-
-export function unsetCliSetting(
-  scope: Exclude<CliSettingsScope, 'resolved'>,
-  keyPath: string,
-  cwd = process.cwd(),
-  env: NodeJS.ProcessEnv = process.env
-): void {
-  if (!SETTING_PATHS.includes(keyPath as SettingPath)) {
-    throw new Error(`Unknown config key: ${keyPath}.`);
-  }
-  const settings = readCliSettingsFile(scope, cwd, env);
-  const next = cloneSettings(settings) as Record<string, unknown>;
-  unsetPathValue(next, keyPath as SettingPath);
-  next.version = 'settings.v1';
-  writeCliSettingsFile(scope, next as CliSettingsFile, cwd, env);
 }
 
 export function resolveCliSettingsSync(args: {
@@ -567,19 +518,6 @@ export function resolveCliSettingsSync(args: {
     resolved,
     sources
   };
-}
-
-export async function resolveCliSettings(args: {
-  cwd?: string;
-  env?: NodeJS.ProcessEnv;
-  profileStore?: ProfileStore;
-} = {}): Promise<ResolvedCliSettingsState> {
-  const activeTenantId = args.profileStore ? (await args.profileStore.getData()).activeTenantId : undefined;
-  return resolveCliSettingsSync({
-    cwd: args.cwd,
-    env: args.env,
-    activeTenantId
-  });
 }
 
 export function parseSettingValue(keyPath: string, rawValue: string): unknown {

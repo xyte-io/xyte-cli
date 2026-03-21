@@ -11,6 +11,7 @@ import {
   type SelectionSyncState
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
+import { createRenderErrorTracker } from '../render-error-tracker';
 import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
 import { loadTicketsData } from '../data-loaders';
 import { sceneFromTicketsState } from '../scene';
@@ -137,10 +138,7 @@ export function createTicketsScreen(): TuiScreen {
   const paneConfig = SCREEN_PANE_CONFIG.tickets;
   let activePane: TuiPaneId = paneConfig.defaultPane;
   let isMounted = false;
-  let renderErrorMessage = '';
-  let renderErrorCount = 0;
-  let renderErrorWindowStart = 0;
-  let renderFrozen = false;
+  const renderErrors = createRenderErrorTracker();
   const detailCacheByTicket = new Map<string, string>();
 
   const focusPane = () => {
@@ -197,7 +195,7 @@ export function createTicketsScreen(): TuiScreen {
     }
     context.debugLog?.('screen.render.start', {
       screen: 'tickets',
-      frozen: renderFrozen
+      frozen: renderErrors.frozen
     });
     rebuildFiltered(restoreTicketId);
 
@@ -206,7 +204,7 @@ export function createTicketsScreen(): TuiScreen {
       : 'actions: writes disabled in partner mode';
 
     try {
-      if (renderFrozen) {
+      if (renderErrors.frozen) {
         setListTableData(list, [
           ['ID', 'Status', 'Priority', 'Subject'],
           ...filtered.map((ticket, index) => [
@@ -241,31 +239,18 @@ export function createTicketsScreen(): TuiScreen {
         ], selectionSync);
         detail?.setContent((detailPanel?.text?.lines ?? ['No tickets.']).join('\n'));
       }
-      renderErrorMessage = '';
-      renderErrorCount = 0;
-      renderErrorWindowStart = 0;
+      renderErrors.recordSuccess();
       context.debugLog?.('screen.render.complete', {
         screen: 'tickets',
-        frozen: renderFrozen
+        frozen: renderErrors.frozen
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const now = Date.now();
-      if (message === renderErrorMessage && now - renderErrorWindowStart <= 2_000) {
-        renderErrorCount += 1;
-      } else {
-        renderErrorMessage = message;
-        renderErrorCount = 1;
-        renderErrorWindowStart = now;
-      }
-      if (renderErrorCount >= 3) {
-        renderFrozen = true;
-      }
+      renderErrors.recordError(message);
       context.debugLog?.('screen.render.error', {
         screen: 'tickets',
         message,
-        count: renderErrorCount,
-        frozen: renderFrozen
+        frozen: renderErrors.frozen
       });
       context.debugLog?.('screen.render.fallback.applied', {
         screen: 'tickets'

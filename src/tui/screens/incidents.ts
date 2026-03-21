@@ -11,6 +11,7 @@ import {
   type SelectionSyncState
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
+import { createRenderErrorTracker } from '../render-error-tracker';
 import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
 import { loadIncidentsData } from '../data-loaders';
 import { sceneFromIncidentsState } from '../scene';
@@ -85,10 +86,7 @@ export function createIncidentsScreen(): TuiScreen {
   const paneConfig = SCREEN_PANE_CONFIG.incidents;
   let activePane: TuiPaneId = paneConfig.defaultPane;
   let isMounted = false;
-  let renderErrorMessage = '';
-  let renderErrorCount = 0;
-  let renderErrorWindowStart = 0;
-  let renderFrozen = false;
+  const renderErrors = createRenderErrorTracker();
 
   const focusPane = () => {
     if (activePane === 'incidents-table') {
@@ -106,7 +104,7 @@ export function createIncidentsScreen(): TuiScreen {
     }
     context.debugLog?.('screen.render.start', {
       screen: 'incidents',
-      frozen: renderFrozen
+      frozen: renderErrors.frozen
     });
     filtered = severityFilter
       ? incidents.filter((incident) => String(incident?.severity ?? incident?.priority ?? '').toLowerCase().includes(severityFilter))
@@ -122,7 +120,7 @@ export function createIncidentsScreen(): TuiScreen {
     const actionsHint = 'actions: a close-incident, f filters, [ ] pages, p per-page';
 
     try {
-      if (renderFrozen) {
+      if (renderErrors.frozen) {
         setListTableData(list, [
           ['ID', 'Severity', 'State', 'Device'],
           ...filtered.map((incident, index) => [
@@ -154,31 +152,18 @@ export function createIncidentsScreen(): TuiScreen {
         ], selectionSync);
         detailBox?.setContent((detailPanel?.text?.lines ?? ['No incidents.']).join('\n'));
       }
-      renderErrorMessage = '';
-      renderErrorCount = 0;
-      renderErrorWindowStart = 0;
+      renderErrors.recordSuccess();
       context.debugLog?.('screen.render.complete', {
         screen: 'incidents',
-        frozen: renderFrozen
+        frozen: renderErrors.frozen
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const now = Date.now();
-      if (message === renderErrorMessage && now - renderErrorWindowStart <= 2_000) {
-        renderErrorCount += 1;
-      } else {
-        renderErrorMessage = message;
-        renderErrorCount = 1;
-        renderErrorWindowStart = now;
-      }
-      if (renderErrorCount >= 3) {
-        renderFrozen = true;
-      }
+      renderErrors.recordError(message);
       context.debugLog?.('screen.render.error', {
         screen: 'incidents',
         message,
-        count: renderErrorCount,
-        frozen: renderFrozen
+        frozen: renderErrors.frozen
       });
       context.debugLog?.('screen.render.fallback.applied', {
         screen: 'incidents'

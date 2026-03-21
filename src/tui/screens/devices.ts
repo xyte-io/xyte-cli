@@ -11,6 +11,7 @@ import {
   type SelectionSyncState
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
+import { createRenderErrorTracker } from '../render-error-tracker';
 import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
 import type { CommandTemplate } from '../data-loaders';
 import { loadCommandTemplates, loadDevicesData } from '../data-loaders';
@@ -80,10 +81,7 @@ export function createDevicesScreen(): TuiScreen {
   const paneConfig = SCREEN_PANE_CONFIG.devices;
   let activePane: TuiPaneId = paneConfig.defaultPane;
   let isMounted = false;
-  let renderErrorMessage = '';
-  let renderErrorCount = 0;
-  let renderErrorWindowStart = 0;
-  let renderFrozen = false;
+  const renderErrors = createRenderErrorTracker();
   let spaceFilter = '';
 
   const focusPane = () => {
@@ -119,7 +117,7 @@ export function createDevicesScreen(): TuiScreen {
     const actionsHint = 'actions: a send-command, f endpoint filter';
 
     try {
-      if (renderFrozen) {
+      if (renderErrors.frozen) {
         setListTableData(table, [
           ['ID', 'Name', 'Status', 'Space'],
           ...filtered.map((device, index) => [
@@ -153,32 +151,19 @@ export function createDevicesScreen(): TuiScreen {
         ], selectionSync);
         detail?.setContent((detailPanel?.text?.lines ?? ['No matching devices.']).join('\n'));
       }
-      renderErrorMessage = '';
-      renderErrorCount = 0;
-      renderErrorWindowStart = 0;
+      renderErrors.recordSuccess();
       context.debugLog?.('screen.render.complete', {
         screen: 'devices',
-        frozen: renderFrozen
+        frozen: renderErrors.frozen
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const now = Date.now();
-      if (message === renderErrorMessage && now - renderErrorWindowStart <= 2_000) {
-        renderErrorCount += 1;
-      } else {
-        renderErrorMessage = message;
-        renderErrorCount = 1;
-        renderErrorWindowStart = now;
-      }
-      if (renderErrorCount >= 3) {
-        renderFrozen = true;
-      }
+      renderErrors.recordError(message);
 
       context.debugLog?.('screen.render.error', {
         screen: 'devices',
         message,
-        count: renderErrorCount,
-        frozen: renderFrozen
+        frozen: renderErrors.frozen
       });
       context.debugLog?.('screen.render.fallback.applied', {
         screen: 'devices'
