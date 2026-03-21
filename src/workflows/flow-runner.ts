@@ -101,6 +101,23 @@ function isInspectProviderScopeError(error: unknown): boolean {
   return error instanceof Error && /inspect provider scope/i.test(error.message);
 }
 
+async function collectSnapshotWithGuard(ctx: RunContext): Promise<ReturnType<typeof collectFleetSnapshot>> {
+  const tenantProfile = await ctx.args.profileStore.getTenant(ctx.args.tenantId);
+  try {
+    return await collectFleetSnapshot(
+      ctx.args.client,
+      ctx.args.tenantId,
+      tenantProfile?.name,
+      ctx.args.inspectProviderScope ?? 'auto'
+    );
+  } catch (error) {
+    if (isInspectProviderScopeError(error)) {
+      throw new FlowNeedsInputError((error as Error).message);
+    }
+    throw error;
+  }
+}
+
 function toStringRecord(value: unknown): Record<string, string> {
   if (!isRecord(value)) {
     return {};
@@ -348,47 +365,13 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
       };
     }
     case 'inspect.fleet': {
-      const tenantProfile = await ctx.args.profileStore.getTenant(ctx.args.tenantId);
-      let snapshot;
-      try {
-        snapshot = await collectFleetSnapshot(
-          ctx.args.client,
-          ctx.args.tenantId,
-          tenantProfile?.name,
-          ctx.args.inspectProviderScope ?? 'auto'
-        );
-      } catch (error) {
-        if (isInspectProviderScopeError(error)) {
-          throw new FlowNeedsInputError((error as Error).message);
-        }
-        throw error;
-      }
-      const inspect = buildFleetInspect(snapshot);
-      return {
-        output: inspect
-      };
+      const snapshot = await collectSnapshotWithGuard(ctx);
+      return { output: buildFleetInspect(snapshot) };
     }
     case 'inspect.deep-dive': {
       const windowHours = resolveFlowWindowHours(step, ctx.resolvedContext);
-      const tenantProfile = await ctx.args.profileStore.getTenant(ctx.args.tenantId);
-      let snapshot;
-      try {
-        snapshot = await collectFleetSnapshot(
-          ctx.args.client,
-          ctx.args.tenantId,
-          tenantProfile?.name,
-          ctx.args.inspectProviderScope ?? 'auto'
-        );
-      } catch (error) {
-        if (isInspectProviderScopeError(error)) {
-          throw new FlowNeedsInputError((error as Error).message);
-        }
-        throw error;
-      }
-      const deepDive = buildDeepDive(snapshot, windowHours);
-      return {
-        output: deepDive
-      };
+      const snapshot = await collectSnapshotWithGuard(ctx);
+      return { output: buildDeepDive(snapshot, windowHours) };
     }
     case 'report.generate': {
       if (!step.report) {

@@ -4,8 +4,12 @@ import path from 'node:path';
 
 import { getXyteConfigDir } from '../utils/config-dir';
 import { isRecord } from '../utils/json';
-import { TUI_SCREEN_IDS, type TuiScreenId } from '../tui/types';
-import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../workflows/fleet-insights';
+import {
+  INSPECT_PROVIDER_SCOPES,
+  TUI_SCREEN_IDS,
+  type InspectProviderScope,
+  type TuiScreenId
+} from '../types/settings-enums';
 
 export const CLI_OUTPUT_MODES = ['auto', 'json', 'text'] as const;
 export type CliOutputMode = (typeof CLI_OUTPUT_MODES)[number];
@@ -101,7 +105,6 @@ export interface ResolvedCliSettingsState {
   user: CliSettingsFile;
   workspace: CliSettingsFile;
   values: ResolvedCliSettings;
-  resolved: ResolvedCliSettings;
   sources: Record<string, 'default' | 'profile' | 'user' | 'workspace' | 'env' | 'flag'>;
 }
 
@@ -515,7 +518,6 @@ export function resolveCliSettingsSync(args: {
     user,
     workspace,
     values: resolved,
-    resolved,
     sources
   };
 }

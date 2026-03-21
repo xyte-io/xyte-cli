@@ -13,7 +13,6 @@ runCli().catch((error) => {
   if (errorFormat === 'json') {
     process.stderr.write(`${JSON.stringify(toProblemDetails(error), null, 2)}\n`);
     process.exit(1);
-    return;
   }
 
   const message = error instanceof Error ? error.message : String(error);

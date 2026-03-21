@@ -5,8 +5,8 @@ import type { ProfileStore } from '../secure/profile-store';
 import type { SecretStore } from '../secure/secret-store';
 import type { ReadinessCheck } from '../config/readiness';
 
-export const TUI_SCREEN_IDS = ['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets'] as const;
-export type TuiScreenId = (typeof TUI_SCREEN_IDS)[number];
+export { TUI_SCREEN_IDS, type TuiScreenId } from '../types/settings-enums';
+import type { TuiScreenId } from '../types/settings-enums';
 export type TuiPaneId = string;
 export type TuiArrowKey = 'up' | 'down' | 'left' | 'right';
 export type TuiArrowHandleResult = 'handled' | 'boundary' | 'unhandled';
