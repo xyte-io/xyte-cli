@@ -107,12 +107,10 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
   const profileStore = options.profileStore ?? new FileProfileStore();
   const secretStore = options.secretStore ?? createSecretStore();
   const motionEnabled = isMotionEnabled({ headless: options.headless, explicitMotion: options.motionEnabled });
-  const debugEnabled = Boolean(
-    options.debug || options.debugLogPath || process.env.XYTE_TUI_DEBUG === '1' || process.env.XYTE_TUI_DEBUG_LOG
-  );
+  const debugEnabled = Boolean(options.debug || options.debugLogPath);
   const logger = createTuiLogger({
     enabled: debugEnabled,
-    path: options.debugLogPath ?? process.env.XYTE_TUI_DEBUG_LOG
+    path: options.debugLogPath
   });
   logger.log('app.start', {
     headless: Boolean(options.headless),

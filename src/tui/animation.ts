@@ -35,10 +35,6 @@ export function pulseChar(phase: number): string {
 }
 
 export function isMotionEnabled(args: { headless?: boolean; explicitMotion?: boolean }): boolean {
-  if (process.env.XYTE_TUI_REDUCED_MOTION === '1') {
-    return false;
-  }
-
   if (args.explicitMotion !== undefined) {
     return args.explicitMotion;
   }

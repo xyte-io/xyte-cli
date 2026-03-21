@@ -2436,14 +2436,12 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
     const options = command.optsWithGlobals() as CliGlobalOptions;
     const settings = resolveCliSettingsSync({ cwd, env });
-    const envEnabled = parseBooleanEnvFlag(process.env.XYTE_LOG_ACTIONS);
     const envMirrorToStderr = parseBooleanEnvFlag(process.env.XYTE_LOG_ACTIONS_STDERR);
-    const envVerbose = parseBooleanEnvFlag(process.env.XYTE_LOG_ACTIONS_VERBOSE);
-    const configuredPath = options.logActionsPath ?? settings.values.logs.path ?? process.env.XYTE_LOG_ACTIONS_PATH;
-    const enabled = options.logActions === true || settings.values.logs.enabled || envEnabled || Boolean(configuredPath);
+    const configuredPath = options.logActionsPath ?? settings.values.logs.path;
+    const enabled = options.logActions === true || settings.values.logs.enabled || Boolean(configuredPath);
     const maxFileBytes = settings.values.logs.maxFileBytes;
     const maxFiles = settings.values.logs.maxFiles;
-    actionLogVerbose = options.logActionsVerbose === true || settings.values.logs.verbose || envVerbose;
+    actionLogVerbose = options.logActionsVerbose === true || settings.values.logs.verbose;
 
     actionLogger = createCliActionLogger({
       enabled,
