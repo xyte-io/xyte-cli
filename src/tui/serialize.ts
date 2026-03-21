@@ -30,8 +30,6 @@ const DEFAULT_OPTIONS: Required<SafeInspectOptions> = {
   compact: false
 };
 
-const asRecord = asRecordOrUndefined;
-
 function sanitizeValue(
   value: unknown,
   depth: number,
@@ -151,7 +149,7 @@ export function payloadSummary(value: unknown): { kind: string; approxSize: numb
 }
 
 function summarizeObject(value: unknown): string[] {
-  const record = asRecord(value);
+  const record = asRecordOrUndefined(value);
   if (!record) {
     return [];
   }

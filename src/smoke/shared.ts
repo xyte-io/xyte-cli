@@ -32,7 +32,7 @@ export interface LoggerLike {
   log: (message: string) => void;
 }
 
-export function normalizeJsonOutput(raw: unknown): any {
+export function normalizeJsonOutput(raw: unknown): unknown {
   const trimmed = String(raw ?? '').trim();
   if (!trimmed) {
     throw new Error('Expected JSON output but got empty stdout.');

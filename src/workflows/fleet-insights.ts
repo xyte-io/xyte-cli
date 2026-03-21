@@ -288,15 +288,13 @@ function withTimeout<T>(operation: () => Promise<T>, timeoutMs: number): Promise
   });
 }
 
-const asObject = asRecordOrUndefined;
-
 function extractObject(value: unknown, preferredKeys: string[]): Record<string, unknown> {
-  const record = asObject(value);
+  const record = asRecordOrUndefined(value);
   if (!record) {
     return {};
   }
   for (const key of preferredKeys) {
-    const candidate = asObject(record[key]);
+    const candidate = asRecordOrUndefined(record[key]);
     if (candidate) {
       return candidate;
     }
@@ -304,8 +302,9 @@ function extractObject(value: unknown, preferredKeys: string[]): Record<string, 
   return record;
 }
 
-function deviceId(value: any): string | undefined {
-  const raw = value?.id ?? value?.device_id ?? value?.device?.id;
+function deviceId(value: unknown): string | undefined {
+  const r = asRecord(value);
+  const raw = r.id ?? r.device_id ?? asRecord(r.device).id;
   if (raw === undefined || raw === null || String(raw).trim() === '') {
     return undefined;
   }
@@ -330,10 +329,11 @@ function recencyBucket(timestamp: unknown): string {
   return '>7d';
 }
 
-function latestTimestamp(items: any[]): Date | undefined {
+function latestTimestamp(items: unknown[]): Date | undefined {
   let latest: Date | undefined;
   for (const item of items) {
-    const parsed = parseTimestamp(item?.timestamp ?? item?.created_at ?? item?.updated_at ?? item?.time ?? item?.recorded_at);
+    const r = asRecord(item);
+    const parsed = parseTimestamp(r.timestamp ?? r.created_at ?? r.updated_at ?? r.time ?? r.recorded_at);
     if (!parsed) {
       continue;
     }
@@ -396,9 +396,9 @@ async function paginateAll(args: {
   fetch: (query: { page: number; per_page: number }) => Promise<unknown>;
   fetchSingle: () => Promise<unknown>;
   extractionKeys: string[];
-}): Promise<any[]> {
+}): Promise<unknown[]> {
   const perPage = 100;
-  const all: any[] = [];
+  const all: unknown[] = [];
 
   for (let page = 1; page <= 50; page += 1) {
     const raw = await args.fetch({ page, per_page: perPage });
@@ -420,7 +420,7 @@ async function paginateAll(args: {
   return extractArray(single, args.extractionKeys);
 }
 
-function loadAllOrganizationDevices(client: XyteClient, tenantId: string): Promise<any[]> {
+function loadAllOrganizationDevices(client: XyteClient, tenantId: string): Promise<unknown[]> {
   return paginateAll({
     fetch: (query) => client.organization.getDevices({ tenantId, query }),
     fetchSingle: () => client.organization.getDevices({ tenantId }),
@@ -428,7 +428,7 @@ function loadAllOrganizationDevices(client: XyteClient, tenantId: string): Promi
   });
 }
 
-function loadAllPartnerDevices(client: XyteClient, tenantId: string): Promise<any[]> {
+function loadAllPartnerDevices(client: XyteClient, tenantId: string): Promise<unknown[]> {
   return paginateAll({
     fetch: (query) => client.partner.getDevices({ tenantId, query }),
     fetchSingle: () => client.partner.getDevices({ tenantId }),
@@ -436,7 +436,7 @@ function loadAllPartnerDevices(client: XyteClient, tenantId: string): Promise<an
   });
 }
 
-function loadAllSpaces(client: XyteClient, tenantId: string): Promise<any[]> {
+function loadAllSpaces(client: XyteClient, tenantId: string): Promise<unknown[]> {
   return paginateAll({
     fetch: (query) => client.organization.getSpaces({ tenantId, query }),
     fetchSingle: () => client.organization.getSpaces({ tenantId }),
@@ -445,10 +445,10 @@ function loadAllSpaces(client: XyteClient, tenantId: string): Promise<any[]> {
 }
 
 
-async function loadAllOrganizationIncidents(client: XyteClient, tenantId: string): Promise<any[]> {
+async function loadAllOrganizationIncidents(client: XyteClient, tenantId: string): Promise<unknown[]> {
   const perPage = 100;
   const to = Math.floor(Date.now() / 1000);
-  const merged = new Map<string, any>();
+  const merged = new Map<string, unknown>();
   const statuses = ['active', 'closed'] as const;
 
   for (const status of statuses) {
@@ -494,12 +494,12 @@ async function loadAllOrganizationIncidents(client: XyteClient, tenantId: string
   return extractArray(single, ['incidents', 'data', 'items']);
 }
 
-async function loadOrganizationTickets(client: XyteClient, tenantId: string): Promise<any[]> {
+async function loadOrganizationTickets(client: XyteClient, tenantId: string): Promise<unknown[]> {
   const raw = await client.organization.getTickets({ tenantId });
   return extractArray(raw, ['tickets', 'data', 'items']);
 }
 
-async function loadPartnerTickets(client: XyteClient, tenantId: string): Promise<any[]> {
+async function loadPartnerTickets(client: XyteClient, tenantId: string): Promise<unknown[]> {
   const raw = await client.partner.getTickets({ tenantId });
   return extractArray(raw, ['tickets', 'data', 'items']);
 }
@@ -507,7 +507,7 @@ async function loadPartnerTickets(client: XyteClient, tenantId: string): Promise
 async function collectPartnerEnrichment(
   client: XyteClient,
   tenantId: string,
-  devices: any[]
+  devices: unknown[]
 ): Promise<PartnerEnrichmentSnapshot> {
   const sampledDeviceIds = Array.from(new Set(devices.map((device) => deviceId(device)).filter((id): id is string => Boolean(id))))
     .sort((a, b) => a.localeCompare(b))
@@ -540,11 +540,11 @@ async function collectPartnerEnrichment(
     return snapshot;
   }
 
-  const baseDevicesById = new Map<string, any>();
+  const baseDevicesById = new Map<string, Record<string, unknown>>();
   for (const item of devices) {
     const id = deviceId(item);
     if (id && !baseDevicesById.has(id)) {
-      baseDevicesById.set(id, item);
+      baseDevicesById.set(id, asRecord(item));
     }
   }
 
@@ -601,7 +601,7 @@ async function collectPartnerEnrichment(
       info.updated_at,
       base?.last_seen_at,
       base?.last_seen,
-      base?.state?.last_seen_at
+      asRecord(base?.state).last_seen_at
     );
     countValue(snapshot.lastSeenRecency, recencyBucket(lastSeen));
 
@@ -746,10 +746,10 @@ export function collectFleetSnapshot(args: {
   const { client, tenantId, tenantName, providerScope = 'auto' } = args;
   return withSpan('xyte.inspect.collect_snapshot', { 'xyte.tenant.id': tenantId }, async () => {
     const resolvedScope = await resolveInspectProviderScope(client, tenantId, providerScope);
-    let devices: any[];
-    let spaces: any[];
-    let incidents: any[];
-    let tickets: any[];
+    let devices: unknown[];
+    let spaces: unknown[];
+    let incidents: unknown[];
+    let tickets: unknown[];
     let partnerEnrichment: PartnerEnrichmentSnapshot | undefined;
 
     if (resolvedScope === 'organization') {
@@ -769,8 +769,12 @@ export function collectFleetSnapshot(args: {
       partnerEnrichment = await collectPartnerEnrichment(client, tenantId, devices);
     }
 
-    const stableSort = (items: any[]) =>
-      items.slice().sort((a, b) => safeString(a?.id ?? a?.name ?? a?.title).localeCompare(safeString(b?.id ?? b?.name ?? b?.title)));
+    const stableSort = (items: unknown[]) =>
+      items.slice().sort((a, b) => {
+        const ra = asRecord(a);
+        const rb = asRecord(b);
+        return safeString(ra.id ?? ra.name ?? ra.title).localeCompare(safeString(rb.id ?? rb.name ?? rb.title));
+      });
 
     return {
       generatedAtUtc: new Date().toISOString(),

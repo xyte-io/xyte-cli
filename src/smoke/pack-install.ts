@@ -218,7 +218,7 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
       env: runtimeEnv
     });
     assertSuccess(doctorResult, 'xyte-cli doctor install', XYTE_COMMAND, ['doctor', 'install', '--format', 'json']);
-    const doctorPayload = normalizeJsonOutput(doctorResult.stdout);
+    const doctorPayload = normalizeJsonOutput(doctorResult.stdout) as Record<string, unknown>;
     if (doctorPayload.sameTarget !== true || doctorPayload.status !== 'ok') {
       throw new Error(`Install doctor did not report the packaged binary as active: ${JSON.stringify(doctorPayload)}`);
     }
@@ -229,7 +229,7 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
       env: runtimeEnv
     });
     assertSuccess(statusResult, 'xyte-cli status', XYTE_COMMAND, ['status', '--mode', 'fast', '--output', 'json']);
-    const statusPayload = normalizeJsonOutput(statusResult.stdout);
+    const statusPayload = normalizeJsonOutput(statusResult.stdout) as Record<string, unknown>;
     if (statusPayload.schemaVersion !== 'xyte.status.v1' || statusPayload.mode !== 'fast') {
       throw new Error(`Status check did not return the expected payload: ${JSON.stringify(statusPayload)}`);
     }
@@ -283,8 +283,9 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
       XYTE_COMMAND,
       ['setup', 'run', '--non-interactive', '--tenant', 'acme', '--key-stdin', '--connectivity', 'never', '--output', 'json']
     );
-    const setupPayload = normalizeJsonOutput(setupResult.stdout);
-    if (setupPayload.tenantId !== 'acme' || setupPayload.readiness?.tenantId !== 'acme') {
+    const setupPayload = normalizeJsonOutput(setupResult.stdout) as Record<string, unknown>;
+    const setupReadiness = setupPayload.readiness as Record<string, unknown> | undefined;
+    if (setupPayload.tenantId !== 'acme' || setupReadiness?.tenantId !== 'acme') {
       throw new Error(`Setup run did not return the expected tenant payload: ${JSON.stringify(setupPayload)}`);
     }
 
@@ -355,7 +356,7 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
     if (!(await pathExistsFn(fleetPath))) {
       throw new Error(`Fleet inspect did not create the nested output path: ${fleetPath}`);
     }
-    const fleetPayload = normalizeJsonOutput(await readFileFn(fleetPath, 'utf8'));
+    const fleetPayload = normalizeJsonOutput(await readFileFn(fleetPath, 'utf8')) as Record<string, unknown>;
     if (fleetPayload.schemaVersion !== 'xyte.inspect.fleet.v1') {
       throw new Error(`Fleet inspect wrote an unexpected payload: ${JSON.stringify(fleetPayload)}`);
     }
@@ -376,7 +377,7 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
     if (!(await pathExistsFn(deepDivePath))) {
       throw new Error(`Deep-dive inspect did not create the nested output path: ${deepDivePath}`);
     }
-    const deepDivePayload = normalizeJsonOutput(await readFileFn(deepDivePath, 'utf8'));
+    const deepDivePayload = normalizeJsonOutput(await readFileFn(deepDivePath, 'utf8')) as Record<string, unknown>;
     if (deepDivePayload.schemaVersion !== 'xyte.inspect.deep-dive.v1') {
       throw new Error(`Deep-dive inspect wrote an unexpected payload: ${JSON.stringify(deepDivePayload)}`);
     }

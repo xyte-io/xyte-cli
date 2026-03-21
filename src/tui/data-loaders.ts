@@ -23,29 +23,19 @@ interface LoadWithOutcomeOptions {
   retry?: RetryPolicyOptions;
 }
 
+const STATE_SEVERITY: Record<ConnectionState, number> = {
+  connected: 0,
+  not_checked: 0,
+  rate_limited: 1,
+  network_error: 2,
+  timeout: 3,
+  auth_required: 4,
+  missing_key: 5,
+  unknown_error: 6
+};
+
 function stateSeverity(state: ConnectionState): number {
-  if (state === 'connected') {
-    return 0;
-  }
-  if (state === 'rate_limited') {
-    return 1;
-  }
-  if (state === 'network_error') {
-    return 2;
-  }
-  if (state === 'timeout') {
-    return 3;
-  }
-  if (state === 'auth_required') {
-    return 4;
-  }
-  if (state === 'missing_key') {
-    return 5;
-  }
-  if (state === 'unknown_error') {
-    return 6;
-  }
-  return 7;
+  return STATE_SEVERITY[state] ?? 7;
 }
 
 function pickWorstOutcome(outcomes: Array<LoadOutcome<unknown>>): LoadOutcome<unknown> {

@@ -130,7 +130,7 @@ export async function runExternalUserLiveSmoke(options: ExternalLiveSmokeOptions
       env: runtimeEnv
     });
     assertSuccess(statusResult, 'xyte-cli status', XYTE_COMMAND, ['status', '--mode', 'fast', '--output', 'json']);
-    const statusPayload = normalizeJsonOutput(statusResult.stdout);
+    const statusPayload = normalizeJsonOutput(statusResult.stdout) as Record<string, unknown>;
     if (statusPayload.schemaVersion !== 'xyte.status.v1' || statusPayload.mode !== 'fast') {
       throw new Error(`Status check did not return the expected payload: ${JSON.stringify(statusPayload)}`);
     }
@@ -194,7 +194,7 @@ export async function runExternalUserLiveSmoke(options: ExternalLiveSmokeOptions
       env: runtimeEnv
     });
     assertSuccess(setupStatusResult, 'xyte-cli setup status', XYTE_COMMAND, ['setup', 'status', '--tenant', tenant, '--output', 'json']);
-    const setupStatusPayload = normalizeJsonOutput(setupStatusResult.stdout);
+    const setupStatusPayload = normalizeJsonOutput(setupStatusResult.stdout) as Record<string, unknown>;
     if (setupStatusPayload.state !== 'ready') {
       throw new Error(`Setup status is not ready after setup run: ${JSON.stringify(setupStatusPayload)}`);
     }
@@ -211,12 +211,13 @@ export async function runExternalUserLiveSmoke(options: ExternalLiveSmokeOptions
       XYTE_COMMAND,
       ['api', 'call', 'organization.devices.getDevices', '--tenant', tenant, '--output-mode', 'envelope', '--strict-json']
     );
-    const callPayload = normalizeJsonOutput(callResult.stdout);
+    const callPayload = normalizeJsonOutput(callResult.stdout) as Record<string, unknown>;
     if (callPayload.schemaVersion !== 'xyte.call.envelope.v1') {
-      throw new Error(`Unexpected envelope schema version: ${callPayload.schemaVersion}`);
+      throw new Error(`Unexpected envelope schema version: ${String(callPayload.schemaVersion)}`);
     }
-    if (!callPayload.response || typeof callPayload.response.status !== 'number' || callPayload.response.status < 200 || callPayload.response.status >= 300) {
-      throw new Error(`Live endpoint call failed or returned non-2xx status: ${JSON.stringify(callPayload.response)}`);
+    const callResponse = callPayload.response as Record<string, unknown> | undefined;
+    if (!callResponse || typeof callResponse.status !== 'number' || callResponse.status < 200 || callResponse.status >= 300) {
+      throw new Error(`Live endpoint call failed or returned non-2xx status: ${JSON.stringify(callResponse)}`);
     }
 
     logger.log(`Smoke passed for tenant "${tenant}" using isolated prefix "${dirs.prefixDir}".`);

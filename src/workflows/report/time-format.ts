@@ -1,4 +1,4 @@
-function identifier(value: unknown): string {
+function safeString(value: unknown): string {
   if (value === undefined || value === null) {
     return 'n/a';
   }
@@ -66,7 +66,7 @@ export function parseTimestamp(value: unknown): Date | undefined {
 export function formatUtcForReport(value: unknown): string {
   const parsed = parseTimestamp(value);
   if (!parsed) {
-    return identifier(value);
+    return safeString(value);
   }
 
   const month = MONTHS_SHORT[parsed.getUTCMonth()];

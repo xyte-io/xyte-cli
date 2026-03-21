@@ -17,21 +17,25 @@ import { loadTicketsData } from '../data-loaders';
 import { sceneFromTicketsState } from '../scene';
 import { payloadSummary, safePreviewLines, safeSearchText } from '../serialize';
 import { confirmWriteWithToken, openActionPalette } from '../actions';
+import { asRecord } from '../../utils/json';
 
-function ticketIdOf(ticket: any): string {
-  return String(ticket?.id ?? ticket?._id ?? '');
+function ticketIdOf(ticket: unknown): string {
+  const r = asRecord(ticket);
+  return String(r.id ?? r._id ?? '');
 }
 
-function ticketStatusOf(ticket: any): string {
-  return String(ticket?.status ?? ticket?.state ?? '').trim().toLowerCase();
+function ticketStatusOf(ticket: unknown): string {
+  const r = asRecord(ticket);
+  return String(r.status ?? r.state ?? '').trim().toLowerCase();
 }
 
-function ticketPriorityOf(ticket: any): string {
-  return String(ticket?.priority ?? '').trim().toLowerCase();
+function ticketPriorityOf(ticket: unknown): string {
+  const r = asRecord(ticket);
+  return String(r.priority ?? '').trim().toLowerCase();
 }
 
 interface ResolveTicketWithGuardArgs {
-  ticket: any;
+  ticket: unknown;
   mode: 'organization' | 'partner';
   context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;
 }
@@ -67,7 +71,7 @@ export async function resolveTicketWithGuard(args: ResolveTicketWithGuardArgs): 
 }
 
 interface SendTicketMessageWithGuardArgs {
-  ticket: any;
+  ticket: unknown;
   mode: 'organization' | 'partner';
   context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;
   message: string;
@@ -118,9 +122,9 @@ export function createTicketsScreen(): TuiScreen {
   let list: blessed.Widgets.ListTableElement | undefined;
   let detail: blessed.Widgets.BoxElement | undefined;
   let context: TuiContext;
-  let tickets: any[] = [];
-  let filteredAll: any[] = [];
-  let filtered: any[] = [];
+  let tickets: unknown[] = [];
+  let filteredAll: unknown[] = [];
+  let filtered: unknown[] = [];
   let mode: 'organization' | 'partner' = 'organization';
   let searchText = '';
   let statusFilter = '';
@@ -207,12 +211,15 @@ export function createTicketsScreen(): TuiScreen {
       if (renderErrors.frozen) {
         setListTableData(list, [
           ['ID', 'Status', 'Priority', 'Subject'],
-          ...filtered.map((ticket, index) => [
-            String(ticket?.id ?? ticket?._id ?? `row-${index + 1}`),
-            String(ticket?.status ?? ticket?.state ?? 'unknown'),
-            String(ticket?.priority ?? 'n/a'),
-            String(ticket?.subject ?? ticket?.title ?? 'n/a')
-          ])
+          ...filtered.map((ticket, index) => {
+            const r = asRecord(ticket);
+            return [
+              String(r.id ?? r._id ?? `row-${index + 1}`),
+              String(r.status ?? r.state ?? 'unknown'),
+              String(r.priority ?? 'n/a'),
+              String(r.subject ?? r.title ?? 'n/a')
+            ];
+          })
         ], selectionSync);
         detail?.setContent('Render fallback mode enabled for ticket details.');
       } else {
@@ -257,12 +264,15 @@ export function createTicketsScreen(): TuiScreen {
       });
       setListTableData(list, [
         ['ID', 'Status', 'Priority', 'Subject'],
-        ...filtered.map((ticket, index) => [
-          String(ticket?.id ?? ticket?._id ?? `row-${index + 1}`),
-          String(ticket?.status ?? ticket?.state ?? 'unknown'),
-          String(ticket?.priority ?? 'n/a'),
-          String(ticket?.subject ?? ticket?.title ?? 'n/a')
-        ])
+        ...filtered.map((ticket, index) => {
+          const r = asRecord(ticket);
+          return [
+            String(r.id ?? r._id ?? `row-${index + 1}`),
+            String(r.status ?? r.state ?? 'unknown'),
+            String(r.priority ?? 'n/a'),
+            String(r.subject ?? r.title ?? 'n/a')
+          ];
+        })
       ], selectionSync);
       detail?.setContent(`Unable to render ticket detail safely.\nReason: ${message}`);
     }
