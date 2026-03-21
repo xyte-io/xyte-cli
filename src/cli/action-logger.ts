@@ -56,14 +56,14 @@ interface CliActionLogFileInfo {
   modifiedAtUtc: string;
 }
 
-interface GcCliActionLogOptions {
+interface PruneCliActionLogOptions {
   path?: string;
   maxFiles?: number;
   maxAgeMs?: number;
   dryRun?: boolean;
 }
 
-interface GcCliActionLogResult {
+interface PruneCliActionLogResult {
   path: string;
   removed: string[];
   kept: string[];
@@ -399,7 +399,7 @@ export function listCliActionLogFiles(pathOverride?: string): CliActionLogFileIn
   return [...out, ...rotated];
 }
 
-export function gcCliActionLogFiles(options: GcCliActionLogOptions = {}): GcCliActionLogResult {
+export function pruneCliActionLogFiles(options: PruneCliActionLogOptions = {}): PruneCliActionLogResult {
   const basePath = resolveCliActionLogPath(options.path);
   const files = listCliActionLogFiles(basePath);
   const maxFiles = normalizePositiveInt(options.maxFiles, DEFAULT_MAX_FILES, 1, 1000);

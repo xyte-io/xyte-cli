@@ -235,29 +235,8 @@ export function loadIncidentsData(
       const perPage = Math.max(1, Number(merged.per_page ?? 100));
       const initialPage = Math.max(1, Number(merged.page ?? 1));
 
-      if (!paginateAll) {
-        const query = compactQuery({
-          from: merged.from,
-          to: merged.to,
-          status: merged.status,
-          priority: merged.priority,
-          title: merged.title,
-          issue: merged.issue,
-          space_id: merged.space_id,
-          page: initialPage,
-          per_page: perPage
-        });
-        const raw = await client.organization.getIncidents({
-          tenantId,
-          ...(query ? { query } : {})
-        });
-        return extractIncidentsArray(raw).map(normalizeIncidentItem);
-      }
-
-      const all: any[] = [];
-
-      for (let page = initialPage; page <= 50; page += 1) {
-        const query = compactQuery({
+      const buildQuery = (page: number) =>
+        compactQuery({
           from: merged.from,
           to: merged.to,
           status: merged.status,
@@ -268,6 +247,20 @@ export function loadIncidentsData(
           page,
           per_page: perPage
         });
+
+      if (!paginateAll) {
+        const query = buildQuery(initialPage);
+        const raw = await client.organization.getIncidents({
+          tenantId,
+          ...(query ? { query } : {})
+        });
+        return extractIncidentsArray(raw).map(normalizeIncidentItem);
+      }
+
+      const all: any[] = [];
+
+      for (let page = initialPage; page <= 50; page += 1) {
+        const query = buildQuery(page);
         const raw = await client.organization.getIncidents({
           tenantId,
           ...(query ? { query } : {})

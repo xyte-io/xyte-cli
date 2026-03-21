@@ -2,6 +2,16 @@ import type { TuiScreenId } from './types';
 import { safePreviewLines } from './serialize';
 import { fitCell, formatBoolTag, sanitizePrintable, shortId } from './table-format';
 import { HEADLESS_FRAME_SCHEMA_VERSION } from '../contracts/versions';
+import type { ProviderReadiness } from '../config/readiness';
+
+export function toSetupProviderRows(providers: ProviderReadiness[]) {
+  return providers.map((provider) => ({
+    provider: provider.provider,
+    slotCount: provider.slotCount,
+    activeSlot: provider.activeSlotId ?? 'none',
+    hasSecret: provider.hasActiveSecret ? 'yes' : 'no'
+  }));
+}
 
 type FrameInputState = 'idle' | 'modal' | 'busy';
 type FrameTransitionState = 'idle' | 'switching';

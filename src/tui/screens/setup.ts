@@ -13,7 +13,7 @@ import { SCREEN_PANE_CONFIG } from '../panes';
 import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
 import type { SecretProvider } from '../../types/profile';
 import { SUPPORTED_SECRET_PROVIDERS } from '../../types/profile';
-import { sceneFromSetupState } from '../scene';
+import { sceneFromSetupState, toSetupProviderRows } from '../scene';
 import { runKeyCreateWizard } from '../key-wizard';
 
 const PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
@@ -64,12 +64,7 @@ export function createSetupScreen(): TuiScreen {
       connectionState: readiness.connectionState,
       missingItems: readiness.missingItems,
       recommendedActions: readiness.recommendedActions,
-      providerRows: readiness.providers.map((provider) => ({
-        provider: provider.provider,
-        slotCount: provider.slotCount,
-        activeSlot: provider.activeSlotId ?? 'none',
-        hasSecret: provider.hasActiveSecret ? 'yes' : 'no'
-      }))
+      providerRows: toSetupProviderRows(readiness.providers)
     });
     providerRowsState = readiness.providers.map((provider) => provider.provider);
 

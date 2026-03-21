@@ -9,7 +9,7 @@ import { Command } from 'commander';
 import { readCliActionLog } from './action-log-store';
 import { runActionLogViewer } from './action-log-viewer';
 import {
-  gcCliActionLogFiles,
+  pruneCliActionLogFiles,
   listCliActionLogFiles,
   createCliActionLogger,
   extractCommandPathFromLogEntry,
@@ -3637,7 +3637,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
         const before = listCliActionLogFiles(options.path);
         const beforeMap = new Map(before.map((item) => [item.path, item]));
-        const result = gcCliActionLogFiles({
+        const result = pruneCliActionLogFiles({
           path: options.path,
           maxFiles,
           maxAgeMs,

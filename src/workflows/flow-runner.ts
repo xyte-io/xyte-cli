@@ -303,6 +303,15 @@ function extractPrimaryOutputPath(value: unknown): string | undefined {
   return undefined;
 }
 
+function resolveReadiness(ctx: RunContext, checkConnectivity: boolean) {
+  return evaluateReadiness({
+    profileStore: ctx.args.profileStore,
+    secretStore: ctx.args.secretStore,
+    tenantId: ctx.args.tenantId,
+    ...(checkConnectivity ? { client: ctx.args.client, checkConnectivity: true } : { checkConnectivity: false })
+  });
+}
+
 async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
   hydrateDerivedFlowContext(step, ctx);
   ensureContextKeys(step, ctx.resolvedContext);
@@ -314,13 +323,7 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
       };
     }
     case 'setup.status': {
-      const readiness = await evaluateReadiness({
-        profileStore: ctx.args.profileStore,
-        secretStore: ctx.args.secretStore,
-        tenantId: ctx.args.tenantId,
-        client: ctx.args.client,
-        checkConnectivity: true
-      });
+      const readiness = await resolveReadiness(ctx, true);
       if (readiness.state !== 'ready') {
         throw new FlowNeedsInputError(`Setup status is ${readiness.state}. Run setup before continuing.`);
       }
@@ -329,13 +332,7 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
       };
     }
     case 'config.doctor': {
-      const readiness = await evaluateReadiness({
-        profileStore: ctx.args.profileStore,
-        secretStore: ctx.args.secretStore,
-        tenantId: ctx.args.tenantId,
-        client: ctx.args.client,
-        checkConnectivity: true
-      });
+      const readiness = await resolveReadiness(ctx, true);
       const payload = {
         retryAttempts: 2,
         retryBackoffMs: 250,
@@ -349,12 +346,7 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
       };
     }
     case 'status.fast': {
-      const readiness = await evaluateReadiness({
-        profileStore: ctx.args.profileStore,
-        secretStore: ctx.args.secretStore,
-        tenantId: ctx.args.tenantId,
-        checkConnectivity: false
-      });
+      const readiness = await resolveReadiness(ctx, false);
       const payload = buildStatusContract({
         mode: 'fast',
         checkConnectivity: false,

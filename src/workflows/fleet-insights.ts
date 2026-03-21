@@ -215,7 +215,7 @@ function topEntries(counter: Record<string, number>, limit = 10): Array<[string,
     .slice(0, limit);
 }
 
-function identifier(value: unknown): string {
+function safeString(value: unknown): string {
   if (value === undefined || value === null) {
     return 'n/a';
   }
@@ -225,13 +225,13 @@ function identifier(value: unknown): string {
 function safeSpacePath(value: unknown): string {
   const r = asRecord(value);
   const space = asRecord(r.space);
-  return identifier(r.space_tree_path_name ?? space.full_path ?? space.name ?? r.space_id ?? 'unknown');
+  return safeString(r.space_tree_path_name ?? space.full_path ?? space.name ?? r.space_id ?? 'unknown');
 }
 
 function safeDeviceName(value: unknown): string {
   const r = asRecord(value);
   const device = asRecord(r.device);
-  return identifier(r.device_name ?? r.name ?? device.name ?? r.device_id ?? 'unknown');
+  return safeString(r.device_name ?? r.name ?? device.name ?? r.device_id ?? 'unknown');
 }
 
 function redactSensitive(value: string, includeSensitive: boolean): string {
@@ -475,7 +475,7 @@ async function loadAllOrganizationIncidents(client: XyteClient, tenantId: string
 
       for (const incident of pageItems) {
         const rec = asRecord(incident);
-        const id = identifier(typeof rec.id === 'string' ? rec.id : '');
+        const id = safeString(typeof rec.id === 'string' ? rec.id : '');
         if (id) {
           merged.set(id, incident);
         } else {
@@ -774,7 +774,7 @@ export async function collectFleetSnapshot(args: {
     }
 
     const stableSort = (items: any[]) =>
-      items.slice().sort((a, b) => identifier(a?.id ?? a?.name ?? a?.title).localeCompare(identifier(b?.id ?? b?.name ?? b?.title)));
+      items.slice().sort((a, b) => safeString(a?.id ?? a?.name ?? a?.title).localeCompare(safeString(b?.id ?? b?.name ?? b?.title)));
 
     return {
       generatedAtUtc: new Date().toISOString(),
@@ -791,10 +791,10 @@ export async function collectFleetSnapshot(args: {
 }
 
 export function buildFleetInspect(snapshot: FleetSnapshot): FleetInspectResult {
-  const deviceStatus = toCounter(snapshot.devices.map((item) => { const r = asRecord(item); return identifier(typeof r.status === 'string' ? r.status : 'unknown'); }));
-  const incidentStatus = toCounter(snapshot.incidents.map((item) => { const r = asRecord(item); return identifier(typeof r.status === 'string' ? r.status : 'unknown'); }));
-  const ticketStatus = toCounter(snapshot.tickets.map((item) => { const r = asRecord(item); return identifier(typeof r.status === 'string' ? r.status : 'unknown'); }));
-  const spaceTypes = toCounter(snapshot.spaces.map((item) => { const r = asRecord(item); return identifier(typeof r.space_type === 'string' ? r.space_type : 'unknown'); }));
+  const deviceStatus = toCounter(snapshot.devices.map((item) => { const r = asRecord(item); return safeString(typeof r.status === 'string' ? r.status : 'unknown'); }));
+  const incidentStatus = toCounter(snapshot.incidents.map((item) => { const r = asRecord(item); return safeString(typeof r.status === 'string' ? r.status : 'unknown'); }));
+  const ticketStatus = toCounter(snapshot.tickets.map((item) => { const r = asRecord(item); return safeString(typeof r.status === 'string' ? r.status : 'unknown'); }));
+  const spaceTypes = toCounter(snapshot.spaces.map((item) => { const r = asRecord(item); return safeString(typeof r.space_type === 'string' ? r.space_type : 'unknown'); }));
 
   const offlineDevices = deviceStatus.offline ?? 0;
   const activeIncidents = incidentStatus.active ?? 0;
@@ -855,9 +855,9 @@ export function formatFleetInspectAscii(result: FleetInspectResult): string {
 }
 
 export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDiveResult {
-  const offlineDevices = snapshot.devices.filter((item) => identifier(asRecord(item).status) === 'offline');
-  const activeIncidents = snapshot.incidents.filter((item) => identifier(asRecord(item).status) === 'active');
-  const openTickets = snapshot.tickets.filter((item) => identifier(asRecord(item).status) === 'open');
+  const offlineDevices = snapshot.devices.filter((item) => safeString(asRecord(item).status) === 'offline');
+  const activeIncidents = snapshot.incidents.filter((item) => safeString(asRecord(item).status) === 'active');
+  const openTickets = snapshot.tickets.filter((item) => safeString(asRecord(item).status) === 'open');
 
   const offlineBySpace = toCounter(offlineDevices.map((item) => safeSpacePath(item)));
   const incidentsByDevice = toCounter(snapshot.incidents.map((item) => safeDeviceName(item)));
@@ -871,8 +871,8 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
   const recentSpace = toCounter(recentIncidents.map((item) => safeSpacePath(item)));
   const recentDevice = toCounter(recentIncidents.map((item) => safeDeviceName(item)));
 
-  const activeDeviceIds = new Set(activeIncidents.map((item) => { const r = asRecord(item); return identifier(r.device_id ?? asRecord(r.device).id); }));
-  const overlapDevices = new Set(openTickets.map((item) => identifier(asRecord(item).device_id)).filter((id) => activeDeviceIds.has(id)));
+  const activeDeviceIds = new Set(activeIncidents.map((item) => { const r = asRecord(item); return safeString(r.device_id ?? asRecord(r.device).id); }));
+  const overlapDevices = new Set(openTickets.map((item) => safeString(asRecord(item).device_id)).filter((id) => activeDeviceIds.has(id)));
 
   const mismatches = snapshot.devices
     .map((item) => {
@@ -881,8 +881,8 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
       if (nestedState === undefined) {
         return undefined;
       }
-      const topLevel = identifier(r.status);
-      const nested = identifier(nestedState);
+      const topLevel = safeString(r.status);
+      const nested = safeString(nestedState);
       if (topLevel === nested) {
         return undefined;
       }
@@ -890,7 +890,7 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
         device: safeDeviceName(item),
         status: topLevel,
         stateStatus: nested,
-        lastSeen: identifier(r.last_seen_at),
+        lastSeen: safeString(r.last_seen_at),
         space: safeSpacePath(item)
       };
     })
@@ -916,7 +916,7 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
       device: safeDeviceName(entry.item),
       space: safeSpacePath(entry.item),
       ageHours: entry.age,
-      createdAtUtc: identifier(asRecord(entry.item).created_at)
+      createdAtUtc: safeString(asRecord(entry.item).created_at)
     }))
     .sort((a, b) => b.ageHours - a.ageHours);
 
@@ -926,11 +926,11 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
     .map((entry) => {
       const r = asRecord(entry.item);
       return {
-        ticketId: identifier(r.id),
-        title: identifier(r.title ?? r.subject),
+        ticketId: safeString(r.id),
+        title: safeString(r.title ?? r.subject),
         ageHours: entry.age,
-        deviceId: identifier(r.device_id),
-        createdAtUtc: identifier(r.created_at)
+        deviceId: safeString(r.device_id),
+        createdAtUtc: safeString(r.created_at)
       };
     })
     .sort((a, b) => b.ageHours - a.ageHours)

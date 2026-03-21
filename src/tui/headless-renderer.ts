@@ -27,6 +27,7 @@ import {
   sceneFromSetupState,
   sceneFromSpacesState,
   sceneFromTicketsState,
+  toSetupProviderRows,
   type HeadlessFrame,
   type ScenePanel
 } from './scene';
@@ -152,12 +153,7 @@ function buildSetupFrame(args: {
     connectionState: args.readiness.connectionState,
     missingItems: args.readiness.missingItems,
     recommendedActions: args.readiness.recommendedActions,
-    providerRows: args.readiness.providers.map((provider) => ({
-      provider: provider.provider,
-      slotCount: provider.slotCount,
-      activeSlot: provider.activeSlotId ?? 'none',
-      hasSecret: provider.hasActiveSecret ? 'yes' : 'no'
-    }))
+    providerRows: toSetupProviderRows(args.readiness.providers)
   });
   return createHeadlessFrame({
     sessionId: args.sessionId,
@@ -600,12 +596,7 @@ export async function runHeadlessRenderer(options: HeadlessRenderOptions): Promi
             connectionState: readiness.connectionState,
             missingItems: readiness.missingItems,
             recommendedActions: readiness.recommendedActions,
-            providerRows: readiness.providers.map((provider) => ({
-              provider: provider.provider,
-              slotCount: provider.slotCount,
-              activeSlot: provider.activeSlotId ?? 'none',
-              hasSecret: provider.hasActiveSecret ? 'yes' : 'no'
-            }))
+            providerRows: toSetupProviderRows(readiness.providers)
           }),
           meta: {
             ...withNavigationMeta('setup', {
