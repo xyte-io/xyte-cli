@@ -2,9 +2,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 
-import { extractArray } from '../tui/data-loaders';
 import type { XyteClient } from '../types/client';
-import { asRecord, extractHasNextPage } from '../utils/json';
+import { asRecord, extractArray, extractHasNextPage } from '../utils/json';
 import { INSPECT_DEEP_DIVE_SCHEMA_VERSION, INSPECT_FLEET_SCHEMA_VERSION, REPORT_SCHEMA_VERSION } from '../contracts/versions';
 import { withSpan } from '../observability/tracing';
 import { renderBrandedPdfReport } from './report/pdf-render';
