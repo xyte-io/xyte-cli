@@ -125,7 +125,7 @@ function sanitizeFlowId(flowId: string): string {
   return flowId.replace(/[^a-zA-Z0-9._-]/g, '-');
 }
 
-function parseRunDirName(runId: string): string {
+function buildRunDirName(runId: string): string {
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+$/, '');
   return `${stamp}-${runId}`;
 }
@@ -425,7 +425,7 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
         throw new Error(`Flow step ${step.id} is missing watch configuration.`);
       }
       const frames: WatchFrameV1[] = [];
-      const once = ctx.args.once ? true : watchConfig.once;
+      const once = ctx.args.once || watchConfig.once;
       await runWatch({
         client: ctx.args.client,
         tenantId: ctx.args.tenantId,
@@ -751,7 +751,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
   const resumeBundle = args.resume ? await findRunBundle(outRoot, args.resume) : undefined;
 
   let runId: string = randomUUID();
-  let bundleDir = path.join(outRoot, sanitizeFlowId(args.flowId), parseRunDirName(runId));
+  let bundleDir = path.join(outRoot, sanitizeFlowId(args.flowId), buildRunDirName(runId));
   let initialStartedAtUtc = nowIso();
   let steps = createInitialSteps(args.definition);
   let cursorIndex = 0;
@@ -975,7 +975,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
     ...(nextStepIndex < args.definition.steps.length ? { nextResumeStepId: args.definition.steps[nextStepIndex].id } : {}),
     ...(nextStepIndex < args.definition.steps.length
       ? {
-          resumeCommand: `xyte-cli flow run ${args.flowId} --tenant ${args.tenantId} --apply --inspect-provider-scope ${effectiveInspectProviderScope} --resume ${runId}`
+          resumeCommand: `xyte-cli flow run ${args.flowId} --tenant ${args.tenantId} --${args.mode} --inspect-provider-scope ${effectiveInspectProviderScope} --resume ${runId}`
         }
       : {}),
     steps,

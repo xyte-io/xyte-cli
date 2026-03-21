@@ -80,11 +80,7 @@ async function promptNonEmpty(context: WizardContext, message: string, initial: 
     if (input === undefined || !input.trim()) {
       return undefined;
     }
-    const normalized = input.trim();
-    if (normalized) {
-      return normalized;
-    }
-    context.setStatus('Value is required.');
+    return input.trim();
   }
 }
 
@@ -94,11 +90,7 @@ async function promptSecretNonEmpty(context: WizardContext, message: string): Pr
     if (input === undefined || !input.trim()) {
       return undefined;
     }
-    const normalized = input.trim();
-    if (normalized) {
-      return normalized;
-    }
-    context.setStatus('Value is required.');
+    return input.trim();
   }
 }
 

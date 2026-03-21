@@ -159,7 +159,12 @@ export class FileProfileStore implements ProfileStore {
   async getData(): Promise<ProfileStoreData> {
     try {
       const content = await fs.readFile(this.filePath, 'utf8');
-      const parsed = JSON.parse(content) as ProfileStoreData;
+      let parsed: ProfileStoreData;
+      try {
+        parsed = JSON.parse(content) as ProfileStoreData;
+      } catch {
+        throw new Error(`Profile store is invalid at ${this.filePath}. Delete or fix this file and rerun setup.`);
+      }
       const normalized = this.normalize(parsed);
       if (normalized.changed) {
         try {

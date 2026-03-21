@@ -339,6 +339,10 @@ function validateSettingValue(keyPath: SettingPath, value: unknown): unknown {
       return parseOptionalPositiveInteger(value, keyPath);
     case 'console.screen':
       return parseEnum(value, keyPath, ['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets']);
+    default: {
+      const _exhaustive: never = keyPath;
+      throw new Error(`Unhandled setting key: ${_exhaustive}`);
+    }
   }
 }
 

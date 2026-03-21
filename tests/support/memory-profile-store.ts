@@ -30,7 +30,8 @@ export class MemoryProfileStore implements ProfileStore {
   }
 
   async getTenant(tenantId: string): Promise<TenantProfile | undefined> {
-    return this.data.tenants.find((tenant) => tenant.id === tenantId);
+    const tenant = this.data.tenants.find((t) => t.id === tenantId);
+    return tenant ? structuredClone(tenant) : undefined;
   }
 
   async upsertTenant(input: {

@@ -102,12 +102,9 @@ function stateSeverity(state: ConnectionState): number {
 }
 
 function pickWorstOutcome(outcomes: Array<LoadOutcome<unknown>>): LoadOutcome<unknown> {
-  return outcomes.reduce((worst, current) => {
-    if (!worst) {
-      return current;
-    }
-    return stateSeverity(current.connectionState) >= stateSeverity(worst.connectionState) ? current : worst;
-  });
+  return outcomes.reduce((worst, current) =>
+    stateSeverity(current.connectionState) >= stateSeverity(worst.connectionState) ? current : worst
+  );
 }
 
 async function loadWithOutcome<T>(
