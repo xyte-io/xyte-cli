@@ -21,6 +21,7 @@ import type { ProfileStore } from '../secure/profile-store';
 import type { SecretStore } from '../secure/secret-store';
 import type { XyteClient } from '../types/client';
 import { buildInstallDoctorReport } from '../utils/install-doctor';
+import { isMutatingMethod } from '../utils/http';
 import { isRecord } from '../utils/json';
 import { runWatch } from './watch';
 import { buildUtilityPrepare } from './utility-prepare';
@@ -259,10 +260,6 @@ function buildStepArtifactPath(ctx: RunContext, stepIndex: number, stepId: strin
 
 async function appendNdjson(targetPath: string, payload: unknown): Promise<void> {
   await appendFile(targetPath, `${JSON.stringify(payload)}\n`, 'utf8');
-}
-
-function isMutatingMethod(method: string): boolean {
-  return !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase());
 }
 
 function buildReportInputNeedsDataMessage(stepId: string, inputStepId: string, cause: unknown): string {

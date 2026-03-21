@@ -91,7 +91,14 @@ function parseNdjson(raw: unknown): any[] {
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
-    .map((line) => JSON.parse(line));
+    .reduce<any[]>((acc, line) => {
+      try {
+        acc.push(JSON.parse(line));
+      } catch {
+        // Skip malformed NDJSON lines
+      }
+      return acc;
+    }, []);
 }
 
 function parseEnvelopeUpstreamError(result: CommandOutcome): string {

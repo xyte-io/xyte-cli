@@ -210,7 +210,7 @@ function normalizeIncidentItem(incident: unknown): any {
   return incident && typeof incident === 'object' ? incident : { value: incident };
 }
 
-export async function loadIncidentsData(
+export function loadIncidentsData(
   client: XyteClient,
   tenantId?: string,
   options: IncidentsLoadOptions = {}
@@ -350,7 +350,7 @@ interface SpacesLoadOptions {
   query?: SpacesQuery;
 }
 
-export async function loadSpacesData(
+export function loadSpacesData(
   client: XyteClient,
   tenantId?: string,
   options: SpacesLoadOptions = {}

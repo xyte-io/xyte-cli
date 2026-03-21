@@ -137,14 +137,14 @@ async function resolveTenantId(profileStore: ProfileStore, explicitTenantId?: st
   return (await profileStore.getData()).activeTenantId;
 }
 
-async function buildSetupFrame(args: {
+function buildSetupFrame(args: {
   sessionId: string;
   sequence: number;
   readiness: ReadinessCheck;
   motionEnabled: boolean;
   motionPhase: number;
   redirectedFrom?: TuiScreenId;
-}): Promise<HeadlessFrame> {
+}): HeadlessFrame {
   const panels = sceneFromSetupState({
     tenantId: args.readiness.tenantId,
     readinessState: args.readiness.state,
@@ -609,7 +609,7 @@ export async function runHeadlessRenderer(options: HeadlessRenderOptions): Promi
 
       let frame: HeadlessFrame;
       if (actualScreen === 'setup') {
-        frame = await buildSetupFrame({
+        frame = buildSetupFrame({
           sessionId,
           sequence: nextSequence(),
           readiness,

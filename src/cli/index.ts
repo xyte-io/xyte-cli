@@ -19,6 +19,7 @@ import {
   type CliActionLogger
 } from './action-logger';
 import { createXyteClient } from '../client/create-client';
+import { isMutatingMethod } from '../utils/http';
 import { getEndpoint, listEndpoints } from '../client/catalog';
 import { buildCallEnvelope } from '../contracts/call-envelope';
 import { toProblemDetails } from '../contracts/problem';
@@ -590,10 +591,6 @@ function parseFlowContextJson(value: string | undefined): Record<string, string>
     throw new Error(`Invalid flow context value for "${key}". Use scalar string/number/boolean values.`);
   }
   return out;
-}
-
-function isMutatingMethod(method: string): boolean {
-  return !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase());
 }
 
 function formatReadinessText(readiness: ReadinessCheck): string {

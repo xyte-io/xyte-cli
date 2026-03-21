@@ -106,7 +106,7 @@ export async function evaluateReadiness(options: ReadinessOptions): Promise<Read
     });
   }
 
-  const hasXyteCredential = providers.some((provider) => XYTE_PROVIDERS.includes(provider.provider) && provider.hasActiveSecret);
+  const hasXyteCredential = providers.some((provider) => provider.hasActiveSecret);
   if (!hasXyteCredential) {
     missingItems.push('No active Xyte API key slot is configured (xyte-org / xyte-partner).');
     recommendedActions.push('Run "xyte-cli setup run --tenant <tenant-id>" or review "xyte-cli config doctor".');
