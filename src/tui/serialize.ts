@@ -1,3 +1,5 @@
+import { asRecordOrUndefined } from '../utils/json';
+
 interface SafeInspectOptions {
   maxDepth?: number;
   maxArrayItems?: number;
@@ -28,12 +30,7 @@ const DEFAULT_OPTIONS: Required<SafeInspectOptions> = {
   compact: false
 };
 
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return undefined;
-  }
-  return value as Record<string, unknown>;
-}
+const asRecord = asRecordOrUndefined;
 
 function sanitizeValue(
   value: unknown,

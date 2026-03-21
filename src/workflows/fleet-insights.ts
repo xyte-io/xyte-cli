@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 
 import type { XyteClient } from '../types/client';
-import { asRecord, extractArray, extractHasNextPage } from '../utils/json';
+import { asRecord, asRecordOrUndefined, extractArray, extractHasNextPage } from '../utils/json';
 import { INSPECT_DEEP_DIVE_SCHEMA_VERSION, INSPECT_FLEET_SCHEMA_VERSION, REPORT_SCHEMA_VERSION } from '../contracts/versions';
 import { withSpan } from '../observability/tracing';
 // Dynamic import: pdfkit is ~5.9MB and only needed for PDF generation.
@@ -288,12 +288,7 @@ function withTimeout<T>(operation: () => Promise<T>, timeoutMs: number): Promise
   });
 }
 
-function asObject(value: unknown): Record<string, unknown> | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return undefined;
-  }
-  return value as Record<string, unknown>;
-}
+const asObject = asRecordOrUndefined;
 
 function extractObject(value: unknown, preferredKeys: string[]): Record<string, unknown> {
   const record = asObject(value);

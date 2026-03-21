@@ -13,9 +13,7 @@ import {
 
 export const CLI_OUTPUT_MODES = ['auto', 'json', 'text'] as const;
 export type CliOutputMode = (typeof CLI_OUTPUT_MODES)[number];
-export type CliTextJsonOutputMode = CliOutputMode;
 export type CliSettingsScope = 'user' | 'workspace' | 'resolved';
-export type SettingsScope = CliSettingsScope;
 
 export interface CliSettingsFile {
   version?: 'settings.v1';
@@ -534,7 +532,7 @@ export function parseSettingValue(keyPath: string, rawValue: string): unknown {
 }
 
 export function setCliSettingSync(args: {
-  scope: Exclude<SettingsScope, 'resolved'>;
+  scope: Exclude<CliSettingsScope, 'resolved'>;
   key: SettingKey;
   value: unknown;
   cwd?: string;
@@ -555,7 +553,7 @@ export function setCliSettingSync(args: {
 }
 
 export function unsetCliSettingSync(args: {
-  scope: Exclude<SettingsScope, 'resolved'>;
+  scope: Exclude<CliSettingsScope, 'resolved'>;
   key: SettingKey;
   cwd?: string;
   env?: NodeJS.ProcessEnv;

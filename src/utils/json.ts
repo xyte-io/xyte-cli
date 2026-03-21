@@ -9,6 +9,13 @@ export function asRecord(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+export function asRecordOrUndefined(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
+}
+
 export function extractArray(value: unknown, preferredKeys: string[] = ['data', 'items']): unknown[] {
   if (Array.isArray(value)) {
     return value;

@@ -208,7 +208,8 @@ export async function updateFlowDefinition(args: {
   };
 }
 
-export async function exportFlowDefinition(flowId: string, outPath: string): Promise<{ flow: FlowDefinitionV1; outPath: string }> {
+export async function exportFlowDefinition(args: { flowId: string; outPath: string }): Promise<{ flow: FlowDefinitionV1; outPath: string }> {
+  const { flowId, outPath } = args;
   const existing = await getFlowDefinition(flowId);
   if (!existing) {
     throw new Error(`Unknown flow definition: ${flowId}.`);
@@ -233,8 +234,8 @@ export async function exportFlowDefinition(flowId: string, outPath: string): Pro
   };
 }
 
-export async function importFlowDefinition(filePath: string, force: boolean): Promise<FlowDefinitionV1 & { path: string; status: 'created' | 'updated' }> {
-  const resolved = path.resolve(filePath);
+export async function importFlowDefinition(args: { filePath: string; force: boolean }): Promise<FlowDefinitionV1 & { path: string; status: 'created' | 'updated' }> {
+  const resolved = path.resolve(args.filePath);
   const raw = JSON.parse(await readFile(resolved, 'utf8'));
   const parsed = validateFlowDefinition(raw);
 
@@ -244,6 +245,6 @@ export async function importFlowDefinition(filePath: string, force: boolean): Pr
     title: parsed.title,
     description: parsed.description,
     defaults: parsed.defaults,
-    overwrite: force
+    overwrite: args.force
   });
 }

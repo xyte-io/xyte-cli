@@ -32,10 +32,10 @@ import {
   resolveCliSettingsSync,
   setCliSettingSync,
   unsetCliSettingSync,
-  type CliTextJsonOutputMode,
+  type CliOutputMode,
   type ResolvedCliSettingsState,
   type SettingKey,
-  type SettingsScope
+  type CliSettingsScope
 } from '../config/settings';
 import { createSecretStore, type SecretStore } from '../secure/secret-store';
 import { makeKeyFingerprint, matchesSlotRef } from '../secure/key-slots';
@@ -107,7 +107,7 @@ interface SetupStep {
 }
 
 interface CliGlobalOptions {
-  output?: CliTextJsonOutputMode;
+  output?: CliOutputMode;
   logActions?: boolean;
   logActionsPath?: string;
   logActionsVerbose?: boolean;
@@ -195,13 +195,13 @@ function commandPathFor(command: Command): string {
   return names.join(' ');
 }
 
-function getExplicitGlobalOutput(command: Command): CliTextJsonOutputMode | undefined {
+function getExplicitGlobalOutput(command: Command): CliOutputMode | undefined {
   const source = command.getOptionValueSourceWithGlobals('output');
   if (!source || source === 'default') {
     return undefined;
   }
   const options = command.optsWithGlobals() as { output?: string };
-  return parseCliTextJsonOutputMode(options.output);
+  return parseCliOutputMode(options.output);
 }
 
 function argvForCommand(command: Command): string[] {
@@ -771,7 +771,7 @@ async function resolveKeyValue(args: {
   return undefined;
 }
 
-function parseCliTextJsonOutputMode(value: string | undefined): CliTextJsonOutputMode | undefined {
+function parseCliOutputMode(value: string | undefined): CliOutputMode | undefined {
   if (value === undefined) {
     return undefined;
   }
@@ -783,7 +783,7 @@ function parseCliTextJsonOutputMode(value: string | undefined): CliTextJsonOutpu
       suggestedCommands: ['Use --output auto', 'Use --output json', 'Use --output text']
     });
   }
-  return normalized as CliTextJsonOutputMode;
+  return normalized as CliOutputMode;
 }
 
 function resolveTextJsonOutput(args: {
@@ -792,7 +792,7 @@ function resolveTextJsonOutput(args: {
   stdoutIsTTY: boolean;
   settings: ResolvedCliSettingsState;
 }): OutputFormat {
-  const explicitOutput = parseCliTextJsonOutputMode(args.output);
+  const explicitOutput = parseCliOutputMode(args.output);
   const localFormat = args.format?.trim().toLowerCase();
   if (localFormat) {
     if (localFormat !== 'json' && localFormat !== 'text') {
@@ -898,7 +898,7 @@ interface RootLauncherPayload {
   configured: boolean;
   settings: {
     tenantId?: string;
-    outputMode: CliTextJsonOutputMode;
+    outputMode: CliOutputMode;
     consoleScreen: TuiScreenId;
   };
   sections: Array<{
@@ -1789,7 +1789,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
         suggestedCommands: ['Use --scope user', 'Use --scope workspace']
       });
     }
-    const targetScope = scope as Exclude<SettingsScope, 'resolved'>;
+    const targetScope = scope as Exclude<CliSettingsScope, 'resolved'>;
     const parsedValue = parseSettingValue(key as SettingKey, value);
     const result = setCliSettingSync({
       scope: targetScope,
@@ -1836,7 +1836,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
         suggestedCommands: ['Use --scope user', 'Use --scope workspace']
       });
     }
-    const targetScope = scope as Exclude<SettingsScope, 'resolved'>;
+    const targetScope = scope as Exclude<CliSettingsScope, 'resolved'>;
     const result = unsetCliSettingSync({
       scope: targetScope,
       key: key as SettingKey,
@@ -2301,7 +2301,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
         suggestedCommands: [`Use one of: ${allowedScreens.join(', ')}`]
       });
     }
-    const requestedOutput = parseCliTextJsonOutputMode(options.output ?? options.format ?? (options.headless ? 'json' : undefined));
+    const requestedOutput = parseCliOutputMode(options.output ?? options.format ?? (options.headless ? 'json' : undefined));
     if (Boolean(options.headless) && requestedOutput && requestedOutput !== 'json') {
       throw new CliUserError({
         summary: 'Headless mode is JSON-only.',
@@ -3048,7 +3048,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .argument('<flowId>', 'Custom flow id')
     .requiredOption('--out <path>', 'Export path')
     .action(async (flowId: string, options: { out: string }) => {
-      printJson(stdout, await exportFlowDefinition(flowId, options.out));
+      printJson(stdout, await exportFlowDefinition({ flowId, outPath: options.out }));
     });
 
   flow
@@ -3057,7 +3057,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .requiredOption('--file <path>', 'Path to a shared flow definition JSON')
     .option('--force', 'Overwrite existing flow definition')
     .action(async (options: { file: string; force?: boolean }) => {
-      const imported = await importFlowDefinition(options.file, options.force === true);
+      const imported = await importFlowDefinition({ filePath: options.file, force: options.force === true });
       if (!hasBuiltInFlowDefinition(imported.basedOn)) {
         throw new Error(`Imported flow ${imported.id} references unknown built-in base flow: ${imported.basedOn}`);
       }
