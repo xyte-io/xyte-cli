@@ -2,6 +2,7 @@ import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 import { UTILITY_BATCH_SCHEMA_VERSION } from '../contracts/versions';
+import { errorMessage } from '../utils/error-format';
 import type { XyteClient, XyteCallResult } from '../types/client';
 
 export type UtilityBatchCommand = 'space.import-tree';
@@ -40,13 +41,6 @@ export interface UtilityBatchResult {
 }
 
 type UtilityRowStatus = 'dry-run' | 'succeeded' | 'failed' | 'skipped';
-
-function stringifyError(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-  return String(error);
-}
 
 function ensureParentDir(filePath: string): void {
   mkdirSync(dirname(resolve(filePath)), { recursive: true });
@@ -100,7 +94,7 @@ export async function runUtilityBatch(args: {
         });
       } catch (error) {
         totals.failed += 1;
-        const message = stringifyError(error);
+        const message = errorMessage(error);
         if (!firstError) {
           firstError = {
             rowIndex: operation.rowIndex,
@@ -177,7 +171,7 @@ export async function runUtilityBatch(args: {
       });
     } catch (error) {
       totals.failed += 1;
-      const message = stringifyError(error);
+      const message = errorMessage(error);
       if (!firstError) {
         firstError = {
           rowIndex: operation.rowIndex,

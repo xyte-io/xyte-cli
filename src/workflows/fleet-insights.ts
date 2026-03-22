@@ -736,7 +736,7 @@ async function resolveInspectProviderScope(
   return 'organization';
 }
 
-export function collectFleetSnapshot(args: {
+export async function collectFleetSnapshot(args: {
   client: XyteClient;
   tenantId: string;
   tenantName?: string;

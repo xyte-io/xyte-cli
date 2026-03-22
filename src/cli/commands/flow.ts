@@ -46,8 +46,9 @@ function parseFlowContextJson(value: string | undefined): Record<string, string>
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
-  } catch {
-    throw new Error(`Failed to parse context JSON at "${value}".`);
+  } catch (error) {
+    const detail = error instanceof SyntaxError ? `: ${error.message}` : '';
+    throw new Error(`Failed to parse context JSON at "${value}"${detail}`);
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     throw new Error(`Context JSON at "${value}" must be a plain object.`);

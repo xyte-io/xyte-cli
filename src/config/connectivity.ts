@@ -1,5 +1,6 @@
 import { XyteAuthError, XyteHttpError } from '../http/errors';
 import type { XyteClient } from '../types/client';
+import { errorMessage } from '../utils/error-format';
 
 export type ConnectionErrorClass = 'auth' | 'missing_key' | 'network' | 'timeout' | 'rate_limit' | 'unknown';
 
@@ -25,13 +26,6 @@ export interface ConnectivityResult {
 interface ConnectivityProbeOptions {
   client: XyteClient;
   tenantId?: string;
-}
-
-function errorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
 }
 
 function classToState(kind: ConnectionErrorClass): ConnectionState {

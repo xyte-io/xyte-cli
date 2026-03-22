@@ -1707,9 +1707,10 @@ export function createCli(runtime: CliRuntime = {}): Command {
     let raw: unknown;
     try {
       raw = JSON.parse(readFileSync(inputPath, 'utf8')) as unknown;
-    } catch {
+    } catch (error) {
+      const detail = error instanceof SyntaxError ? `: ${error.message}` : '';
       throw new CliUserError({
-        summary: 'Input JSON is invalid.',
+        summary: `Input JSON is invalid${detail}`,
         cause: `Failed to parse ${inputPath}.`,
         suggestedCommands: ['Generate fresh input with xyte-cli ops inspect deep-dive --output json']
       });
