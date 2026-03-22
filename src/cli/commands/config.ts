@@ -16,7 +16,7 @@ import { CliUserError } from '../../contracts/user-error';
 import { makeKeyFingerprint, matchesSlotRef } from '../../secure/key-slots';
 import type { ProfileStore } from '../../secure/profile-store';
 import type { SecretStore } from '../../secure/secret-store';
-import { SUPPORTED_SECRET_PROVIDERS, isSecretProvider, type SecretProvider } from '../../types/profile';
+import { PROVIDER_ORG, PROVIDER_PARTNER, SUPPORTED_SECRET_PROVIDERS, isSecretProvider, type SecretProvider } from '../../types/profile';
 import {
   type CliContext,
   type OutputFormat,
@@ -157,7 +157,7 @@ async function runSlotConnectivityTest(args: {
   key: string;
   profileStore: ProfileStore;
 }) {
-  if (args.provider === 'xyte-org') {
+  if (args.provider === PROVIDER_ORG) {
     const client = createXyteClient({
       profileStore: args.profileStore,
       tenantId: args.tenantId,
@@ -170,7 +170,7 @@ async function runSlotConnectivityTest(args: {
     };
   }
 
-  if (args.provider === 'xyte-partner') {
+  if (args.provider === PROVIDER_PARTNER) {
     const client = createXyteClient({
       profileStore: args.profileStore,
       tenantId: args.tenantId,

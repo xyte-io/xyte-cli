@@ -21,17 +21,6 @@ import {
   resolveTextJsonOutput
 } from '../cli-context';
 
-function parsePositiveIntegerEnv(value: string | undefined, fallback: number): number {
-  if (!value) {
-    return fallback;
-  }
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return fallback;
-  }
-  return parsed;
-}
-
 function formatActionLogText(entry: CliActionLogEntry): string {
   const commandPath = extractCommandPathFromLogEntry(entry) ?? '-';
   const data = isRecord(entry.data) ? entry.data : undefined;
@@ -178,8 +167,7 @@ export function registerLogsCommands(parent: Command, ctx: CliContext): void {
         command: Command
       ) => {
         const settings = await ctx.resolveSettings();
-        const maxFilesDefault = parsePositiveIntegerEnv(process.env.XYTE_LOG_ACTIONS_MAX_FILES, 5);
-        const maxFiles = parsePositiveIntegerOption(options.maxFiles, maxFilesDefault, 'max-files');
+        const maxFiles = parsePositiveIntegerOption(options.maxFiles, settings.values.logs.maxFiles, 'max-files');
         const maxAgeDays = parsePositiveNumberOption(options.maxAgeDays, undefined, 'max-age-days');
         const maxAgeMs = maxAgeDays === undefined ? undefined : Math.round(maxAgeDays * 24 * 60 * 60 * 1000);
 

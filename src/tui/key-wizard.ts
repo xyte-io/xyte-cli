@@ -1,6 +1,6 @@
 import { makeKeyFingerprint, matchesSlotRef } from '../secure/key-slots';
 import type { ApiKeySlotMeta, SecretProvider } from '../types/profile';
-import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
+import { PROVIDER_ORG, SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
 import type { TuiContext } from './types';
 
 const PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
@@ -117,7 +117,7 @@ function labelForSlot(slot: ApiKeySlotMeta): string {
 
 export async function runKeyCreateWizard(args: RunKeyCreateWizardArgs): Promise<KeyWizardResult> {
   const { context, tenantId } = args;
-  const provider = await promptProvider(context, args.defaultProvider ?? 'xyte-org');
+  const provider = await promptProvider(context, args.defaultProvider ?? PROVIDER_ORG);
   if (!provider) {
     return canceledResult();
   }

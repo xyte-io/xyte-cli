@@ -6,7 +6,7 @@ import { createPartnerNamespace } from './namespaces/partner';
 import { createSecretStore, type SecretStore } from '../secure/secret-store';
 import { FileProfileStore, type ProfileStore } from '../secure/profile-store';
 import type { PublicEndpointSpec } from '../types/endpoints';
-import type { SecretProvider } from '../types/profile';
+import { PROVIDER_ORG, PROVIDER_PARTNER, type SecretProvider } from '../types/profile';
 import type { XyteCallArgs, XyteCallResult, XyteClient, XyteClientOptions } from '../types/client';
 import { isRecord } from '../utils/json';
 
@@ -40,10 +40,10 @@ function withQueryParams(url: URL, query: XyteCallArgs['query']): URL {
 
 function authProviderFromScope(scope: PublicEndpointSpec['authScope']): SecretProvider | undefined {
   if (scope === 'organization') {
-    return 'xyte-org';
+    return PROVIDER_ORG;
   }
   if (scope === 'partner') {
-    return 'xyte-partner';
+    return PROVIDER_PARTNER;
   }
   return undefined;
 }
@@ -199,13 +199,13 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
     listTenantEndpoints: async (tenantId: string) => {
       const secretStore = getSecretStore();
       const [orgSlot, partnerSlot] = await Promise.all([
-        profileStore.getActiveKeySlot(tenantId, 'xyte-org'),
-        profileStore.getActiveKeySlot(tenantId, 'xyte-partner')
+        profileStore.getActiveKeySlot(tenantId, PROVIDER_ORG),
+        profileStore.getActiveKeySlot(tenantId, PROVIDER_PARTNER)
       ]);
 
       const [org, partner] = await Promise.all([
-        secretStore.getSlotSecret(tenantId, 'xyte-org', orgSlot?.slotId ?? 'default'),
-        secretStore.getSlotSecret(tenantId, 'xyte-partner', partnerSlot?.slotId ?? 'default')
+        secretStore.getSlotSecret(tenantId, PROVIDER_ORG, orgSlot?.slotId ?? 'default'),
+        secretStore.getSlotSecret(tenantId, PROVIDER_PARTNER, partnerSlot?.slotId ?? 'default')
       ]);
 
       return listEndpoints().filter((endpoint) => {

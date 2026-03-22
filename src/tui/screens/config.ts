@@ -14,7 +14,7 @@ import { SCREEN_PANE_CONFIG } from '../panes';
 import { sceneFromConfigState } from '../scene';
 import { runKeyCreateWizard, runKeyUpdateWizard } from '../key-wizard';
 import type { SecretProvider } from '../../types/profile';
-import { SUPPORTED_SECRET_PROVIDERS } from '../../types/profile';
+import { PROVIDER_ORG, PROVIDER_PARTNER, SUPPORTED_SECRET_PROVIDERS } from '../../types/profile';
 import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
 
 const PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
@@ -35,7 +35,7 @@ async function runSlotConnectivityProbe(args: {
     throw new Error(`No secret found for slot ${slotId} (${provider}).`);
   }
 
-  if (provider === 'xyte-org') {
+  if (provider === PROVIDER_ORG) {
     const client = createXyteClient({
       profileStore: context.profileStore,
       secretStore: context.secretStore,
@@ -46,7 +46,7 @@ async function runSlotConnectivityProbe(args: {
     return 'organization.getOrganizationInfo ok';
   }
 
-  if (provider === 'xyte-partner') {
+  if (provider === PROVIDER_PARTNER) {
     const client = createXyteClient({
       profileStore: context.profileStore,
       secretStore: context.secretStore,
@@ -135,7 +135,7 @@ export function createConfigScreen(): TuiScreen {
     }
 
     selectedProviderIndex = clampIndex(selectedProviderIndex, providerRowsState.length);
-    const selectedProvider = providerRowsState[selectedProviderIndex]?.provider ?? 'xyte-org';
+    const selectedProvider = providerRowsState[selectedProviderIndex]?.provider ?? PROVIDER_ORG;
 
     const filteredSlots = allSlots.filter((slot) => slot.provider === selectedProvider);
     const activeForProvider =

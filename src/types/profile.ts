@@ -2,6 +2,9 @@ export const SUPPORTED_SECRET_PROVIDERS = ['xyte-org', 'xyte-partner'] as const;
 
 export type SecretProvider = (typeof SUPPORTED_SECRET_PROVIDERS)[number];
 
+export const PROVIDER_ORG = 'xyte-org' as const;
+export const PROVIDER_PARTNER = 'xyte-partner' as const;
+
 export function isSecretProvider(value: string): value is SecretProvider {
   return (SUPPORTED_SECRET_PROVIDERS as readonly string[]).includes(value);
 }

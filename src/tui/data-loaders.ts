@@ -9,6 +9,7 @@ import type { SecretProvider } from '../types/profile';
 import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
 import { extractArray, extractHasNextPage, extractIncidentsArray } from '../utils/json';
 import { errorMessage } from '../utils/error-format';
+import { PROVIDER_ORG } from '../types/profile';
 
 interface LoadOutcome<T> {
   data: T;
@@ -534,7 +535,7 @@ export async function loadConfigData(
     })
   );
 
-  const selectedProvider = providerRows.find((row) => row.slotCount > 0)?.provider ?? 'xyte-org';
+  const selectedProvider = providerRows.find((row) => row.slotCount > 0)?.provider ?? PROVIDER_ORG;
 
   const slotRows: ConfigSlotRow[] = await Promise.all(
     allSlots

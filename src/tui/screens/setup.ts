@@ -12,7 +12,7 @@ import {
 import { SCREEN_PANE_CONFIG } from '../panes';
 import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
 import type { SecretProvider } from '../../types/profile';
-import { SUPPORTED_SECRET_PROVIDERS } from '../../types/profile';
+import { PROVIDER_ORG, SUPPORTED_SECRET_PROVIDERS } from '../../types/profile';
 import { sceneFromSetupState, toSetupProviderRows } from '../scene';
 import { runKeyCreateWizard } from '../key-wizard';
 
@@ -261,7 +261,7 @@ export function createSetupScreen(): TuiScreen {
             context.setStatus('Set an active tenant first (a/u).');
             return true;
           }
-          const selectedProvider = providerRowsState[clampIndex(selectedProviderIndex, providerRowsState.length)] ?? 'xyte-org';
+          const selectedProvider = providerRowsState[clampIndex(selectedProviderIndex, providerRowsState.length)] ?? PROVIDER_ORG;
           const result = await runKeyCreateWizard({
             context,
             tenantId,
@@ -287,7 +287,7 @@ export function createSetupScreen(): TuiScreen {
             context.setStatus('Set an active tenant first.');
             return true;
           }
-          const providerText = (await context.prompt('Provider:', 'xyte-org'))?.trim();
+          const providerText = (await context.prompt('Provider:', PROVIDER_ORG))?.trim();
           if (!isMounted) {
             return true;
           }

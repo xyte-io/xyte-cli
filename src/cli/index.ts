@@ -29,7 +29,7 @@ import { createSecretStore, type SecretStore } from '../secure/secret-store';
 import { makeKeyFingerprint } from '../secure/key-slots';
 import { FileProfileStore, type ProfileStore } from '../secure/profile-store';
 import type { SecretProvider } from '../types/profile';
-import { isSecretProvider } from '../types/profile';
+import { isSecretProvider, PROVIDER_ORG, PROVIDER_PARTNER } from '../types/profile';
 import { isRecord, parseJsonObject } from '../utils/json';
 import { buildInstallDoctorReport, type InstallDoctorResult } from '../utils/install-doctor';
 import type { UtilityInputFormat } from '../utils/input-parser';
@@ -134,7 +134,7 @@ interface CliRuntime {
   env?: NodeJS.ProcessEnv;
 }
 
-const SIMPLE_SETUP_AUTH_PROVIDER = 'xyte-org' as const;
+const SIMPLE_SETUP_AUTH_PROVIDER = PROVIDER_ORG;
 const SIMPLE_SETUP_SLOT_NAME = 'primary';
 const SIMPLE_SETUP_DEFAULT_TENANT = 'default';
 const SKILL_AGENTS: SkillAgent[] = ['claude', 'copilot', 'codex'];
@@ -798,11 +798,16 @@ export function createCli(runtime: CliRuntime = {}): Command {
     });
   };
 
+  let profileMigrated = false;
   const withClient = async (
     tenantId?: string,
     retry?: { attempts?: number; backoffMs?: number },
     flagOverrides: Partial<Record<SettingKey, unknown>> = {}
   ) => {
+    if (!profileMigrated) {
+      profileMigrated = true;
+      await profileStore.migrateIfNeeded();
+    }
     const secretStore = getSecretStore();
     const settings = await resolveSettings(flagOverrides);
     const resolvedTenantId = tenantId ?? settings.values.defaults.tenant;
@@ -820,7 +825,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     provider: SecretProvider;
     keyValue: string;
   }): Promise<string | undefined> => {
-    if (args.provider !== 'xyte-org') {
+    if (args.provider !== PROVIDER_ORG) {
       return undefined;
     }
 
@@ -1222,7 +1227,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     if (!options.nonInteractive) {
       tenantId = tenantId || (await prompt({ question: 'Tenant id', stdout }));
       tenantName = tenantName || (await prompt({ question: 'Tenant display name', initial: tenantId, stdout }));
-      const providerAnswer = provider || parseProvider(await prompt({ question: 'Provider', initial: 'xyte-org', stdout }));
+      const providerAnswer = provider || parseProvider(await prompt({ question: 'Provider', initial: PROVIDER_ORG, stdout }));
       provider = providerAnswer;
       slotName = await prompt({ question: 'Slot name', initial: slotName, stdout });
     }
