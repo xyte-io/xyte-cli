@@ -103,6 +103,15 @@ async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptio
   const strictJson = resolveStrictJson({ strictJson: options.strictJson, settings });
   const mutating = isMutatingMethod(method);
 
+  const envelopeBase = {
+    requestId,
+    tenantId,
+    endpointKey: key,
+    method,
+    guard: { allowWrite: mutating },
+    request: { path, query, body }
+  };
+
   try {
     const client = await ctx.withClient({ tenantId });
     const result = await client.callWithMeta(key, {
@@ -115,18 +124,7 @@ async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptio
 
     if (outputMode === 'envelope') {
       const envelope = buildCallEnvelope({
-        requestId,
-        tenantId,
-        endpointKey: key,
-        method,
-        guard: {
-          allowWrite: mutating
-        },
-        request: {
-          path,
-          query,
-          body
-        },
+        ...envelopeBase,
         response: {
           status: result.status,
           durationMs: result.durationMs,
@@ -154,18 +152,7 @@ async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptio
     }
 
     const envelope = buildCallEnvelope({
-      requestId,
-      tenantId,
-      endpointKey: key,
-      method,
-      guard: {
-        allowWrite: mutating
-      },
-      request: {
-        path,
-        query,
-        body
-      },
+      ...envelopeBase,
       error: toProblemDetails(error, `/api/call/${key}`)
     });
     printJson(ctx.stdout, envelope, { strictJson });

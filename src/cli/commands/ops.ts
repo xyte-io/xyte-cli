@@ -187,7 +187,7 @@ async function handleOpsWatchIncidents(ctx: CliContext, options: {
   if (options.intervalMs) {
     overrides['watch.intervalMs'] = parseWatchIntervalMs(options.intervalMs);
   }
-  if (options.maxPolls) {
+  if (options.maxPolls !== undefined) {
     overrides['watch.maxPolls'] = parseWatchMaxPolls(options.maxPolls);
   }
   const settings = await ctx.resolveSettings(overrides);
@@ -205,14 +205,11 @@ async function handleOpsWatchIncidents(ctx: CliContext, options: {
   await runWatch({
     client,
     tenantId,
-    profile: (overrides['watch.profile'] as WatchProfile | undefined) ?? settings.values.watch.profile,
+    profile: settings.values.watch.profile,
     query,
-    intervalMs: (overrides['watch.intervalMs'] as number | undefined) ?? settings.values.watch.intervalMs,
+    intervalMs: settings.values.watch.intervalMs,
     once: options.once === true,
-    maxPolls:
-      options.maxPolls !== undefined
-        ? (overrides['watch.maxPolls'] as number | undefined)
-        : settings.values.watch.maxPolls,
+    maxPolls: settings.values.watch.maxPolls,
     onFrame: (frame) => {
       const renderFrame =
         output === 'text' ? formatWatchFrameText(frame) : `${stringifyJsonOutput(frame, { strictJson, compact: true })}\n`;
