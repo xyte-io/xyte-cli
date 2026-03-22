@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { firstText } from '../src/workflows/fleet-insights-loaders';
-import { safeString } from '../src/utils/json';
+import { firstText, safeString } from '../src/utils/json';
 
 describe('safeString', () => {
   it('returns string representation for primitives', () => {

@@ -100,7 +100,7 @@ async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptio
       throw new Error(`Invalid --body-json${detail}`);
     }
   }
-  const strictJson = resolveStrictJson({ strictJson: !!options.strictJson, settings });
+  const strictJson = resolveStrictJson({ strictJson: options.strictJson, settings });
   const mutating = isMutatingMethod(method);
 
   try {

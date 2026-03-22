@@ -1,24 +1,17 @@
 import type { XyteClient } from '../types/client';
 import type { InspectProviderScope } from '../types/settings-enums';
-import { asRecord, asRecordOrUndefined, extractArray, extractHasNextPage, safeString } from '../utils/json';
+import { asRecord, asRecordOrUndefined, extractArray, extractHasNextPage, firstText, safeString } from '../utils/json';
 import { withSpan } from '../observability/tracing';
 import { parseTimestamp } from './report/time-format';
 
 import type { FleetSnapshot, PartnerEnrichmentSnapshot, PartnerEndpointOutcome, ResolvedInspectProviderScope, StatusCounts } from '../types/fleet-inspect';
 
+export { firstText } from '../utils/json';
+
 const PARTNER_ENRICHMENT_SAMPLE_SIZE = 25;
 const PARTNER_ENRICHMENT_CONCURRENCY = 5;
 const PARTNER_ENRICHMENT_TIMEOUT_MS = 3_000;
 const PARTNER_FRESH_TELEMETRY_WINDOW_HOURS = 24;
-
-export function firstText(...values: unknown[]): string | undefined {
-  for (const value of values) {
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim();
-    }
-  }
-  return undefined;
-}
 
 function countValue(counter: StatusCounts, key: string): void {
   counter[key] = (counter[key] ?? 0) + 1;

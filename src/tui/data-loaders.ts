@@ -527,7 +527,7 @@ export interface ConfigData {
   slotRows: ConfigSlotRow[];
 }
 
-export async function readConfigData(
+export async function loadConfigData(
   profileStore: ProfileStore,
   secretStore: SecretStore,
   tenantId: string | undefined

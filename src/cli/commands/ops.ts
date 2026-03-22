@@ -480,10 +480,7 @@ async function handleOpsConsole(
     });
   }
   const follow = options.once ? false : options.follow ?? settings.values.console.follow;
-  const intervalMs =
-    options.intervalMs !== undefined
-      ? parsePositiveIntegerOption(options.intervalMs, settings.values.console.intervalMs, 'interval-ms')
-      : settings.values.console.intervalMs;
+  const intervalMs = settings.values.console.intervalMs;
   const motionEnabled = options.motion === false ? false : settings.values.console.motion;
 
   await runTui({

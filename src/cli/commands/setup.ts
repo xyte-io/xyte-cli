@@ -6,7 +6,7 @@ import { makeKeyFingerprint } from '../../secure/key-slots';
 import type { ApiKeySlotMeta, SecretProvider } from '../../types/profile';
 import { parseProvider, PROVIDER_ORG } from '../../types/profile';
 import { isRecord } from '../../utils/json';
-import { firstText } from '../../workflows/fleet-insights-loaders';
+import { firstText } from '../../utils/json';
 import { CliUserError } from '../../contracts/user-error';
 import { formatReadinessText } from '../format-readiness';
 import { resolveKeyValue } from '../resolve-key';
