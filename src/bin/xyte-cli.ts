@@ -2,7 +2,7 @@
 
 import { runCli } from '../cli/index';
 import { toProblemDetails } from '../contracts/problem';
-import { resolveCliErrorFormat } from '../utils/error-format';
+import { errorMessage, resolveCliErrorFormat } from '../utils/error-format';
 import { redactSensitiveText } from '../utils/redact';
 
 runCli().catch((error) => {
@@ -15,7 +15,7 @@ runCli().catch((error) => {
     process.exit(1);
   }
 
-  const message = error instanceof Error ? error.message : String(error);
+  const message = errorMessage(error);
   process.stderr.write(`${redactSensitiveText(message)}\n`);
   process.exit(1);
 });

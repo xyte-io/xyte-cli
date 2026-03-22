@@ -1,5 +1,6 @@
 import type { XyteClient } from '../types/client';
 import { loadInputRows, type UtilityInputFormat } from '../utils/input-parser';
+import { errorMessage } from '../utils/error-format';
 import { runUtilityBatch, type UtilityBatchOperation, type UtilityBatchResult } from './utility-batch';
 
 function requireNonEmptyString(value: unknown, fieldName: string, rowIndex: number): string {
@@ -36,8 +37,7 @@ function parseOptionalConfig(value: unknown, fieldName: string, rowIndex: number
   try {
     parsed = JSON.parse(value);
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(`Row ${rowIndex}: field "${fieldName}" is not valid JSON (${detail}).`);
+    throw new Error(`Row ${rowIndex}: field "${fieldName}" is not valid JSON (${errorMessage(error)}).`);
   }
 
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {

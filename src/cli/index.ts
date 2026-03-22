@@ -55,10 +55,11 @@ import {
 } from '../workflows/fleet-insights';
 import type { InspectProviderScope } from '../types/settings-enums';
 import { runWatch } from '../workflows/watch';
-import { buildUtilityPrepare, listUtilityPrepareActions } from '../workflows/utility-prepare';
+import { runUtilityPrepare, listUtilityPrepareActions } from '../workflows/utility-prepare';
 import type { UtilityPreparePrimaryFormat } from '../workflows/utility-action-profiles';
 import { runSpaceImportTree } from '../workflows/utility-commands';
 import { CliUserError } from '../contracts/user-error';
+import { errorMessage } from '../utils/error-format';
 import { registerLogsCommands } from './commands/logs';
 import { registerConfigCommands } from './commands/config';
 import { registerFlowCommands } from './commands/flow';
@@ -1829,7 +1830,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     strictJson?: boolean;
   }) => {
     const settings = await resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
-    const result = buildUtilityPrepare({
+    const result = runUtilityPrepare({
       inputPath: options.input,
       actionKey: options.action,
       outputDir: options.outputDir,
@@ -2574,7 +2575,7 @@ export async function runCli(argv = process.argv, runtime: CliRuntime = {}): Pro
         baseErrorPayload.argv = sanitizeArgvForLog(argv.slice(2));
         baseErrorPayload.error = toProblemDetails(error);
       } else {
-        baseErrorPayload.error = error instanceof Error ? error.message : String(error);
+        baseErrorPayload.error = errorMessage(error);
       }
 
       state.logger.log(

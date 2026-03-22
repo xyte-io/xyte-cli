@@ -1,5 +1,7 @@
 import { SpanStatusCode, trace, type Attributes, type Span } from '@opentelemetry/api';
 
+import { errorMessage } from '../utils/error-format';
+
 const tracer = trace.getTracer('xyte-cli');
 
 export function withSpan<T>(name: string, attributes: Attributes, operation: (span: Span) => Promise<T>): Promise<T> {
@@ -12,7 +14,7 @@ export function withSpan<T>(name: string, attributes: Attributes, operation: (sp
       span.recordException(error as Error);
       span.setStatus({
         code: SpanStatusCode.ERROR,
-        message: error instanceof Error ? error.message : String(error)
+        message: errorMessage(error)
       });
       throw error;
     } finally {

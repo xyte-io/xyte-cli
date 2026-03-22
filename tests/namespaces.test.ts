@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { createOrganizationNamespace } from '../src/namespaces/organization';
-import { createPartnerNamespace } from '../src/namespaces/partner';
+import { createOrganizationNamespace } from '../src/client/namespaces/organization';
+import { createPartnerNamespace } from '../src/client/namespaces/partner';
 
 describe('namespace endpoint mappings', () => {
   it('maps partner.getDevices to partner.devices.getDevices', async () => {

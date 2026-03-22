@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import Ajv2020 from 'ajv/dist/2020';
 import { describe, expect, it } from 'vitest';
 
-import { buildUtilityPrepare, listUtilityPrepareActions } from '../src/workflows/utility-prepare';
+import { runUtilityPrepare, listUtilityPrepareActions } from '../src/workflows/utility-prepare';
 
 function makeTempRoot(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix));
@@ -18,7 +18,7 @@ describe('utility prepare workflow', () => {
     const outDir = join(root, 'out');
     writeFileSync(inputPath, 'placeholder', 'utf8');
 
-    const result = buildUtilityPrepare({
+    const result = runUtilityPrepare({
       inputPath,
       actionKey: 'organization.devices.claimDevice',
       outputDir: outDir,
@@ -45,7 +45,7 @@ describe('utility prepare workflow', () => {
     const outDir = join(root, 'out');
     writeFileSync(inputPath, 'placeholder', 'utf8');
 
-    const result = buildUtilityPrepare({
+    const result = runUtilityPrepare({
       inputPath,
       actionKey: 'space.import-tree',
       outputDir: outDir
@@ -65,7 +65,7 @@ describe('utility prepare workflow', () => {
     const outDir = join(root, 'out');
     writeFileSync(inputPath, 'x', 'utf8');
 
-    const result = buildUtilityPrepare({
+    const result = runUtilityPrepare({
       inputPath,
       actionKey: 'organization.tickets.updateTicket',
       outputDir: outDir
@@ -82,7 +82,7 @@ describe('utility prepare workflow', () => {
     const outDir = join(root, 'out');
     writeFileSync(inputPath, 'x', 'utf8');
 
-    const result = buildUtilityPrepare({
+    const result = runUtilityPrepare({
       inputPath,
       actionKey: 'organization.commands.sendCommand',
       outputDir: outDir,
@@ -100,7 +100,7 @@ describe('utility prepare workflow', () => {
     const outDir = join(root, 'out');
     writeFileSync(inputPath, 'x', 'utf8');
 
-    const result = buildUtilityPrepare({
+    const result = runUtilityPrepare({
       inputPath,
       actionKey: 'organization.devices.updateDevice',
       outputDir: outDir,
@@ -119,7 +119,7 @@ describe('utility prepare workflow', () => {
     writeFileSync(inputPath, 'x', 'utf8');
 
     expect(() =>
-      buildUtilityPrepare({
+      runUtilityPrepare({
         inputPath,
         actionKey: 'no.such.action',
         outputDir: outDir
@@ -127,21 +127,21 @@ describe('utility prepare workflow', () => {
     ).toThrow('Unknown utility action');
 
     expect(() =>
-      buildUtilityPrepare({
+      runUtilityPrepare({
         inputPath,
         actionKey: 'device.file-dumps.appendDumpFile',
         outputDir: outDir
       })
     ).toThrow('Unknown utility action');
 
-    buildUtilityPrepare({
+    runUtilityPrepare({
       inputPath,
       actionKey: 'space.import-tree',
       outputDir: outDir
     });
 
     expect(() =>
-      buildUtilityPrepare({
+      runUtilityPrepare({
         inputPath,
         actionKey: 'space.import-tree',
         outputDir: outDir
@@ -165,7 +165,7 @@ describe('utility prepare workflow', () => {
     const ajv = new Ajv2020({ strict: false });
     const validate = ajv.compile(schema);
 
-    const result = buildUtilityPrepare({
+    const result = runUtilityPrepare({
       inputPath,
       actionKey: 'space.import-tree',
       outputDir: outDir

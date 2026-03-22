@@ -24,6 +24,7 @@ import { createInputController } from './input-controller';
 import { ScreenRuntime, type ScreenRuntimeStatus } from './runtime';
 import { createTuiLogger } from './logger';
 import { nextTab } from './tabs';
+import { errorMessage } from '../utils/error-format';
 
 interface TuiAppOptions {
   client: XyteClient;
@@ -39,13 +40,6 @@ interface TuiAppOptions {
   output?: Pick<typeof process.stdout, 'write'>;
   debug?: boolean;
   debugLogPath?: string;
-}
-
-function toErrorText(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
 }
 
 async function renderStartupSequence(
@@ -297,7 +291,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
 
     let shutdownRef: (() => void) | undefined;
     const safeShowError = (source: string, error: unknown) => {
-      const text = toErrorText(error);
+      const text = errorMessage(error);
       logger.log('ui.error.safe', {
         source,
         message: text,
@@ -351,7 +345,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
               original: text,
               renderError
             });
-            writeErrorStderr(source, `render failure after error modal: ${toErrorText(renderError)}`);
+            writeErrorStderr(source, `render failure after error modal: ${errorMessage(renderError)}`);
             shutdownRef?.();
           }
         });
@@ -363,7 +357,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
           original: text,
           displayError
         });
-        writeErrorStderr(source, `unable to display error modal: ${toErrorText(displayError)} | original: ${text}`);
+        writeErrorStderr(source, `unable to display error modal: ${errorMessage(displayError)} | original: ${text}`);
         shutdownRef?.();
       }
     };

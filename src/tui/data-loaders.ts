@@ -8,6 +8,7 @@ import type { XyteClient } from '../types/client';
 import type { SecretProvider } from '../types/profile';
 import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
 import { extractArray, extractHasNextPage, extractIncidentsArray } from '../utils/json';
+import { errorMessage } from '../utils/error-format';
 
 interface LoadOutcome<T> {
   data: T;
@@ -166,7 +167,7 @@ export async function loadDevicesData(
         .getDevices({ tenantId, ...(query ? { query } : {}) })
         .catch((orgError: unknown) => {
           if (process.env.DEBUG) {
-            const msg = orgError instanceof Error ? orgError.message : String(orgError);
+            const msg = errorMessage(orgError);
             process.stderr.write(`[data-loaders] org getDevices failed, falling back to partner: ${msg}\n`);
           }
           return client.partner.getDevices({ tenantId });
@@ -204,7 +205,7 @@ function normalizeIncidentItem(incident: unknown): Record<string, unknown> {
   return incident && typeof incident === 'object' ? (incident as Record<string, unknown>) : { value: incident };
 }
 
-export function loadIncidentsData(
+export async function loadIncidentsData(
   client: XyteClient,
   tenantId?: string,
   options: IncidentsLoadOptions = {}
@@ -337,7 +338,7 @@ interface SpacesLoadOptions {
   query?: SpacesQuery;
 }
 
-export function loadSpacesData(
+export async function loadSpacesData(
   client: XyteClient,
   tenantId?: string,
   options: SpacesLoadOptions = {}

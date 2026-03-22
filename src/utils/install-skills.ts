@@ -2,6 +2,8 @@ import { access, constants, cp, mkdir, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
+import { errorMessage } from './error-format';
+
 export type SkillAgent = 'claude' | 'copilot' | 'codex';
 export type SkillInstallScope = 'project' | 'user' | 'both';
 export type SkillInstallStatus = 'installed' | 'overwritten' | 'skipped' | 'failed';
@@ -144,11 +146,10 @@ export async function installSkills(options: InstallSkillsOptions): Promise<Inst
         status: alreadyInstalled ? 'overwritten' : 'installed'
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
       outcomes.push({
         ...destination,
         status: 'failed',
-        error: message
+        error: errorMessage(error)
       });
     }
   }

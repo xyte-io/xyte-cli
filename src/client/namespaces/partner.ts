@@ -1,4 +1,4 @@
-import type { PartnerNamespace, XyteCallArgs } from '../types/client';
+import type { PartnerNamespace, XyteCallArgs } from '../../types/client';
 
 export function createPartnerNamespace(call: (endpointKey: string, args?: XyteCallArgs) => Promise<unknown>): PartnerNamespace {
   return {

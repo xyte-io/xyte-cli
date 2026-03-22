@@ -163,7 +163,7 @@ function buildCsvHeader(headers: string[]): string {
   return `${headers.join(',')}\n`;
 }
 
-export function buildUtilityPrepare(args: {
+export function runUtilityPrepare(args: {
   inputPath: string;
   actionKey: string;
   outputDir?: string;

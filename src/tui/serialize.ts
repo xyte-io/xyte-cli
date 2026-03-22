@@ -1,4 +1,5 @@
 import { asRecordOrUndefined } from '../utils/json';
+import { errorMessage } from '../utils/error-format';
 
 interface SafeInspectOptions {
   maxDepth?: number;
@@ -117,8 +118,7 @@ export function safeInspect(value: unknown, options: SafeInspectOptions = {}): S
     text = JSON.stringify(sanitized, null, merged.compact ? 0 : 2);
   } catch (error) {
     state.truncated = true;
-    const message = error instanceof Error ? error.message : String(error);
-    text = JSON.stringify({ error: `Serialization failed: ${message}` }, null, merged.compact ? 0 : 2);
+    text = JSON.stringify({ error: `Serialization failed: ${errorMessage(error)}` }, null, merged.compact ? 0 : 2);
   }
 
   if (text.length > merged.maxOutputChars) {

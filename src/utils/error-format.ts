@@ -26,6 +26,13 @@ export function parseErrorFormatArg(argv: string[]): CliErrorFormat | undefined 
   return undefined;
 }
 
+export function errorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
 export function resolveCliErrorFormat(argv: string[], envValue?: string): CliErrorFormat {
   const fromArg = parseErrorFormatArg(argv);
   if (fromArg) {

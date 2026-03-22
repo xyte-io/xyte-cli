@@ -1,4 +1,4 @@
-import type { OrganizationNamespace, XyteCallArgs } from '../types/client';
+import type { OrganizationNamespace, XyteCallArgs } from '../../types/client';
 
 export function createOrganizationNamespace(call: (endpointKey: string, args?: XyteCallArgs) => Promise<unknown>): OrganizationNamespace {
   return {

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { NPM_COMMAND, XYTE_COMMAND, runCommand } from './shared';
+import { errorMessage } from '../utils/error-format';
 
 interface ParsedArgs {
   tenant: string;
@@ -381,7 +382,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 
 if (require.main === module) {
   void main().catch((error: unknown) => {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.stderr.write(`${errorMessage(error)}\n`);
     process.exitCode = 1;
   });
 }

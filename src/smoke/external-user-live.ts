@@ -17,6 +17,7 @@ import {
   type LoggerLike,
   type RunCommandOptions
 } from './shared';
+import { errorMessage } from '../utils/error-format';
 
 const SKILL_MANIFEST_VALIDATION_SCRIPT = [
   'const fs = require("node:fs");',
@@ -239,8 +240,7 @@ export async function main(): Promise<void> {
 
 if (require.main === module) {
   void main().catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(message);
+    console.error(errorMessage(error));
     process.exitCode = 1;
   });
 }

@@ -11,7 +11,7 @@ import { buildWatchFrame } from '../src/contracts/watch-frame';
 import { buildUpgradeCheck } from '../src/contracts/upgrade';
 import { MemorySecretStore } from '../src/secure/secret-store';
 import { runHeadlessRenderer } from '../src/tui/headless-renderer';
-import { buildUtilityPrepare } from '../src/workflows/utility-prepare';
+import { runUtilityPrepare } from '../src/workflows/utility-prepare';
 import { buildDeepDive, buildFleetInspect, generateFleetReport } from '../src/workflows/fleet-insights';
 import { MemoryProfileStore } from './support/memory-profile-store';
 
@@ -166,7 +166,7 @@ describe('golden contracts', () => {
     const outputDir = join(tmpRoot, 'output');
     writeFileSync(inputPath, 'raw', 'utf8');
 
-    const result = buildUtilityPrepare({
+    const result = runUtilityPrepare({
       inputPath,
       actionKey: 'organization.devices.claimDevice',
       outputDir,

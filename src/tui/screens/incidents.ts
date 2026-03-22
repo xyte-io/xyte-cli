@@ -17,6 +17,7 @@ import { loadIncidentsData } from '../data-loaders';
 import { sceneFromIncidentsState } from '../scene';
 import { payloadSummary } from '../serialize';
 import { confirmWriteWithToken, openActionPalette } from '../actions';
+import { errorMessage } from '../../utils/error-format';
 
 function incidentIdOf(incident: unknown): string {
   const rec = incident && typeof incident === 'object' ? (incident as Record<string, unknown>) : undefined;
@@ -162,7 +163,7 @@ export function createIncidentsScreen(): TuiScreen {
         frozen: renderErrors.frozen
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       renderErrors.recordError(message);
       context.debugLog?.('screen.render.error', {
         screen: 'incidents',

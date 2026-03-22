@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { SecretProvider } from '../types/profile';
 import { isSecretProvider } from '../types/profile';
 import { getXyteConfigDir } from '../utils/config-dir';
+import { errorMessage } from '../utils/error-format';
 import { DEFAULT_SLOT_ID } from './key-slots';
 
 const SECRET_STORE_VERSION = 1;
@@ -141,7 +142,7 @@ export class FileSecretStore implements SecretStore {
     try {
       parsed = JSON.parse(content) as PersistedSecrets;
     } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
+      const detail = errorMessage(error);
       throw new Error(`Secret store is invalid at ${this.filePath}: ${detail}. Delete or fix this file and rerun setup.`);
     }
 

@@ -18,6 +18,7 @@ import {
   type LoggerLike,
   type RunCommandOptions
 } from './shared';
+import { errorMessage } from '../utils/error-format';
 
 interface MockServerHandle {
   baseUrl: string;
@@ -144,7 +145,7 @@ async function startMockServer(options: { cwd?: string; env?: NodeJS.ProcessEnv;
   } catch (error) {
     await stopMockServer(child);
     const details = stderr.trim();
-    throw new Error(details ? `${error instanceof Error ? error.message : String(error)}\n${details}` : String(error));
+    throw new Error(details ? `${errorMessage(error)}\n${details}` : String(error));
   }
 
   return {
@@ -425,8 +426,7 @@ export async function main(): Promise<void> {
 
 if (require.main === module) {
   void main().catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(message);
+    console.error(errorMessage(error));
     process.exitCode = 1;
   });
 }

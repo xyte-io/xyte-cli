@@ -16,12 +16,7 @@ interface ScreenRuntimeOptions {
   onError?: (error: unknown) => void;
 }
 
-function toErrorText(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
-}
+import { errorMessage } from '../utils/error-format';
 
 export class ScreenRuntime {
   private mountToken = 0;
@@ -96,7 +91,7 @@ export class ScreenRuntime {
         this.staleDiscarded += 1;
         return;
       }
-      this.lastError = toErrorText(error);
+      this.lastError = errorMessage(error);
       this.state = 'error';
       this.options.onError?.(error);
       this.emitStatus();

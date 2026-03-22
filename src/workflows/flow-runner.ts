@@ -24,7 +24,7 @@ import { buildInstallDoctorReport } from '../utils/install-doctor';
 import { isMutatingMethod } from '../utils/http';
 import { isRecord } from '../utils/json';
 import { runWatch } from './watch';
-import { buildUtilityPrepare } from './utility-prepare';
+import { runUtilityPrepare } from './utility-prepare';
 import { runSpaceImportTree } from './utility-commands';
 import {
   buildDeepDive,
@@ -489,7 +489,7 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
       }
       const inputPath = path.resolve(resolveTemplateString(step.utilityPrepare.inputPath, ctx.resolvedContext));
       const outputDir = path.join(ctx.outputsDir, path.basename(step.utilityPrepare.outputDir));
-      const result = buildUtilityPrepare({
+      const result = runUtilityPrepare({
         inputPath,
         actionKey: step.utilityPrepare.actionKey,
         outputDir,

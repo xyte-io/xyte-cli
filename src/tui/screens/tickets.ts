@@ -18,6 +18,7 @@ import { sceneFromTicketsState } from '../scene';
 import { payloadSummary, safePreviewLines, safeSearchText } from '../serialize';
 import { confirmWriteWithToken, openActionPalette } from '../actions';
 import { asRecord } from '../../utils/json';
+import { errorMessage } from '../../utils/error-format';
 
 function ticketIdOf(ticket: unknown): string {
   const r = asRecord(ticket);
@@ -252,7 +253,7 @@ export function createTicketsScreen(): TuiScreen {
         frozen: renderErrors.frozen
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       renderErrors.recordError(message);
       context.debugLog?.('screen.render.error', {
         screen: 'tickets',

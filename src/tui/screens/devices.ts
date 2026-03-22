@@ -18,6 +18,7 @@ import { loadCommandTemplates, loadDevicesData } from '../data-loaders';
 import { sceneFromDevicesState } from '../scene';
 import { payloadSummary, safeSearchText } from '../serialize';
 import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, promptChoice } from '../actions';
+import { errorMessage } from '../../utils/error-format';
 
 function deviceIdOf(device: unknown): string {
   const rec = device && typeof device === 'object' ? (device as Record<string, unknown>) : undefined;
@@ -161,7 +162,7 @@ export function createDevicesScreen(): TuiScreen {
         frozen: renderErrors.frozen
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       renderErrors.recordError(message);
 
       context.debugLog?.('screen.render.error', {

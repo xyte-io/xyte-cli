@@ -1,8 +1,8 @@
 import { getEndpoint, listEndpoints } from './catalog';
 import { HttpTransport } from '../http/transport';
 import { XyteAuthError, XyteValidationError } from '../http/errors';
-import { createOrganizationNamespace } from '../namespaces/organization';
-import { createPartnerNamespace } from '../namespaces/partner';
+import { createOrganizationNamespace } from './namespaces/organization';
+import { createPartnerNamespace } from './namespaces/partner';
 import { createSecretStore, type SecretStore } from '../secure/secret-store';
 import { FileProfileStore, type ProfileStore } from '../secure/profile-store';
 import type { PublicEndpointSpec } from '../types/endpoints';

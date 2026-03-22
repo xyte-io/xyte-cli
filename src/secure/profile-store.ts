@@ -10,6 +10,7 @@ import type {
 } from '../types/profile';
 import { SUPPORTED_SECRET_PROVIDERS, isSecretProvider } from '../types/profile';
 import { getXyteConfigDir } from '../utils/config-dir';
+import { errorMessage } from '../utils/error-format';
 import { buildSlotId, ensureSlotName, matchesSlotRef } from './key-slots';
 
 const DEFAULT_DATA: ProfileStoreData = {
@@ -164,7 +165,7 @@ export class FileProfileStore implements ProfileStore {
       try {
         parsed = JSON.parse(content) as ProfileStoreData;
       } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
+        const detail = errorMessage(error);
         throw new Error(`Profile store is invalid at ${this.filePath}: ${detail}. Delete or fix this file and rerun setup.`);
       }
       return this.normalize(parsed).data;

@@ -3,6 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { XyteHttpError } from './errors';
 import { getLogger } from '../observability/logger';
 import { withSpan } from '../observability/tracing';
+import { errorMessage } from '../utils/error-format';
 
 interface TransportOptions {
   timeoutMs?: number;
@@ -201,7 +202,7 @@ export class HttpTransport {
                 url: request.url,
                 attempt,
                 retryable,
-                error: error instanceof Error ? error.message : String(error)
+                error: errorMessage(error)
               },
               'HTTP request failed'
             );
