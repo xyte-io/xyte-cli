@@ -7,6 +7,7 @@ import { runUtilityPrepare, listUtilityPrepareActions } from '../../workflows/ut
 import { runSpaceImportTree } from '../../workflows/utility-commands';
 import {
   type CliContext,
+  type CliGlobalOptions,
   printJson,
   resolveStrictJson,
   resolveTextJsonOutput
@@ -30,10 +31,6 @@ function parseUtilityInputFormat(value: string | undefined): UtilityInputFormat 
     throw new Error(`Invalid input format: ${value}. Use auto|csv|json|jsonl.`);
   }
   return normalized as UtilityInputFormat;
-}
-
-interface CliGlobalOptions {
-  output?: string;
 }
 
 async function handleUtilPrepare(ctx: CliContext, options: {

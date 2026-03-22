@@ -37,6 +37,10 @@ export interface CliContext {
   }) => Promise<XyteClient>;
 }
 
+export interface CliGlobalOptions {
+  output?: string;
+}
+
 export function getExplicitGlobalOutput(command: Command): CliOutputMode | undefined {
   const source = command.getOptionValueSourceWithGlobals('output');
   if (!source || source === 'default') {

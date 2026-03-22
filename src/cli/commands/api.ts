@@ -10,6 +10,7 @@ import { isMutatingMethod } from '../../http/http';
 import { parseJsonObject } from '../../utils/json';
 import {
   type CliContext,
+  type CliGlobalOptions,
   printJson,
   resolveStrictJson,
   resolveTextJsonOutput
@@ -39,10 +40,6 @@ function parseQueryJson(value: string | undefined): Record<string, string | numb
     throw new Error(`Query parameter "${key}" must be scalar, null, or undefined.`);
   }
   return out;
-}
-
-interface CliGlobalOptions {
-  output?: string;
 }
 
 async function handleApiEndpointsList(ctx: CliContext, options: { tenant?: string; output?: string; format?: string }): Promise<void> {

@@ -27,6 +27,7 @@ import type { SettingKey } from '../../config/settings';
 import { parseJsonObject } from '../../utils/json';
 import {
   type CliContext,
+  type CliGlobalOptions,
   type OutputFormat,
   type OutputStream,
   getExplicitGlobalOutput,
@@ -177,10 +178,6 @@ function formatWatchFrameText(frame: WatchFrameV1): string {
   }
 
   return `${JSON.stringify(frame)}\n`;
-}
-
-interface CliGlobalOptions {
-  output?: string;
 }
 
 async function handleOpsWatchIncidents(ctx: CliContext, options: {
