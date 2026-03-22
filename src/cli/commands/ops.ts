@@ -59,6 +59,17 @@ function appendRenderedOutput(stream: OutputStream, text: string, outPath?: stri
   }
 }
 
+function resolveRenderMode(options: { render?: string; format?: string }, allowed: string[], fallback: string): string {
+  const render = (options.render ?? options.format ?? fallback).trim().toLowerCase();
+  if (!allowed.includes(render)) {
+    throw new CliUserError({
+      summary: `Invalid render mode: "${render}".`,
+      suggestedCommands: allowed.map((mode) => `Use --render ${mode}`)
+    });
+  }
+  return render;
+}
+
 function parseWatchProfile(value: string | undefined): WatchProfile {
   const normalized = (value ?? DEFAULT_WATCH_PROFILE).trim().toLowerCase();
   if (normalized !== DEFAULT_WATCH_PROFILE) {
@@ -258,14 +269,7 @@ async function handleOpsInspectFleet(ctx: CliContext, options: {
   out?: string;
   strictJson?: boolean;
 }): Promise<void> {
-  const render = (options.render ?? options.format ?? 'json').trim().toLowerCase();
-  if (!['json', 'ascii'].includes(render)) {
-    throw new CliUserError({
-      summary: 'Invalid inspect fleet render mode.',
-      cause: `Received "${render}".`,
-      suggestedCommands: ['Use --render json', 'Use --render ascii']
-    });
-  }
+  const render = resolveRenderMode(options, ['json', 'ascii'], 'json');
   const { settings, snapshot } = await resolveInspectContext(ctx, {
     tenant: options.tenant,
     providerScope: options.providerScope,
@@ -305,14 +309,7 @@ async function handleOpsInspectDeepDive(ctx: CliContext, options: {
   out?: string;
   strictJson?: boolean;
 }): Promise<void> {
-  const render = (options.render ?? options.format ?? 'json').trim().toLowerCase();
-  if (!['json', 'ascii', 'markdown'].includes(render)) {
-    throw new CliUserError({
-      summary: 'Invalid deep-dive render mode.',
-      cause: `Received "${render}".`,
-      suggestedCommands: ['Use --render json', 'Use --render ascii', 'Use --render markdown']
-    });
-  }
+  const render = resolveRenderMode(options, ['json', 'ascii', 'markdown'], 'json');
   const { settings, snapshot } = await resolveInspectContext(ctx, {
     tenant: options.tenant,
     providerScope: options.providerScope,
@@ -385,14 +382,7 @@ async function handleOpsReportGenerate(ctx: CliContext, options: {
     });
   }
 
-  const render = (options.render ?? options.format ?? 'pdf').trim().toLowerCase();
-  if (!['markdown', 'pdf'].includes(render)) {
-    throw new CliUserError({
-      summary: 'Invalid report render mode.',
-      cause: `Received "${render}".`,
-      suggestedCommands: ['Use --render pdf', 'Use --render markdown']
-    });
-  }
+  const render = resolveRenderMode(options, ['markdown', 'pdf'], 'pdf');
 
   let deepDive = parseDeepDiveForReport(raw, tenantId);
   if (!deepDive.tenantName) {

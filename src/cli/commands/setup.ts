@@ -13,6 +13,7 @@ import { resolveKeyValue } from '../resolve-key';
 import {
   type CliContext,
   type OutputFormat,
+  getExplicitGlobalOutput,
   printJson,
   resolveStrictJson,
   resolveTextJsonOutput
@@ -481,8 +482,7 @@ export function registerSetupCommands(parent: Command, ctx: CliContext): void {
     .option('--field <name>', 'Print a single scalar field (for example tenantId)')
     .option('--format <format>', 'json|text', 'json')
     .action(async (options: { tenant?: string; field?: string; format?: OutputFormat }, command: Command) => {
-      const globals = command.optsWithGlobals() as { output?: string };
-      await handleSetupStatus(ctx, { tenant: options.tenant, field: options.field, format: options.format, output: globals.output });
+      await handleSetupStatus(ctx, { tenant: options.tenant, field: options.field, format: options.format, output: getExplicitGlobalOutput(command) });
     });
 
   setup
@@ -516,8 +516,7 @@ export function registerSetupCommands(parent: Command, ctx: CliContext): void {
         },
         command: Command
       ) => {
-        const globals = command.optsWithGlobals() as { output?: string };
-        await handleSetupRun(ctx, { ...options, output: globals.output });
+        await handleSetupRun(ctx, { ...options, output: getExplicitGlobalOutput(command) });
       }
     );
 }
