@@ -14,7 +14,6 @@ interface StatusCounts {
   [key: string]: number;
 }
 
-export type { InspectProviderScope } from '../types/settings-enums';
 import type { InspectProviderScope } from '../types/settings-enums';
 type ResolvedInspectProviderScope = Exclude<InspectProviderScope, 'auto'>;
 

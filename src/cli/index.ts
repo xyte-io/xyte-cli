@@ -51,9 +51,9 @@ import {
   formatDeepDiveMarkdown,
   formatFleetInspectAscii,
   generateFleetReport,
-  parseDeepDiveForReport,
-  type InspectProviderScope
+  parseDeepDiveForReport
 } from '../workflows/fleet-insights';
+import type { InspectProviderScope } from '../types/settings-enums';
 import { runWatch } from '../workflows/watch';
 import { buildUtilityPrepare, listUtilityPrepareActions } from '../workflows/utility-prepare';
 import type { UtilityPreparePrimaryFormat } from '../workflows/utility-action-profiles';

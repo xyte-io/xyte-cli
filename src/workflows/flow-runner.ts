@@ -31,9 +31,9 @@ import {
   buildFleetInspect,
   collectFleetSnapshot,
   generateFleetReport,
-  parseDeepDiveForReport,
-  type InspectProviderScope
+  parseDeepDiveForReport
 } from './fleet-insights';
+import type { InspectProviderScope } from '../types/settings-enums';
 import type { BuiltInFlowDefinition, FlowStep, FlowTaskStep } from './flow-catalog';
 
 export type FlowRunMode = 'plan' | 'apply';

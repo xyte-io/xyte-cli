@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildDeepDive, collectFleetSnapshot, type InspectProviderScope } from '../src/workflows/fleet-insights';
+import { buildDeepDive, collectFleetSnapshot } from '../src/workflows/fleet-insights';
 import type { XyteClient } from '../src/types/client';
+import type { InspectProviderScope } from '../src/types/settings-enums';
 
 type FixtureOptions = {
   hasOrganization: boolean;
