@@ -12,7 +12,7 @@ import {
   type FlowRunStep,
   type FlowRunSummary
 } from '../contracts/flow-run';
-import { toProblemDetails } from '../contracts/problem';
+import { toProblemDetails } from '../http/problem-mapper';
 import { buildStatusContract } from '../contracts/status';
 import type { WatchFrameV1 } from '../contracts/watch-frame';
 import { getEndpoint } from '../client/catalog';

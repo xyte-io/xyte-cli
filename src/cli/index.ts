@@ -10,7 +10,7 @@ import {
   type CliActionLogger
 } from './action-logger';
 import { createXyteClient } from '../client/create-client';
-import { toProblemDetails } from '../contracts/problem';
+import { toProblemDetails } from '../http/problem-mapper';
 import { buildStatusContract, type StatusMode } from '../contracts/status';
 import { evaluateReadiness, type ReadinessCheck } from '../config/readiness';
 import {

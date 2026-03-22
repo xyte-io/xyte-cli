@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { runCli } from '../cli/index';
-import { toProblemDetails } from '../contracts/problem';
+import { toProblemDetails } from '../http/problem-mapper';
 import { errorMessage, resolveCliErrorFormat } from '../utils/error-format';
 import { redactSensitiveText } from '../utils/redact';
 

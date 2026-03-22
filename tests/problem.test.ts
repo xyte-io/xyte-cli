@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { toProblemDetails } from '../src/contracts/problem';
+import { toProblemDetails } from '../src/http/problem-mapper';
 import { XyteHttpError } from '../src/http/errors';
 
 describe('problem details redaction', () => {

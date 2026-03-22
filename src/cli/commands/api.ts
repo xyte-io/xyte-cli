@@ -4,7 +4,7 @@ import type { Command } from 'commander';
 
 import { getEndpoint, listEndpoints } from '../../client/catalog';
 import { buildCallEnvelope } from '../../contracts/call-envelope';
-import { toProblemDetails } from '../../contracts/problem';
+import { toProblemDetails } from '../../http/problem-mapper';
 import { CliUserError } from '../../contracts/user-error';
 import { isMutatingMethod } from '../../http/http';
 import { parseJsonObject } from '../../utils/json';
