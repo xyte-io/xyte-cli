@@ -1,7 +1,7 @@
 import type { DeepDiveResult } from '../types/deep-dive';
 import { redactForDisplay } from '../utils/redact';
 
-import type { FleetInspectResult } from './fleet-insights';
+import type { FleetInspectResult } from '../types/fleet-inspect';
 
 function asciiBar(label: string, count: number, total: number, width = 30): string {
   const share = total > 0 ? count / total : 0;

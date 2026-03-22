@@ -4,9 +4,7 @@ import { asRecord, asRecordOrUndefined, extractArray, extractHasNextPage } from 
 import { withSpan } from '../observability/tracing';
 import { parseTimestamp } from './report/time-format';
 
-import type { FleetSnapshot, PartnerEnrichmentSnapshot, PartnerEndpointOutcome, StatusCounts } from './fleet-insights';
-
-type ResolvedInspectProviderScope = Exclude<InspectProviderScope, 'auto'>;
+import type { FleetSnapshot, PartnerEnrichmentSnapshot, PartnerEndpointOutcome, ResolvedInspectProviderScope, StatusCounts } from '../types/fleet-inspect';
 
 export function safeString(value: unknown): string {
   if (value === undefined || value === null) {
