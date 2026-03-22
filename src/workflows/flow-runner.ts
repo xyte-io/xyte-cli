@@ -793,9 +793,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
   const decisions = [...priorDecisions];
   const errors = [...priorErrors];
 
-  if (nextStepIndex >= args.definition.steps.length) {
-    outcome = 'completed';
-  } else {
+  if (nextStepIndex < args.definition.steps.length) {
     for (let index = nextStepIndex; index < args.definition.steps.length; index += 1) {
       const step = args.definition.steps[index];
       const stepState = steps[index];

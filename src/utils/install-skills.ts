@@ -134,7 +134,7 @@ export async function installSkills(options: InstallSkillsOptions): Promise<Inst
         continue;
       }
 
-      if (alreadyInstalled && options.force === true) {
+      if (alreadyInstalled) {
         await rm(destination.targetDir, { recursive: true, force: true });
       }
 

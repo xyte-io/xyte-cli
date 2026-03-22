@@ -141,8 +141,9 @@ function parseJsonArray(raw: string): Array<Record<string, unknown>> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
-  } catch {
-    throw new Error('JSON input is invalid.');
+  } catch (error) {
+    const detail = error instanceof SyntaxError ? `: ${error.message}` : '';
+    throw new Error(`JSON input is invalid${detail}`);
   }
   if (!Array.isArray(parsed)) {
     throw new Error('JSON input must be an array of objects.');
@@ -166,8 +167,9 @@ function parseJsonLines(raw: string): Array<Record<string, unknown>> {
     let parsed: unknown;
     try {
       parsed = JSON.parse(line);
-    } catch {
-      throw new Error(`JSONL row ${index + 1} is invalid JSON.`);
+    } catch (error) {
+      const detail = error instanceof SyntaxError ? `: ${error.message}` : '';
+      throw new Error(`JSONL row ${index + 1} is invalid JSON${detail}`);
     }
     if (!isRecord(parsed)) {
       throw new Error(`JSONL row ${index + 1} must be an object.`);

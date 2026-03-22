@@ -8,13 +8,10 @@ import { FileProfileStore, type ProfileStore } from '../secure/profile-store';
 import type { PublicEndpointSpec } from '../types/endpoints';
 import type { SecretProvider } from '../types/profile';
 import type { XyteCallArgs, XyteCallResult, XyteClient, XyteClientOptions } from '../types/client';
+import { isRecord } from '../utils/json';
 
 const DEFAULT_HUB_BASE_URL = 'https://hub.xyte.io';
 const DEFAULT_ENTRY_BASE_URL = 'https://entry.xyte.io';
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
 
 function withPathParams(pathTemplate: string, pathParams: PublicEndpointSpec['pathParams'], path: XyteCallArgs['path']): string {
   let compiled = pathTemplate;
@@ -152,7 +149,7 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
       if (endpoint.bodyType === 'multipart-form') {
         if (args.body instanceof FormData) {
           body = args.body;
-        } else if (isPlainRecord(args.body)) {
+        } else if (isRecord(args.body)) {
           const form = new FormData();
           for (const [key, value] of Object.entries(args.body)) {
             form.append(key, typeof value === 'string' ? value : JSON.stringify(value));
