@@ -52,7 +52,7 @@ function parseFlowContextJson(value: string | undefined): Record<string, string>
 }
 
 export function registerFlowCommands(parent: Command, ctx: CliContext): void {
-  const flow = parent.command('flow').description('Deterministic flow orchestration');
+  const flow = parent.command('flow').description('Deterministic flow orchestration (output is always JSON)');
 
   flow
     .command('list')
