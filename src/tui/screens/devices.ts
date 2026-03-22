@@ -401,7 +401,7 @@ export function createDevicesScreen(): TuiScreen {
                   return;
                 }
                 const tenantId = await context.getActiveTenantId();
-                const templatesOutcome = await loadCommandTemplates(context.client, tenantId, deviceId);
+                const templatesOutcome = await loadCommandTemplates(context.client, tenantId, { deviceId });
                 if (templatesOutcome.error) {
                   context.setStatus(`Command templates unavailable: ${templatesOutcome.error.message}`);
                   return;

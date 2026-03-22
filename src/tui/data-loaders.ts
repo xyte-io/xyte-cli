@@ -415,13 +415,13 @@ function normalizeCommandTemplates(items: unknown[]): CommandTemplate[] {
 export async function loadCommandTemplates(
   client: XyteClient,
   tenantId: string | undefined,
-  deviceId: string
+  options: { deviceId: string }
 ): Promise<LoadOutcome<CommandTemplate[]>> {
   return loadWithOutcome(
     async () => {
       const raw = await client.organization.getCommands({
         tenantId,
-        path: { device_id: deviceId }
+        path: { device_id: options.deviceId }
       });
       const commands = extractArray(raw, ['commands', 'data', 'items']);
       return normalizeCommandTemplates(commands);

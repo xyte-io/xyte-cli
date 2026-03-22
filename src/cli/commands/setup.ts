@@ -448,23 +448,17 @@ async function handleSetupRunAdvanced(ctx: CliContext, options: {
   });
   const secretStore = ctx.getSecretStore();
 
-  let slot;
-  try {
-    slot = await ctx.profileStore.addKeySlot(tenantId, {
-      provider,
-      name: slotName,
-      fingerprint: makeKeyFingerprint(keyValue)
-    });
-  } catch (error) {
-    const knownSlots = await ctx.profileStore.listKeySlots(tenantId, provider);
-    const existing = knownSlots.find((item) => item.name.toLowerCase() === slotName.toLowerCase());
-    if (!existing) {
-      throw error;
-    }
-    slot = await ctx.profileStore.updateKeySlot(tenantId, provider, existing.slotId, {
-      fingerprint: makeKeyFingerprint(keyValue)
-    });
-  }
+  const knownSlots = await ctx.profileStore.listKeySlots(tenantId, provider);
+  const existing = knownSlots.find((item) => item.name.toLowerCase() === slotName.toLowerCase());
+  const slot = existing
+    ? await ctx.profileStore.updateKeySlot(tenantId, provider, existing.slotId, {
+        fingerprint: makeKeyFingerprint(keyValue)
+      })
+    : await ctx.profileStore.addKeySlot(tenantId, {
+        provider,
+        name: slotName,
+        fingerprint: makeKeyFingerprint(keyValue)
+      });
   await secretStore.setSlotSecret(tenantId, provider, slot.slotId, keyValue);
   steps.push({
     key: 'slot_written',

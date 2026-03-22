@@ -176,7 +176,7 @@ describe('tui data loaders', () => {
       }
     };
 
-    const templates = await loadCommandTemplates(client, 'acme', 'dev-1');
+    const templates = await loadCommandTemplates(client, 'acme', { deviceId: 'dev-1' });
     expect(templates.connectionState).toBe('connected');
     expect(templates.data).toEqual([
       { mode: 'command', value: 'reboot', label: 'command: reboot' },
