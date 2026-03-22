@@ -2,20 +2,22 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 
-import type { XyteClient } from '../types/client';
-import { asRecord, asRecordOrUndefined, extractArray, extractHasNextPage } from '../utils/json';
+import { asRecord } from '../utils/json';
 import { INSPECT_DEEP_DIVE_SCHEMA_VERSION, INSPECT_FLEET_SCHEMA_VERSION, REPORT_SCHEMA_VERSION } from '../contracts/versions';
-import { withSpan } from '../observability/tracing';
-import { redactForDisplay } from '../utils/redact';
-// Dynamic import: pdfkit is ~5.9MB and only needed for PDF generation.
-// import { renderBrandedPdfReport } from './report/pdf-render';
 import { parseTimestamp } from './report/time-format';
 
-interface StatusCounts {
+import { safeString } from './fleet-insights-loaders';
+
+export { collectFleetSnapshot } from './fleet-insights-loaders';
+export { formatFleetInspectAscii, formatDeepDiveAscii, formatDeepDiveMarkdown } from './fleet-insights-format';
+import { formatDeepDiveMarkdown } from './fleet-insights-format';
+
+import type { InspectProviderScope } from '../types/settings-enums';
+
+export interface StatusCounts {
   [key: string]: number;
 }
 
-import type { InspectProviderScope } from '../types/settings-enums';
 type ResolvedInspectProviderScope = Exclude<InspectProviderScope, 'auto'>;
 
 export interface FleetSnapshot {
@@ -30,7 +32,7 @@ export interface FleetSnapshot {
   partnerEnrichment?: PartnerEnrichmentSnapshot;
 }
 
-interface PartnerEndpointOutcome {
+export interface PartnerEndpointOutcome {
   attempted: number;
   succeeded: number;
   failed: number;
@@ -59,7 +61,7 @@ export interface PartnerEnrichmentSnapshot {
   };
 }
 
-interface FleetInspectResult {
+export interface FleetInspectResult {
   schemaVersion: typeof INSPECT_FLEET_SCHEMA_VERSION;
   generatedAtUtc: string;
   tenantId: string;
@@ -216,13 +218,6 @@ function topEntries(counter: Record<string, number>, limit = 10): Array<[string,
     .slice(0, limit);
 }
 
-function safeString(value: unknown): string {
-  if (value === undefined || value === null) {
-    return 'n/a';
-  }
-  return String(value);
-}
-
 function safeSpacePath(value: unknown): string {
   const r = asRecord(value);
   const space = asRecord(r.space);
@@ -235,105 +230,8 @@ function safeDeviceName(value: unknown): string {
   return safeString(r.device_name ?? r.name ?? device.name ?? r.device_id ?? 'unknown');
 }
 
-const redactSensitive = redactForDisplay;
-
-const PARTNER_ENRICHMENT_SAMPLE_SIZE = 25;
-const PARTNER_ENRICHMENT_CONCURRENCY = 5;
-const PARTNER_ENRICHMENT_TIMEOUT_MS = 3_000;
-const PARTNER_FRESH_TELEMETRY_WINDOW_HOURS = 24;
-
-function firstText(...values: unknown[]): string | undefined {
-  for (const value of values) {
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim();
-    }
-  }
-  return undefined;
-}
-
-function countValue(counter: StatusCounts, key: string): void {
-  counter[key] = (counter[key] ?? 0) + 1;
-}
-
-function endpointOutcome(): PartnerEndpointOutcome {
-  return {
-    attempted: 0,
-    succeeded: 0,
-    failed: 0
-  };
-}
-
 function totalCount(counter: StatusCounts): number {
   return Object.values(counter).reduce((sum, value) => sum + value, 0);
-}
-
-function withTimeout<T>(operation: () => Promise<T>, timeoutMs: number): Promise<T> {
-  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timeoutHandle = setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs);
-  });
-
-  return Promise.race([operation(), timeout]).finally(() => {
-    if (timeoutHandle) {
-      clearTimeout(timeoutHandle);
-    }
-  });
-}
-
-function extractObject(value: unknown, preferredKeys: string[]): Record<string, unknown> {
-  const record = asRecordOrUndefined(value);
-  if (!record) {
-    return {};
-  }
-  for (const key of preferredKeys) {
-    const candidate = asRecordOrUndefined(record[key]);
-    if (candidate) {
-      return candidate;
-    }
-  }
-  return record;
-}
-
-function deviceId(value: unknown): string | undefined {
-  const r = asRecord(value);
-  const raw = r.id ?? r.device_id ?? asRecord(r.device).id;
-  if (raw === undefined || raw === null || String(raw).trim() === '') {
-    return undefined;
-  }
-  return String(raw);
-}
-
-function recencyBucket(timestamp: unknown): string {
-  const parsed = parseTimestamp(timestamp);
-  if (!parsed) {
-    return 'unknown';
-  }
-  const ageMs = Math.max(0, Date.now() - parsed.getTime());
-  if (ageMs <= 3_600_000) {
-    return '<=1h';
-  }
-  if (ageMs <= 86_400_000) {
-    return '1h-24h';
-  }
-  if (ageMs <= 604_800_000) {
-    return '1d-7d';
-  }
-  return '>7d';
-}
-
-function latestTimestamp(items: unknown[]): Date | undefined {
-  let latest: Date | undefined;
-  for (const item of items) {
-    const r = asRecord(item);
-    const parsed = parseTimestamp(r.timestamp ?? r.created_at ?? r.updated_at ?? r.time ?? r.recorded_at);
-    if (!parsed) {
-      continue;
-    }
-    if (!latest || parsed.getTime() > latest.getTime()) {
-      latest = parsed;
-    }
-  }
-  return latest;
 }
 
 function formatDistribution(counter: StatusCounts, sampleSize: number, maxEntries = 4): string | undefined {
@@ -366,282 +264,11 @@ function formatRecency(counter: StatusCounts, sampleSize: number): string | unde
   return `${ordered.join(', ')} (sampled ${sampleSize})`;
 }
 
-async function mapWithConcurrency<T>(items: T[], concurrency: number, operation: (item: T) => Promise<void>): Promise<void> {
-  let index = 0;
-  const workerCount = Math.min(Math.max(1, concurrency), items.length);
-
-  await Promise.all(
-    Array.from({ length: workerCount }, async () => {
-      while (true) {
-        const current = index;
-        index += 1;
-        if (current >= items.length) {
-          return;
-        }
-        await operation(items[current]);
-      }
-    })
-  );
-}
-
-async function paginateAll(args: {
-  fetch: (query: { page: number; per_page: number }) => Promise<unknown>;
-  fetchSingle: () => Promise<unknown>;
-  extractionKeys: string[];
-}): Promise<unknown[]> {
-  const perPage = 100;
-  const all: unknown[] = [];
-
-  for (let page = 1; page <= 50; page += 1) {
-    const raw = await args.fetch({ page, per_page: perPage });
-    const pageItems = extractArray(raw, args.extractionKeys);
-    if (!pageItems.length) {
-      break;
-    }
-    all.push(...pageItems);
-    if (pageItems.length < perPage) {
-      break;
-    }
-  }
-
-  if (all.length > 0) {
-    return all;
-  }
-
-  const single = await args.fetchSingle();
-  return extractArray(single, args.extractionKeys);
-}
-
-function loadAllOrganizationDevices(client: XyteClient, tenantId: string): Promise<unknown[]> {
-  return paginateAll({
-    fetch: (query) => client.organization.getDevices({ tenantId, query }),
-    fetchSingle: () => client.organization.getDevices({ tenantId }),
-    extractionKeys: ['devices', 'data', 'items']
-  });
-}
-
-function loadAllPartnerDevices(client: XyteClient, tenantId: string): Promise<unknown[]> {
-  return paginateAll({
-    fetch: (query) => client.partner.getDevices({ tenantId, query }),
-    fetchSingle: () => client.partner.getDevices({ tenantId }),
-    extractionKeys: ['devices', 'data', 'items']
-  });
-}
-
-function loadAllSpaces(client: XyteClient, tenantId: string): Promise<unknown[]> {
-  return paginateAll({
-    fetch: (query) => client.organization.getSpaces({ tenantId, query }),
-    fetchSingle: () => client.organization.getSpaces({ tenantId }),
-    extractionKeys: ['spaces', 'data', 'items']
-  });
-}
-
-
-async function loadAllOrganizationIncidents(client: XyteClient, tenantId: string): Promise<unknown[]> {
-  const perPage = 100;
-  const to = Math.floor(Date.now() / 1000);
-  const merged = new Map<string, unknown>();
-  const statuses = ['active', 'closed'] as const;
-
-  for (const status of statuses) {
-    for (let page = 1; page <= 50; page += 1) {
-      const raw = await client.organization.getIncidents({
-        tenantId,
-        query: {
-          status,
-          from: 0,
-          to,
-          page,
-          per_page: perPage
-        }
-      });
-
-      const pageItems = extractArray(raw, ['incidents', 'data', 'items']);
-      if (!pageItems.length) {
-        break;
-      }
-
-      for (const incident of pageItems) {
-        const rec = asRecord(incident);
-        const id = safeString(typeof rec.id === 'string' ? rec.id : '');
-        if (id) {
-          merged.set(id, incident);
-        } else {
-          merged.set(`${status}:${merged.size}`, incident);
-        }
-      }
-
-      const hasNext = extractHasNextPage(raw);
-      if (hasNext === false || (hasNext === undefined && pageItems.length < perPage)) {
-        break;
-      }
-    }
-  }
-
-  if (merged.size > 0) {
-    return [...merged.values()];
-  }
-
-  const single = await client.organization.getIncidents({ tenantId });
-  return extractArray(single, ['incidents', 'data', 'items']);
-}
-
-async function loadOrganizationTickets(client: XyteClient, tenantId: string): Promise<unknown[]> {
-  const raw = await client.organization.getTickets({ tenantId });
-  return extractArray(raw, ['tickets', 'data', 'items']);
-}
-
-async function loadPartnerTickets(client: XyteClient, tenantId: string): Promise<unknown[]> {
-  const raw = await client.partner.getTickets({ tenantId });
-  return extractArray(raw, ['tickets', 'data', 'items']);
-}
-
-async function collectPartnerEnrichment(
-  client: XyteClient,
-  tenantId: string,
-  devices: unknown[]
-): Promise<PartnerEnrichmentSnapshot> {
-  const sampledDeviceIds = Array.from(new Set(devices.map((device) => deviceId(device)).filter((id): id is string => Boolean(id))))
-    .sort((a, b) => a.localeCompare(b))
-    .slice(0, PARTNER_ENRICHMENT_SAMPLE_SIZE);
-
-  const snapshot: PartnerEnrichmentSnapshot = {
-    sampledDeviceCount: sampledDeviceIds.length,
-    totalDeviceCount: devices.length,
-    endpointAvailability: {
-      deviceInfo: endpointOutcome(),
-      commands: endpointOutcome(),
-      telemetries: endpointOutcome(),
-      stateHistory: endpointOutcome()
-    },
-    modelDistribution: {},
-    firmwareDistribution: {},
-    lastSeenRecency: {},
-    commandPosture: {},
-    telemetryCoverage: {
-      withTelemetries: 0,
-      freshWithin24Hours: 0
-    },
-    stateHistoryCoverage: {
-      withHistory: 0,
-      totalEntries: 0
-    }
-  };
-
-  if (!sampledDeviceIds.length) {
-    return snapshot;
-  }
-
-  const baseDevicesById = new Map<string, Record<string, unknown>>();
-  for (const item of devices) {
-    const id = deviceId(item);
-    if (id && !baseDevicesById.has(id)) {
-      baseDevicesById.set(id, asRecord(item));
-    }
-  }
-
-  async function safeCall(outcome: PartnerEndpointOutcome, operation: () => Promise<unknown>): Promise<unknown | undefined> {
-    outcome.attempted += 1;
-    try {
-      const value = await withTimeout(operation, PARTNER_ENRICHMENT_TIMEOUT_MS);
-      outcome.succeeded += 1;
-      return value;
-    } catch {
-      outcome.failed += 1;
-      return undefined;
-    }
-  }
-
-  await mapWithConcurrency(sampledDeviceIds, PARTNER_ENRICHMENT_CONCURRENCY, async (id) => {
-    const base = baseDevicesById.get(id);
-
-    const infoRaw = await safeCall(snapshot.endpointAvailability.deviceInfo, () =>
-      client.partner.getDeviceInfo({
-        tenantId,
-        path: { device_id: id }
-      })
-    );
-    const info = extractObject(infoRaw, ['device', 'data', 'item']);
-
-    const model = firstText(
-      info.model_name,
-      info.model,
-      info.device_model,
-      info.product_model,
-      base?.model_name,
-      base?.model,
-      base?.device_model,
-      base?.product_model
-    );
-    countValue(snapshot.modelDistribution, model ?? 'unknown');
-
-    const firmware = firstText(
-      info.firmware_version,
-      info.firmware,
-      info.software_version,
-      info.version,
-      base?.firmware_version,
-      base?.firmware,
-      base?.software_version,
-      base?.version
-    );
-    countValue(snapshot.firmwareDistribution, firmware ?? 'unknown');
-
-    const lastSeen = firstText(
-      info.last_seen_at,
-      info.last_seen,
-      info.updated_at,
-      base?.last_seen_at,
-      base?.last_seen,
-      asRecord(base?.state).last_seen_at
-    );
-    countValue(snapshot.lastSeenRecency, recencyBucket(lastSeen));
-
-    const commandsRaw = await safeCall(snapshot.endpointAvailability.commands, () =>
-      client.partner.getCommands({
-        tenantId,
-        path: { device_id: id }
-      })
-    );
-    const commands = extractArray(commandsRaw, ['commands', 'data', 'items']);
-    for (const command of commands) {
-      const cmd = asRecord(command);
-      const status = firstText(cmd.status, cmd.state, cmd.result);
-      countValue(snapshot.commandPosture, status ? status.toLowerCase() : 'unknown');
-    }
-
-    const telemetriesRaw = await safeCall(snapshot.endpointAvailability.telemetries, () =>
-      client.partner.getTelemetries({
-        tenantId,
-        path: { device_id: id }
-      })
-    );
-    const telemetries = extractArray(telemetriesRaw, ['telemetries', 'data', 'items']);
-    if (telemetries.length > 0) {
-      snapshot.telemetryCoverage.withTelemetries += 1;
-      const latest = latestTimestamp(telemetries);
-      if (latest) {
-        const age = Math.max(0, Date.now() - latest.getTime());
-        if (age <= PARTNER_FRESH_TELEMETRY_WINDOW_HOURS * 3_600_000) {
-          snapshot.telemetryCoverage.freshWithin24Hours += 1;
-        }
-      }
-    }
-
-    const historyRaw = await safeCall(snapshot.endpointAvailability.stateHistory, () =>
-      client.partner.getStateHistory({
-        tenantId,
-        path: { device_id: id }
-      })
-    );
-    const history = extractArray(historyRaw, ['history', 'state_history', 'states', 'data', 'items']);
-    if (history.length > 0) {
-      snapshot.stateHistoryCoverage.withHistory += 1;
-      snapshot.stateHistoryCoverage.totalEntries += history.length;
-    }
-  });
-
-  return snapshot;
+function fieldCounter(items: unknown[], field: string): Record<string, number> {
+  return toCounter(items.map((item) => {
+    const r = asRecord(item);
+    return safeString(typeof r[field] === 'string' ? r[field] : 'unknown');
+  }));
 }
 
 function buildPartnerSummaryLines(snapshot: FleetSnapshot): string[] {
@@ -688,107 +315,6 @@ function buildPartnerSummaryLines(snapshot: FleetSnapshot): string[] {
   return lines;
 }
 
-async function resolveInspectProviderScope(
-  client: XyteClient,
-  tenantId: string,
-  providerScope: InspectProviderScope
-): Promise<ResolvedInspectProviderScope> {
-  const endpoints = await client.listTenantEndpoints(tenantId);
-  const hasOrganization = endpoints.some((endpoint) => endpoint.authScope === 'organization');
-  const hasPartner = endpoints.some((endpoint) => endpoint.authScope === 'partner');
-
-  if (providerScope === 'organization') {
-    if (!hasOrganization) {
-      throw new Error(
-        `Inspect provider scope "organization" is unavailable for tenant ${tenantId}. Configure an xyte-org key or run with --provider-scope partner (inspect) or --inspect-provider-scope partner (flow run).`
-      );
-    }
-    return 'organization';
-  }
-
-  if (providerScope === 'partner') {
-    if (!hasPartner) {
-      throw new Error(
-        `Inspect provider scope "partner" is unavailable for tenant ${tenantId}. Configure an xyte-partner key or run with --provider-scope organization (inspect) or --inspect-provider-scope organization (flow run).`
-      );
-    }
-    return 'partner';
-  }
-
-  if (hasOrganization && hasPartner) {
-    throw new Error(
-      `Inspect provider scope is ambiguous for tenant ${tenantId}: both organization and partner credentials are configured. Re-run with --provider-scope organization|partner (or --inspect-provider-scope for flow run).`
-    );
-  }
-
-  if (hasPartner) {
-    return 'partner';
-  }
-
-  // Preserve prior missing-key behavior when no provider is configured.
-  return 'organization';
-}
-
-export async function collectFleetSnapshot(args: {
-  client: XyteClient;
-  tenantId: string;
-  tenantName?: string;
-  providerScope?: InspectProviderScope;
-}): Promise<FleetSnapshot> {
-  const { client, tenantId, tenantName, providerScope = 'auto' } = args;
-  return withSpan('xyte.inspect.collect_snapshot', { 'xyte.tenant.id': tenantId }, async () => {
-    const resolvedScope = await resolveInspectProviderScope(client, tenantId, providerScope);
-    let devices: unknown[];
-    let spaces: unknown[];
-    let incidents: unknown[];
-    let tickets: unknown[];
-    let partnerEnrichment: PartnerEnrichmentSnapshot | undefined;
-
-    if (resolvedScope === 'organization') {
-      [devices, spaces, incidents, tickets] = await Promise.all([
-        loadAllOrganizationDevices(client, tenantId),
-        loadAllSpaces(client, tenantId),
-        loadAllOrganizationIncidents(client, tenantId),
-        loadOrganizationTickets(client, tenantId)
-      ]);
-    } else {
-      [devices, tickets] = await Promise.all([
-        loadAllPartnerDevices(client, tenantId),
-        loadPartnerTickets(client, tenantId)
-      ]);
-      spaces = [];
-      incidents = [];
-      partnerEnrichment = await collectPartnerEnrichment(client, tenantId, devices);
-    }
-
-    const stableSort = (items: unknown[]) =>
-      items.slice().sort((a, b) => {
-        const ra = asRecord(a);
-        const rb = asRecord(b);
-        return safeString(ra.id ?? ra.name ?? ra.title).localeCompare(safeString(rb.id ?? rb.name ?? rb.title));
-      });
-
-    return {
-      generatedAtUtc: new Date().toISOString(),
-      tenantId,
-      tenantName,
-      providerScope: resolvedScope,
-      devices: stableSort(devices),
-      spaces: stableSort(spaces),
-      incidents: stableSort(incidents),
-      tickets: stableSort(tickets),
-      partnerEnrichment
-    };
-  });
-}
-
-function fieldCounter(items: unknown[], field: string): Record<string, number> {
-  return toCounter(items.map((item) => {
-    const r = asRecord(item);
-    return safeString(typeof r[field] === 'string' ? r[field] : 'unknown');
-  }));
-}
-
 export function buildFleetInspect(snapshot: FleetSnapshot): FleetInspectResult {
   const deviceStatus = fieldCounter(snapshot.devices, 'status');
   const incidentStatus = fieldCounter(snapshot.incidents, 'status');
@@ -823,34 +349,6 @@ export function buildFleetInspect(snapshot: FleetSnapshot): FleetInspectResult {
       openTickets
     }
   };
-}
-
-function asciiBar(label: string, count: number, total: number, width = 30): string {
-  const share = total > 0 ? count / total : 0;
-  const filled = Math.min(width, Math.max(0, Math.round(share * width)));
-  const bar = `${'#'.repeat(filled)}${' '.repeat(width - filled)}`;
-  return `${label.padEnd(12)} ${String(count).padStart(4)} |${bar}| ${String((share * 100).toFixed(1)).padStart(5)}%`;
-}
-
-export function formatFleetInspectAscii(result: FleetInspectResult): string {
-  return [
-    `Fleet Inspect Snapshot (${result.tenantId})`,
-    `Generated: ${result.generatedAtUtc}`,
-    '',
-    'DEVICES',
-    asciiBar('offline', result.status.devices.offline ?? 0, result.totals.devices),
-    asciiBar('online', result.status.devices.online ?? 0, result.totals.devices),
-    asciiBar('other', result.totals.devices - (result.status.devices.offline ?? 0) - (result.status.devices.online ?? 0), result.totals.devices),
-    '',
-    'INCIDENTS',
-    asciiBar('active', result.status.incidents.active ?? 0, result.totals.incidents),
-    asciiBar('closed', result.status.incidents.closed ?? 0, result.totals.incidents),
-    '',
-    'TICKETS',
-    asciiBar('open', result.status.tickets.open ?? 0, Math.max(1, result.totals.tickets)),
-    '',
-    `Highlights: offline=${result.highlights.offlinePct}% active_incidents=${result.highlights.activeIncidentPct}% open_tickets=${result.highlights.openTickets}`
-  ].join('\n');
 }
 
 export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDiveResult {
@@ -997,202 +495,8 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
   };
 }
 
-export function formatDeepDiveAscii(result: DeepDiveResult): string {
-  const hasOfflineSpaceData = result.topOfflineSpaces.length > 0;
-  const hasIncidentData =
-    result.topIncidentDevices.length > 0 ||
-    result.activeIncidentAging.length > 0 ||
-    result.churnWindow.incidents > 0 ||
-    result.churnWindow.bySpace.length > 0 ||
-    result.churnWindow.byDevice.length > 0;
-  const hasTicketData = result.ticketPosture.openTickets > 0 || result.ticketPosture.oldestOpenTickets.length > 0;
-
-  const lines: string[] = [];
-  lines.push(`Deep Dive (${result.tenantId})`);
-  lines.push(`Generated: ${result.generatedAtUtc}`);
-  lines.push('');
-  lines.push('SUMMARY');
-  result.summary.forEach((line) => lines.push(`- ${line}`));
-
-  if (hasOfflineSpaceData) {
-    lines.push('');
-    lines.push('TOP OFFLINE SPACES');
-    result.topOfflineSpaces.forEach((row) => lines.push(`${row.space} | offline=${row.offlineDevices} | share=${row.shareOfOfflinePct}%`));
-  }
-
-  if (hasIncidentData) {
-    lines.push('');
-    lines.push('TOP INCIDENT DEVICES');
-    result.topIncidentDevices.forEach((row) =>
-      lines.push(`${row.device} | incidents=${row.incidentCount} | active=${row.activeIncidents}`)
-    );
-    lines.push('');
-    lines.push(`${result.windowHours}H CHURN: incidents=${result.churnWindow.incidents} devices=${result.churnWindow.devices} spaces=${result.churnWindow.spaces}`);
-    result.churnWindow.bySpace.forEach((row) => lines.push(`space: ${row.space} -> ${row.incidents}`));
-  }
-
-  if (hasTicketData) {
-    lines.push('');
-    lines.push(`OPEN TICKETS: ${result.ticketPosture.openTickets}`);
-    if (hasIncidentData) {
-      lines.push(`OVERLAP DEVICES: ${result.ticketPosture.overlappingActiveIncidentDevices}`);
-    }
-  }
-
-  return lines.join('\n');
-}
-
-export function formatDeepDiveMarkdown(result: DeepDiveResult, includeSensitive = false): string {
-  const hasOfflineSpaceData = result.topOfflineSpaces.length > 0;
-  const hasIncidentData =
-    result.topIncidentDevices.length > 0 ||
-    result.activeIncidentAging.length > 0 ||
-    result.churnWindow.incidents > 0 ||
-    result.churnWindow.bySpace.length > 0 ||
-    result.churnWindow.byDevice.length > 0;
-  const hasTicketData = result.ticketPosture.openTickets > 0 || result.ticketPosture.oldestOpenTickets.length > 0;
-  const hasDataQualityIssues = result.dataQuality.statusMismatches.length > 0;
-  const partnerHighlights = result.summary.filter((line) => line.startsWith('Partner '));
-
-  const markdown: string[] = [];
-  markdown.push('# Xyte Fleet Deep Dive');
-  markdown.push('');
-  markdown.push(`- Tenant: \`${result.tenantId}\``);
-  markdown.push(`- Generated: \`${result.generatedAtUtc}\``);
-  markdown.push(`- Window: \`${result.windowHours}h\``);
-  markdown.push('');
-  markdown.push('## Summary');
-  markdown.push('');
-  result.summary.forEach((line) => markdown.push(`- ${line}`));
-
-  if (partnerHighlights.length > 0) {
-    markdown.push('');
-    markdown.push('## Partner Highlights');
-    markdown.push('');
-    partnerHighlights.forEach((line) => markdown.push(`- ${line}`));
-  }
-
-  if (hasOfflineSpaceData) {
-    markdown.push('');
-    markdown.push('## Top Offline Spaces');
-    markdown.push('');
-    markdown.push('| Space | Offline Devices | Share |');
-    markdown.push('| --- | ---: | ---: |');
-    result.topOfflineSpaces.forEach((row) => markdown.push(`| ${row.space} | ${row.offlineDevices} | ${row.shareOfOfflinePct}% |`));
-  }
-
-  if (hasIncidentData) {
-    markdown.push('');
-    markdown.push('## Top Devices by Incident Volume');
-    markdown.push('');
-    markdown.push('| Device | Incidents | Active |');
-    markdown.push('| --- | ---: | ---: |');
-    result.topIncidentDevices.forEach((row) => markdown.push(`| ${row.device} | ${row.incidentCount} | ${row.activeIncidents} |`));
-    markdown.push('');
-    markdown.push(`## ${result.windowHours}-Hour Churn`);
-    markdown.push('');
-    markdown.push(
-      `Incidents: **${result.churnWindow.incidents}**, devices: **${result.churnWindow.devices}**, spaces: **${result.churnWindow.spaces}**.`
-    );
-    if (result.churnWindow.bySpace.length > 0) {
-      markdown.push('');
-      markdown.push('| Space | Incidents |');
-      markdown.push('| --- | ---: |');
-      result.churnWindow.bySpace.forEach((row) => markdown.push(`| ${row.space} | ${row.incidents} |`));
-    }
-    if (result.churnWindow.byDevice.length > 0) {
-      markdown.push('');
-      markdown.push('| Device | Incidents |');
-      markdown.push('| --- | ---: |');
-      result.churnWindow.byDevice.forEach((row) => markdown.push(`| ${row.device} | ${row.incidents} |`));
-    }
-  }
-
-  if (hasTicketData) {
-    markdown.push('');
-    markdown.push('## Ticket Posture');
-    markdown.push('');
-    markdown.push(`- Open tickets: **${result.ticketPosture.openTickets}**`);
-    if (hasIncidentData) {
-      markdown.push(`- Overlapping active-incident devices: **${result.ticketPosture.overlappingActiveIncidentDevices}**`);
-    }
-    if (result.ticketPosture.oldestOpenTickets.length > 0) {
-      markdown.push('');
-      markdown.push('| Ticket ID | Title | Age (h) | Device ID | Created At |');
-      markdown.push('| --- | --- | ---: | --- | --- |');
-      result.ticketPosture.oldestOpenTickets.slice(0, 10).forEach((row) => {
-        markdown.push(
-          `| ${redactSensitive(row.ticketId, includeSensitive)} | ${row.title} | ${row.ageHours} | ${redactSensitive(
-            row.deviceId,
-            includeSensitive
-          )} | ${row.createdAtUtc} |`
-        );
-      });
-    }
-  }
-
-  if (hasDataQualityIssues) {
-    markdown.push('');
-    markdown.push('## Data Quality');
-    markdown.push('');
-    markdown.push('| Device | Status | state.status | Last Seen | Space |');
-    markdown.push('| --- | --- | --- | --- | --- |');
-    result.dataQuality.statusMismatches.forEach((row) =>
-      markdown.push(`| ${row.device} | ${row.status} | ${row.stateStatus} | ${row.lastSeen} | ${row.space} |`)
-    );
-  }
-
-  return markdown.join('\n');
-}
-
 function ensureDir(filePath: string): void {
   mkdirSync(dirname(resolve(filePath)), { recursive: true });
-}
-
-function parseLegacyOverviewMetrics(summary: string[]): DeepDiveResult['overviewMetrics'] {
-  const metrics = {
-    totalDevices: 0,
-    offlineDevices: 0,
-    offlinePct: 0,
-    totalIncidents: 0,
-    activeIncidents: 0,
-    activeIncidentPct: 0,
-    totalTickets: 0,
-    openTickets: 0,
-    statusMismatches: 0
-  };
-
-  for (const line of summary) {
-    const deviceMatch = line.match(/^Devices:\s+(\d+)\s+total,\s+(\d+)\s+offline\s+\(([\d.]+)%\)\.$/i);
-    if (deviceMatch) {
-      metrics.totalDevices = Number.parseInt(deviceMatch[1], 10);
-      metrics.offlineDevices = Number.parseInt(deviceMatch[2], 10);
-      metrics.offlinePct = Number.parseFloat(deviceMatch[3]);
-      continue;
-    }
-
-    const incidentMatch = line.match(/^Incidents:\s+(\d+)\s+total,\s+(\d+)\s+active\s+\(([\d.]+)%\)\.$/i);
-    if (incidentMatch) {
-      metrics.totalIncidents = Number.parseInt(incidentMatch[1], 10);
-      metrics.activeIncidents = Number.parseInt(incidentMatch[2], 10);
-      metrics.activeIncidentPct = Number.parseFloat(incidentMatch[3]);
-      continue;
-    }
-
-    const ticketMatch = line.match(/^Tickets:\s+(\d+)\s+total,\s+(\d+)\s+open\.$/i);
-    if (ticketMatch) {
-      metrics.totalTickets = Number.parseInt(ticketMatch[1], 10);
-      metrics.openTickets = Number.parseInt(ticketMatch[2], 10);
-      continue;
-    }
-
-    const mismatchMatch = line.match(/^Data quality:\s+(\d+)\s+status mismatches detected\.$/i);
-    if (mismatchMatch) {
-      metrics.statusMismatches = Number.parseInt(mismatchMatch[1], 10);
-    }
-  }
-
-  return metrics;
 }
 
 export function parseDeepDiveForReport(raw: unknown, expectedTenantId?: string): DeepDiveResult {
@@ -1205,12 +509,7 @@ export function parseDeepDiveForReport(raw: unknown, expectedTenantId?: string):
     throw new Error(`Input tenant mismatch. Expected ${expectedTenantId}, got ${parsed.data.tenantId}.`);
   }
 
-  return parsed.data.overviewMetrics
-    ? parsed.data
-    : {
-        ...parsed.data,
-        overviewMetrics: parseLegacyOverviewMetrics(parsed.data.summary)
-      };
+  return parsed.data;
 }
 
 export async function generateFleetReport(args: {

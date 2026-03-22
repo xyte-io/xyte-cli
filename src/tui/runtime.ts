@@ -1,3 +1,5 @@
+import { errorMessage } from '../utils/error-format';
+
 export type RefreshReason = 'mount' | 'manual' | 'background' | 'readiness';
 export type RefreshState = 'idle' | 'loading' | 'retrying' | 'error';
 
@@ -15,8 +17,6 @@ interface ScreenRuntimeOptions {
   onStatus?: (status: ScreenRuntimeStatus) => void;
   onError?: (error: unknown) => void;
 }
-
-import { errorMessage } from '../utils/error-format';
 
 export class ScreenRuntime {
   private mountToken = 0;
