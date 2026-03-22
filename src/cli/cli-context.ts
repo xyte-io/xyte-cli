@@ -39,10 +39,11 @@ export interface CliContext {
 
 export function getExplicitGlobalOutput(command: Command): CliOutputMode | undefined {
   const source = command.getOptionValueSourceWithGlobals('output');
-  if (source === 'cli' || source === 'implied') {
-    return (command.optsWithGlobals() as { output?: string }).output as CliOutputMode | undefined;
+  if (!source || source === 'default') {
+    return undefined;
   }
-  return undefined;
+  const options = command.optsWithGlobals() as { output?: string };
+  return parseCliOutputMode(options.output);
 }
 
 export function parseCliOutputMode(value: string | undefined): CliOutputMode | undefined {
@@ -93,7 +94,7 @@ export function resolveStrictJson(args: { strictJson?: boolean; settings: Resolv
   return args.settings.values.output.strictJson;
 }
 
-function renderJsonOutput(
+export function renderJsonOutput(
   value: unknown,
   options: { strictJson?: boolean; compact?: boolean } = {}
 ): string {
@@ -109,12 +110,12 @@ export function printJson(
 }
 
 export function parsePositiveIntegerOption(value: string | undefined, fallback: number, label: string): number {
-  if (value === undefined) {
+  if (!value) {
     return fallback;
   }
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`Invalid ${label}: expected a positive integer, got "${value}".`);
+    throw new Error(`Invalid ${label}: ${value}. Use a positive integer.`);
   }
   return parsed;
 }

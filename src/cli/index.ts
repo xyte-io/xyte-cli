@@ -32,7 +32,6 @@ import type { SecretProvider } from '../types/profile';
 import { isSecretProvider } from '../types/profile';
 import { isRecord, parseJsonObject } from '../utils/json';
 import { buildInstallDoctorReport, type InstallDoctorResult } from '../utils/install-doctor';
-import { stringifyJsonOutput } from '../utils/json-output';
 import type { UtilityInputFormat } from '../utils/input-parser';
 import { getCliVersion } from '../utils/version';
 import {
@@ -63,12 +62,22 @@ import { CliUserError } from '../contracts/user-error';
 import { registerLogsCommands } from './commands/logs';
 import { registerConfigCommands } from './commands/config';
 import { registerFlowCommands } from './commands/flow';
-import { formatReadinessText, parseCliOutputMode, type CliContext } from './cli-context';
+import {
+  formatReadinessText,
+  getExplicitGlobalOutput,
+  parseCliOutputMode,
+  parsePositiveIntegerOption,
+  printJson,
+  renderJsonOutput,
+  resolveStrictJson,
+  resolveTextJsonOutput,
+  type CliContext,
+  type ErrorStream,
+  type OutputFormat,
+  type OutputStream,
+  type PromptValueFn
+} from './cli-context';
 
-type OutputStream = Pick<typeof process.stdout, 'write'>;
-type ErrorStream = Pick<typeof process.stderr, 'write'>;
-type OutputFormat = 'json' | 'text';
-type PromptValueFn = (args: { question: string; initial?: string; stdout: OutputStream; secret?: boolean }) => Promise<string>;
 type SetupConnectivityMode = 'auto' | 'always' | 'never';
 type SetupStepKey =
   | 'tenant_upserted'
@@ -151,15 +160,6 @@ function commandPathFor(command: Command): string {
   return names.join(' ');
 }
 
-function getExplicitGlobalOutput(command: Command): CliOutputMode | undefined {
-  const source = command.getOptionValueSourceWithGlobals('output');
-  if (!source || source === 'default') {
-    return undefined;
-  }
-  const options = command.optsWithGlobals() as { output?: string };
-  return parseCliOutputMode(options.output);
-}
-
 function argvForCommand(command: Command): string[] {
   let root: Command = command;
   while (root.parent) {
@@ -172,17 +172,6 @@ function argvForCommand(command: Command): string[] {
     return [];
   }
   return rawArgs.slice(2);
-}
-
-function parsePositiveIntegerOption(value: string | undefined, fallback: number, label: string): number {
-  if (!value) {
-    return fallback;
-  }
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`Invalid ${label}: ${value}. Use a positive integer.`);
-  }
-  return parsed;
 }
 
 function firstNonEmptyString(values: unknown[]): string | undefined {
@@ -248,13 +237,6 @@ function resolveSkillSourceDir(): string {
   return path.resolve(__dirname, '../../skills/xyte-cli');
 }
 
-function renderJsonOutput(value: unknown, options: { strictJson?: boolean; compact?: boolean } = {}): string {
-  return `${stringifyJsonOutput(value, { strictJson: options.strictJson, compact: options.compact })}\n`;
-}
-
-function printJson(stream: OutputStream, value: unknown, options: { strictJson?: boolean; compact?: boolean } = {}) {
-  stream.write(renderJsonOutput(value, options));
-}
 
 function resolveOutPath(out: string | undefined): string | undefined {
   return out ? path.resolve(out) : undefined;
@@ -562,39 +544,6 @@ async function resolveKeyValue(args: {
     return prompted.trim() || undefined;
   }
   return undefined;
-}
-
-function resolveTextJsonOutput(args: {
-  output?: string;
-  format?: string;
-  stdoutIsTTY: boolean;
-  settings: ResolvedCliSettingsState;
-}): OutputFormat {
-  const explicitOutput = parseCliOutputMode(args.output);
-  const localFormat = args.format?.trim().toLowerCase();
-  if (localFormat) {
-    if (localFormat !== 'json' && localFormat !== 'text') {
-      throw new CliUserError({
-        summary: 'Invalid format.',
-        cause: `Received "${args.format}".`,
-        suggestedCommands: ['Use --output json', 'Use --output text']
-      });
-    }
-    return localFormat;
-  }
-
-  const mode = explicitOutput ?? args.settings.values.output.mode;
-  if (mode === 'auto') {
-    return args.stdoutIsTTY ? 'text' : 'json';
-  }
-  return mode;
-}
-
-function resolveStrictJson(args: { strictJson?: boolean; settings: ResolvedCliSettingsState }): boolean {
-  if (args.strictJson === true) {
-    return true;
-  }
-  return args.settings.values.output.strictJson;
 }
 
 function stringifyWatchValue(value: unknown, fallback = '-'): string {
@@ -1576,7 +1525,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
           : settings.values.watch.maxPolls,
       onFrame: (frame) => {
         const renderFrame =
-          output === 'text' ? formatWatchFrameText(frame) : renderJsonOutput(frame, { strictJson, compact: true });
+          output === 'text' ? formatWatchFrameText(frame) : `${renderJsonOutput(frame, { strictJson, compact: true })}\n`;
         if (output === 'text') {
           if (outPath && !wroteOutPath) {
             writeRenderedOutput(stdout, renderFrame, outPath);
@@ -1652,7 +1601,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     }
     writeRenderedOutput(
       stdout,
-      renderJsonOutput(result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) }),
+      `${renderJsonOutput(result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) })}\n`,
       outPath
     );
   };
@@ -1719,7 +1668,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     }
     writeRenderedOutput(
       stdout,
-      renderJsonOutput(result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) }),
+      `${renderJsonOutput(result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) })}\n`,
       outPath
     );
   };
