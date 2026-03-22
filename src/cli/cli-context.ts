@@ -94,19 +94,12 @@ export function resolveStrictJson(args: { strictJson?: boolean; settings: Resolv
   return args.settings.values.output.strictJson;
 }
 
-export function renderJsonOutput(
-  value: unknown,
-  options: { strictJson?: boolean; compact?: boolean } = {}
-): string {
-  return stringifyJsonOutput(value, { strictJson: options.strictJson, compact: options.compact });
-}
-
 export function printJson(
   stream: OutputStream,
   value: unknown,
   options: { strictJson?: boolean; compact?: boolean } = {}
 ): void {
-  stream.write(`${renderJsonOutput(value, options)}\n`);
+  stream.write(`${stringifyJsonOutput(value, options)}\n`);
 }
 
 export function createSecretConflictError(cause: string): CliUserError {

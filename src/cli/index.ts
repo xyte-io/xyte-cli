@@ -53,6 +53,7 @@ import {
   generateFleetReport,
   parseDeepDiveForReport
 } from '../workflows/fleet-insights';
+import { firstText } from '../workflows/fleet-insights-loaders';
 import { parseInspectProviderScope, type InspectProviderScope } from '../types/settings-enums';
 import { runWatch } from '../workflows/watch';
 import { runUtilityPrepare, listUtilityPrepareActions } from '../workflows/utility-prepare';
@@ -60,6 +61,7 @@ import type { UtilityPreparePrimaryFormat } from '../workflows/utility-action-pr
 import { runSpaceImportTree } from '../workflows/utility-commands';
 import { CliUserError } from '../contracts/user-error';
 import { errorMessage } from '../utils/error-format';
+import { stringifyJsonOutput } from '../utils/json-output';
 import { registerLogsCommands } from './commands/logs';
 import { registerConfigCommands } from './commands/config';
 import { registerFlowCommands } from './commands/flow';
@@ -71,7 +73,6 @@ import {
   parseCliOutputMode,
   parsePositiveIntegerOption,
   printJson,
-  renderJsonOutput,
   resolveStrictJson,
   resolveTextJsonOutput,
   type CliContext,
@@ -169,15 +170,6 @@ function argvForCommand(command: Command): string[] {
   return rawArgs.slice(2);
 }
 
-function firstNonEmptyString(values: unknown[]): string | undefined {
-  for (const value of values) {
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim();
-    }
-  }
-  return undefined;
-}
-
 function extractTenantNameFromOrganizationInfo(payload: unknown): string | undefined {
   if (!isRecord(payload)) {
     return undefined;
@@ -185,7 +177,7 @@ function extractTenantNameFromOrganizationInfo(payload: unknown): string | undef
 
   const nameKeys = ['name', 'organization_name', 'display_name', 'tenant_name', 'company_name'] as const;
   const readName = (record: Record<string, unknown>): string | undefined =>
-    firstNonEmptyString(nameKeys.map((key) => record[key]));
+    firstText(...nameKeys.map((key) => record[key]));
 
   const candidates: Record<string, unknown>[] = [payload];
   const directNested = [payload.organization, payload.data, payload.result, payload.payload].filter(isRecord) as Record<string, unknown>[];
@@ -1466,7 +1458,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
           : settings.values.watch.maxPolls,
       onFrame: (frame) => {
         const renderFrame =
-          output === 'text' ? formatWatchFrameText(frame) : `${renderJsonOutput(frame, { strictJson, compact: true })}\n`;
+          output === 'text' ? formatWatchFrameText(frame) : `${stringifyJsonOutput(frame, { strictJson, compact: true })}\n`;
         if (output === 'text') {
           if (outPath && !wroteOutPath) {
             writeRenderedOutput(stdout, renderFrame, outPath);
@@ -1542,7 +1534,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     }
     writeRenderedOutput(
       stdout,
-      `${renderJsonOutput(result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) })}\n`,
+      `${stringifyJsonOutput(result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) })}\n`,
       outPath
     );
   };
@@ -1609,7 +1601,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     }
     writeRenderedOutput(
       stdout,
-      `${renderJsonOutput(result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) })}\n`,
+      `${stringifyJsonOutput(result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) })}\n`,
       outPath
     );
   };

@@ -126,7 +126,7 @@ async function resolveRootSpaceId(client: XyteClient, tenantId: string): Promise
   return rootId;
 }
 
-export async function runSpaceImportTree(args: {
+export function runSpaceImportTree(args: {
   client: XyteClient;
   tenantId: string;
   inputPath: string;

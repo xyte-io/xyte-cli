@@ -78,11 +78,29 @@ export async function runUtilityBatch(args: {
     writeFileSync(args.reportPath, '', 'utf8');
   }
 
-  if (!args.apply) {
-    for (let index = 0; index < args.operations.length; index += 1) {
-      const operation = args.operations[index];
-      try {
-        operation.validate?.();
+  for (let index = 0; index < args.operations.length; index += 1) {
+    const operation = args.operations[index];
+
+    try {
+      operation.validate?.();
+      if (args.apply) {
+        const response = await operation.execute(args.client, args.tenantId);
+        totals.succeeded += 1;
+        writeReportLine(args.reportPath, {
+          timestampUtc: new Date().toISOString(),
+          rowIndex: operation.rowIndex,
+          status: 'succeeded' satisfies UtilityRowStatus,
+          endpointKey: operation.endpointKey,
+          request: operation.request,
+          response: {
+            status: response.status,
+            durationMs: response.durationMs,
+            retryCount: response.retryCount,
+            data: response.data
+          },
+          input: operation.input
+        });
+      } else {
         totals.skipped += 1;
         writeReportLine(args.reportPath, {
           timestampUtc: new Date().toISOString(),
@@ -92,83 +110,7 @@ export async function runUtilityBatch(args: {
           request: operation.request,
           input: operation.input
         });
-      } catch (error) {
-        totals.failed += 1;
-        const message = errorMessage(error);
-        if (!firstError) {
-          firstError = {
-            rowIndex: operation.rowIndex,
-            message
-          };
-        }
-        writeReportLine(args.reportPath, {
-          timestampUtc: new Date().toISOString(),
-          rowIndex: operation.rowIndex,
-          status: 'failed' satisfies UtilityRowStatus,
-          endpointKey: operation.endpointKey,
-          request: operation.request,
-          error: {
-            message
-          },
-          input: operation.input
-        });
-
-        if (!args.continueOnError) {
-          stoppedEarly = true;
-          const remaining = args.operations.slice(index + 1);
-          totals.skipped += remaining.length;
-          for (const skippedOperation of remaining) {
-            writeReportLine(args.reportPath, {
-              timestampUtc: new Date().toISOString(),
-              rowIndex: skippedOperation.rowIndex,
-              status: 'skipped' satisfies UtilityRowStatus,
-              endpointKey: skippedOperation.endpointKey,
-              request: skippedOperation.request,
-              error: {
-                message: 'Skipped because processing stopped after first failure (fail-fast mode).'
-              },
-              input: skippedOperation.input
-            });
-          }
-          break;
-        }
       }
-    }
-
-    return {
-      schemaVersion: UTILITY_BATCH_SCHEMA_VERSION,
-      generatedAtUtc: new Date().toISOString(),
-      tenantId: args.tenantId,
-      command: args.command,
-      mode,
-      totals,
-      stoppedEarly,
-      ...(firstError ? { firstError } : {}),
-      ...(args.reportPath ? { reportPath: args.reportPath } : {})
-    };
-  }
-
-  for (let index = 0; index < args.operations.length; index += 1) {
-    const operation = args.operations[index];
-
-    try {
-      operation.validate?.();
-      const response = await operation.execute(args.client, args.tenantId);
-      totals.succeeded += 1;
-      writeReportLine(args.reportPath, {
-        timestampUtc: new Date().toISOString(),
-        rowIndex: operation.rowIndex,
-        status: 'succeeded' satisfies UtilityRowStatus,
-        endpointKey: operation.endpointKey,
-        request: operation.request,
-        response: {
-          status: response.status,
-          durationMs: response.durationMs,
-          retryCount: response.retryCount,
-          data: response.data
-        },
-        input: operation.input
-      });
     } catch (error) {
       totals.failed += 1;
       const message = errorMessage(error);

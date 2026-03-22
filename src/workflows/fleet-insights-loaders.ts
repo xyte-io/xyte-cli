@@ -20,7 +20,7 @@ const PARTNER_ENRICHMENT_CONCURRENCY = 5;
 const PARTNER_ENRICHMENT_TIMEOUT_MS = 3_000;
 const PARTNER_FRESH_TELEMETRY_WINDOW_HOURS = 24;
 
-function firstText(...values: unknown[]): string | undefined {
+export function firstText(...values: unknown[]): string | undefined {
   for (const value of values) {
     if (typeof value === 'string' && value.trim()) {
       return value.trim();
