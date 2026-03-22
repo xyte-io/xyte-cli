@@ -3,7 +3,8 @@ import { z } from 'zod';
 import type { ProblemDetails } from './problem';
 import { WATCH_FRAME_SCHEMA_VERSION } from './versions';
 
-export const WatchProfileSchema = z.literal('incidents-active');
+export const DEFAULT_WATCH_PROFILE = 'incidents-active' as const;
+export const WatchProfileSchema = z.literal(DEFAULT_WATCH_PROFILE);
 const WatchEventTypeSchema = z.enum(['snapshot', 'delta', 'heartbeat', 'error']);
 
 const WatchDeltaEntrySchema = z.object({

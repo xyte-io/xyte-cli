@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseCliOutputMode } from '../src/cli/cli-context';
+import { formatBytes } from '../src/cli/format-bytes';
 import {
   parseQueryJson,
   parsePositiveIntegerOption,
-  parsePositiveNumberOption,
-  formatBytes
+  parsePositiveNumberOption
 } from '../src/cli/parse-options';
 
 describe('parseQueryJson', () => {

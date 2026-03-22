@@ -56,7 +56,7 @@ export async function closeIncidentWithGuard(args: CloseIncidentWithGuardArgs): 
   }
 }
 
-export function normalizeIncidents(items: unknown): Record<string, unknown>[] {
+export function castIncidentRecords(items: unknown): Record<string, unknown>[] {
   if (!Array.isArray(items)) {
     return [];
   }
@@ -217,7 +217,7 @@ export function createIncidentsScreen(): TuiScreen {
     if (!isMounted) {
       return;
     }
-    incidents = normalizeIncidents(loaded.data);
+    incidents = castIncidentRecords(loaded.data);
     context.debugLog?.('screen.data.fetch.complete', {
       screen: 'incidents',
       tenantId,

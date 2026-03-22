@@ -9,7 +9,7 @@ import {
   type InspectProviderScope
 } from '../types/settings-enums';
 import { TUI_SCREEN_IDS, type TuiScreenId } from '../types/tui-screens';
-import type { WatchProfile } from '../contracts/watch-frame';
+import { DEFAULT_WATCH_PROFILE, type WatchProfile } from '../contracts/watch-frame';
 
 const CLI_OUTPUT_MODES = ['auto', 'json', 'text'] as const;
 export type CliOutputMode = (typeof CLI_OUTPUT_MODES)[number];
@@ -118,7 +118,7 @@ const DEFAULT_SETTINGS: ResolvedCliSettings = {
     providerScope: 'auto'
   },
   watch: {
-    profile: 'incidents-active',
+    profile: DEFAULT_WATCH_PROFILE,
     intervalMs: 2000
   },
   http: {
@@ -326,7 +326,7 @@ function validateSettingValue(keyPath: SettingPath, value: unknown): unknown {
     case 'ops.providerScope':
       return parseEnum(value, keyPath, [...INSPECT_PROVIDER_SCOPES]);
     case 'watch.profile':
-      return parseEnum(value, keyPath, ['incidents-active']);
+      return parseEnum(value, keyPath, [DEFAULT_WATCH_PROFILE]);
     case 'watch.intervalMs':
     case 'http.retryAttempts':
     case 'http.retryBackoffMs':

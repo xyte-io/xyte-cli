@@ -10,7 +10,8 @@ import {
   type CliActionLogEntry
 } from '../action-logger';
 import { isRecord } from '../../utils/json';
-import { formatBytes, parsePositiveIntegerOption, parsePositiveNumberOption } from '../parse-options';
+import { formatBytes } from '../format-bytes';
+import { parsePositiveIntegerOption, parsePositiveNumberOption } from '../parse-options';
 import {
   type CliContext,
   getExplicitGlobalOutput,

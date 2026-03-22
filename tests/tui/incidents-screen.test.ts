@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizeIncidents } from '../../src/tui/screens/incidents';
+import { castIncidentRecords } from '../../src/tui/screens/incidents';
 import { sceneFromIncidentsState } from '../../src/tui/scene';
 
 describe('incidents screen helpers', () => {
   it('normalizes malformed incident payload items safely', () => {
-    expect(normalizeIncidents(undefined)).toEqual([]);
-    expect(normalizeIncidents([null, undefined, 'oops', { id: 'inc-1' }])).toEqual([{ value: 'oops' }, { id: 'inc-1' }]);
+    expect(castIncidentRecords(undefined)).toEqual([]);
+    expect(castIncidentRecords([null, undefined, 'oops', { id: 'inc-1' }])).toEqual([{ value: 'oops' }, { id: 'inc-1' }]);
   });
 
   it('renders incident detail safely for cyclic payloads', () => {

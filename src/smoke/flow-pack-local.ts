@@ -269,6 +269,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   mkdirSync(configDir, { recursive: true });
   mkdirSync(outDir, { recursive: true });
 
+  // Intentionally minimal env: this smoke test uses a mock server and does not
+  // install npm packages, so full HOME/npm isolation via buildIsolatedEnv is not needed.
   const env = {
     ...process.env,
     XYTE_CLI_CONFIG_DIR: configDir,

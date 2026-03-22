@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import type { Command } from 'commander';
 
-import type { WatchFrameV1, WatchProfile } from '../../contracts/watch-frame';
+import { DEFAULT_WATCH_PROFILE, type WatchFrameV1, type WatchProfile } from '../../contracts/watch-frame';
 import { CliUserError } from '../../contracts/user-error';
 import { errorMessage } from '../../utils/error-format';
 import { isRecord } from '../../utils/json';
@@ -60,9 +60,9 @@ function appendRenderedOutput(stream: OutputStream, text: string, outPath?: stri
 }
 
 function parseWatchProfile(value: string | undefined): WatchProfile {
-  const normalized = (value ?? 'incidents-active').trim().toLowerCase();
-  if (normalized !== 'incidents-active') {
-    throw new Error(`Invalid watch profile: ${value}. Use incidents-active.`);
+  const normalized = (value ?? DEFAULT_WATCH_PROFILE).trim().toLowerCase();
+  if (normalized !== DEFAULT_WATCH_PROFILE) {
+    throw new Error(`Invalid watch profile: ${value}. Use ${DEFAULT_WATCH_PROFILE}.`);
   }
   return normalized as WatchProfile;
 }
@@ -351,8 +351,8 @@ async function handleOpsReportGenerate(ctx: CliContext, options: {
   tenant?: string;
   input: string;
   out: string;
-  render?: 'markdown' | 'pdf';
-  format?: 'markdown' | 'pdf';
+  render?: string;
+  format?: string;
   includeSensitive?: boolean;
   strictJson?: boolean;
 }): Promise<void> {
@@ -581,7 +581,7 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
       tenant?: string;
       input: string;
       out: string;
-      render?: 'markdown' | 'pdf';
+      render?: string;
       includeSensitive?: boolean;
       strictJson?: boolean;
     }) {
