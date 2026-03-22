@@ -33,7 +33,7 @@ import {
   generateFleetReport,
   parseDeepDiveForReport
 } from './fleet-insights';
-import type { InspectProviderScope } from '../types/settings-enums';
+import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';
 import type { BuiltInFlowDefinition, FlowStep, FlowTaskStep } from './flow-catalog';
 
 export type FlowRunMode = 'plan' | 'apply';
@@ -629,7 +629,7 @@ async function readLinesAsJson<T>(filePath: string): Promise<T[]> {
 }
 
 function isInspectProviderScopeValue(value: unknown): value is InspectProviderScope {
-  return value === 'auto' || value === 'organization' || value === 'partner';
+  return (INSPECT_PROVIDER_SCOPES as readonly string[]).includes(value as string);
 }
 
 async function readStoredInspectProviderScope(bundleDir: string): Promise<InspectProviderScope | undefined> {

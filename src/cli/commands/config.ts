@@ -22,6 +22,7 @@ import {
   type OutputFormat,
   createSecretConflictError,
   formatReadinessText,
+  getExplicitGlobalOutput,
   resolveKeyValue,
   parsePositiveIntegerOption,
   printJson,
@@ -153,7 +154,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
         options: { tenant?: string; retryAttempts?: string; retryBackoffMs?: string; format?: OutputFormat },
         command: Command
       ) => {
-        const globals = command.optsWithGlobals() as { output?: string };
+        const explicitOutput = getExplicitGlobalOutput(command);
         const overrides: Partial<Record<SettingKey, unknown>> = {};
         if (options.tenant) {
           overrides['defaults.tenant'] = options.tenant;
@@ -182,7 +183,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
 
         if (
           resolveTextJsonOutput({
-            output: globals.output,
+            output: explicitOutput,
             format: options.format,
             stdoutIsTTY: ctx.stdoutIsTTY,
             settings
@@ -210,7 +211,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
     .option('--scope <scope>', 'user|workspace|resolved', 'resolved')
     .option('--format <format>', 'json|text')
     .action(async (options: { scope?: string; format?: OutputFormat }, command: Command) => {
-      const globals = command.optsWithGlobals() as { output?: string };
+      const explicitOutput = getExplicitGlobalOutput(command);
       const scope = (options.scope ?? 'resolved').trim().toLowerCase();
       if (!['user', 'workspace', 'resolved'].includes(scope)) {
         throw new CliUserError({
@@ -221,7 +222,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
       }
       const settings = await ctx.resolveSettings();
       const output = resolveTextJsonOutput({
-        output: globals.output,
+        output: explicitOutput,
         format: options.format,
         stdoutIsTTY: ctx.stdoutIsTTY,
         settings
@@ -248,10 +249,10 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
     .description('Show settings, profile, and secret-store paths')
     .option('--format <format>', 'json|text')
     .action(async (options: { format?: OutputFormat }, command: Command) => {
-      const globals = command.optsWithGlobals() as { output?: string };
+      const explicitOutput = getExplicitGlobalOutput(command);
       const settings = await ctx.resolveSettings();
       const output = resolveTextJsonOutput({
-        output: globals.output,
+        output: explicitOutput,
         format: options.format,
         stdoutIsTTY: ctx.stdoutIsTTY,
         settings
@@ -282,7 +283,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
     .option('--scope <scope>', 'user|workspace', 'user')
     .option('--format <format>', 'json|text')
     .action(async (key: string, value: string, options: { scope?: string; format?: OutputFormat }, command: Command) => {
-      const globals = command.optsWithGlobals() as { output?: string };
+      const explicitOutput = getExplicitGlobalOutput(command);
       if (!SUPPORTED_SETTING_KEYS.includes(key as SettingKey)) {
         throw new CliUserError({
           summary: 'Unknown config key.',
@@ -309,7 +310,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
       });
       const settings = await ctx.resolveSettings();
       const output = resolveTextJsonOutput({
-        output: globals.output,
+        output: explicitOutput,
         format: options.format,
         stdoutIsTTY: ctx.stdoutIsTTY,
         settings
@@ -336,7 +337,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
     .option('--scope <scope>', 'user|workspace', 'user')
     .option('--format <format>', 'json|text')
     .action(async (key: string, options: { scope?: string; format?: OutputFormat }, command: Command) => {
-      const globals = command.optsWithGlobals() as { output?: string };
+      const explicitOutput = getExplicitGlobalOutput(command);
       if (!SUPPORTED_SETTING_KEYS.includes(key as SettingKey)) {
         throw new CliUserError({
           summary: 'Unknown config key.',
@@ -361,7 +362,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
       });
       const settings = await ctx.resolveSettings();
       const output = resolveTextJsonOutput({
-        output: globals.output,
+        output: explicitOutput,
         format: options.format,
         stdoutIsTTY: ctx.stdoutIsTTY,
         settings
@@ -488,7 +489,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
     .option('--provider <provider>', 'Optional provider filter')
     .option('--format <format>', 'json|text', 'json')
     .action(async (options: { tenant: string; provider?: string; format?: OutputFormat }, command: Command) => {
-      const globals = command.optsWithGlobals() as { output?: string };
+      const explicitOutput = getExplicitGlobalOutput(command);
       const settings = await ctx.resolveSettings({ 'defaults.tenant': options.tenant });
       const secretStore = ctx.getSecretStore();
       const provider = options.provider ? parseProvider(options.provider) : undefined;
@@ -500,7 +501,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
       });
       if (
         resolveTextJsonOutput({
-          output: globals.output,
+          output: explicitOutput,
           format: options.format,
           stdoutIsTTY: ctx.stdoutIsTTY,
           settings

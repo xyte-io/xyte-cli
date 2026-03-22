@@ -1335,7 +1335,15 @@ export function createCli(runtime: CliRuntime = {}): Command {
     const tenantId = tenantOverride ?? settings.values.defaults.tenant;
     const path = parsePathJson(options.pathJson as string | undefined);
     const query = parseQueryJson(options.queryJson as string | undefined);
-    const body = options.bodyJson ? JSON.parse(String(options.bodyJson)) : undefined;
+    let body: unknown;
+    if (options.bodyJson) {
+      try {
+        body = JSON.parse(String(options.bodyJson));
+      } catch (error) {
+        const detail = error instanceof SyntaxError ? `: ${error.message}` : '';
+        throw new Error(`Invalid --body-json${detail}`);
+      }
+    }
     const strictJson = resolveStrictJson({ strictJson: options.strictJson === true, settings });
     const mutating = isMutatingMethod(method);
 
@@ -1635,10 +1643,11 @@ export function createCli(runtime: CliRuntime = {}): Command {
     try {
       raw = JSON.parse(readFileSync(inputPath, 'utf8')) as unknown;
     } catch (error) {
-      const detail = error instanceof SyntaxError ? `: ${error.message}` : '';
+      const isSyntax = error instanceof SyntaxError;
+      const detail = isSyntax ? `: ${error.message}` : `: ${errorMessage(error)}`;
       throw new CliUserError({
-        summary: `Input JSON is invalid${detail}`,
-        cause: `Failed to parse ${inputPath}.`,
+        summary: isSyntax ? `Input JSON is invalid${detail}` : `Cannot read input file${detail}`,
+        cause: `Failed to ${isSyntax ? 'parse' : 'read'} ${inputPath}.`,
         suggestedCommands: ['Generate fresh input with xyte-cli ops inspect deep-dive --output json']
       });
     }

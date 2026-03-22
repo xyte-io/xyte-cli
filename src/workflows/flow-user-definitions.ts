@@ -236,7 +236,13 @@ export async function exportFlowDefinition(args: { flowId: string; outPath: stri
 
 export async function importFlowDefinition(args: { filePath: string; force: boolean }): Promise<FlowDefinitionV1 & { path: string; status: 'created' | 'updated' }> {
   const resolved = path.resolve(args.filePath);
-  const raw = JSON.parse(await readFile(resolved, 'utf8'));
+  let raw: unknown;
+  try {
+    raw = JSON.parse(await readFile(resolved, 'utf8'));
+  } catch (error) {
+    const detail = error instanceof SyntaxError ? `: ${error.message}` : '';
+    throw new Error(`Failed to parse flow definition at "${resolved}"${detail}`);
+  }
   const parsed = validateFlowDefinition(raw);
 
   return saveFlowDefinition({

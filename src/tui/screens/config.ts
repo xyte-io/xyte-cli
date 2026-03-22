@@ -57,7 +57,7 @@ async function runSlotConnectivityProbe(args: {
     return 'partner.getDevices ok';
   }
 
-  return 'provider key check: secret present (remote probe skipped)';
+  throw new Error(`Unrecognized provider: ${provider}`);
 }
 
 export function createConfigScreen(): TuiScreen {
