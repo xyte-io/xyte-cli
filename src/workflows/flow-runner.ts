@@ -31,6 +31,7 @@ import {
   buildFleetInspect,
   collectFleetSnapshot,
   generateFleetReport,
+  InspectProviderScopeError,
   parseDeepDiveForReport
 } from './fleet-insights';
 import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';
@@ -98,7 +99,7 @@ interface RunDeterministicFlowArgs {
 }
 
 function isInspectProviderScopeError(error: unknown): boolean {
-  return error instanceof Error && /inspect provider scope/i.test(error.message);
+  return error instanceof InspectProviderScopeError;
 }
 
 async function collectSnapshotWithGuard(ctx: RunContext): Promise<ReturnType<typeof collectFleetSnapshot>> {

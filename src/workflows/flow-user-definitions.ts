@@ -126,7 +126,7 @@ export async function getFlowDefinition(flowId: string): Promise<(FlowDefinition
       path: filePath
     };
   } catch (error) {
-    if (error instanceof Error && /ENOENT/.test(error.message)) {
+    if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
       return undefined;
     }
     throw error;

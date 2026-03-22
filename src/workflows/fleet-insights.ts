@@ -6,7 +6,7 @@ import { asRecord, safeString } from '../utils/json';
 import { INSPECT_DEEP_DIVE_SCHEMA_VERSION, INSPECT_FLEET_SCHEMA_VERSION, REPORT_SCHEMA_VERSION } from '../contracts/versions';
 import { parseTimestamp } from './report/time-format';
 
-export { collectFleetSnapshot } from './fleet-insights-loaders';
+export { collectFleetSnapshot, InspectProviderScopeError } from './fleet-insights-loaders';
 export { formatFleetInspectAscii, formatDeepDiveAscii, formatDeepDiveMarkdown } from './fleet-insights-format';
 import { formatDeepDiveMarkdown } from './fleet-insights-format';
 

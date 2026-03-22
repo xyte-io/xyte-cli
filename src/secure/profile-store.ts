@@ -185,8 +185,12 @@ export class FileProfileStore implements ProfileStore {
       if (normalized.changed) {
         await this.writeData(normalized.data);
       }
-    } catch {
-      // No file or invalid file — nothing to migrate.
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT' || error instanceof SyntaxError) {
+        return; // No file or invalid JSON — nothing to migrate.
+      }
+      throw error;
     }
   }
 

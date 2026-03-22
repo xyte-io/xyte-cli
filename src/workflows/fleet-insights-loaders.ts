@@ -6,7 +6,12 @@ import { parseTimestamp } from './report/time-format';
 
 import type { FleetSnapshot, PartnerEnrichmentSnapshot, PartnerEndpointOutcome, ResolvedInspectProviderScope, StatusCounts } from '../types/fleet-inspect';
 
-export { firstText } from '../utils/json';
+export class InspectProviderScopeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InspectProviderScopeError';
+  }
+}
 
 const PARTNER_ENRICHMENT_SAMPLE_SIZE = 25;
 const PARTNER_ENRICHMENT_CONCURRENCY = 5;
@@ -383,7 +388,7 @@ async function resolveInspectProviderScope(
 
   if (providerScope === 'organization') {
     if (!hasOrganization) {
-      throw new Error(
+      throw new InspectProviderScopeError(
         `Inspect provider scope "organization" is unavailable for tenant ${tenantId}. Configure an xyte-org key or run with --provider-scope partner (inspect) or --inspect-provider-scope partner (flow run).`
       );
     }
@@ -392,7 +397,7 @@ async function resolveInspectProviderScope(
 
   if (providerScope === 'partner') {
     if (!hasPartner) {
-      throw new Error(
+      throw new InspectProviderScopeError(
         `Inspect provider scope "partner" is unavailable for tenant ${tenantId}. Configure an xyte-partner key or run with --provider-scope organization (inspect) or --inspect-provider-scope organization (flow run).`
       );
     }
@@ -400,7 +405,7 @@ async function resolveInspectProviderScope(
   }
 
   if (hasOrganization && hasPartner) {
-    throw new Error(
+    throw new InspectProviderScopeError(
       `Inspect provider scope is ambiguous for tenant ${tenantId}: both organization and partner credentials are configured. Re-run with --provider-scope organization|partner (or --inspect-provider-scope for flow run).`
     );
   }

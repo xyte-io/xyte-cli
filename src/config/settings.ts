@@ -235,7 +235,7 @@ function setPathValue(record: Record<string, unknown>, keyPath: SettingPath, val
 
 function unsetPathValue(record: Record<string, unknown>, keyPath: SettingPath): void {
   const segments = keyPath.split('.');
-  let current: Record<string, unknown> | undefined = record;
+  let current: Record<string, unknown> = record;
   for (let index = 0; index < segments.length - 1; index += 1) {
     const segment = segments[index];
     if (segment === '__proto__' || segment === 'prototype' || segment === 'constructor') {
@@ -246,10 +246,6 @@ function unsetPathValue(record: Record<string, unknown>, keyPath: SettingPath): 
       return;
     }
     current = next;
-  }
-
-  if (!current) {
-    return;
   }
 
   const leafSegment = segments.at(-1)!;
