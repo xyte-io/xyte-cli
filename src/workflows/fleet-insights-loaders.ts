@@ -22,7 +22,7 @@ function countValue(counter: StatusCounts, key: string): void {
   counter[key] = (counter[key] ?? 0) + 1;
 }
 
-function endpointOutcome(): PartnerEndpointOutcome {
+function emptyEndpointOutcome(): PartnerEndpointOutcome {
   return {
     attempted: 0,
     succeeded: 0,
@@ -242,10 +242,10 @@ async function collectPartnerEnrichment(
     sampledDeviceCount: sampledDeviceIds.length,
     totalDeviceCount: devices.length,
     endpointAvailability: {
-      deviceInfo: endpointOutcome(),
-      commands: endpointOutcome(),
-      telemetries: endpointOutcome(),
-      stateHistory: endpointOutcome()
+      deviceInfo: emptyEndpointOutcome(),
+      commands: emptyEndpointOutcome(),
+      telemetries: emptyEndpointOutcome(),
+      stateHistory: emptyEndpointOutcome()
     },
     modelDistribution: {},
     firmwareDistribution: {},

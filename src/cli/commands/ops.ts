@@ -278,17 +278,12 @@ async function handleOpsInspectFleet(ctx: CliContext, options: {
   const result = buildFleetInspect(snapshot);
   const outPath = resolveOutPath(options.out);
 
-  if (render === 'ascii') {
-    writeRenderedOutput(ctx.stdout, `${formatFleetInspectAscii(result)}\n`, outPath);
-    return;
-  }
-
   const output = resolveTextJsonOutput({
     output: options.output,
     stdoutIsTTY: ctx.stdoutIsTTY,
     settings
   });
-  if (output === 'text') {
+  if (render === 'ascii' || output === 'text') {
     writeRenderedOutput(ctx.stdout, `${formatFleetInspectAscii(result)}\n`, outPath);
     return;
   }
@@ -323,17 +318,13 @@ async function handleOpsInspectDeepDive(ctx: CliContext, options: {
     writeRenderedOutput(ctx.stdout, `${formatDeepDiveAscii(result)}\n`, outPath);
     return;
   }
-  if (render === 'markdown') {
-    writeRenderedOutput(ctx.stdout, `${formatDeepDiveMarkdown(result, false)}\n`, outPath);
-    return;
-  }
 
   const output = resolveTextJsonOutput({
     output: options.output,
     stdoutIsTTY: ctx.stdoutIsTTY,
     settings
   });
-  if (output === 'text') {
+  if (render === 'markdown' || output === 'text') {
     writeRenderedOutput(ctx.stdout, `${formatDeepDiveMarkdown(result, false)}\n`, outPath);
     return;
   }
