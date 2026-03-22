@@ -13,13 +13,13 @@ const WATCH_MIN_INTERVAL_MS = 1000;
 const WATCH_DEFAULT_MAX_POLLS = 600;
 const WATCH_MAX_POLLS = 3600;
 
-interface NormalizedIncident {
+export interface NormalizedIncident {
   id: string;
   raw: unknown;
   stable: string;
 }
 
-function stableNormalize(value: unknown): unknown {
+export function stableNormalize(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map((item) => stableNormalize(item));
   }
@@ -40,7 +40,7 @@ function stableStringify(value: unknown): string {
   return JSON.stringify(stableNormalize(value));
 }
 
-function resolveIncidentId(item: unknown, stable: string): string {
+export function resolveIncidentId(item: unknown, stable: string): string {
   const record = asRecord(item);
   const candidates = [record.id, record._id, record.incident_id]
     .map((value) => String(value ?? '').trim())
@@ -54,7 +54,7 @@ function resolveIncidentId(item: unknown, stable: string): string {
   return `anon:${digest}`;
 }
 
-function normalizeIncidents(items: unknown[]): NormalizedIncident[] {
+export function normalizeIncidents(items: unknown[]): NormalizedIncident[] {
   const deduped = new Map<string, NormalizedIncident>();
 
   for (const item of items) {
@@ -78,7 +78,7 @@ function toMap(items: NormalizedIncident[]): Map<string, NormalizedIncident> {
   return map;
 }
 
-function computeDelta(previous: NormalizedIncident[], current: NormalizedIncident[]): WatchDelta {
+export function computeDelta(previous: NormalizedIncident[], current: NormalizedIncident[]): WatchDelta {
   const previousById = toMap(previous);
   const currentById = toMap(current);
 

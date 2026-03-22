@@ -1,3 +1,5 @@
+import type { WatchProfile } from '../contracts/watch-frame';
+
 export type BuiltInFlowId =
   | 'flow.setup-readiness-10m'
   | 'flow.incidents-delta-watch'
@@ -30,7 +32,7 @@ export interface FlowTaskStep extends FlowStepBase {
   mutating: boolean;
   requiresContext?: string[];
   watch?: {
-    profile: 'incidents-active';
+    profile: WatchProfile;
     once: boolean;
     intervalMs?: number;
     maxPolls?: number;

@@ -17,7 +17,7 @@ import { getEndpoint, listEndpoints } from '../client/catalog';
 import { buildCallEnvelope } from '../contracts/call-envelope';
 import { toProblemDetails } from '../contracts/problem';
 import { buildStatusContract, type StatusMode } from '../contracts/status';
-import type { WatchFrameV1 } from '../contracts/watch-frame';
+import type { WatchFrameV1, WatchProfile } from '../contracts/watch-frame';
 import { evaluateReadiness, type ReadinessCheck } from '../config/readiness';
 import {
   resolveCliSettingsSync,
@@ -42,7 +42,7 @@ import {
 } from '../utils/install-skills';
 import { applyUpgrade, checkForUpgrade, type UpgradeDependencies } from '../utils/upgrade';
 import { runTuiApp } from '../tui/app';
-import type { TuiScreenId } from '../types/settings-enums';
+import { TUI_SCREEN_IDS, type TuiScreenId } from '../types/settings-enums';
 import {
   buildDeepDive,
   buildFleetInspect,
@@ -390,12 +390,12 @@ function parseSetupConnectivityMode(value: string | undefined): SetupConnectivit
   return normalized as SetupConnectivityMode;
 }
 
-function parseWatchProfile(value: string | undefined): 'incidents-active' {
+function parseWatchProfile(value: string | undefined): WatchProfile {
   const normalized = (value ?? 'incidents-active').trim().toLowerCase();
   if (normalized !== 'incidents-active') {
     throw new Error(`Invalid watch profile: ${value}. Use incidents-active.`);
   }
-  return 'incidents-active';
+  return normalized as WatchProfile;
 }
 
 function parseWatchIntervalMs(value: string | undefined): number {
@@ -1457,7 +1457,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     await runWatch({
       client,
       tenantId,
-      profile: (overrides['watch.profile'] as 'incidents-active' | undefined) ?? settings.values.watch.profile,
+      profile: (overrides['watch.profile'] as WatchProfile | undefined) ?? settings.values.watch.profile,
       query,
       intervalMs: (overrides['watch.intervalMs'] as number | undefined) ?? settings.values.watch.intervalMs,
       once: options.once === true,
@@ -1700,6 +1700,13 @@ export function createCli(runtime: CliRuntime = {}): Command {
       overrides['defaults.tenant'] = options.tenant;
     }
     if (options.screen) {
+      if (!(TUI_SCREEN_IDS as readonly string[]).includes(options.screen)) {
+        throw new CliUserError({
+          summary: 'Invalid console screen.',
+          cause: `Received "${options.screen}".`,
+          suggestedCommands: [`Use one of: ${TUI_SCREEN_IDS.join(', ')}`]
+        });
+      }
       overrides['console.screen'] = options.screen as TuiScreenId;
     }
     if (options.motion === false) {
@@ -1723,15 +1730,15 @@ export function createCli(runtime: CliRuntime = {}): Command {
       retryAttempts: settings.values.http.retryAttempts,
       retryBackoffMs: settings.values.http.retryBackoffMs
     });
-    const allowedScreens: TuiScreenId[] = ['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets'];
-    const screen = (options.screen ?? settings.values.console.screen ?? 'dashboard') as TuiScreenId;
-    if (!allowedScreens.includes(screen)) {
+    const screenRaw = options.screen ?? settings.values.console.screen ?? 'dashboard';
+    if (!(TUI_SCREEN_IDS as readonly string[]).includes(screenRaw)) {
       throw new CliUserError({
         summary: 'Invalid console screen.',
-        cause: `Received "${options.screen}".`,
-        suggestedCommands: [`Use one of: ${allowedScreens.join(', ')}`]
+        cause: `Received "${screenRaw}".`,
+        suggestedCommands: [`Use one of: ${TUI_SCREEN_IDS.join(', ')}`]
       });
     }
+    const screen = screenRaw as TuiScreenId;
     const requestedOutput = parseCliOutputMode(options.output ?? options.format ?? (options.headless ? 'json' : undefined));
     if (Boolean(options.headless) && requestedOutput && requestedOutput !== 'json') {
       throw new CliUserError({

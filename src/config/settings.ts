@@ -10,6 +10,7 @@ import {
   type InspectProviderScope,
   type TuiScreenId
 } from '../types/settings-enums';
+import type { WatchProfile } from '../contracts/watch-frame';
 
 const CLI_OUTPUT_MODES = ['auto', 'json', 'text'] as const;
 export type CliOutputMode = (typeof CLI_OUTPUT_MODES)[number];
@@ -28,7 +29,7 @@ interface CliSettingsFile {
     providerScope?: InspectProviderScope;
   };
   watch?: {
-    profile?: 'incidents-active';
+    profile?: WatchProfile;
     intervalMs?: number;
     maxPolls?: number;
   };
@@ -68,7 +69,7 @@ export interface ResolvedCliSettings {
     providerScope: InspectProviderScope;
   };
   watch: {
-    profile: 'incidents-active';
+    profile: WatchProfile;
     intervalMs: number;
     maxPolls?: number;
   };
