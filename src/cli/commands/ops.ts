@@ -3,7 +3,6 @@ import path from 'node:path';
 
 import type { Command } from 'commander';
 
-import { createXyteClient } from '../../client/create-client';
 import type { WatchFrameV1, WatchProfile } from '../../contracts/watch-frame';
 import { CliUserError } from '../../contracts/user-error';
 import { errorMessage } from '../../utils/error-format';
@@ -223,15 +222,11 @@ async function handleOpsWatchIncidents(ctx: CliContext, options: {
   });
 }
 
-async function handleOpsInspectFleet(ctx: CliContext, options: {
+async function resolveInspectContext(ctx: CliContext, options: {
   tenant?: string;
   providerScope?: string;
-  render?: string;
-  format?: string;
-  output?: string;
-  out?: string;
-  strictJson?: boolean;
-}): Promise<void> {
+  commandLabel: string;
+}) {
   const overrides: Partial<Record<SettingKey, unknown>> = {};
   if (options.tenant) {
     overrides['defaults.tenant'] = options.tenant;
@@ -243,10 +238,27 @@ async function handleOpsInspectFleet(ctx: CliContext, options: {
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
   if (!tenantId) {
     throw new CliUserError({
-      summary: 'Missing tenant for ops inspect fleet.',
+      summary: `Missing tenant for ${options.commandLabel}.`,
       suggestedCommands: ['Use --tenant <tenant-id>', 'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>']
     });
   }
+  const providerScope =
+    (overrides['ops.providerScope'] as InspectProviderScope | undefined) ?? settings.values.ops.providerScope;
+  const client = await ctx.withClient({ tenantId, flagOverrides: overrides });
+  const tenantProfile = await ctx.profileStore.getTenant(tenantId);
+  const snapshot = await collectFleetSnapshot({ client, tenantId, tenantName: tenantProfile?.name, providerScope });
+  return { settings, overrides, snapshot };
+}
+
+async function handleOpsInspectFleet(ctx: CliContext, options: {
+  tenant?: string;
+  providerScope?: string;
+  render?: string;
+  format?: string;
+  output?: string;
+  out?: string;
+  strictJson?: boolean;
+}): Promise<void> {
   const render = (options.render ?? options.format ?? 'json').trim().toLowerCase();
   if (!['json', 'ascii'].includes(render)) {
     throw new CliUserError({
@@ -255,11 +267,11 @@ async function handleOpsInspectFleet(ctx: CliContext, options: {
       suggestedCommands: ['Use --render json', 'Use --render ascii']
     });
   }
-  const providerScope =
-    (overrides['ops.providerScope'] as InspectProviderScope | undefined) ?? settings.values.ops.providerScope;
-  const client = await ctx.withClient({ tenantId, flagOverrides: overrides });
-  const tenantProfile = await ctx.profileStore.getTenant(tenantId);
-  const snapshot = await collectFleetSnapshot({ client, tenantId, tenantName: tenantProfile?.name, providerScope });
+  const { settings, snapshot } = await resolveInspectContext(ctx, {
+    tenant: options.tenant,
+    providerScope: options.providerScope,
+    commandLabel: 'ops inspect fleet'
+  });
   const result = buildFleetInspect(snapshot);
   const outPath = resolveOutPath(options.out);
 
@@ -294,21 +306,6 @@ async function handleOpsInspectDeepDive(ctx: CliContext, options: {
   out?: string;
   strictJson?: boolean;
 }): Promise<void> {
-  const overrides: Partial<Record<SettingKey, unknown>> = {};
-  if (options.tenant) {
-    overrides['defaults.tenant'] = options.tenant;
-  }
-  if (options.providerScope) {
-    overrides['ops.providerScope'] = parseInspectProviderScope(options.providerScope);
-  }
-  const settings = await ctx.resolveSettings(overrides);
-  const tenantId = options.tenant ?? settings.values.defaults.tenant;
-  if (!tenantId) {
-    throw new CliUserError({
-      summary: 'Missing tenant for ops inspect deep-dive.',
-      suggestedCommands: ['Use --tenant <tenant-id>', 'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>']
-    });
-  }
   const render = (options.render ?? options.format ?? 'json').trim().toLowerCase();
   if (!['json', 'ascii', 'markdown'].includes(render)) {
     throw new CliUserError({
@@ -317,12 +314,12 @@ async function handleOpsInspectDeepDive(ctx: CliContext, options: {
       suggestedCommands: ['Use --render json', 'Use --render ascii', 'Use --render markdown']
     });
   }
-  const providerScope =
-    (overrides['ops.providerScope'] as InspectProviderScope | undefined) ?? settings.values.ops.providerScope;
+  const { settings, snapshot } = await resolveInspectContext(ctx, {
+    tenant: options.tenant,
+    providerScope: options.providerScope,
+    commandLabel: 'ops inspect deep-dive'
+  });
   const windowHours = Number.parseInt(options.window ?? '24', 10);
-  const client = await ctx.withClient({ tenantId, flagOverrides: overrides });
-  const tenantProfile = await ctx.profileStore.getTenant(tenantId);
-  const snapshot = await collectFleetSnapshot({ client, tenantId, tenantName: tenantProfile?.name, providerScope });
   const result = buildDeepDive(snapshot, Number.isFinite(windowHours) ? windowHours : 24);
   const outPath = resolveOutPath(options.out);
 
@@ -453,12 +450,9 @@ async function handleOpsConsole(
   }
   const settings = await ctx.resolveSettings(overrides);
   const secretStore = ctx.getSecretStore();
-  const client = createXyteClient({
-    profileStore: ctx.profileStore,
-    secretStore,
+  const client = await ctx.withClient({
     tenantId: options.tenant ?? settings.values.defaults.tenant,
-    retryAttempts: settings.values.http.retryAttempts,
-    retryBackoffMs: settings.values.http.retryBackoffMs
+    flagOverrides: overrides
   });
   const screenRaw = options.screen ?? settings.values.console.screen ?? 'dashboard';
   if (!(TUI_SCREEN_IDS as readonly string[]).includes(screenRaw)) {
