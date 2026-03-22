@@ -182,10 +182,7 @@ export class FileSecretStore implements SecretStore {
     const dir = path.dirname(this.filePath);
     await fs.mkdir(dir, { recursive: true });
 
-    const normalized: PersistedSecrets = {
-      version: SECRET_STORE_VERSION,
-      records: { ...(data.records ?? {}) }
-    };
+    const normalized = cloneData(data);
 
     const tmpPath = `${this.filePath}.tmp`;
     const payload = `${JSON.stringify(normalized, null, 2)}\n`;

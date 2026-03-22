@@ -45,7 +45,7 @@ export function createInputController(options: InputControllerOptions) {
     inFlight
   });
 
-  const processQueue = async (): Promise<void> => {
+  const drainQueue = async (): Promise<void> => {
     if (inFlight) {
       return;
     }
@@ -86,7 +86,7 @@ export function createInputController(options: InputControllerOptions) {
     }
 
     queue.push(event);
-    void processQueue();
+    void drainQueue();
     return {
       accepted: true,
       bypassed: false,

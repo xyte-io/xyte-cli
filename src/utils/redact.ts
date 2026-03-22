@@ -82,3 +82,13 @@ function redactInternal(value: unknown, seen: WeakMap<object, unknown>): unknown
 export function redactSensitiveData<T>(value: T): T {
   return redactInternal(value, new WeakMap<object, unknown>()) as T;
 }
+
+export function redactForDisplay(value: string, includeSensitive: boolean): string {
+  if (includeSensitive || value === 'n/a') {
+    return value;
+  }
+  if (value.length <= 8) {
+    return '***';
+  }
+  return `${value.slice(0, 4)}...${value.slice(-4)}`;
+}

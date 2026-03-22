@@ -6,6 +6,7 @@ import type { XyteClient } from '../types/client';
 import { asRecord, asRecordOrUndefined, extractArray, extractHasNextPage } from '../utils/json';
 import { INSPECT_DEEP_DIVE_SCHEMA_VERSION, INSPECT_FLEET_SCHEMA_VERSION, REPORT_SCHEMA_VERSION } from '../contracts/versions';
 import { withSpan } from '../observability/tracing';
+import { redactForDisplay } from '../utils/redact';
 // Dynamic import: pdfkit is ~5.9MB and only needed for PDF generation.
 // import { renderBrandedPdfReport } from './report/pdf-render';
 import { parseTimestamp } from './report/time-format';
@@ -154,7 +155,7 @@ const DeepDiveResultSchema = z.object({
   topOfflineSpaces: z.array(DeepDiveTopOfflineSpaceSchema),
   topIncidentDevices: z.array(DeepDiveTopIncidentDeviceSchema),
   activeIncidentAging: z.array(DeepDiveIncidentAgingSchema),
-  churn24h: z.object({
+  churnWindow: z.object({
     incidents: z.number(),
     devices: z.number(),
     spaces: z.number(),
@@ -234,15 +235,7 @@ function safeDeviceName(value: unknown): string {
   return safeString(r.device_name ?? r.name ?? device.name ?? r.device_id ?? 'unknown');
 }
 
-function redactSensitive(value: string, includeSensitive: boolean): string {
-  if (includeSensitive || value === 'n/a') {
-    return value;
-  }
-  if (value.length <= 8) {
-    return '***';
-  }
-  return `${value.slice(0, 4)}...${value.slice(-4)}`;
-}
+const redactSensitive = redactForDisplay;
 
 const PARTNER_ENRICHMENT_SAMPLE_SIZE = 25;
 const PARTNER_ENRICHMENT_CONCURRENCY = 5;
@@ -986,7 +979,7 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
     topOfflineSpaces,
     topIncidentDevices,
     activeIncidentAging,
-    churn24h: {
+    churnWindow: {
       incidents: recentIncidents.length,
       devices: Object.keys(recentDevice).length,
       spaces: Object.keys(recentSpace).length,
@@ -1009,9 +1002,9 @@ export function formatDeepDiveAscii(result: DeepDiveResult): string {
   const hasIncidentData =
     result.topIncidentDevices.length > 0 ||
     result.activeIncidentAging.length > 0 ||
-    result.churn24h.incidents > 0 ||
-    result.churn24h.bySpace.length > 0 ||
-    result.churn24h.byDevice.length > 0;
+    result.churnWindow.incidents > 0 ||
+    result.churnWindow.bySpace.length > 0 ||
+    result.churnWindow.byDevice.length > 0;
   const hasTicketData = result.ticketPosture.openTickets > 0 || result.ticketPosture.oldestOpenTickets.length > 0;
 
   const lines: string[] = [];
@@ -1034,8 +1027,8 @@ export function formatDeepDiveAscii(result: DeepDiveResult): string {
       lines.push(`${row.device} | incidents=${row.incidentCount} | active=${row.activeIncidents}`)
     );
     lines.push('');
-    lines.push(`24H CHURN: incidents=${result.churn24h.incidents} devices=${result.churn24h.devices} spaces=${result.churn24h.spaces}`);
-    result.churn24h.bySpace.forEach((row) => lines.push(`space: ${row.space} -> ${row.incidents}`));
+    lines.push(`${result.windowHours}H CHURN: incidents=${result.churnWindow.incidents} devices=${result.churnWindow.devices} spaces=${result.churnWindow.spaces}`);
+    result.churnWindow.bySpace.forEach((row) => lines.push(`space: ${row.space} -> ${row.incidents}`));
   }
 
   if (hasTicketData) {
@@ -1054,9 +1047,9 @@ export function formatDeepDiveMarkdown(result: DeepDiveResult, includeSensitive 
   const hasIncidentData =
     result.topIncidentDevices.length > 0 ||
     result.activeIncidentAging.length > 0 ||
-    result.churn24h.incidents > 0 ||
-    result.churn24h.bySpace.length > 0 ||
-    result.churn24h.byDevice.length > 0;
+    result.churnWindow.incidents > 0 ||
+    result.churnWindow.bySpace.length > 0 ||
+    result.churnWindow.byDevice.length > 0;
   const hasTicketData = result.ticketPosture.openTickets > 0 || result.ticketPosture.oldestOpenTickets.length > 0;
   const hasDataQualityIssues = result.dataQuality.statusMismatches.length > 0;
   const partnerHighlights = result.summary.filter((line) => line.startsWith('Partner '));
@@ -1099,19 +1092,19 @@ export function formatDeepDiveMarkdown(result: DeepDiveResult, includeSensitive 
     markdown.push(`## ${result.windowHours}-Hour Churn`);
     markdown.push('');
     markdown.push(
-      `Incidents: **${result.churn24h.incidents}**, devices: **${result.churn24h.devices}**, spaces: **${result.churn24h.spaces}**.`
+      `Incidents: **${result.churnWindow.incidents}**, devices: **${result.churnWindow.devices}**, spaces: **${result.churnWindow.spaces}**.`
     );
-    if (result.churn24h.bySpace.length > 0) {
+    if (result.churnWindow.bySpace.length > 0) {
       markdown.push('');
       markdown.push('| Space | Incidents |');
       markdown.push('| --- | ---: |');
-      result.churn24h.bySpace.forEach((row) => markdown.push(`| ${row.space} | ${row.incidents} |`));
+      result.churnWindow.bySpace.forEach((row) => markdown.push(`| ${row.space} | ${row.incidents} |`));
     }
-    if (result.churn24h.byDevice.length > 0) {
+    if (result.churnWindow.byDevice.length > 0) {
       markdown.push('');
       markdown.push('| Device | Incidents |');
       markdown.push('| --- | ---: |');
-      result.churn24h.byDevice.forEach((row) => markdown.push(`| ${row.device} | ${row.incidents} |`));
+      result.churnWindow.byDevice.forEach((row) => markdown.push(`| ${row.device} | ${row.incidents} |`));
     }
   }
 

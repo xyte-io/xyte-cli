@@ -12,19 +12,9 @@ import {
 import { SCREEN_PANE_CONFIG } from '../panes';
 import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
 import type { SecretProvider } from '../../types/profile';
-import { PROVIDER_ORG, SUPPORTED_SECRET_PROVIDERS } from '../../types/profile';
+import { PROVIDER_ORG, parseProvider } from '../../types/profile';
 import { sceneFromSetupState, toSetupProviderRows } from '../scene';
 import { runKeyCreateWizard } from '../key-wizard';
-
-const PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
-
-function parseProvider(value: string): SecretProvider {
-  const normalized = value.trim() as SecretProvider;
-  if (!PROVIDERS.includes(normalized)) {
-    throw new Error(`Invalid provider: ${value}`);
-  }
-  return normalized;
-}
 
 export function createSetupScreen(): TuiScreen {
   let root: blessed.Widgets.BoxElement | undefined;

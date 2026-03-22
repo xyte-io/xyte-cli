@@ -49,6 +49,7 @@ interface CliSettingsFile {
     verbose?: boolean;
     maxFileBytes?: number;
     maxFiles?: number;
+    mirrorToStderr?: boolean;
   };
   report?: {
     includeSensitive?: boolean;
@@ -88,6 +89,7 @@ export interface ResolvedCliSettings {
     verbose: boolean;
     maxFileBytes: number;
     maxFiles: number;
+    mirrorToStderr: boolean;
   };
   report: {
     includeSensitive: boolean;
@@ -133,7 +135,8 @@ const DEFAULT_SETTINGS: ResolvedCliSettings = {
     enabled: false,
     verbose: false,
     maxFileBytes: 10 * 1024 * 1024,
-    maxFiles: 5
+    maxFiles: 5,
+    mirrorToStderr: false
   },
   report: {
     includeSensitive: false
@@ -160,6 +163,7 @@ const SETTING_PATHS = [
   'logs.verbose',
   'logs.maxFileBytes',
   'logs.maxFiles',
+  'logs.mirrorToStderr',
   'report.includeSensitive'
 ] as const;
 
@@ -320,6 +324,7 @@ function validateSettingValue(keyPath: SettingPath, value: unknown): unknown {
     case 'console.follow':
     case 'logs.enabled':
     case 'logs.verbose':
+    case 'logs.mirrorToStderr':
     case 'report.includeSensitive':
       return parseBoolean(value, keyPath);
     case 'ops.providerScope':
@@ -390,6 +395,8 @@ function getEnvValue(env: NodeJS.ProcessEnv, keyPath: SettingPath): unknown {
       return env.XYTE_CLI_LOGS_MAX_FILE_BYTES ?? env.XYTE_LOG_ACTIONS_MAX_FILE_BYTES;
     case 'logs.maxFiles':
       return env.XYTE_CLI_LOGS_MAX_FILES ?? env.XYTE_LOG_ACTIONS_MAX_FILES;
+    case 'logs.mirrorToStderr':
+      return env.XYTE_CLI_LOGS_MIRROR_TO_STDERR ?? env.XYTE_LOG_ACTIONS_STDERR;
     case 'report.includeSensitive':
       return env.XYTE_CLI_REPORT_INCLUDE_SENSITIVE;
     default: {

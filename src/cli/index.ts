@@ -29,7 +29,7 @@ import { createSecretStore, type SecretStore } from '../secure/secret-store';
 import { makeKeyFingerprint } from '../secure/key-slots';
 import { FileProfileStore, type ProfileStore } from '../secure/profile-store';
 import type { SecretProvider } from '../types/profile';
-import { isSecretProvider, PROVIDER_ORG } from '../types/profile';
+import { parseProvider, PROVIDER_ORG } from '../types/profile';
 import { isRecord, parseJsonObject } from '../utils/json';
 import { buildInstallDoctorReport, type InstallDoctorResult } from '../utils/install-doctor';
 import type { UtilityInputFormat } from '../utils/input-parser';
@@ -42,7 +42,7 @@ import {
 } from '../utils/install-skills';
 import { applyUpgrade, checkForUpgrade, type UpgradeDependencies } from '../utils/upgrade';
 import { runTuiApp } from '../tui/app';
-import type { TuiScreenId } from '../tui/types';
+import type { TuiScreenId } from '../types/settings-enums';
 import {
   buildDeepDive,
   buildFleetInspect,
@@ -53,7 +53,7 @@ import {
   generateFleetReport,
   parseDeepDiveForReport
 } from '../workflows/fleet-insights';
-import type { InspectProviderScope } from '../types/settings-enums';
+import { parseInspectProviderScope, type InspectProviderScope } from '../types/settings-enums';
 import { runWatch } from '../workflows/watch';
 import { runUtilityPrepare, listUtilityPrepareActions } from '../workflows/utility-prepare';
 import type { UtilityPreparePrimaryFormat } from '../workflows/utility-action-profiles';
@@ -64,7 +64,9 @@ import { registerLogsCommands } from './commands/logs';
 import { registerConfigCommands } from './commands/config';
 import { registerFlowCommands } from './commands/flow';
 import {
+  createSecretConflictError,
   formatReadinessText,
+  resolveKeyValue,
   getExplicitGlobalOutput,
   parseCliOutputMode,
   parsePositiveIntegerOption,
@@ -139,14 +141,6 @@ const SIMPLE_SETUP_SLOT_NAME = 'primary';
 const SIMPLE_SETUP_DEFAULT_TENANT = 'default';
 const SKILL_AGENTS: SkillAgent[] = ['claude', 'copilot', 'codex'];
 const SKILL_SCOPES: SkillInstallScope[] = ['project', 'user', 'both'];
-
-function parseBooleanEnvFlag(value: string | undefined): boolean {
-  if (!value) {
-    return false;
-  }
-  const normalized = value.trim().toLowerCase();
-  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
-}
 
 function commandPathFor(command: Command): string {
   const names: string[] = [];
@@ -289,20 +283,6 @@ function formatScalarFieldValue(value: unknown, field: string): string {
   return value === null ? 'null' : String(value);
 }
 
-function createSecretConflictError(cause: string): CliUserError {
-  return new CliUserError({
-    summary: 'Conflicting API key sources.',
-    cause,
-    suggestedCommands: ['Use exactly one of --key, --key-stdin, or XYTE_CLI_KEY']
-  });
-}
-
-function parseProvider(value: string): SecretProvider {
-  if (!isSecretProvider(value)) {
-    throw new Error(`Invalid provider: ${value}`);
-  }
-  return value;
-}
 
 function parseSkillInstallScope(value: string | undefined): SkillInstallScope | undefined {
   if (!value) {
@@ -451,14 +431,6 @@ function parseWatchMaxPolls(value: string | undefined): number | undefined {
   return parsed;
 }
 
-function parseInspectProviderScope(value: string | undefined): InspectProviderScope {
-  const normalized = (value ?? 'auto').trim().toLowerCase();
-  if (normalized !== 'auto' && normalized !== 'organization' && normalized !== 'partner') {
-    throw new Error(`Invalid inspect provider scope: ${value}. Use organization|partner|auto.`);
-  }
-  return normalized as InspectProviderScope;
-}
-
 function runInstallDoctor(): InstallDoctorResult {
   const expectedPath = path.resolve(__dirname, '../../dist/bin/xyte-cli.js');
   return buildInstallDoctorReport(expectedPath);
@@ -508,43 +480,6 @@ function normalizeTenantId(value: string): string {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
   return normalized || SIMPLE_SETUP_DEFAULT_TENANT;
-}
-
-async function resolveKeyValue(args: {
-  key?: string;
-  keyStdin?: boolean;
-  envKey?: string;
-  allowPrompt?: boolean;
-  prompt: PromptValueFn;
-  readStdin: () => Promise<string>;
-  promptQuestion: string;
-  stdout: OutputStream;
-}): Promise<string | undefined> {
-  const inlineKey = args.key?.trim();
-  const envKey = args.envKey?.trim();
-
-  if (inlineKey && args.keyStdin) {
-    throw createSecretConflictError('Use either --key or --key-stdin, not both.');
-  }
-  if (inlineKey) {
-    return inlineKey;
-  }
-  if (args.keyStdin) {
-    const stdinValue = (await args.readStdin()).trim();
-    return stdinValue || undefined;
-  }
-  if (envKey) {
-    return envKey;
-  }
-  if (args.allowPrompt) {
-    const prompted = await args.prompt({
-      question: args.promptQuestion,
-      stdout: args.stdout,
-      secret: true
-    });
-    return prompted.trim() || undefined;
-  }
-  return undefined;
 }
 
 function stringifyWatchValue(value: unknown, fallback = '-'): string {
@@ -1930,7 +1865,6 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
     const options = command.optsWithGlobals() as CliGlobalOptions;
     const settings = resolveCliSettingsSync({ cwd, env });
-    const envMirrorToStderr = parseBooleanEnvFlag(process.env.XYTE_LOG_ACTIONS_STDERR);
     const configuredPath = options.logActionsPath ?? settings.values.logs.path;
     const enabled = options.logActions === true || settings.values.logs.enabled || Boolean(configuredPath);
     const maxFileBytes = settings.values.logs.maxFileBytes;
@@ -1940,7 +1874,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     actionLogger = createCliActionLogger({
       enabled,
       path: configuredPath,
-      mirrorToStderr: options.logActions === true || envMirrorToStderr,
+      mirrorToStderr: options.logActions === true || settings.values.logs.mirrorToStderr,
       stderr,
       argv: actionLogVerbose ? argvForCommand(command) : undefined,
       maxFileBytes,

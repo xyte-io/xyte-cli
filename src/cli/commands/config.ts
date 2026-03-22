@@ -16,11 +16,13 @@ import { CliUserError } from '../../contracts/user-error';
 import { makeKeyFingerprint, matchesSlotRef } from '../../secure/key-slots';
 import type { ProfileStore } from '../../secure/profile-store';
 import type { SecretStore } from '../../secure/secret-store';
-import { PROVIDER_ORG, PROVIDER_PARTNER, SUPPORTED_SECRET_PROVIDERS, isSecretProvider, type SecretProvider } from '../../types/profile';
+import { PROVIDER_ORG, PROVIDER_PARTNER, SUPPORTED_SECRET_PROVIDERS, parseProvider, type SecretProvider } from '../../types/profile';
 import {
   type CliContext,
   type OutputFormat,
+  createSecretConflictError,
   formatReadinessText,
+  resolveKeyValue,
   parsePositiveIntegerOption,
   printJson,
   resolveStrictJson,
@@ -38,20 +40,6 @@ interface SlotView {
   lastValidatedAt?: string;
 }
 
-function parseProvider(value: string): SecretProvider {
-  if (isSecretProvider(value)) {
-    return value;
-  }
-  throw new Error(`Invalid provider: ${value}`);
-}
-
-function createSecretConflictError(cause: string): CliUserError {
-  return new CliUserError({
-    summary: 'Conflicting key source options.',
-    cause,
-    suggestedCommands: ['Use either --key or --key-stdin, not both.']
-  });
-}
 
 async function resolveSlotByRef(
   profileStore: ProfileStore,
@@ -96,43 +84,6 @@ async function collectSlotViews(args: {
     });
   }
   return views;
-}
-
-async function resolveKeyValue(args: {
-  key?: string;
-  keyStdin?: boolean;
-  envKey?: string;
-  allowPrompt?: boolean;
-  prompt: CliContext['prompt'];
-  readStdin: () => Promise<string>;
-  promptQuestion: string;
-  stdout: CliContext['stdout'];
-}): Promise<string | undefined> {
-  const inlineKey = args.key?.trim();
-  const envKey = args.envKey?.trim();
-
-  if (inlineKey && args.keyStdin) {
-    throw createSecretConflictError('Use either --key or --key-stdin, not both.');
-  }
-  if (inlineKey) {
-    return inlineKey;
-  }
-  if (args.keyStdin) {
-    const stdinValue = (await args.readStdin()).trim();
-    return stdinValue || undefined;
-  }
-  if (envKey) {
-    return envKey;
-  }
-  if (args.allowPrompt) {
-    const prompted = await args.prompt({
-      question: args.promptQuestion,
-      stdout: args.stdout,
-      secret: true
-    });
-    return prompted.trim() || undefined;
-  }
-  return undefined;
 }
 
 function formatSlotListText(slots: SlotView[]): string {

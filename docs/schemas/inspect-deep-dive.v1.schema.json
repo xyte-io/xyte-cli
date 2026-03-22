@@ -13,7 +13,7 @@
     "topOfflineSpaces",
     "topIncidentDevices",
     "activeIncidentAging",
-    "churn24h",
+    "churnWindow",
     "ticketPosture",
     "dataQuality"
   ],
@@ -152,7 +152,7 @@
         }
       }
     },
-    "churn24h": {
+    "churnWindow": {
       "type": "object",
       "required": [
         "incidents",

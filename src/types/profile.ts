@@ -9,6 +9,14 @@ export function isSecretProvider(value: string): value is SecretProvider {
   return (SUPPORTED_SECRET_PROVIDERS as readonly string[]).includes(value);
 }
 
+export function parseProvider(value: string): SecretProvider {
+  const normalized = value.trim();
+  if (!isSecretProvider(normalized)) {
+    throw new Error(`Invalid provider: ${value}`);
+  }
+  return normalized;
+}
+
 export interface ApiKeySlotMeta {
   slotId: string;
   provider: SecretProvider;

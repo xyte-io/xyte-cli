@@ -223,7 +223,7 @@ function resolveFlowWindowHours(step: FlowTaskStep, context: Record<string, stri
   return parsed;
 }
 
-function hydrateDerivedFlowContext(_step: FlowTaskStep, ctx: RunContext): void {
+function hydrateDerivedFlowContext(ctx: RunContext): void {
   const context = ctx.resolvedContext;
 
   if (!context.device_id && context.watch_device_id) {
@@ -308,7 +308,7 @@ function resolveReadiness(ctx: RunContext, checkConnectivity: boolean) {
 }
 
 async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
-  hydrateDerivedFlowContext(step, ctx);
+  hydrateDerivedFlowContext(ctx);
   ensureContextKeys(step, ctx.resolvedContext);
 
   switch (step.task) {
@@ -914,10 +914,6 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
         break;
       }
     }
-  }
-
-  if (outcome === 'completed' && nextStepIndex < args.definition.steps.length) {
-    outcome = 'pending_gate';
   }
 
   const decisionsCount = computeDecisionCounts(decisions);

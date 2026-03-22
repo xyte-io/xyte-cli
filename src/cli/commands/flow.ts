@@ -14,7 +14,7 @@ import {
   saveFlowDefinition,
   updateFlowDefinition
 } from '../../workflows/flow-user-definitions';
-import type { InspectProviderScope } from '../../types/settings-enums';
+import { parseInspectProviderScope, type InspectProviderScope } from '../../types/settings-enums';
 import { type CliContext, printJson } from '../cli-context';
 
 function parseFlowMode(options: { plan?: boolean; apply?: boolean }): FlowRunMode {
@@ -25,16 +25,6 @@ function parseFlowMode(options: { plan?: boolean; apply?: boolean }): FlowRunMod
     return 'apply';
   }
   return 'plan';
-}
-
-function parseInspectProviderScope(value: string | undefined): InspectProviderScope {
-  if (!value || value === 'auto') {
-    return 'auto';
-  }
-  if (value === 'organization' || value === 'partner') {
-    return value;
-  }
-  throw new Error(`Invalid inspect provider scope: "${value}". Expected organization|partner|auto.`);
 }
 
 function parseFlowContextJson(value: string | undefined): Record<string, string> {

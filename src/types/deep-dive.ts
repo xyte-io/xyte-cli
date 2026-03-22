@@ -21,7 +21,7 @@ export interface DeepDiveResult {
   topOfflineSpaces: Array<{ space: string; offlineDevices: number; shareOfOfflinePct: number }>;
   topIncidentDevices: Array<{ device: string; incidentCount: number; activeIncidents: number }>;
   activeIncidentAging: Array<{ device: string; space: string; ageHours: number; createdAtUtc: string }>;
-  churn24h: {
+  churnWindow: {
     incidents: number;
     devices: number;
     spaces: number;

@@ -512,7 +512,7 @@ export interface ConfigData {
   slotRows: ConfigSlotRow[];
 }
 
-export async function loadConfigData(
+export async function readConfigData(
   profileStore: ProfileStore,
   secretStore: SecretStore,
   tenantId: string | undefined

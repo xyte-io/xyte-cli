@@ -43,7 +43,7 @@
       "createdAtUtc": "2026-02-24T00:00:00.000Z"
     }
   ],
-  "churn24h": {
+  "churnWindow": {
     "incidents": 0,
     "devices": 0,
     "spaces": 0,

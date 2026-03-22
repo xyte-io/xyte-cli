@@ -1653,7 +1653,7 @@ describe('cli integration', () => {
     expect(parsed.schemaVersion).toBe('xyte.inspect.deep-dive.v1');
     expect(parsed.tenantId).toBe('acme');
     expect(parsed.ticketPosture.openTickets).toBe(1);
-    expect(parsed.churn24h.incidents).toBe(0);
+    expect(parsed.churnWindow.incidents).toBe(0);
     expect(parsed.summary.some((line: string) => line.startsWith('Partner model distribution:'))).toBe(true);
     expect(parsed.summary.some((line: string) => line.startsWith('Partner telemetry coverage:'))).toBe(true);
     const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));

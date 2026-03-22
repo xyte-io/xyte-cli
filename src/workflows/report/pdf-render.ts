@@ -21,19 +21,10 @@ import {
 import { registerReportFonts } from './font-asset';
 import { formatRelativeAgeFromHours, formatUtcForReport, formatWindowLabel } from './time-format';
 import { REPORT_THEME, getWindowFocus } from './theme';
+import { redactForDisplay as redactSensitive } from '../../utils/redact';
 
 function ensureDir(filePath: string): void {
   mkdirSync(dirname(resolve(filePath)), { recursive: true });
-}
-
-function redactSensitive(value: string, includeSensitive: boolean): string {
-  if (includeSensitive || value === 'n/a') {
-    return value;
-  }
-  if (value.length <= 8) {
-    return '***';
-  }
-  return `${value.slice(0, 4)}...${value.slice(-4)}`;
 }
 
 function compactIdentifier(value: string): string {
@@ -173,7 +164,7 @@ export function buildDeepDiveOverviewPlan(deepDive: DeepDiveResult): DeepDiveOve
   const topIncidentDevice = deepDive.topIncidentDevices[0];
   const overlapDevices = deepDive.ticketPosture.overlappingActiveIncidentDevices;
   const churnTone: 'normal' | 'warn' | 'bad' =
-    deepDive.churn24h.incidents >= 10 ? 'bad' : deepDive.churn24h.incidents > 0 ? 'warn' : 'normal';
+    deepDive.churnWindow.incidents >= 10 ? 'bad' : deepDive.churnWindow.incidents > 0 ? 'warn' : 'normal';
   const dataQualityTone: 'normal' | 'warn' | 'bad' = metrics.mismatches > 0 ? 'warn' : 'normal';
 
   const offlineTone: 'normal' | 'warn' | 'bad' =
@@ -216,8 +207,8 @@ export function buildDeepDiveOverviewPlan(deepDive: DeepDiveResult): DeepDiveOve
     },
     {
       label: deepDive.windowHours <= 24 ? '24h churn' : 'Window churn',
-      value: String(deepDive.churn24h.incidents),
-      detail: `${deepDive.churn24h.devices} devices in ${deepDive.churn24h.spaces} spaces`,
+      value: String(deepDive.churnWindow.incidents),
+      detail: `${deepDive.churnWindow.devices} devices in ${deepDive.churnWindow.spaces} spaces`,
       tone: churnTone
     },
     {
@@ -279,9 +270,9 @@ export function buildDeepDiveReportSectionPlan(deepDive: DeepDiveResult): DeepDi
   const includeIncidentSections =
     deepDive.topIncidentDevices.length > 0 ||
     deepDive.activeIncidentAging.length > 0 ||
-    deepDive.churn24h.incidents > 0 ||
-    deepDive.churn24h.bySpace.length > 0 ||
-    deepDive.churn24h.byDevice.length > 0;
+    deepDive.churnWindow.incidents > 0 ||
+    deepDive.churnWindow.bySpace.length > 0 ||
+    deepDive.churnWindow.byDevice.length > 0;
 
   return {
     includeOfflineSpaces: deepDive.topOfflineSpaces.length > 0,
@@ -367,7 +358,7 @@ export function renderBrandedPdfReport(deepDive: DeepDiveResult, outputPath: str
       drawSpaceBars(
         doc,
         ctx,
-        deepDive.churn24h.bySpace.map((row) => ({
+        deepDive.churnWindow.bySpace.map((row) => ({
           space: formatSpaceHierarchy(row.space),
           incidents: row.incidents
         }))
@@ -424,14 +415,14 @@ export function renderBrandedPdfReport(deepDive: DeepDiveResult, outputPath: str
         emptyMessage: 'No active incidents.'
       });
 
-      if (deepDive.churn24h.bySpace.length > 0) {
+      if (deepDive.churnWindow.bySpace.length > 0) {
         drawTable(doc, ctx, {
           title: `${windowLabel} Churn by Space`,
           columns: [
             { header: 'Space', width: 333, wrap: true },
             { header: 'Incidents', width: 120, align: 'right', wrap: false }
           ],
-          rows: deepDive.churn24h.bySpace.map((row) => [formatSpaceHierarchy(row.space), String(row.incidents)]),
+          rows: deepDive.churnWindow.bySpace.map((row) => [formatSpaceHierarchy(row.space), String(row.incidents)]),
           emptyMessage: 'No churn events in this window.'
         });
       }
