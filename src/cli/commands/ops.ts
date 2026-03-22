@@ -26,7 +26,6 @@ import type { SettingKey } from '../../config/settings';
 import { parsePositiveIntegerOption, parseQueryJson } from '../parse-options';
 import {
   type CliContext,
-  type CliGlobalOptions,
   type OutputFormat,
   type OutputStream,
   getExplicitGlobalOutput,
@@ -519,7 +518,7 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
     .action(async function (options: Record<string, unknown>) {
       await handleOpsWatchIncidents(ctx, {
         ...options,
-        output: (this.optsWithGlobals() as CliGlobalOptions).output
+        output: getExplicitGlobalOutput(this)
       });
     });
 
@@ -541,7 +540,7 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
     }) {
       await handleOpsInspectFleet(ctx, {
         ...options,
-        output: (this.optsWithGlobals() as CliGlobalOptions).output
+        output: getExplicitGlobalOutput(this)
       });
     });
 
@@ -564,7 +563,7 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
     }) {
       await handleOpsInspectDeepDive(ctx, {
         ...options,
-        output: (this.optsWithGlobals() as CliGlobalOptions).output
+        output: getExplicitGlobalOutput(this)
       });
     });
 
