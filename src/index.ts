@@ -14,7 +14,7 @@ export {
   generateFleetReport
 } from './workflows/fleet-insights';
 
-export { FileProfileStore } from './secure/profile-store';
+export { FileProfileStore, createProfileStore } from './secure/profile-store';
 export { createSecretStore, MemorySecretStore, FileSecretStore } from './secure/secret-store';
 export type { SecretStore } from './secure/secret-store';
 export type { ProfileStore } from './secure/profile-store';

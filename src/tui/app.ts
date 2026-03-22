@@ -12,8 +12,7 @@ import { createDevicesScreen } from './screens/devices';
 import { createIncidentsScreen } from './screens/incidents';
 import { createTicketsScreen } from './screens/tickets';
 import type { XyteClient } from '../types/client';
-import type { ProfileStore } from '../secure/profile-store';
-import { FileProfileStore } from '../secure/profile-store';
+import { createProfileStore, type ProfileStore } from '../secure/profile-store';
 import { createSecretStore, type SecretStore } from '../secure/secret-store';
 import { dispatchKeypress } from './dispatch';
 import { isMotionEnabled, startupFrames } from './animation';
@@ -98,7 +97,7 @@ export function updateErrorStormState(
 }
 
 export async function runTuiApp(options: TuiAppOptions): Promise<void> {
-  const profileStore = options.profileStore ?? new FileProfileStore();
+  const profileStore = options.profileStore ?? createProfileStore();
   const secretStore = options.secretStore ?? createSecretStore();
   const motionEnabled = isMotionEnabled({ headless: options.headless, explicitMotion: options.motionEnabled });
   const debugEnabled = Boolean(options.debug || options.debugLogPath);

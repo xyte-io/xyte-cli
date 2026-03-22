@@ -4,7 +4,7 @@ import { XyteAuthError, XyteValidationError } from '../http/errors';
 import { createOrganizationNamespace } from './namespaces/organization';
 import { createPartnerNamespace } from './namespaces/partner';
 import { createSecretStore, type SecretStore } from '../secure/secret-store';
-import { FileProfileStore, type ProfileStore } from '../secure/profile-store';
+import { createProfileStore, type ProfileStore } from '../secure/profile-store';
 import type { PublicEndpointSpec } from '../types/endpoints';
 import { PROVIDER_ORG, PROVIDER_PARTNER, type SecretProvider } from '../types/profile';
 import type { XyteCallArgs, XyteCallResult, XyteClient, XyteClientOptions } from '../types/client';
@@ -59,7 +59,7 @@ function directAuthValue(options: XyteClientOptions, scope: PublicEndpointSpec['
 }
 
 export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
-  const profileStore: ProfileStore = options.profileStore ?? new FileProfileStore();
+  const profileStore: ProfileStore = options.profileStore ?? createProfileStore();
   const transport = options.transport ??
     new HttpTransport({
       timeoutMs: options.timeoutMs,

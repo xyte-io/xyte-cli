@@ -20,7 +20,7 @@ import {
   type SettingKey
 } from '../config/settings';
 import { createSecretStore, type SecretStore } from '../secure/secret-store';
-import { FileProfileStore, type ProfileStore } from '../secure/profile-store';
+import { createProfileStore, type ProfileStore } from '../secure/profile-store';
 import { buildInstallDoctorReport, type InstallDoctorResult } from '../utils/install-doctor';
 import { getCliVersion } from '../utils/version';
 import {
@@ -404,7 +404,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
   const stdoutIsTTY =
     runtime.stdoutIsTTY ??
     Boolean(('isTTY' in stdout ? (stdout as typeof process.stdout).isTTY : undefined) ?? process.stdout.isTTY);
-  const profileStore = runtime.profileStore ?? new FileProfileStore();
+  const profileStore = runtime.profileStore ?? createProfileStore();
   const runTui = runtime.runTui ?? runTuiApp;
   const cwd = runtime.cwd ?? process.cwd();
   const env = runtime.env ?? process.env;

@@ -492,3 +492,7 @@ export class FileProfileStore implements ProfileStore {
     };
   }
 }
+
+export function createProfileStore(): ProfileStore {
+  return new FileProfileStore();
+}
