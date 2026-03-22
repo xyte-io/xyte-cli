@@ -54,6 +54,22 @@ function writeReportLine(reportPath: string | undefined, payload: Record<string,
   appendFileSync(reportPath, `${JSON.stringify(payload)}\n`, 'utf8');
 }
 
+function reportLine(
+  operation: UtilityBatchOperation,
+  status: UtilityRowStatus,
+  extra?: Record<string, unknown>
+): Record<string, unknown> {
+  return {
+    timestampUtc: new Date().toISOString(),
+    rowIndex: operation.rowIndex,
+    status,
+    endpointKey: operation.endpointKey,
+    request: operation.request,
+    input: operation.input,
+    ...extra
+  };
+}
+
 export async function runUtilityBatch(args: {
   client: XyteClient;
   tenantId: string;
@@ -86,69 +102,35 @@ export async function runUtilityBatch(args: {
       if (args.apply) {
         const response = await operation.execute(args.client, args.tenantId);
         totals.succeeded += 1;
-        writeReportLine(args.reportPath, {
-          timestampUtc: new Date().toISOString(),
-          rowIndex: operation.rowIndex,
-          status: 'succeeded' satisfies UtilityRowStatus,
-          endpointKey: operation.endpointKey,
-          request: operation.request,
+        writeReportLine(args.reportPath, reportLine(operation, 'succeeded', {
           response: {
             status: response.status,
             durationMs: response.durationMs,
             retryCount: response.retryCount,
             data: response.data
-          },
-          input: operation.input
-        });
+          }
+        }));
       } else {
         totals.skipped += 1;
-        writeReportLine(args.reportPath, {
-          timestampUtc: new Date().toISOString(),
-          rowIndex: operation.rowIndex,
-          status: 'dry-run' satisfies UtilityRowStatus,
-          endpointKey: operation.endpointKey,
-          request: operation.request,
-          input: operation.input
-        });
+        writeReportLine(args.reportPath, reportLine(operation, 'dry-run'));
       }
     } catch (error) {
       totals.failed += 1;
       const message = errorMessage(error);
       if (!firstError) {
-        firstError = {
-          rowIndex: operation.rowIndex,
-          message
-        };
+        firstError = { rowIndex: operation.rowIndex, message };
       }
 
-      writeReportLine(args.reportPath, {
-        timestampUtc: new Date().toISOString(),
-        rowIndex: operation.rowIndex,
-        status: 'failed' satisfies UtilityRowStatus,
-        endpointKey: operation.endpointKey,
-        request: operation.request,
-        error: {
-          message
-        },
-        input: operation.input
-      });
+      writeReportLine(args.reportPath, reportLine(operation, 'failed', { error: { message } }));
 
       if (!args.continueOnError) {
         stoppedEarly = true;
         const remaining = args.operations.slice(index + 1);
         totals.skipped += remaining.length;
-        for (const skippedOperation of remaining) {
-          writeReportLine(args.reportPath, {
-            timestampUtc: new Date().toISOString(),
-            rowIndex: skippedOperation.rowIndex,
-            status: 'skipped' satisfies UtilityRowStatus,
-            endpointKey: skippedOperation.endpointKey,
-            request: skippedOperation.request,
-            error: {
-              message: 'Skipped because processing stopped after first failure (fail-fast mode).'
-            },
-            input: skippedOperation.input
-          });
+        for (const skippedOp of remaining) {
+          writeReportLine(args.reportPath, reportLine(skippedOp, 'skipped', {
+            error: { message: 'Skipped because processing stopped after first failure (fail-fast mode).' }
+          }));
         }
         break;
       }
