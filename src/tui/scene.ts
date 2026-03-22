@@ -151,15 +151,15 @@ interface SetupSceneState {
   connectionState: string;
   missingItems: string[];
   recommendedActions: string[];
-  providerRows: Array<{ provider: string; slotCount: number; activeSlot: string; hasSecret: string }>;
+  providerRows: Array<{ provider: string; slotCount: number; activeSlot: string; hasSecret: 'yes' | 'no' }>;
 }
 
 interface ConfigSceneState {
   tenantId?: string;
-  providerRows: Array<{ provider: string; slotCount: number; activeSlot: string; hasSecret: string; lastValidatedAt?: string }>;
+  providerRows: Array<{ provider: string; slotCount: number; activeSlot: string; hasSecret: 'yes' | 'no'; lastValidatedAt?: string }>;
   selectedProvider?: string;
-  slotRows: Array<{ provider: string; slotId: string; name: string; active: string; hasSecret: string; fingerprint: string }>;
-  selectedSlot?: { provider: string; slotId: string; name: string; active: string; hasSecret: string; fingerprint: string };
+  slotRows: Array<{ provider: string; slotId: string; name: string; active: 'yes' | 'no'; hasSecret: 'yes' | 'no'; fingerprint: string }>;
+  selectedSlot?: { provider: string; slotId: string; name: string; active: 'yes' | 'no'; hasSecret: 'yes' | 'no'; fingerprint: string };
   doctorStatus?: string;
 }
 

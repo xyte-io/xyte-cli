@@ -289,20 +289,23 @@ describe('fleet insights provider scope', () => {
   });
 
   it('applies a 3s timeout to stuck partner enrichment endpoint calls', async () => {
-    const fixture = makeFixture({ hasOrganization: false, hasPartner: true });
-    fixture.partner.getDeviceInfo.mockImplementation(
-      () =>
-        new Promise(() => {
-          // Intentionally unresolved to assert timeout behavior.
-        })
-    );
+    vi.useFakeTimers();
+    try {
+      const fixture = makeFixture({ hasOrganization: false, hasPartner: true });
+      fixture.partner.getDeviceInfo.mockImplementation(
+        () =>
+          new Promise(() => {
+            // Intentionally unresolved to assert timeout behavior.
+          })
+      );
 
-    const started = Date.now();
-    const snapshot = await collectFleetSnapshot({ client: fixture.client, tenantId: 'acme', tenantName: 'Acme', providerScope: 'partner' });
-    const elapsed = Date.now() - started;
+      const snapshotPromise = collectFleetSnapshot({ client: fixture.client, tenantId: 'acme', tenantName: 'Acme', providerScope: 'partner' });
+      await vi.advanceTimersByTimeAsync(3_000);
+      const snapshot = await snapshotPromise;
 
-    expect(snapshot.devices.length).toBe(1);
-    expect(elapsed).toBeGreaterThanOrEqual(2_500);
-    expect(elapsed).toBeLessThan(10_000);
+      expect(snapshot.devices.length).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

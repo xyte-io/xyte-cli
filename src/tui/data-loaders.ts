@@ -493,7 +493,7 @@ export interface ConfigProviderRow {
   provider: SecretProvider;
   slotCount: number;
   activeSlot: string;
-  hasSecret: string;
+  hasSecret: 'yes' | 'no';
   lastValidatedAt?: string;
 }
 
@@ -501,8 +501,8 @@ export interface ConfigSlotRow {
   provider: SecretProvider;
   slotId: string;
   name: string;
-  active: string;
-  hasSecret: string;
+  active: 'yes' | 'no';
+  hasSecret: 'yes' | 'no';
   fingerprint: string;
 }
 
