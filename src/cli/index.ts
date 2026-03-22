@@ -29,7 +29,7 @@ import { createSecretStore, type SecretStore } from '../secure/secret-store';
 import { makeKeyFingerprint } from '../secure/key-slots';
 import { FileProfileStore, type ProfileStore } from '../secure/profile-store';
 import type { SecretProvider } from '../types/profile';
-import { isSecretProvider, PROVIDER_ORG, PROVIDER_PARTNER } from '../types/profile';
+import { isSecretProvider, PROVIDER_ORG } from '../types/profile';
 import { isRecord, parseJsonObject } from '../utils/json';
 import { buildInstallDoctorReport, type InstallDoctorResult } from '../utils/install-doctor';
 import type { UtilityInputFormat } from '../utils/input-parser';
