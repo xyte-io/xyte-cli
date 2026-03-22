@@ -120,14 +120,8 @@ function extractTenantNameFromOrganizationInfo(payload: unknown): string | undef
 }
 
 export {
-  type SetupConnectivityMode,
-  type SetupStepKey,
-  type SetupStep,
-  SIMPLE_SETUP_AUTH_PROVIDER,
-  SIMPLE_SETUP_SLOT_NAME,
   SIMPLE_SETUP_DEFAULT_TENANT,
   normalizeTenantId,
-  extractTenantNameFromOrganizationInfo,
   runSimpleSetup
 };
 
