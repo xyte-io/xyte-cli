@@ -145,9 +145,9 @@ function buildRunDirName(runId: string): string {
   return `${stamp}-${runId}`;
 }
 
-function parseVarEntries(values: string[]): Record<string, string> {
+export function parseFlowVarOptions(values: string[] | undefined): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const entry of values) {
+  for (const entry of values ?? []) {
     const index = entry.indexOf('=');
     if (index <= 0) {
       throw new Error(`Invalid --var entry: ${entry}. Use key=value.`);
@@ -160,10 +160,6 @@ function parseVarEntries(values: string[]): Record<string, string> {
     out[key] = value;
   }
   return out;
-}
-
-export function parseFlowVarOptions(values: string[] | undefined): Record<string, string> {
-  return parseVarEntries(values ?? []);
 }
 
 function resolveTemplateString(input: string, context: Record<string, string>): string {

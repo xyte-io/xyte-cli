@@ -231,7 +231,7 @@ function buildPartnerSummaryLines(snapshot: FleetSnapshot): string[] {
 
   if (enrichment.endpointAvailability.telemetries.succeeded > 0) {
     lines.push(
-      `Partner telemetry coverage: ${enrichment.telemetryCoverage.withTelemetries}/${sampled} devices with telemetries, ${enrichment.telemetryCoverage.freshWithin24Hours}/${sampled} fresh <=24h.`
+      `Partner telemetry coverage: ${enrichment.telemetryCoverage.withTelemetries}/${sampled} devices with telemetries, ${enrichment.telemetryCoverage.freshWithinWindow}/${sampled} fresh <=24h.`
     );
   }
 

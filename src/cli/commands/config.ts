@@ -320,7 +320,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
       });
       const payload = {
         schemaVersion: 'xyte.settings.v1',
-        scope,
+        scope: targetScope,
         path: result.path,
         key,
         value: parsedValue,
@@ -364,7 +364,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
       });
       const payload = {
         schemaVersion: 'xyte.settings.v1',
-        scope,
+        scope: targetScope,
         path: result.path,
         key,
         values: result.data

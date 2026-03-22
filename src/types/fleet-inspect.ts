@@ -40,7 +40,7 @@ export interface PartnerEnrichmentSnapshot {
   commandPosture: StatusCounts;
   telemetryCoverage: {
     withTelemetries: number;
-    freshWithin24Hours: number;
+    freshWithinWindow: number;
   };
   stateHistoryCoverage: {
     withHistory: number;

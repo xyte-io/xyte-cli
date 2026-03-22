@@ -123,7 +123,7 @@ describe('report layout helpers', () => {
         firmwareDistribution: { '1.2.3': 1 },
         lastSeenRecency: { '<=1h': 1 },
         commandPosture: { sent: 1 },
-        telemetryCoverage: { withTelemetries: 1, freshWithin24Hours: 1 },
+        telemetryCoverage: { withTelemetries: 1, freshWithinWindow: 1 },
         stateHistoryCoverage: { withHistory: 1, totalEntries: 3 }
       }
     });
@@ -174,7 +174,7 @@ describe('report layout helpers', () => {
         firmwareDistribution: { '1.2.3': 1 },
         lastSeenRecency: { '<=1h': 1 },
         commandPosture: { sent: 1 },
-        telemetryCoverage: { withTelemetries: 1, freshWithin24Hours: 1 },
+        telemetryCoverage: { withTelemetries: 1, freshWithinWindow: 1 },
         stateHistoryCoverage: { withHistory: 1, totalEntries: 3 }
       }
     });

@@ -262,7 +262,7 @@ async function collectPartnerEnrichment(
     commandPosture: {},
     telemetryCoverage: {
       withTelemetries: 0,
-      freshWithin24Hours: 0
+      freshWithinWindow: 0
     },
     stateHistoryCoverage: {
       withHistory: 0,
@@ -365,7 +365,7 @@ async function collectPartnerEnrichment(
       if (latest) {
         const age = Math.max(0, Date.now() - latest.getTime());
         if (age <= PARTNER_FRESH_TELEMETRY_WINDOW_HOURS * 3_600_000) {
-          snapshot.telemetryCoverage.freshWithin24Hours += 1;
+          snapshot.telemetryCoverage.freshWithinWindow += 1;
         }
       }
     }
