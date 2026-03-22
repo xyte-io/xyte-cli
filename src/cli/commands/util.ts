@@ -36,98 +36,98 @@ interface CliGlobalOptions {
   output?: string;
 }
 
+async function handleUtilPrepare(ctx: CliContext, options: {
+  input: string;
+  action: string;
+  tenant?: string;
+  outputDir?: string;
+  primaryFormat?: string;
+  force?: boolean;
+  strictJson?: boolean;
+}): Promise<void> {
+  const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
+  const result = runUtilityPrepare({
+    inputPath: options.input,
+    actionKey: options.action,
+    outputDir: options.outputDir,
+    tenantId: options.tenant ?? settings.values.defaults.tenant,
+    primaryFormat: parseUtilityPreparePrimaryFormat(options.primaryFormat),
+    force: options.force === true
+  });
+  printJson(ctx.stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+}
+
+async function handleUtilListActions(ctx: CliContext, options: {
+  output?: string;
+  format?: string;
+  entity?: string;
+  includeGeneric?: boolean;
+  strictJson?: boolean;
+}): Promise<void> {
+  const settings = await ctx.resolveSettings();
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    format: options.format,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
+  const actions = listUtilityPrepareActions({
+    entity: options.entity,
+    includeGeneric: options.includeGeneric !== false
+  });
+  if (output === 'json') {
+    printJson(ctx.stdout, actions, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+    return;
+  }
+  if (!actions.length) {
+    ctx.stdout.write('No utility actions found.\n');
+    return;
+  }
+  for (const action of actions) {
+    ctx.stdout.write(`${action.actionKey} | entity=${action.entity} | mode=${action.mode} | execution=${action.executionSupport}\n`);
+  }
+}
+
+async function handleUtilImportTree(ctx: CliContext, options: {
+  tenant?: string;
+  input: string;
+  inputFormat?: string;
+  pathField?: string;
+  spaceTypeField?: string;
+  configField?: string;
+  apply?: boolean;
+  continueOnError?: boolean;
+  report?: string;
+  strictJson?: boolean;
+}): Promise<void> {
+  const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
+  const tenantId = options.tenant ?? settings.values.defaults.tenant;
+  if (!tenantId) {
+    throw new CliUserError({
+      summary: 'Missing tenant for util import-tree.',
+      suggestedCommands: ['Use --tenant <tenant-id>', 'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>']
+    });
+  }
+  const client = await ctx.withClient({ tenantId });
+  const result = await runSpaceImportTree({
+    client,
+    tenantId,
+    inputPath: options.input,
+    inputFormat: parseUtilityInputFormat(options.inputFormat),
+    apply: options.apply === true,
+    continueOnError: options.continueOnError === true,
+    reportPath: options.report,
+    pathField: options.pathField,
+    spaceTypeField: options.spaceTypeField,
+    configField: options.configField
+  });
+  printJson(ctx.stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+  if (result.totals.failed > 0) {
+    process.exitCode = 1;
+  }
+}
+
 export function registerUtilCommands(parent: Command, ctx: CliContext): void {
-  const handleUtilPrepare = async (options: {
-    input: string;
-    action: string;
-    tenant?: string;
-    outputDir?: string;
-    primaryFormat?: string;
-    force?: boolean;
-    strictJson?: boolean;
-  }) => {
-    const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
-    const result = runUtilityPrepare({
-      inputPath: options.input,
-      actionKey: options.action,
-      outputDir: options.outputDir,
-      tenantId: options.tenant ?? settings.values.defaults.tenant,
-      primaryFormat: parseUtilityPreparePrimaryFormat(options.primaryFormat),
-      force: options.force === true
-    });
-    printJson(ctx.stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
-  };
-
-  const handleUtilListActions = async (options: {
-    output?: string;
-    format?: string;
-    entity?: string;
-    includeGeneric?: boolean;
-    strictJson?: boolean;
-  }) => {
-    const settings = await ctx.resolveSettings();
-    const output = resolveTextJsonOutput({
-      output: options.output,
-      format: options.format,
-      stdoutIsTTY: ctx.stdoutIsTTY,
-      settings
-    });
-    const actions = listUtilityPrepareActions({
-      entity: options.entity,
-      includeGeneric: options.includeGeneric !== false
-    });
-    if (output === 'json') {
-      printJson(ctx.stdout, actions, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
-      return;
-    }
-    if (!actions.length) {
-      ctx.stdout.write('No utility actions found.\n');
-      return;
-    }
-    for (const action of actions) {
-      ctx.stdout.write(`${action.actionKey} | entity=${action.entity} | mode=${action.mode} | execution=${action.executionSupport}\n`);
-    }
-  };
-
-  const handleUtilImportTree = async (options: {
-    tenant?: string;
-    input: string;
-    inputFormat?: string;
-    pathField?: string;
-    spaceTypeField?: string;
-    configField?: string;
-    apply?: boolean;
-    continueOnError?: boolean;
-    report?: string;
-    strictJson?: boolean;
-  }) => {
-    const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
-    const tenantId = options.tenant ?? settings.values.defaults.tenant;
-    if (!tenantId) {
-      throw new CliUserError({
-        summary: 'Missing tenant for util import-tree.',
-        suggestedCommands: ['Use --tenant <tenant-id>', 'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>']
-      });
-    }
-    const client = await ctx.withClient({ tenantId });
-    const result = await runSpaceImportTree({
-      client,
-      tenantId,
-      inputPath: options.input,
-      inputFormat: parseUtilityInputFormat(options.inputFormat),
-      apply: options.apply === true,
-      continueOnError: options.continueOnError === true,
-      reportPath: options.report,
-      pathField: options.pathField,
-      spaceTypeField: options.spaceTypeField,
-      configField: options.configField
-    });
-    printJson(ctx.stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
-    if (result.totals.failed > 0) {
-      process.exitCode = 1;
-    }
-  };
-
   const util = parent.command('util').description('Utility preprocessing and import workflows');
   util.addHelpText(
     'after',
@@ -149,7 +149,17 @@ export function registerUtilCommands(parent: Command, ctx: CliContext): void {
     .option('--primary-format <format>', 'csv|jsonl')
     .option('--force', 'Overwrite scaffold files if they already exist')
     .option('--strict-json', 'Fail on non-serializable output')
-    .action(handleUtilPrepare);
+    .action(async (options: {
+      input: string;
+      action: string;
+      tenant?: string;
+      outputDir?: string;
+      primaryFormat?: string;
+      force?: boolean;
+      strictJson?: boolean;
+    }) => {
+      await handleUtilPrepare(ctx, options);
+    });
 
   util
     .command('list-actions')
@@ -160,7 +170,7 @@ export function registerUtilCommands(parent: Command, ctx: CliContext): void {
     .option('--format <format>', 'json|text')
     .option('--strict-json', 'Fail on non-serializable output')
     .action(async function (options: { entity?: string; includeGeneric?: boolean; format?: string; strictJson?: boolean }) {
-      await handleUtilListActions({
+      await handleUtilListActions(ctx, {
         ...options,
         output: (this.optsWithGlobals() as CliGlobalOptions).output
       });
@@ -179,5 +189,18 @@ export function registerUtilCommands(parent: Command, ctx: CliContext): void {
     .option('--continue-on-error', 'Continue processing rows after failures')
     .option('--report <path>', 'Write NDJSON row report file')
     .option('--strict-json', 'Fail on non-serializable output')
-    .action(handleUtilImportTree);
+    .action(async (options: {
+      tenant?: string;
+      input: string;
+      inputFormat?: string;
+      pathField?: string;
+      spaceTypeField?: string;
+      configField?: string;
+      apply?: boolean;
+      continueOnError?: boolean;
+      report?: string;
+      strictJson?: boolean;
+    }) => {
+      await handleUtilImportTree(ctx, options);
+    });
 }

@@ -235,279 +235,324 @@ async function runSimpleSetup(ctx: CliContext, args: {
   };
 }
 
-export function registerSetupCommands(parent: Command, ctx: CliContext): void {
-  const handleSetupStatus = async (options: { tenant?: string; output?: string; format?: OutputFormat; field?: string }) => {
-    const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
-    const secretStore = ctx.getSecretStore();
-    const tenantId = options.tenant ?? settings.values.defaults.tenant;
-    const client = tenantId ? await ctx.withClient({ tenantId }) : undefined;
-    const readiness = await evaluateReadiness({
-      profileStore: ctx.profileStore,
-      secretStore,
-      tenantId,
-      client,
-      checkConnectivity: true
-    });
+async function handleSetupStatus(ctx: CliContext, options: {
+  tenant?: string;
+  output?: string;
+  format?: OutputFormat;
+  field?: string;
+}): Promise<void> {
+  const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
+  const secretStore = ctx.getSecretStore();
+  const tenantId = options.tenant ?? settings.values.defaults.tenant;
+  const client = tenantId ? await ctx.withClient({ tenantId }) : undefined;
+  const readiness = await evaluateReadiness({
+    profileStore: ctx.profileStore,
+    secretStore,
+    tenantId,
+    client,
+    checkConnectivity: true
+  });
 
-    if (options.field) {
-      const fieldValue = resolveFieldValue(readiness, options.field);
-      ctx.stdout.write(`${formatScalarFieldValue(fieldValue, options.field)}\n`);
-      return;
-    }
+  if (options.field) {
+    const fieldValue = resolveFieldValue(readiness, options.field);
+    ctx.stdout.write(`${formatScalarFieldValue(fieldValue, options.field)}\n`);
+    return;
+  }
 
-    if (
-      resolveTextJsonOutput({
-        output: options.output,
-        format: options.format,
-        stdoutIsTTY: ctx.stdoutIsTTY,
-        settings
-      }) === 'text'
-    ) {
-      ctx.stdout.write(formatReadinessText(readiness));
-      return;
-    }
-    printJson(ctx.stdout, readiness, { strictJson: resolveStrictJson({ settings }) });
-  };
-
-  const handleSetupRun = async (options: {
-    tenant?: string;
-    name?: string;
-    advanced?: boolean;
-    provider?: string;
-    slotName?: string;
-    key?: string;
-    keyStdin?: boolean;
-    setActive?: boolean;
-    connectivity?: string;
-    nonInteractive?: boolean;
-    output?: string;
-    format?: OutputFormat;
-  }) => {
-    if (!options.nonInteractive && !ctx.isInteractive) {
-      throw new CliUserError({
-        summary: 'Interactive setup requires a TTY.',
-        suggestedCommands: ['Use xyte-cli setup run --non-interactive --tenant <tenant-id> --key-stdin']
-      });
-    }
-
-    const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
-    const explicitTenantName = typeof options.name === 'string' && options.name.trim().length > 0;
-    const connectivityMode = parseSetupConnectivityMode(options.connectivity);
-    const advanced = options.advanced === true || options.provider !== undefined;
-    const output = resolveTextJsonOutput({
+  if (
+    resolveTextJsonOutput({
       output: options.output,
       format: options.format,
       stdoutIsTTY: ctx.stdoutIsTTY,
       settings
-    });
-    if (!advanced) {
-      let tenantLabel =
-        (options.name ?? options.tenant ?? settings.values.defaults.tenant ?? SIMPLE_SETUP_DEFAULT_TENANT).trim() ||
-        SIMPLE_SETUP_DEFAULT_TENANT;
-      let keyValue = await resolveKeyValue({
-        key: options.key,
-        keyStdin: options.keyStdin,
-        envKey: ctx.env.XYTE_CLI_KEY,
-        allowPrompt: !options.nonInteractive,
-        prompt: ctx.prompt,
-        readStdin: ctx.readStdin,
-        promptQuestion: 'XYTE API key',
+    }) === 'text'
+  ) {
+    ctx.stdout.write(formatReadinessText(readiness));
+    return;
+  }
+  printJson(ctx.stdout, readiness, { strictJson: resolveStrictJson({ settings }) });
+}
+
+async function handleSetupRunSimple(ctx: CliContext, options: {
+  tenant?: string;
+  name?: string;
+  key?: string;
+  keyStdin?: boolean;
+  setActive?: boolean;
+  connectivity?: string;
+  nonInteractive?: boolean;
+  output?: string;
+  format?: OutputFormat;
+}): Promise<void> {
+  const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
+  const explicitTenantName = typeof options.name === 'string' && options.name.trim().length > 0;
+  const connectivityMode = parseSetupConnectivityMode(options.connectivity);
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    format: options.format,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
+
+  let tenantLabel =
+    (options.name ?? options.tenant ?? settings.values.defaults.tenant ?? SIMPLE_SETUP_DEFAULT_TENANT).trim() ||
+    SIMPLE_SETUP_DEFAULT_TENANT;
+  const keyValue = await resolveKeyValue({
+    key: options.key,
+    keyStdin: options.keyStdin,
+    envKey: ctx.env.XYTE_CLI_KEY,
+    allowPrompt: !options.nonInteractive,
+    prompt: ctx.prompt,
+    readStdin: ctx.readStdin,
+    promptQuestion: 'XYTE API key',
+    stdout: ctx.stdout
+  });
+
+  if (!options.nonInteractive) {
+    tenantLabel =
+      (await ctx.prompt({
+        question: 'Tenant label (optional)',
+        initial: tenantLabel,
         stdout: ctx.stdout
-      });
+      })) || tenantLabel;
+  }
 
-      if (!options.nonInteractive) {
-        tenantLabel =
-          (await ctx.prompt({
-            question: 'Tenant label (optional)',
-            initial: tenantLabel,
-            stdout: ctx.stdout
-          })) || tenantLabel;
-      }
-
-      if (!keyValue) {
-        throw new CliUserError({
-          summary: 'Missing API key.',
-          cause: 'Setup needs --key, --key-stdin, XYTE_CLI_KEY, or interactive input.',
-          suggestedCommands: ['Use xyte-cli setup run --tenant <tenant-id>']
-        });
-      }
-
-      const tenantId = normalizeTenantId(options.tenant?.trim() || tenantLabel);
-      const tenantName = tenantLabel.trim() || tenantId;
-      const resolvedTenantName =
-        connectivityMode !== 'never' && !explicitTenantName && tenantName === tenantId
-          ? await resolveTenantNameFromKey(ctx, {
-              tenantId,
-              provider: SIMPLE_SETUP_AUTH_PROVIDER,
-              keyValue
-            })
-          : undefined;
-      const setupResult = await runSimpleSetup(ctx, {
-        tenantId,
-        tenantName: resolvedTenantName ?? tenantName,
-        keyValue,
-        setActive: options.setActive !== false,
-        connectivityMode
-      });
-
-      if (output === 'text') {
-        ctx.stdout.write(formatReadinessText(setupResult.readiness));
-        return;
-      }
-
-      printJson(ctx.stdout, setupResult, { strictJson: resolveStrictJson({ settings }) });
-      return;
-    }
-
-    let tenantId = options.tenant ?? settings.values.defaults.tenant;
-    let tenantName = options.name;
-    let provider = options.provider ? parseProvider(options.provider) : undefined;
-    let slotName = options.slotName ?? 'primary';
-    let keyValue = await resolveKeyValue({
-      key: options.key,
-      keyStdin: options.keyStdin,
-      envKey: ctx.env.XYTE_CLI_KEY,
-      allowPrompt: !options.nonInteractive,
-      prompt: ctx.prompt,
-      readStdin: ctx.readStdin,
-      promptQuestion: 'API key',
-      stdout: ctx.stdout
+  if (!keyValue) {
+    throw new CliUserError({
+      summary: 'Missing API key.',
+      cause: 'Setup needs --key, --key-stdin, XYTE_CLI_KEY, or interactive input.',
+      suggestedCommands: ['Use xyte-cli setup run --tenant <tenant-id>']
     });
-    const steps: SetupStep[] = [];
+  }
 
-    if (!options.nonInteractive) {
-      tenantId = tenantId || (await ctx.prompt({ question: 'Tenant id', stdout: ctx.stdout }));
-      tenantName = tenantName || (await ctx.prompt({ question: 'Tenant display name', initial: tenantId, stdout: ctx.stdout }));
-      const providerAnswer = provider || parseProvider(await ctx.prompt({ question: 'Provider', initial: PROVIDER_ORG, stdout: ctx.stdout }));
-      provider = providerAnswer;
-      slotName = await ctx.prompt({ question: 'Slot name', initial: slotName, stdout: ctx.stdout });
-    }
+  const tenantId = normalizeTenantId(options.tenant?.trim() || tenantLabel);
+  const tenantName = tenantLabel.trim() || tenantId;
+  const resolvedTenantName =
+    connectivityMode !== 'never' && !explicitTenantName && tenantName === tenantId
+      ? await resolveTenantNameFromKey(ctx, {
+          tenantId,
+          provider: SIMPLE_SETUP_AUTH_PROVIDER,
+          keyValue
+        })
+      : undefined;
+  const setupResult = await runSimpleSetup(ctx, {
+    tenantId,
+    tenantName: resolvedTenantName ?? tenantName,
+    keyValue,
+    setActive: options.setActive !== false,
+    connectivityMode
+  });
 
-    if (!tenantId) {
-      throw new CliUserError({
-        summary: 'Missing tenant id.',
-        suggestedCommands: ['Use xyte-cli setup run --advanced --tenant <tenant-id> --provider xyte-org']
-      });
-    }
-    if (!provider) {
-      throw new CliUserError({
-        summary: 'Missing provider.',
-        suggestedCommands: ['Use --provider xyte-org', 'Use --provider xyte-partner']
-      });
-    }
-    if (!keyValue) {
-      throw new CliUserError({
-        summary: 'Missing API key.',
-        suggestedCommands: ['Use xyte-cli setup run --advanced --tenant <tenant-id> --provider xyte-org']
-      });
-    }
+  if (output === 'text') {
+    ctx.stdout.write(formatReadinessText(setupResult.readiness));
+    return;
+  }
 
-    const candidateTenantName = (tenantName?.trim() || tenantId).trim() || tenantId;
-    const resolvedTenantName =
-      connectivityMode !== 'never' && !explicitTenantName && candidateTenantName === tenantId
-        ? await resolveTenantNameFromKey(ctx, {
-            tenantId,
-            provider,
-            keyValue
-          })
-        : undefined;
-    tenantName = resolvedTenantName ?? candidateTenantName;
+  printJson(ctx.stdout, setupResult, { strictJson: resolveStrictJson({ settings }) });
+}
 
-    await ctx.profileStore.upsertTenant({
-      id: tenantId,
-      name: tenantName
+async function handleSetupRunAdvanced(ctx: CliContext, options: {
+  tenant?: string;
+  name?: string;
+  provider?: string;
+  slotName?: string;
+  key?: string;
+  keyStdin?: boolean;
+  setActive?: boolean;
+  connectivity?: string;
+  nonInteractive?: boolean;
+  output?: string;
+  format?: OutputFormat;
+}): Promise<void> {
+  const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
+  const explicitTenantName = typeof options.name === 'string' && options.name.trim().length > 0;
+  const connectivityMode = parseSetupConnectivityMode(options.connectivity);
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    format: options.format,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
+
+  let tenantId = options.tenant ?? settings.values.defaults.tenant;
+  let tenantName = options.name;
+  let provider = options.provider ? parseProvider(options.provider) : undefined;
+  let slotName = options.slotName ?? 'primary';
+  const keyValue = await resolveKeyValue({
+    key: options.key,
+    keyStdin: options.keyStdin,
+    envKey: ctx.env.XYTE_CLI_KEY,
+    allowPrompt: !options.nonInteractive,
+    prompt: ctx.prompt,
+    readStdin: ctx.readStdin,
+    promptQuestion: 'API key',
+    stdout: ctx.stdout
+  });
+  const steps: SetupStep[] = [];
+
+  if (!options.nonInteractive) {
+    tenantId = tenantId || (await ctx.prompt({ question: 'Tenant id', stdout: ctx.stdout }));
+    tenantName = tenantName || (await ctx.prompt({ question: 'Tenant display name', initial: tenantId, stdout: ctx.stdout }));
+    const providerAnswer = provider || parseProvider(await ctx.prompt({ question: 'Provider', initial: PROVIDER_ORG, stdout: ctx.stdout }));
+    provider = providerAnswer;
+    slotName = await ctx.prompt({ question: 'Slot name', initial: slotName, stdout: ctx.stdout });
+  }
+
+  if (!tenantId) {
+    throw new CliUserError({
+      summary: 'Missing tenant id.',
+      suggestedCommands: ['Use xyte-cli setup run --advanced --tenant <tenant-id> --provider xyte-org']
     });
+  }
+  if (!provider) {
+    throw new CliUserError({
+      summary: 'Missing provider.',
+      suggestedCommands: ['Use --provider xyte-org', 'Use --provider xyte-partner']
+    });
+  }
+  if (!keyValue) {
+    throw new CliUserError({
+      summary: 'Missing API key.',
+      suggestedCommands: ['Use xyte-cli setup run --advanced --tenant <tenant-id> --provider xyte-org']
+    });
+  }
+
+  const candidateTenantName = (tenantName?.trim() || tenantId).trim() || tenantId;
+  const resolvedTenantName =
+    connectivityMode !== 'never' && !explicitTenantName && candidateTenantName === tenantId
+      ? await resolveTenantNameFromKey(ctx, {
+          tenantId,
+          provider,
+          keyValue
+        })
+      : undefined;
+  tenantName = resolvedTenantName ?? candidateTenantName;
+
+  await ctx.profileStore.upsertTenant({
+    id: tenantId,
+    name: tenantName
+  });
+  steps.push({
+    key: 'tenant_upserted',
+    status: 'ok',
+    detail: tenantId
+  });
+  await ctx.profileStore.setActiveTenant(tenantId);
+  steps.push({
+    key: 'tenant_activated',
+    status: 'ok',
+    detail: tenantId
+  });
+  const secretStore = ctx.getSecretStore();
+
+  let slot;
+  try {
+    slot = await ctx.profileStore.addKeySlot(tenantId, {
+      provider,
+      name: slotName,
+      fingerprint: makeKeyFingerprint(keyValue)
+    });
+  } catch (error) {
+    const knownSlots = await ctx.profileStore.listKeySlots(tenantId, provider);
+    const existing = knownSlots.find((item) => item.name.toLowerCase() === slotName.toLowerCase());
+    if (!existing) {
+      throw error;
+    }
+    slot = await ctx.profileStore.updateKeySlot(tenantId, provider, existing.slotId, {
+      fingerprint: makeKeyFingerprint(keyValue)
+    });
+  }
+  await secretStore.setSlotSecret(tenantId, provider, slot.slotId, keyValue);
+  steps.push({
+    key: 'slot_written',
+    status: 'ok',
+    detail: slot.slotId
+  });
+
+  if (options.setActive !== false) {
+    await ctx.profileStore.setActiveKeySlot(tenantId, provider, slot.slotId);
     steps.push({
-      key: 'tenant_upserted',
-      status: 'ok',
-      detail: tenantId
-    });
-    await ctx.profileStore.setActiveTenant(tenantId);
-    steps.push({
-      key: 'tenant_activated',
-      status: 'ok',
-      detail: tenantId
-    });
-    const secretStore = ctx.getSecretStore();
-
-    let slot;
-    try {
-      slot = await ctx.profileStore.addKeySlot(tenantId, {
-        provider,
-        name: slotName,
-        fingerprint: makeKeyFingerprint(keyValue)
-      });
-    } catch (error) {
-      const knownSlots = await ctx.profileStore.listKeySlots(tenantId, provider);
-      const existing = knownSlots.find((item) => item.name.toLowerCase() === slotName.toLowerCase());
-      if (!existing) {
-        throw error;
-      }
-      slot = await ctx.profileStore.updateKeySlot(tenantId, provider, existing.slotId, {
-        fingerprint: makeKeyFingerprint(keyValue)
-      });
-    }
-    await secretStore.setSlotSecret(tenantId, provider, slot.slotId, keyValue);
-    steps.push({
-      key: 'slot_written',
+      key: 'slot_activated',
       status: 'ok',
       detail: slot.slotId
     });
+  } else {
+    steps.push({
+      key: 'slot_activated',
+      status: 'skipped',
+      detail: 'setActive=false'
+    });
+  }
 
-    if (options.setActive !== false) {
-      await ctx.profileStore.setActiveKeySlot(tenantId, provider, slot.slotId);
-      steps.push({
-        key: 'slot_activated',
-        status: 'ok',
-        detail: slot.slotId
-      });
-    } else {
-      steps.push({
-        key: 'slot_activated',
-        status: 'skipped',
-        detail: 'setActive=false'
-      });
-    }
+  const checkConnectivity = connectivityMode !== 'never';
+  const client = checkConnectivity ? await ctx.withClient({ tenantId }) : undefined;
+  const readiness = await evaluateReadiness({
+    profileStore: ctx.profileStore,
+    secretStore,
+    tenantId,
+    client,
+    checkConnectivity
+  });
+  steps.push({
+    key: 'connectivity_checked',
+    status: checkConnectivity ? 'ok' : 'skipped',
+    detail: checkConnectivity ? readiness.connectivity.message : 'Connectivity probe skipped by setup mode.'
+  });
+  steps.push({
+    key: 'readiness_evaluated',
+    status: 'ok',
+    detail: readiness.state
+  });
 
-    const checkConnectivity = connectivityMode !== 'never';
-    const client = checkConnectivity ? await ctx.withClient({ tenantId }) : undefined;
-    const readiness = await evaluateReadiness({
-      profileStore: ctx.profileStore,
-      secretStore,
+  if (output === 'text') {
+    ctx.stdout.write(formatReadinessText(readiness));
+    return;
+  }
+
+  printJson(
+    ctx.stdout,
+    {
       tenantId,
-      client,
-      checkConnectivity
-    });
-    steps.push({
-      key: 'connectivity_checked',
-      status: checkConnectivity ? 'ok' : 'skipped',
-      detail: checkConnectivity ? readiness.connectivity.message : 'Connectivity probe skipped by setup mode.'
-    });
-    steps.push({
-      key: 'readiness_evaluated',
-      status: 'ok',
-      detail: readiness.state
-    });
+      provider,
+      slot,
+      readiness,
+      connectivityMode,
+      steps
+    },
+    { strictJson: resolveStrictJson({ settings }) }
+  );
+}
 
-    if (output === 'text') {
-      ctx.stdout.write(formatReadinessText(readiness));
-      return;
-    }
+async function handleSetupRun(ctx: CliContext, options: {
+  tenant?: string;
+  name?: string;
+  advanced?: boolean;
+  provider?: string;
+  slotName?: string;
+  key?: string;
+  keyStdin?: boolean;
+  setActive?: boolean;
+  connectivity?: string;
+  nonInteractive?: boolean;
+  output?: string;
+  format?: OutputFormat;
+}): Promise<void> {
+  if (!options.nonInteractive && !ctx.isInteractive) {
+    throw new CliUserError({
+      summary: 'Interactive setup requires a TTY.',
+      suggestedCommands: ['Use xyte-cli setup run --non-interactive --tenant <tenant-id> --key-stdin']
+    });
+  }
 
-    printJson(
-      ctx.stdout,
-      {
-        tenantId,
-        provider,
-        slot,
-        readiness,
-        connectivityMode,
-        steps
-      },
-      { strictJson: resolveStrictJson({ settings }) }
-    );
-  };
+  const advanced = options.advanced === true || options.provider !== undefined;
+  if (advanced) {
+    await handleSetupRunAdvanced(ctx, options);
+  } else {
+    await handleSetupRunSimple(ctx, options);
+  }
+}
 
+export function registerSetupCommands(parent: Command, ctx: CliContext): void {
   const setup = parent.command('setup').description('Run setup and readiness checks');
 
   setup
@@ -518,7 +563,7 @@ export function registerSetupCommands(parent: Command, ctx: CliContext): void {
     .option('--format <format>', 'json|text', 'json')
     .action(async (options: { tenant?: string; field?: string; format?: OutputFormat }, command: Command) => {
       const globals = command.optsWithGlobals() as { output?: string };
-      await handleSetupStatus({ tenant: options.tenant, field: options.field, format: options.format, output: globals.output });
+      await handleSetupStatus(ctx, { tenant: options.tenant, field: options.field, format: options.format, output: globals.output });
     });
 
   setup
@@ -553,7 +598,7 @@ export function registerSetupCommands(parent: Command, ctx: CliContext): void {
         command: Command
       ) => {
         const globals = command.optsWithGlobals() as { output?: string };
-        await handleSetupRun({ ...options, output: globals.output });
+        await handleSetupRun(ctx, { ...options, output: globals.output });
       }
     );
 }

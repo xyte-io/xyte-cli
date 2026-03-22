@@ -14,7 +14,7 @@ import {
   saveFlowDefinition,
   updateFlowDefinition
 } from '../../workflows/flow-user-definitions';
-import { parseInspectProviderScope, type InspectProviderScope } from '../../types/settings-enums';
+import { parseInspectProviderScope } from '../../types/settings-enums';
 import { type CliContext, printJson } from '../cli-context';
 
 function parseFlowMode(options: { plan?: boolean; apply?: boolean }): FlowRunMode {

@@ -183,272 +183,265 @@ interface CliGlobalOptions {
   output?: string;
 }
 
-export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: typeof runTuiApp = runTuiApp): void {
-  const handleOpsWatchIncidents = async (options: {
-    tenant?: string;
-    profile?: string;
-    queryJson?: string;
-    intervalMs?: string;
-    maxPolls?: string;
-    once?: boolean;
-    output?: string;
-    out?: string;
-    strictJson?: boolean;
-  }) => {
-    const overrides: Partial<Record<SettingKey, unknown>> = {};
-    if (options.tenant) {
-      overrides['defaults.tenant'] = options.tenant;
-    }
-    if (options.profile) {
-      overrides['watch.profile'] = parseWatchProfile(options.profile);
-    }
-    if (options.intervalMs) {
-      overrides['watch.intervalMs'] = parseWatchIntervalMs(options.intervalMs);
-    }
-    if (options.maxPolls) {
-      overrides['watch.maxPolls'] = parseWatchMaxPolls(options.maxPolls);
-    }
-    const settings = await ctx.resolveSettings(overrides);
-    const tenantId = options.tenant ?? settings.values.defaults.tenant;
-    const query = parseQueryJson(options.queryJson);
-    const output = resolveTextJsonOutput({
-      output: options.output,
-      stdoutIsTTY: ctx.stdoutIsTTY,
-      settings
-    });
-    const strictJson = resolveStrictJson({ strictJson: options.strictJson, settings });
-    const outPath = resolveOutPath(options.out);
-    let wroteOutPath = false;
-    const client = await ctx.withClient({ tenantId, flagOverrides: overrides });
-    await runWatch({
-      client,
-      tenantId,
-      profile: (overrides['watch.profile'] as WatchProfile | undefined) ?? settings.values.watch.profile,
-      query,
-      intervalMs: (overrides['watch.intervalMs'] as number | undefined) ?? settings.values.watch.intervalMs,
-      once: options.once === true,
-      maxPolls:
-        options.maxPolls !== undefined
-          ? (overrides['watch.maxPolls'] as number | undefined)
-          : settings.values.watch.maxPolls,
-      onFrame: (frame) => {
-        const renderFrame =
-          output === 'text' ? formatWatchFrameText(frame) : `${stringifyJsonOutput(frame, { strictJson, compact: true })}\n`;
-        if (output === 'text') {
-          if (outPath && !wroteOutPath) {
-            writeRenderedOutput(ctx.stdout, renderFrame, outPath);
-            wroteOutPath = true;
-            return;
-          }
-          appendRenderedOutput(ctx.stdout, renderFrame, outPath);
-          return;
-        }
-        if (outPath && !wroteOutPath) {
-          writeRenderedOutput(ctx.stdout, renderFrame, outPath);
-          wroteOutPath = true;
-          return;
-        }
-        appendRenderedOutput(ctx.stdout, renderFrame, outPath);
+async function handleOpsWatchIncidents(ctx: CliContext, options: {
+  tenant?: string;
+  profile?: string;
+  queryJson?: string;
+  intervalMs?: string;
+  maxPolls?: string;
+  once?: boolean;
+  output?: string;
+  out?: string;
+  strictJson?: boolean;
+}): Promise<void> {
+  const overrides: Partial<Record<SettingKey, unknown>> = {};
+  if (options.tenant) {
+    overrides['defaults.tenant'] = options.tenant;
+  }
+  if (options.profile) {
+    overrides['watch.profile'] = parseWatchProfile(options.profile);
+  }
+  if (options.intervalMs) {
+    overrides['watch.intervalMs'] = parseWatchIntervalMs(options.intervalMs);
+  }
+  if (options.maxPolls) {
+    overrides['watch.maxPolls'] = parseWatchMaxPolls(options.maxPolls);
+  }
+  const settings = await ctx.resolveSettings(overrides);
+  const tenantId = options.tenant ?? settings.values.defaults.tenant;
+  const query = parseQueryJson(options.queryJson);
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
+  const strictJson = resolveStrictJson({ strictJson: options.strictJson, settings });
+  const outPath = resolveOutPath(options.out);
+  let wroteOutPath = false;
+  const client = await ctx.withClient({ tenantId, flagOverrides: overrides });
+  await runWatch({
+    client,
+    tenantId,
+    profile: (overrides['watch.profile'] as WatchProfile | undefined) ?? settings.values.watch.profile,
+    query,
+    intervalMs: (overrides['watch.intervalMs'] as number | undefined) ?? settings.values.watch.intervalMs,
+    once: options.once === true,
+    maxPolls:
+      options.maxPolls !== undefined
+        ? (overrides['watch.maxPolls'] as number | undefined)
+        : settings.values.watch.maxPolls,
+    onFrame: (frame) => {
+      const renderFrame =
+        output === 'text' ? formatWatchFrameText(frame) : `${stringifyJsonOutput(frame, { strictJson, compact: true })}\n`;
+      if (outPath && !wroteOutPath) {
+        writeRenderedOutput(ctx.stdout, renderFrame, outPath);
+        wroteOutPath = true;
+        return;
       }
-    });
-  };
+      appendRenderedOutput(ctx.stdout, renderFrame, outPath);
+    }
+  });
+}
 
-  const handleOpsInspectFleet = async (options: {
-    tenant?: string;
-    providerScope?: string;
-    render?: string;
-    format?: string;
-    output?: string;
-    out?: string;
-    strictJson?: boolean;
-  }) => {
-    const overrides: Partial<Record<SettingKey, unknown>> = {};
-    if (options.tenant) {
-      overrides['defaults.tenant'] = options.tenant;
-    }
-    if (options.providerScope) {
-      overrides['ops.providerScope'] = parseInspectProviderScope(options.providerScope);
-    }
-    const settings = await ctx.resolveSettings(overrides);
-    const tenantId = options.tenant ?? settings.values.defaults.tenant;
-    if (!tenantId) {
-      throw new CliUserError({
-        summary: 'Missing tenant for ops inspect fleet.',
-        suggestedCommands: ['Use --tenant <tenant-id>', 'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>']
-      });
-    }
-    const render = (options.render ?? options.format ?? 'json').trim().toLowerCase();
-    if (!['json', 'ascii'].includes(render)) {
-      throw new CliUserError({
-        summary: 'Invalid inspect fleet render mode.',
-        cause: `Received "${render}".`,
-        suggestedCommands: ['Use --render json', 'Use --render ascii']
-      });
-    }
-    const providerScope =
-      (overrides['ops.providerScope'] as InspectProviderScope | undefined) ?? settings.values.ops.providerScope;
-    const client = await ctx.withClient({ tenantId, flagOverrides: overrides });
+async function handleOpsInspectFleet(ctx: CliContext, options: {
+  tenant?: string;
+  providerScope?: string;
+  render?: string;
+  format?: string;
+  output?: string;
+  out?: string;
+  strictJson?: boolean;
+}): Promise<void> {
+  const overrides: Partial<Record<SettingKey, unknown>> = {};
+  if (options.tenant) {
+    overrides['defaults.tenant'] = options.tenant;
+  }
+  if (options.providerScope) {
+    overrides['ops.providerScope'] = parseInspectProviderScope(options.providerScope);
+  }
+  const settings = await ctx.resolveSettings(overrides);
+  const tenantId = options.tenant ?? settings.values.defaults.tenant;
+  if (!tenantId) {
+    throw new CliUserError({
+      summary: 'Missing tenant for ops inspect fleet.',
+      suggestedCommands: ['Use --tenant <tenant-id>', 'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>']
+    });
+  }
+  const render = (options.render ?? options.format ?? 'json').trim().toLowerCase();
+  if (!['json', 'ascii'].includes(render)) {
+    throw new CliUserError({
+      summary: 'Invalid inspect fleet render mode.',
+      cause: `Received "${render}".`,
+      suggestedCommands: ['Use --render json', 'Use --render ascii']
+    });
+  }
+  const providerScope =
+    (overrides['ops.providerScope'] as InspectProviderScope | undefined) ?? settings.values.ops.providerScope;
+  const client = await ctx.withClient({ tenantId, flagOverrides: overrides });
+  const tenantProfile = await ctx.profileStore.getTenant(tenantId);
+  const snapshot = await collectFleetSnapshot({ client, tenantId, tenantName: tenantProfile?.name, providerScope });
+  const result = buildFleetInspect(snapshot);
+  const outPath = resolveOutPath(options.out);
+
+  if (render === 'ascii') {
+    writeRenderedOutput(ctx.stdout, `${formatFleetInspectAscii(result)}\n`, outPath);
+    return;
+  }
+
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
+  if (output === 'text') {
+    writeRenderedOutput(ctx.stdout, `${formatFleetInspectAscii(result)}\n`, outPath);
+    return;
+  }
+  writeRenderedOutput(
+    ctx.stdout,
+    `${stringifyJsonOutput(result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) })}\n`,
+    outPath
+  );
+}
+
+async function handleOpsInspectDeepDive(ctx: CliContext, options: {
+  tenant?: string;
+  providerScope?: string;
+  window?: string;
+  render?: string;
+  format?: string;
+  output?: string;
+  out?: string;
+  strictJson?: boolean;
+}): Promise<void> {
+  const overrides: Partial<Record<SettingKey, unknown>> = {};
+  if (options.tenant) {
+    overrides['defaults.tenant'] = options.tenant;
+  }
+  if (options.providerScope) {
+    overrides['ops.providerScope'] = parseInspectProviderScope(options.providerScope);
+  }
+  const settings = await ctx.resolveSettings(overrides);
+  const tenantId = options.tenant ?? settings.values.defaults.tenant;
+  if (!tenantId) {
+    throw new CliUserError({
+      summary: 'Missing tenant for ops inspect deep-dive.',
+      suggestedCommands: ['Use --tenant <tenant-id>', 'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>']
+    });
+  }
+  const render = (options.render ?? options.format ?? 'json').trim().toLowerCase();
+  if (!['json', 'ascii', 'markdown'].includes(render)) {
+    throw new CliUserError({
+      summary: 'Invalid deep-dive render mode.',
+      cause: `Received "${render}".`,
+      suggestedCommands: ['Use --render json', 'Use --render ascii', 'Use --render markdown']
+    });
+  }
+  const providerScope =
+    (overrides['ops.providerScope'] as InspectProviderScope | undefined) ?? settings.values.ops.providerScope;
+  const windowHours = Number.parseInt(options.window ?? '24', 10);
+  const client = await ctx.withClient({ tenantId, flagOverrides: overrides });
+  const tenantProfile = await ctx.profileStore.getTenant(tenantId);
+  const snapshot = await collectFleetSnapshot({ client, tenantId, tenantName: tenantProfile?.name, providerScope });
+  const result = buildDeepDive(snapshot, Number.isFinite(windowHours) ? windowHours : 24);
+  const outPath = resolveOutPath(options.out);
+
+  if (render === 'ascii') {
+    writeRenderedOutput(ctx.stdout, `${formatDeepDiveAscii(result)}\n`, outPath);
+    return;
+  }
+  if (render === 'markdown') {
+    writeRenderedOutput(ctx.stdout, `${formatDeepDiveMarkdown(result, false)}\n`, outPath);
+    return;
+  }
+
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
+  if (output === 'text') {
+    writeRenderedOutput(ctx.stdout, `${formatDeepDiveMarkdown(result, false)}\n`, outPath);
+    return;
+  }
+  writeRenderedOutput(
+    ctx.stdout,
+    `${stringifyJsonOutput(result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) })}\n`,
+    outPath
+  );
+}
+
+async function handleOpsReportGenerate(ctx: CliContext, options: {
+  tenant?: string;
+  input: string;
+  out: string;
+  render?: 'markdown' | 'pdf';
+  format?: 'markdown' | 'pdf';
+  includeSensitive?: boolean;
+  strictJson?: boolean;
+}): Promise<void> {
+  const overrides: Partial<Record<SettingKey, unknown>> = {};
+  if (options.tenant) {
+    overrides['defaults.tenant'] = options.tenant;
+  }
+  if (options.includeSensitive === true) {
+    overrides['report.includeSensitive'] = true;
+  }
+  const settings = await ctx.resolveSettings(overrides);
+  const tenantId = options.tenant ?? settings.values.defaults.tenant;
+  if (!tenantId) {
+    throw new CliUserError({
+      summary: 'Missing tenant for ops report generate.',
+      suggestedCommands: ['Use --tenant <tenant-id>', 'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>']
+    });
+  }
+  const inputPath = path.resolve(options.input);
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(inputPath, 'utf8')) as unknown;
+  } catch (error) {
+    const isSyntax = error instanceof SyntaxError;
+    const detail = isSyntax ? `: ${error.message}` : `: ${errorMessage(error)}`;
+    throw new CliUserError({
+      summary: isSyntax ? `Input JSON is invalid${detail}` : `Cannot read input file${detail}`,
+      cause: `Failed to ${isSyntax ? 'parse' : 'read'} ${inputPath}.`,
+      suggestedCommands: ['Generate fresh input with xyte-cli ops inspect deep-dive --output json']
+    });
+  }
+
+  const render = (options.render ?? options.format ?? 'pdf').trim().toLowerCase();
+  if (!['markdown', 'pdf'].includes(render)) {
+    throw new CliUserError({
+      summary: 'Invalid report render mode.',
+      cause: `Received "${render}".`,
+      suggestedCommands: ['Use --render pdf', 'Use --render markdown']
+    });
+  }
+
+  let deepDive = parseDeepDiveForReport(raw, tenantId);
+  if (!deepDive.tenantName) {
     const tenantProfile = await ctx.profileStore.getTenant(tenantId);
-    const snapshot = await collectFleetSnapshot({ client, tenantId, tenantName: tenantProfile?.name, providerScope });
-    const result = buildFleetInspect(snapshot);
-    const outPath = resolveOutPath(options.out);
+    if (tenantProfile?.name) {
+      deepDive = {
+        ...deepDive,
+        tenantName: tenantProfile.name
+      };
+    }
+  }
 
-    if (render === 'ascii') {
-      writeRenderedOutput(ctx.stdout, `${formatFleetInspectAscii(result)}\n`, outPath);
-      return;
-    }
+  const generated = await generateFleetReport({
+    deepDive,
+    format: render as 'markdown' | 'pdf',
+    outPath: options.out,
+    includeSensitive: options.includeSensitive === true || settings.values.report.includeSensitive
+  });
+  printJson(ctx.stdout, generated, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+}
 
-    const output = resolveTextJsonOutput({
-      output: options.output,
-      stdoutIsTTY: ctx.stdoutIsTTY,
-      settings
-    });
-    if (output === 'text') {
-      writeRenderedOutput(ctx.stdout, `${formatFleetInspectAscii(result)}\n`, outPath);
-      return;
-    }
-    writeRenderedOutput(
-      ctx.stdout,
-      `${stringifyJsonOutput(result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) })}\n`,
-      outPath
-    );
-  };
-
-  const handleOpsInspectDeepDive = async (options: {
-    tenant?: string;
-    providerScope?: string;
-    window?: string;
-    render?: string;
-    format?: string;
-    output?: string;
-    out?: string;
-    strictJson?: boolean;
-  }) => {
-    const overrides: Partial<Record<SettingKey, unknown>> = {};
-    if (options.tenant) {
-      overrides['defaults.tenant'] = options.tenant;
-    }
-    if (options.providerScope) {
-      overrides['ops.providerScope'] = parseInspectProviderScope(options.providerScope);
-    }
-    const settings = await ctx.resolveSettings(overrides);
-    const tenantId = options.tenant ?? settings.values.defaults.tenant;
-    if (!tenantId) {
-      throw new CliUserError({
-        summary: 'Missing tenant for ops inspect deep-dive.',
-        suggestedCommands: ['Use --tenant <tenant-id>', 'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>']
-      });
-    }
-    const render = (options.render ?? options.format ?? 'json').trim().toLowerCase();
-    if (!['json', 'ascii', 'markdown'].includes(render)) {
-      throw new CliUserError({
-        summary: 'Invalid deep-dive render mode.',
-        cause: `Received "${render}".`,
-        suggestedCommands: ['Use --render json', 'Use --render ascii', 'Use --render markdown']
-      });
-    }
-    const providerScope =
-      (overrides['ops.providerScope'] as InspectProviderScope | undefined) ?? settings.values.ops.providerScope;
-    const windowHours = Number.parseInt(options.window ?? '24', 10);
-    const client = await ctx.withClient({ tenantId, flagOverrides: overrides });
-    const tenantProfile = await ctx.profileStore.getTenant(tenantId);
-    const snapshot = await collectFleetSnapshot({ client, tenantId, tenantName: tenantProfile?.name, providerScope });
-    const result = buildDeepDive(snapshot, Number.isFinite(windowHours) ? windowHours : 24);
-    const outPath = resolveOutPath(options.out);
-
-    if (render === 'ascii') {
-      writeRenderedOutput(ctx.stdout, `${formatDeepDiveAscii(result)}\n`, outPath);
-      return;
-    }
-    if (render === 'markdown') {
-      writeRenderedOutput(ctx.stdout, `${formatDeepDiveMarkdown(result, false)}\n`, outPath);
-      return;
-    }
-
-    const output = resolveTextJsonOutput({
-      output: options.output,
-      stdoutIsTTY: ctx.stdoutIsTTY,
-      settings
-    });
-    if (output === 'text') {
-      writeRenderedOutput(ctx.stdout, `${formatDeepDiveMarkdown(result, false)}\n`, outPath);
-      return;
-    }
-    writeRenderedOutput(
-      ctx.stdout,
-      `${stringifyJsonOutput(result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) })}\n`,
-      outPath
-    );
-  };
-
-  const handleOpsReportGenerate = async (options: {
-    tenant?: string;
-    input: string;
-    out: string;
-    render?: 'markdown' | 'pdf';
-    format?: 'markdown' | 'pdf';
-    includeSensitive?: boolean;
-    strictJson?: boolean;
-  }) => {
-    const overrides: Partial<Record<SettingKey, unknown>> = {};
-    if (options.tenant) {
-      overrides['defaults.tenant'] = options.tenant;
-    }
-    if (options.includeSensitive === true) {
-      overrides['report.includeSensitive'] = true;
-    }
-    const settings = await ctx.resolveSettings(overrides);
-    const tenantId = options.tenant ?? settings.values.defaults.tenant;
-    if (!tenantId) {
-      throw new CliUserError({
-        summary: 'Missing tenant for ops report generate.',
-        suggestedCommands: ['Use --tenant <tenant-id>', 'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>']
-      });
-    }
-    const inputPath = path.resolve(options.input);
-    let raw: unknown;
-    try {
-      raw = JSON.parse(readFileSync(inputPath, 'utf8')) as unknown;
-    } catch (error) {
-      const isSyntax = error instanceof SyntaxError;
-      const detail = isSyntax ? `: ${error.message}` : `: ${errorMessage(error)}`;
-      throw new CliUserError({
-        summary: isSyntax ? `Input JSON is invalid${detail}` : `Cannot read input file${detail}`,
-        cause: `Failed to ${isSyntax ? 'parse' : 'read'} ${inputPath}.`,
-        suggestedCommands: ['Generate fresh input with xyte-cli ops inspect deep-dive --output json']
-      });
-    }
-
-    const render = (options.render ?? options.format ?? 'pdf').trim().toLowerCase();
-    if (!['markdown', 'pdf'].includes(render)) {
-      throw new CliUserError({
-        summary: 'Invalid report render mode.',
-        cause: `Received "${render}".`,
-        suggestedCommands: ['Use --render pdf', 'Use --render markdown']
-      });
-    }
-
-    let deepDive = parseDeepDiveForReport(raw, tenantId);
-    if (!deepDive.tenantName) {
-      const tenantProfile = await ctx.profileStore.getTenant(tenantId);
-      if (tenantProfile?.name) {
-        deepDive = {
-          ...deepDive,
-          tenantName: tenantProfile.name
-        };
-      }
-    }
-
-    const generated = await generateFleetReport({
-      deepDive,
-      format: render as 'markdown' | 'pdf',
-      outPath: options.out,
-      includeSensitive: options.includeSensitive === true || settings.values.report.includeSensitive
-    });
-    printJson(ctx.stdout, generated, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
-  };
-
-  const handleOpsConsole = async (options: {
+async function handleOpsConsole(
+  ctx: CliContext,
+  runTui: typeof runTuiApp,
+  options: {
     headless?: boolean;
     screen?: string;
     format?: string;
@@ -460,82 +453,84 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
     motion?: boolean;
     debug?: boolean;
     debugLog?: string;
-  }) => {
-    const overrides: Partial<Record<SettingKey, unknown>> = {};
-    if (options.tenant) {
-      overrides['defaults.tenant'] = options.tenant;
-    }
-    if (options.screen) {
-      if (!(TUI_SCREEN_IDS as readonly string[]).includes(options.screen)) {
-        throw new CliUserError({
-          summary: 'Invalid console screen.',
-          cause: `Received "${options.screen}".`,
-          suggestedCommands: [`Use one of: ${TUI_SCREEN_IDS.join(', ')}`]
-        });
-      }
-      overrides['console.screen'] = options.screen as TuiScreenId;
-    }
-    if (options.motion === false) {
-      overrides['console.motion'] = false;
-    }
-    if (options.follow === true) {
-      overrides['console.follow'] = true;
-    }
-    if (options.intervalMs) {
-      overrides['console.intervalMs'] = parsePositiveIntegerOption(options.intervalMs, 2000, 'interval-ms');
-    }
-    if (options.debugLog) {
-      overrides['console.debugLogPath'] = options.debugLog;
-    }
-    const settings = await ctx.resolveSettings(overrides);
-    const secretStore = ctx.getSecretStore();
-    const client = createXyteClient({
-      profileStore: ctx.profileStore,
-      secretStore,
-      tenantId: options.tenant ?? settings.values.defaults.tenant,
-      retryAttempts: settings.values.http.retryAttempts,
-      retryBackoffMs: settings.values.http.retryBackoffMs
-    });
-    const screenRaw = options.screen ?? settings.values.console.screen ?? 'dashboard';
-    if (!(TUI_SCREEN_IDS as readonly string[]).includes(screenRaw)) {
+  }
+): Promise<void> {
+  const overrides: Partial<Record<SettingKey, unknown>> = {};
+  if (options.tenant) {
+    overrides['defaults.tenant'] = options.tenant;
+  }
+  if (options.screen) {
+    if (!(TUI_SCREEN_IDS as readonly string[]).includes(options.screen)) {
       throw new CliUserError({
         summary: 'Invalid console screen.',
-        cause: `Received "${screenRaw}".`,
+        cause: `Received "${options.screen}".`,
         suggestedCommands: [`Use one of: ${TUI_SCREEN_IDS.join(', ')}`]
       });
     }
-    const screen = screenRaw as TuiScreenId;
-    const requestedOutput = parseCliOutputMode(options.output ?? options.format ?? (options.headless ? 'json' : undefined));
-    if (Boolean(options.headless) && requestedOutput && requestedOutput !== 'json') {
-      throw new CliUserError({
-        summary: 'Headless mode is JSON-only.',
-        suggestedCommands: ['Use xyte-cli ops console --headless --output json']
-      });
-    }
-    const follow = options.once ? false : options.follow ?? settings.values.console.follow;
-    const intervalMs =
-      options.intervalMs !== undefined
-        ? parsePositiveIntegerOption(options.intervalMs, settings.values.console.intervalMs, 'interval-ms')
-        : settings.values.console.intervalMs;
-    const motionEnabled = options.motion === false ? false : settings.values.console.motion;
-
-    await runTui({
-      client,
-      profileStore: ctx.profileStore,
-      secretStore,
-      initialScreen: screen,
-      headless: Boolean(options.headless),
-      format: (options.headless ? 'json' : requestedOutput === 'text' ? 'text' : 'json') as OutputFormat,
-      motionEnabled,
-      follow,
-      intervalMs,
-      tenantId: options.tenant ?? settings.values.defaults.tenant,
-      output: ctx.stdout,
-      debug: options.debug,
-      debugLogPath: options.debugLog ?? settings.values.console.debugLogPath
+    overrides['console.screen'] = options.screen as TuiScreenId;
+  }
+  if (options.motion === false) {
+    overrides['console.motion'] = false;
+  }
+  if (options.follow === true) {
+    overrides['console.follow'] = true;
+  }
+  if (options.intervalMs) {
+    overrides['console.intervalMs'] = parsePositiveIntegerOption(options.intervalMs, 2000, 'interval-ms');
+  }
+  if (options.debugLog) {
+    overrides['console.debugLogPath'] = options.debugLog;
+  }
+  const settings = await ctx.resolveSettings(overrides);
+  const secretStore = ctx.getSecretStore();
+  const client = createXyteClient({
+    profileStore: ctx.profileStore,
+    secretStore,
+    tenantId: options.tenant ?? settings.values.defaults.tenant,
+    retryAttempts: settings.values.http.retryAttempts,
+    retryBackoffMs: settings.values.http.retryBackoffMs
+  });
+  const screenRaw = options.screen ?? settings.values.console.screen ?? 'dashboard';
+  if (!(TUI_SCREEN_IDS as readonly string[]).includes(screenRaw)) {
+    throw new CliUserError({
+      summary: 'Invalid console screen.',
+      cause: `Received "${screenRaw}".`,
+      suggestedCommands: [`Use one of: ${TUI_SCREEN_IDS.join(', ')}`]
     });
-  };
+  }
+  const screen = screenRaw as TuiScreenId;
+  const requestedOutput = parseCliOutputMode(options.output ?? options.format ?? (options.headless ? 'json' : undefined));
+  if (Boolean(options.headless) && requestedOutput && requestedOutput !== 'json') {
+    throw new CliUserError({
+      summary: 'Headless mode is JSON-only.',
+      suggestedCommands: ['Use xyte-cli ops console --headless --output json']
+    });
+  }
+  const follow = options.once ? false : options.follow ?? settings.values.console.follow;
+  const intervalMs =
+    options.intervalMs !== undefined
+      ? parsePositiveIntegerOption(options.intervalMs, settings.values.console.intervalMs, 'interval-ms')
+      : settings.values.console.intervalMs;
+  const motionEnabled = options.motion === false ? false : settings.values.console.motion;
 
+  await runTui({
+    client,
+    profileStore: ctx.profileStore,
+    secretStore,
+    initialScreen: screen,
+    headless: Boolean(options.headless),
+    format: (options.headless ? 'json' : requestedOutput === 'text' ? 'text' : 'json') as OutputFormat,
+    motionEnabled,
+    follow,
+    intervalMs,
+    tenantId: options.tenant ?? settings.values.defaults.tenant,
+    output: ctx.stdout,
+    debug: options.debug,
+    debugLogPath: options.debugLog ?? settings.values.console.debugLogPath
+  });
+}
+
+export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: typeof runTuiApp = runTuiApp): void {
   const ops = parent.command('ops').description('Operator-focused console, watch, inspect, and report workflows');
   ops.addHelpText(
     'after',
@@ -561,7 +556,7 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
     .option('--out <path>', 'Write the rendered output to a UTF-8 file')
     .option('--strict-json', 'Fail on non-serializable output')
     .action(async function (options: Record<string, unknown>) {
-      await handleOpsWatchIncidents({
+      await handleOpsWatchIncidents(ctx, {
         ...options,
         output: (this.optsWithGlobals() as CliGlobalOptions).output
       });
@@ -583,7 +578,7 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
       out?: string;
       strictJson?: boolean;
     }) {
-      await handleOpsInspectFleet({
+      await handleOpsInspectFleet(ctx, {
         ...options,
         output: (this.optsWithGlobals() as CliGlobalOptions).output
       });
@@ -606,7 +601,7 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
       out?: string;
       strictJson?: boolean;
     }) {
-      await handleOpsInspectDeepDive({
+      await handleOpsInspectDeepDive(ctx, {
         ...options,
         output: (this.optsWithGlobals() as CliGlobalOptions).output
       });
@@ -630,7 +625,7 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
       includeSensitive?: boolean;
       strictJson?: boolean;
     }) {
-      await handleOpsReportGenerate(options);
+      await handleOpsReportGenerate(ctx, options);
     });
 
   ops
@@ -656,7 +651,7 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
       debug?: boolean;
       debugLog?: string;
     }) {
-      await handleOpsConsole({
+      await handleOpsConsole(ctx, runTui, {
         ...options,
         output: getExplicitGlobalOutput(this)
       });

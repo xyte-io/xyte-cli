@@ -20,7 +20,6 @@ import { PROVIDER_ORG, PROVIDER_PARTNER, SUPPORTED_SECRET_PROVIDERS, parseProvid
 import {
   type CliContext,
   type OutputFormat,
-  createSecretConflictError,
   formatReadinessText,
   getExplicitGlobalOutput,
   resolveKeyValue,
