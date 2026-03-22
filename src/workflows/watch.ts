@@ -9,9 +9,9 @@ import { asRecord, extractIncidentsArray } from '../utils/json';
 type QueryValue = string | number | boolean | null | undefined;
 
 const WATCH_ENDPOINT_KEY = 'organization.incidents.getIncidents';
-const WATCH_MIN_INTERVAL_MS = 1000;
+export const WATCH_MIN_INTERVAL_MS = 1000;
 const WATCH_DEFAULT_MAX_POLLS = 600;
-const WATCH_MAX_POLLS = 3600;
+export const WATCH_MAX_POLLS = 3600;
 
 export interface NormalizedIncident {
   id: string;

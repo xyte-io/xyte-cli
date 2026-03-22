@@ -21,7 +21,7 @@ import type { ProfileStore } from '../secure/profile-store';
 import type { SecretStore } from '../secure/secret-store';
 import type { XyteClient } from '../types/client';
 import { buildInstallDoctorReport } from '../utils/install-doctor';
-import { isMutatingMethod } from '../http/http';
+import { isMutatingMethod } from '../client/catalog';
 import { isRecord } from '../utils/json';
 import { runWatch } from './watch';
 import { runUtilityPrepare } from './utility-prepare';

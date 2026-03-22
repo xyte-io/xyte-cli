@@ -1,6 +1,8 @@
 import rawEndpoints from '../spec/public-endpoints.json';
 import type { EndpointNamespace, PublicEndpointSpec } from '../types/endpoints';
 
+export { isMutatingMethod } from '../http/http';
+
 const endpoints = rawEndpoints as PublicEndpointSpec[];
 const endpointMap = new Map(endpoints.map((endpoint) => [endpoint.key, endpoint]));
 

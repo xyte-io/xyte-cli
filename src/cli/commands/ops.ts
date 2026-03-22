@@ -21,7 +21,7 @@ import {
   generateFleetReport,
   parseDeepDiveForReport
 } from '../../workflows/fleet-insights';
-import { runWatch } from '../../workflows/watch';
+import { runWatch, WATCH_MIN_INTERVAL_MS, WATCH_MAX_POLLS } from '../../workflows/watch';
 import type { SettingKey } from '../../config/settings';
 import { parsePositiveIntegerOption, parseQueryJson } from '../parse-options';
 import {
@@ -83,8 +83,8 @@ function parseWatchIntervalMs(value: string | undefined): number {
   if (!Number.isFinite(parsed)) {
     throw new Error(`Invalid interval: ${value}.`);
   }
-  if (parsed < 1000) {
-    throw new Error(`Invalid interval: ${parsed}. Minimum is 1000ms.`);
+  if (parsed < WATCH_MIN_INTERVAL_MS) {
+    throw new Error(`Invalid interval: ${parsed}. Minimum is ${WATCH_MIN_INTERVAL_MS}ms.`);
   }
   return parsed;
 }
@@ -97,8 +97,8 @@ function parseWatchMaxPolls(value: string | undefined): number | undefined {
   if (!Number.isFinite(parsed) || parsed <= 0) {
     throw new Error(`Invalid max-polls: ${value}. Use a positive integer.`);
   }
-  if (parsed > 3600) {
-    throw new Error(`Invalid max-polls: ${value}. Maximum is 3600.`);
+  if (parsed > WATCH_MAX_POLLS) {
+    throw new Error(`Invalid max-polls: ${value}. Maximum is ${WATCH_MAX_POLLS}.`);
   }
   return parsed;
 }

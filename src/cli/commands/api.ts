@@ -6,7 +6,7 @@ import { getEndpoint, listEndpoints } from '../../client/catalog';
 import { buildCallEnvelope } from '../../contracts/call-envelope';
 import { toProblemDetails } from '../../http/problem-mapper';
 import { CliUserError } from '../../contracts/user-error';
-import { isMutatingMethod } from '../../http/http';
+import { isMutatingMethod } from '../../client/catalog';
 import { parseJsonObject } from '../../utils/json';
 import { parseQueryJson } from '../parse-options';
 import {
