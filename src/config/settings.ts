@@ -11,11 +11,11 @@ import {
   type TuiScreenId
 } from '../types/settings-enums';
 
-export const CLI_OUTPUT_MODES = ['auto', 'json', 'text'] as const;
+const CLI_OUTPUT_MODES = ['auto', 'json', 'text'] as const;
 export type CliOutputMode = (typeof CLI_OUTPUT_MODES)[number];
 export type CliSettingsScope = 'user' | 'workspace' | 'resolved';
 
-export interface CliSettingsFile {
+interface CliSettingsFile {
   version?: 'settings.v1';
   defaults?: {
     tenant?: string;
