@@ -8,9 +8,7 @@ import { Command } from 'commander';
 
 import {
   createCliActionLogger,
-  extractCommandPathFromLogEntry,
   sanitizeArgvForLog,
-  type CliActionLogEntry,
   type CliActionLogger
 } from './action-logger';
 import { createXyteClient } from '../client/create-client';
@@ -31,7 +29,7 @@ import { createSecretStore, type SecretStore } from '../secure/secret-store';
 import { makeKeyFingerprint } from '../secure/key-slots';
 import { FileProfileStore, type ProfileStore } from '../secure/profile-store';
 import type { SecretProvider } from '../types/profile';
-import { SUPPORTED_SECRET_PROVIDERS, isSecretProvider } from '../types/profile';
+import { isSecretProvider } from '../types/profile';
 import { isRecord, parseJsonObject } from '../utils/json';
 import { buildInstallDoctorReport, type InstallDoctorResult } from '../utils/install-doctor';
 import { stringifyJsonOutput } from '../utils/json-output';
@@ -65,7 +63,7 @@ import { CliUserError } from '../contracts/user-error';
 import { registerLogsCommands } from './commands/logs';
 import { registerConfigCommands } from './commands/config';
 import { registerFlowCommands } from './commands/flow';
-import type { CliContext } from './cli-context';
+import { formatReadinessText, parseCliOutputMode, type CliContext } from './cli-context';
 
 type OutputStream = Pick<typeof process.stdout, 'write'>;
 type ErrorStream = Pick<typeof process.stderr, 'write'>;
@@ -140,17 +138,6 @@ function parseBooleanEnvFlag(value: string | undefined): boolean {
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
 }
 
-function parsePositiveIntegerEnv(value: string | undefined, fallback: number): number {
-  if (!value) {
-    return fallback;
-  }
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return fallback;
-  }
-  return parsed;
-}
-
 function commandPathFor(command: Command): string {
   const names: string[] = [];
   let current: Command | undefined = command;
@@ -198,17 +185,6 @@ function parsePositiveIntegerOption(value: string | undefined, fallback: number,
   return parsed;
 }
 
-function parsePositiveNumberOption(value: string | undefined, fallback: number | undefined, label: string): number | undefined {
-  if (value === undefined) {
-    return fallback;
-  }
-  const parsed = Number.parseFloat(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`Invalid ${label}: ${value}. Use a positive number.`);
-  }
-  return parsed;
-}
-
 function firstNonEmptyString(values: unknown[]): string | undefined {
   for (const value of values) {
     if (typeof value === 'string' && value.trim()) {
@@ -244,27 +220,6 @@ function extractTenantNameFromOrganizationInfo(payload: unknown): string | undef
   }
 
   return undefined;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  const units = ['KB', 'MB', 'GB'];
-  let size = bytes / 1024;
-  let unitIndex = 0;
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex += 1;
-  }
-  return `${size.toFixed(1)} ${units[unitIndex]}`;
-}
-
-function formatActionLogText(entry: CliActionLogEntry): string {
-  const commandPath = extractCommandPathFromLogEntry(entry) ?? '-';
-  const data = isRecord(entry.data) ? entry.data : undefined;
-  const duration = typeof data?.durationMs === 'number' && Number.isFinite(data.durationMs) ? `${Math.round(data.durationMs)}ms` : '-';
-  return `${entry.timestamp} | ${entry.level} | ${entry.event} | ${commandPath} | ${duration}`;
 }
 
 function inferCommandPathFromArgv(argv: string[]): string {
@@ -521,35 +476,6 @@ function parseInspectProviderScope(value: string | undefined): InspectProviderSc
   return normalized as InspectProviderScope;
 }
 
-function formatReadinessText(readiness: ReadinessCheck): string {
-  const lines: string[] = [];
-  lines.push(`Readiness: ${readiness.state}`);
-  lines.push(`Tenant: ${readiness.tenantId ?? 'none'}`);
-  lines.push(`Connectivity: ${readiness.connectionState} (${readiness.connectivity.message})`);
-  lines.push('');
-  lines.push('Providers:');
-
-  for (const provider of readiness.providers) {
-    lines.push(
-      `- ${provider.provider}: slots=${provider.slotCount}, active=${provider.activeSlotId ?? 'none'} (${provider.activeSlotName ?? 'n/a'}), hasSecret=${provider.hasActiveSecret}`
-    );
-  }
-
-  if (readiness.missingItems.length) {
-    lines.push('');
-    lines.push('Missing items:');
-    readiness.missingItems.forEach((item) => lines.push(`- ${item}`));
-  }
-
-  if (readiness.recommendedActions.length) {
-    lines.push('');
-    lines.push('Recommended actions:');
-    readiness.recommendedActions.forEach((item) => lines.push(`- ${item}`));
-  }
-
-  return `${lines.join('\n')}\n`;
-}
-
 function runInstallDoctor(): InstallDoctorResult {
   const expectedPath = path.resolve(__dirname, '../../dist/bin/xyte-cli.js');
   return buildInstallDoctorReport(expectedPath);
@@ -636,21 +562,6 @@ async function resolveKeyValue(args: {
     return prompted.trim() || undefined;
   }
   return undefined;
-}
-
-function parseCliOutputMode(value: string | undefined): CliOutputMode | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-  const normalized = value.trim().toLowerCase();
-  if (normalized !== 'auto' && normalized !== 'json' && normalized !== 'text') {
-    throw new CliUserError({
-      summary: 'Invalid output mode.',
-      cause: `Received "${value}".`,
-      suggestedCommands: ['Use --output auto', 'Use --output json', 'Use --output text']
-    });
-  }
-  return normalized as CliOutputMode;
 }
 
 function resolveTextJsonOutput(args: {

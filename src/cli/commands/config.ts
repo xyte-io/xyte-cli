@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Command } from 'commander';
 
 import { createXyteClient } from '../../client/create-client';
-import { evaluateReadiness, type ReadinessCheck } from '../../config/readiness';
+import { evaluateReadiness } from '../../config/readiness';
 import {
   SUPPORTED_SETTING_KEYS,
   parseSettingValue,
@@ -20,7 +20,7 @@ import { SUPPORTED_SECRET_PROVIDERS, isSecretProvider, type SecretProvider } fro
 import {
   type CliContext,
   type OutputFormat,
-  getExplicitGlobalOutput,
+  formatReadinessText,
   parsePositiveIntegerOption,
   printJson,
   resolveStrictJson,
@@ -133,35 +133,6 @@ async function resolveKeyValue(args: {
     return prompted.trim() || undefined;
   }
   return undefined;
-}
-
-function formatReadinessText(readiness: ReadinessCheck): string {
-  const lines: string[] = [];
-  lines.push(`Readiness: ${readiness.state}`);
-  lines.push(`Tenant: ${readiness.tenantId ?? 'none'}`);
-  lines.push(`Connectivity: ${readiness.connectionState} (${readiness.connectivity.message})`);
-  lines.push('');
-  lines.push('Providers:');
-
-  for (const provider of readiness.providers) {
-    lines.push(
-      `- ${provider.provider}: slots=${provider.slotCount}, active=${provider.activeSlotId ?? 'none'} (${provider.activeSlotName ?? 'n/a'}), hasSecret=${provider.hasActiveSecret}`
-    );
-  }
-
-  if (readiness.missingItems.length) {
-    lines.push('');
-    lines.push('Missing items:');
-    readiness.missingItems.forEach((item) => lines.push(`- ${item}`));
-  }
-
-  if (readiness.recommendedActions.length) {
-    lines.push('');
-    lines.push('Recommended actions:');
-    readiness.recommendedActions.forEach((item) => lines.push(`- ${item}`));
-  }
-
-  return `${lines.join('\n')}\n`;
 }
 
 function formatSlotListText(slots: SlotView[]): string {

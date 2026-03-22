@@ -12,7 +12,6 @@ import {
 import { isRecord } from '../../utils/json';
 import {
   type CliContext,
-  type OutputFormat,
   formatBytes,
   getExplicitGlobalOutput,
   parsePositiveIntegerOption,
