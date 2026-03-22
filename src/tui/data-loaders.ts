@@ -8,9 +8,20 @@ import type { XyteClient } from '../types/client';
 import type { SecretProvider } from '../types/profile';
 import type { EndpointNamespace } from '../types/endpoints';
 import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
+import { XyteAuthError, XyteHttpError } from '../http/errors';
 import { extractArray, extractHasNextPage, extractIncidentsArray } from '../utils/json';
 import { errorMessage } from '../utils/error-format';
 import { PROVIDER_ORG } from '../types/profile';
+
+function isAuthError(error: unknown): boolean {
+  if (error instanceof XyteAuthError) {
+    return true;
+  }
+  if (error instanceof XyteHttpError && (error.status === 401 || error.status === 403)) {
+    return true;
+  }
+  return false;
+}
 
 interface LoadOutcome<T> {
   data: T;
@@ -168,6 +179,9 @@ export async function loadDevicesData(
       const raw = await client.organization
         .getDevices({ tenantId, ...(query ? { query } : {}) })
         .catch((orgError: unknown) => {
+          if (isAuthError(orgError)) {
+            throw orgError;
+          }
           if (process.env.DEBUG) {
             const msg = errorMessage(orgError);
             process.stderr.write(`[data-loaders] org getDevices failed, falling back to partner: ${msg}\n`);
