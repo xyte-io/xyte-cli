@@ -8,10 +8,10 @@ import { toProblemDetails } from '../../contracts/problem';
 import { CliUserError } from '../../contracts/user-error';
 import { isMutatingMethod } from '../../http/http';
 import { parseJsonObject } from '../../utils/json';
+import { parseQueryJson } from '../parse-options';
 import {
   type CliContext,
   type CliGlobalOptions,
-  parseQueryJson,
   printJson,
   resolveStrictJson,
   resolveTextJsonOutput

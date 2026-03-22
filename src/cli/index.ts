@@ -31,7 +31,7 @@ import {
 } from '../utils/install-skills';
 import { applyUpgrade, checkForUpgrade, type UpgradeDependencies } from '../utils/upgrade';
 import { runTuiApp } from '../tui/app';
-import type { TuiScreenId } from '../types/settings-enums';
+import type { TuiScreenId } from '../types/tui-screens';
 import { CliUserError } from '../contracts/user-error';
 import { errorMessage } from '../utils/error-format';
 import { registerLogsCommands } from './commands/logs';
@@ -41,9 +41,9 @@ import { registerSetupCommands, SIMPLE_SETUP_DEFAULT_TENANT, normalizeTenantId, 
 import { registerOpsCommands } from './commands/ops';
 import { registerApiCommands } from './commands/api';
 import { registerUtilCommands } from './commands/util';
+import { formatReadinessText } from './format-readiness';
+import { resolveKeyValue } from './resolve-key';
 import {
-  formatReadinessText,
-  resolveKeyValue,
   getExplicitGlobalOutput,
   printJson,
   resolveStrictJson,

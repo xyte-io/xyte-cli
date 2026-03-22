@@ -5,8 +5,8 @@ import type { ProfileStore } from '../secure/profile-store';
 import type { SecretStore } from '../secure/secret-store';
 import type { ReadinessCheck } from '../config/readiness';
 
-export { TUI_SCREEN_IDS, type TuiScreenId } from '../types/settings-enums';
-import type { TuiScreenId } from '../types/settings-enums';
+export { TUI_SCREEN_IDS, type TuiScreenId } from '../types/tui-screens';
+import type { TuiScreenId } from '../types/tui-screens';
 export type TuiPaneId = string;
 export type TuiArrowKey = 'up' | 'down' | 'left' | 'right';
 export type TuiArrowHandleResult = 'handled' | 'boundary' | 'unhandled';

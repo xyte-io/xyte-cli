@@ -10,7 +10,7 @@ import { errorMessage } from '../../utils/error-format';
 import { isRecord } from '../../utils/json';
 import { stringifyJsonOutput } from '../../utils/json-output';
 import { parseInspectProviderScope, type InspectProviderScope } from '../../types/settings-enums';
-import { TUI_SCREEN_IDS, type TuiScreenId } from '../../types/settings-enums';
+import { TUI_SCREEN_IDS, type TuiScreenId } from '../../types/tui-screens';
 import { runTuiApp } from '../../tui/app';
 import {
   buildDeepDive,
@@ -24,6 +24,7 @@ import {
 } from '../../workflows/fleet-insights';
 import { runWatch } from '../../workflows/watch';
 import type { SettingKey } from '../../config/settings';
+import { parsePositiveIntegerOption, parseQueryJson } from '../parse-options';
 import {
   type CliContext,
   type CliGlobalOptions,
@@ -31,8 +32,6 @@ import {
   type OutputStream,
   getExplicitGlobalOutput,
   parseCliOutputMode,
-  parsePositiveIntegerOption,
-  parseQueryJson,
   printJson,
   resolveStrictJson,
   resolveTextJsonOutput

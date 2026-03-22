@@ -8,12 +8,12 @@ import { parseProvider, PROVIDER_ORG } from '../../types/profile';
 import { isRecord } from '../../utils/json';
 import { firstText } from '../../workflows/fleet-insights-loaders';
 import { CliUserError } from '../../contracts/user-error';
+import { formatReadinessText } from '../format-readiness';
+import { resolveKeyValue } from '../resolve-key';
 import {
   type CliContext,
   type OutputFormat,
-  formatReadinessText,
   printJson,
-  resolveKeyValue,
   resolveStrictJson,
   resolveTextJsonOutput
 } from '../cli-context';

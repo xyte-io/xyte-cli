@@ -4,8 +4,6 @@ import type { ProfileStore } from '../secure/profile-store';
 import type { SecretStore } from '../secure/secret-store';
 import type { XyteClient } from '../types/client';
 import type { CliOutputMode, ResolvedCliSettingsState, SettingKey } from '../config/settings';
-import type { ReadinessCheck } from '../config/readiness';
-import { parseJsonObject } from '../utils/json';
 import { stringifyJsonOutput } from '../utils/json-output';
 import { CliUserError } from '../contracts/user-error';
 
@@ -40,19 +38,6 @@ export interface CliContext {
 
 export interface CliGlobalOptions {
   output?: string;
-}
-
-export function parseQueryJson(value: string | undefined): Record<string, string | number | boolean | null | undefined> {
-  const record = parseJsonObject(value);
-  const out: Record<string, string | number | boolean | null | undefined> = {};
-  for (const [key, item] of Object.entries(record)) {
-    if (item === null || item === undefined || typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
-      out[key] = item as string | number | boolean | null | undefined;
-      continue;
-    }
-    throw new Error(`Query parameter "${key}" must be scalar, null, or undefined.`);
-  }
-  return out;
 }
 
 export function getExplicitGlobalOutput(command: Command): CliOutputMode | undefined {
@@ -120,112 +105,3 @@ export function printJson(
   stream.write(`${stringifyJsonOutput(value, options)}\n`);
 }
 
-function createSecretConflictError(cause: string): CliUserError {
-  return new CliUserError({
-    summary: 'Conflicting API key sources.',
-    cause,
-    suggestedCommands: ['Use exactly one of --key, --key-stdin, or XYTE_CLI_KEY']
-  });
-}
-
-export async function resolveKeyValue(args: {
-  key?: string;
-  keyStdin?: boolean;
-  envKey?: string;
-  allowPrompt?: boolean;
-  prompt: PromptValueFn;
-  readStdin: () => Promise<string>;
-  promptQuestion: string;
-  stdout: OutputStream;
-}): Promise<string | undefined> {
-  const inlineKey = args.key?.trim();
-  const envKey = args.envKey?.trim();
-
-  if (inlineKey && args.keyStdin) {
-    throw createSecretConflictError('Use either --key or --key-stdin, not both.');
-  }
-  if (inlineKey) {
-    return inlineKey;
-  }
-  if (args.keyStdin) {
-    const stdinValue = (await args.readStdin()).trim();
-    return stdinValue || undefined;
-  }
-  if (envKey) {
-    return envKey;
-  }
-  if (args.allowPrompt) {
-    const prompted = await args.prompt({
-      question: args.promptQuestion,
-      stdout: args.stdout,
-      secret: true
-    });
-    return prompted.trim() || undefined;
-  }
-  return undefined;
-}
-
-export function parsePositiveIntegerOption(value: string | undefined, fallback: number, label: string): number {
-  if (!value) {
-    return fallback;
-  }
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`Invalid ${label}: ${value}. Use a positive integer.`);
-  }
-  return parsed;
-}
-
-export function parsePositiveNumberOption(
-  value: string | undefined,
-  fallback: number | undefined,
-  label: string
-): number | undefined {
-  if (value === undefined) {
-    return fallback;
-  }
-  const parsed = Number.parseFloat(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`Invalid ${label}: expected a positive number, got "${value}".`);
-  }
-  return parsed;
-}
-
-export function formatBytes(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-export function formatReadinessText(readiness: ReadinessCheck): string {
-  const lines: string[] = [];
-  lines.push(`Readiness: ${readiness.state}`);
-  lines.push(`Tenant: ${readiness.tenantId ?? 'none'}`);
-  lines.push(`Connectivity: ${readiness.connectionState} (${readiness.connectivity.message})`);
-  lines.push('');
-  lines.push('Providers:');
-
-  for (const provider of readiness.providers) {
-    lines.push(
-      `- ${provider.provider}: slots=${provider.slotCount}, active=${provider.activeSlotId ?? 'none'} (${provider.activeSlotName ?? 'n/a'}), hasSecret=${provider.hasActiveSecret}`
-    );
-  }
-
-  if (readiness.missingItems.length) {
-    lines.push('');
-    lines.push('Missing items:');
-    readiness.missingItems.forEach((item) => lines.push(`- ${item}`));
-  }
-
-  if (readiness.recommendedActions.length) {
-    lines.push('');
-    lines.push('Recommended actions:');
-    readiness.recommendedActions.forEach((item) => lines.push(`- ${item}`));
-  }
-
-  return `${lines.join('\n')}\n`;
-}

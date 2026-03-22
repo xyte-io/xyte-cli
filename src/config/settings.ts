@@ -6,10 +6,9 @@ import { getXyteConfigDir } from '../utils/config-dir';
 import { isRecord } from '../utils/json';
 import {
   INSPECT_PROVIDER_SCOPES,
-  TUI_SCREEN_IDS,
-  type InspectProviderScope,
-  type TuiScreenId
+  type InspectProviderScope
 } from '../types/settings-enums';
+import { TUI_SCREEN_IDS, type TuiScreenId } from '../types/tui-screens';
 import type { WatchProfile } from '../contracts/watch-frame';
 
 const CLI_OUTPUT_MODES = ['auto', 'json', 'text'] as const;

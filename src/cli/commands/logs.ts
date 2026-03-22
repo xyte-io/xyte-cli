@@ -10,12 +10,10 @@ import {
   type CliActionLogEntry
 } from '../action-logger';
 import { isRecord } from '../../utils/json';
+import { formatBytes, parsePositiveIntegerOption, parsePositiveNumberOption } from '../parse-options';
 import {
   type CliContext,
-  formatBytes,
   getExplicitGlobalOutput,
-  parsePositiveIntegerOption,
-  parsePositiveNumberOption,
   printJson,
   resolveStrictJson,
   resolveTextJsonOutput
