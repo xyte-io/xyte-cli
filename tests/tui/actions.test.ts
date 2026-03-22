@@ -50,7 +50,7 @@ describe('tui actions helpers', () => {
       setStatus: vi.fn()
     };
 
-    const ok = await confirmWriteWithToken(context, 'Resolve ticket', 'resolve', 'canceled');
+    const ok = await confirmWriteWithToken({ context, actionLabel: 'Resolve ticket', token: 'resolve', cancelStatus: 'canceled' });
     expect(ok).toBe(false);
     expect(context.setStatus).toHaveBeenCalledWith('canceled');
   });

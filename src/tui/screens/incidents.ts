@@ -36,7 +36,7 @@ export async function closeIncidentWithGuard(args: CloseIncidentWithGuardArgs): 
     return false;
   }
 
-  const ok = await confirmWriteWithToken(args.context, 'Close incident', 'close', 'Close incident canceled.');
+  const ok = await confirmWriteWithToken({ context: args.context, actionLabel: 'Close incident', token: 'close', cancelStatus: 'Close incident canceled.' });
   if (!ok) {
     return false;
   }

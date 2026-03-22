@@ -12,7 +12,7 @@ import {
   type CliActionLogger
 } from './action-logger';
 import { createXyteClient } from '../client/create-client';
-import { isMutatingMethod } from '../utils/http';
+import { isMutatingMethod } from '../http/http';
 import { getEndpoint, listEndpoints } from '../client/catalog';
 import { buildCallEnvelope } from '../contracts/call-envelope';
 import { toProblemDetails } from '../contracts/problem';
@@ -726,11 +726,12 @@ export function createCli(runtime: CliRuntime = {}): Command {
   };
 
   let profileMigrated = false;
-  const withClient = async (
-    tenantId?: string,
-    retry?: { attempts?: number; backoffMs?: number },
-    flagOverrides: Partial<Record<SettingKey, unknown>> = {}
-  ) => {
+  const withClient = async (args?: {
+    tenantId?: string;
+    retry?: { attempts?: number; backoffMs?: number };
+    flagOverrides?: Partial<Record<SettingKey, unknown>>;
+  }) => {
+    const { tenantId, retry, flagOverrides = {} } = args ?? {};
     if (!profileMigrated) {
       profileMigrated = true;
       await profileStore.migrateIfNeeded();
@@ -831,7 +832,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
     const connectivityMode = args.connectivityMode ?? 'auto';
     const checkConnectivity = connectivityMode !== 'never';
-    const client = checkConnectivity ? await withClient(args.tenantId) : undefined;
+    const client = checkConnectivity ? await withClient({ tenantId: args.tenantId }) : undefined;
     const readiness = await evaluateReadiness({
       profileStore,
       secretStore,
@@ -864,7 +865,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     const settings = await resolveSettings();
     const tenantId = settings.values.defaults.tenant;
     const secretStore = getSecretStore();
-    const client = tenantId ? await withClient(tenantId) : undefined;
+    const client = tenantId ? await withClient({ tenantId }) : undefined;
     const readiness = await evaluateReadiness({
       profileStore,
       secretStore,
@@ -1016,7 +1017,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     const settings = await resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
     const secretStore = getSecretStore();
     const tenantId = options.tenant ?? settings.values.defaults.tenant;
-    const client = tenantId ? await withClient(tenantId) : undefined;
+    const client = tenantId ? await withClient({ tenantId }) : undefined;
     const readiness = await evaluateReadiness({
       profileStore,
       secretStore,
@@ -1246,7 +1247,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     }
 
     const checkConnectivity = connectivityMode !== 'never';
-    const client = checkConnectivity ? await withClient(tenantId) : undefined;
+    const client = checkConnectivity ? await withClient({ tenantId }) : undefined;
     const readiness = await evaluateReadiness({
       profileStore,
       secretStore,
@@ -1287,7 +1288,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
   const handleApiEndpointsList = async (options: { tenant?: string; output?: string; format?: string }) => {
     const settings = await resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
     const tenantId = options.tenant ?? settings.values.defaults.tenant;
-    const payload = tenantId ? await (await withClient(tenantId)).listTenantEndpoints(tenantId) : listEndpoints();
+    const payload = tenantId ? await (await withClient({ tenantId })).listTenantEndpoints(tenantId) : listEndpoints();
     const output = resolveTextJsonOutput({
       output: options.output,
       format: options.format,
@@ -1348,7 +1349,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     const mutating = isMutatingMethod(method);
 
     try {
-      const client = await withClient(tenantId);
+      const client = await withClient({ tenantId });
       const result = await client.callWithMeta(key, {
         requestId,
         tenantId,
@@ -1452,7 +1453,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     const strictJson = resolveStrictJson({ strictJson: options.strictJson, settings });
     const outPath = resolveOutPath(options.out);
     let wroteOutPath = false;
-    const client = await withClient(tenantId, undefined, overrides);
+    const client = await withClient({ tenantId, flagOverrides: overrides });
     await runWatch({
       client,
       tenantId,
@@ -1520,7 +1521,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     }
     const providerScope =
       (overrides['ops.providerScope'] as InspectProviderScope | undefined) ?? settings.values.ops.providerScope;
-    const client = await withClient(tenantId, undefined, overrides);
+    const client = await withClient({ tenantId, flagOverrides: overrides });
     const tenantProfile = await profileStore.getTenant(tenantId);
     const snapshot = await collectFleetSnapshot({ client, tenantId, tenantName: tenantProfile?.name, providerScope });
     const result = buildFleetInspect(snapshot);
@@ -1583,7 +1584,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     const providerScope =
       (overrides['ops.providerScope'] as InspectProviderScope | undefined) ?? settings.values.ops.providerScope;
     const windowHours = Number.parseInt(options.window ?? '24', 10);
-    const client = await withClient(tenantId, undefined, overrides);
+    const client = await withClient({ tenantId, flagOverrides: overrides });
     const tenantProfile = await profileStore.getTenant(tenantId);
     const snapshot = await collectFleetSnapshot({ client, tenantId, tenantName: tenantProfile?.name, providerScope });
     const result = buildDeepDive(snapshot, Number.isFinite(windowHours) ? windowHours : 24);
@@ -1834,7 +1835,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
         suggestedCommands: ['Use --tenant <tenant-id>', 'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>']
       });
     }
-    const client = await withClient(tenantId);
+    const client = await withClient({ tenantId });
     const result = await runSpaceImportTree({
       client,
       tenantId,
@@ -2020,7 +2021,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       const checkConnectivity = mode === 'full';
       const tenantId = options.tenant ?? settings.values.defaults.tenant;
       const secretStore = getSecretStore();
-      const client = checkConnectivity ? await withClient(tenantId) : undefined;
+      const client = checkConnectivity ? await withClient({ tenantId }) : undefined;
       const readiness = await evaluateReadiness({
         profileStore,
         secretStore,

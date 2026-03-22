@@ -54,7 +54,7 @@ export async function claimDeviceWithGuard(args: ClaimDeviceWithGuardArgs): Prom
     return false;
   }
 
-  const ok = await confirmWriteWithToken(args.context, 'Claim device', 'claim', 'Claim action canceled.');
+  const ok = await confirmWriteWithToken({ context: args.context, actionLabel: 'Claim device', token: 'claim', cancelStatus: 'Claim action canceled.' });
   if (!ok) {
     return false;
   }
@@ -102,7 +102,7 @@ export async function createChildSpaceWithGuard(args: CreateChildSpaceWithGuardA
     return false;
   }
 
-  const ok = await confirmWriteWithToken(args.context, 'Create child space', 'create', 'Create child space canceled.');
+  const ok = await confirmWriteWithToken({ context: args.context, actionLabel: 'Create child space', token: 'create', cancelStatus: 'Create child space canceled.' });
   if (!ok) {
     return false;
   }
@@ -146,7 +146,7 @@ export async function renameSpaceWithGuard(args: RenameSpaceWithGuardArgs): Prom
     return false;
   }
 
-  const ok = await confirmWriteWithToken(args.context, 'Rename space', 'rename', 'Rename space canceled.');
+  const ok = await confirmWriteWithToken({ context: args.context, actionLabel: 'Rename space', token: 'rename', cancelStatus: 'Rename space canceled.' });
   if (!ok) {
     return false;
   }

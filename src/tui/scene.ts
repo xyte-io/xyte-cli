@@ -1,4 +1,5 @@
 import type { TuiScreenId } from './types';
+import type { EndpointNamespace } from '../types/endpoints';
 import { safePreviewLines } from './serialize';
 import { fitCell, formatBoolTag, sanitizePrintable, shortId } from './table-format';
 import { HEADLESS_FRAME_SCHEMA_VERSION } from '../contracts/versions';
@@ -119,7 +120,7 @@ interface IncidentsSceneState {
 
 interface TicketsSceneState {
   tenantId?: string;
-  mode: 'organization' | 'partner';
+  mode: EndpointNamespace;
   searchText: string;
   selectedIndex: number;
   tickets: unknown[];

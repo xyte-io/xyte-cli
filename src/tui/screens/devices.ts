@@ -39,7 +39,7 @@ export async function sendCommandWithGuard(args: SendCommandWithGuardArgs): Prom
     return false;
   }
 
-  const ok = await confirmWriteWithToken(args.context, 'Send command', 'command', 'Send command canceled.');
+  const ok = await confirmWriteWithToken({ context: args.context, actionLabel: 'Send command', token: 'command', cancelStatus: 'Send command canceled.' });
   if (!ok) {
     return false;
   }

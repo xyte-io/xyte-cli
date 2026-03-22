@@ -6,6 +6,7 @@ import type { ProfileStore } from '../secure/profile-store';
 import type { SecretStore } from '../secure/secret-store';
 import type { XyteClient } from '../types/client';
 import type { SecretProvider } from '../types/profile';
+import type { EndpointNamespace } from '../types/endpoints';
 import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
 import { extractArray, extractHasNextPage, extractIncidentsArray } from '../utils/json';
 import { errorMessage } from '../utils/error-format';
@@ -280,7 +281,7 @@ export async function loadIncidentsData(
 }
 
 interface TicketsLoadResult {
-  mode: 'organization' | 'partner';
+  mode: EndpointNamespace;
   tickets: unknown[];
 }
 

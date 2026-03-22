@@ -70,12 +70,13 @@ export async function openActionPalette(args: {
   }
 }
 
-export async function confirmWriteWithToken(
-  context: GuardContext,
-  actionLabel: string,
-  token: string,
-  cancelStatus: string
-): Promise<boolean> {
+export async function confirmWriteWithToken(args: {
+  context: GuardContext;
+  actionLabel: string;
+  token: string;
+  cancelStatus: string;
+}): Promise<boolean> {
+  const { context, actionLabel, token, cancelStatus } = args;
   const ok = await context.confirmWrite(actionLabel, token);
   if (!ok) {
     context.setStatus(cancelStatus);

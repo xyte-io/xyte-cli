@@ -30,11 +30,11 @@ export interface CliContext {
   prompt: PromptValueFn;
   readStdin: () => Promise<string>;
   resolveSettings: (flagOverrides?: Partial<Record<SettingKey, unknown>>) => Promise<ResolvedCliSettingsState>;
-  withClient: (
-    tenantId?: string,
-    retry?: { attempts?: number; backoffMs?: number },
-    flagOverrides?: Partial<Record<SettingKey, unknown>>
-  ) => Promise<XyteClient>;
+  withClient: (args?: {
+    tenantId?: string;
+    retry?: { attempts?: number; backoffMs?: number };
+    flagOverrides?: Partial<Record<SettingKey, unknown>>;
+  }) => Promise<XyteClient>;
 }
 
 export function getExplicitGlobalOutput(command: Command): CliOutputMode | undefined {

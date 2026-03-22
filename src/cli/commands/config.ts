@@ -172,7 +172,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
         const settings = await ctx.resolveSettings(overrides);
         const tenantId = options.tenant ?? settings.values.defaults.tenant;
         const secretStore = ctx.getSecretStore();
-        const client = await ctx.withClient(tenantId, undefined, overrides);
+        const client = await ctx.withClient({ tenantId, flagOverrides: overrides });
         const readiness = await evaluateReadiness({
           profileStore: ctx.profileStore,
           secretStore,

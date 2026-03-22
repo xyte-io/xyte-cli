@@ -13,6 +13,7 @@ import {
 import { SCREEN_PANE_CONFIG } from '../panes';
 import { createRenderErrorTracker } from '../render-error-tracker';
 import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
+import type { EndpointNamespace } from '../../types/endpoints';
 import { loadTicketsData } from '../data-loaders';
 import { sceneFromTicketsState } from '../scene';
 import { payloadSummary, safePreviewLines, safeSearchText } from '../serialize';
@@ -37,7 +38,7 @@ function ticketPriorityOf(ticket: unknown): string {
 
 interface ResolveTicketWithGuardArgs {
   ticket: unknown;
-  mode: 'organization' | 'partner';
+  mode: EndpointNamespace;
   context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;
 }
 
@@ -54,7 +55,7 @@ export async function resolveTicketWithGuard(args: ResolveTicketWithGuardArgs): 
     return false;
   }
 
-  const ok = await confirmWriteWithToken(context, 'Resolve ticket', 'resolve', 'Resolve action canceled.');
+  const ok = await confirmWriteWithToken({ context, actionLabel: 'Resolve ticket', token: 'resolve', cancelStatus: 'Resolve action canceled.' });
   if (!ok) {
     return false;
   }
@@ -73,7 +74,7 @@ export async function resolveTicketWithGuard(args: ResolveTicketWithGuardArgs): 
 
 interface SendTicketMessageWithGuardArgs {
   ticket: unknown;
-  mode: 'organization' | 'partner';
+  mode: EndpointNamespace;
   context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;
   message: string;
 }
@@ -97,7 +98,7 @@ export async function sendTicketMessageWithGuard(args: SendTicketMessageWithGuar
     return false;
   }
 
-  const ok = await confirmWriteWithToken(context, 'Send ticket message', 'message', 'Send message canceled.');
+  const ok = await confirmWriteWithToken({ context, actionLabel: 'Send ticket message', token: 'message', cancelStatus: 'Send message canceled.' });
   if (!ok) {
     return false;
   }
@@ -126,7 +127,7 @@ export function createTicketsScreen(): TuiScreen {
   let tickets: unknown[] = [];
   let filteredAll: unknown[] = [];
   let filtered: unknown[] = [];
-  let mode: 'organization' | 'partner' = 'organization';
+  let mode: EndpointNamespace = 'organization';
   let searchText = '';
   let statusFilter = '';
   let priorityFilter = '';

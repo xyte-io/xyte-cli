@@ -275,7 +275,7 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
           strictJson: options.strictJson === true,
           profileStore: ctx.profileStore,
           secretStore: ctx.getSecretStore(),
-          client: await ctx.withClient(options.tenant)
+          client: await ctx.withClient({ tenantId: options.tenant })
         });
 
         printJson(ctx.stdout, summary, { strictJson: options.strictJson });
