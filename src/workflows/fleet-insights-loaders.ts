@@ -1,17 +1,10 @@
 import type { XyteClient } from '../types/client';
 import type { InspectProviderScope } from '../types/settings-enums';
-import { asRecord, asRecordOrUndefined, extractArray, extractHasNextPage } from '../utils/json';
+import { asRecord, asRecordOrUndefined, extractArray, extractHasNextPage, safeString } from '../utils/json';
 import { withSpan } from '../observability/tracing';
 import { parseTimestamp } from './report/time-format';
 
 import type { FleetSnapshot, PartnerEnrichmentSnapshot, PartnerEndpointOutcome, ResolvedInspectProviderScope, StatusCounts } from '../types/fleet-inspect';
-
-export function safeString(value: unknown): string {
-  if (value === undefined || value === null) {
-    return 'n/a';
-  }
-  return String(value);
-}
 
 const PARTNER_ENRICHMENT_SAMPLE_SIZE = 25;
 const PARTNER_ENRICHMENT_CONCURRENCY = 5;
