@@ -12,13 +12,7 @@ export { collectFleetSnapshot } from './fleet-insights-loaders';
 export { formatFleetInspectAscii, formatDeepDiveAscii, formatDeepDiveMarkdown } from './fleet-insights-format';
 import { formatDeepDiveMarkdown } from './fleet-insights-format';
 
-export type {
-  StatusCounts,
-  FleetSnapshot,
-  PartnerEndpointOutcome,
-  PartnerEnrichmentSnapshot,
-  FleetInspectResult
-} from '../types/fleet-inspect';
+export type { FleetSnapshot, FleetInspectResult } from '../types/fleet-inspect';
 import type { StatusCounts, FleetSnapshot, FleetInspectResult } from '../types/fleet-inspect';
 
 export type { DeepDiveResult } from '../types/deep-dive';

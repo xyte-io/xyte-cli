@@ -120,7 +120,7 @@ export function printJson(
   stream.write(`${stringifyJsonOutput(value, options)}\n`);
 }
 
-export function createSecretConflictError(cause: string): CliUserError {
+function createSecretConflictError(cause: string): CliUserError {
   return new CliUserError({
     summary: 'Conflicting API key sources.',
     cause,
