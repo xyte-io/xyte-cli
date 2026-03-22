@@ -148,67 +148,48 @@ async function resolveTenantNameFromKey(ctx: CliContext, args: {
   }
 }
 
-async function runSimpleSetup(ctx: CliContext, args: {
+async function runSetupCore(ctx: CliContext, args: {
   tenantId: string;
   tenantName: string;
+  provider: SecretProvider;
+  slotName: string;
   keyValue: string;
-  setActive?: boolean;
-  connectivityMode?: SetupConnectivityMode;
+  setActive: boolean;
+  connectivityMode: SetupConnectivityMode;
 }): Promise<SetupRunResult> {
   const steps: SetupStep[] = [];
-  await ctx.profileStore.upsertTenant({
-    id: args.tenantId,
-    name: args.tenantName
-  });
-  steps.push({
-    key: 'tenant_upserted',
-    status: 'ok',
-    detail: args.tenantId
-  });
+
+  await ctx.profileStore.upsertTenant({ id: args.tenantId, name: args.tenantName });
+  steps.push({ key: 'tenant_upserted', status: 'ok', detail: args.tenantId });
+
   await ctx.profileStore.setActiveTenant(args.tenantId);
-  steps.push({
-    key: 'tenant_activated',
-    status: 'ok',
-    detail: args.tenantId
-  });
+  steps.push({ key: 'tenant_activated', status: 'ok', detail: args.tenantId });
 
   const secretStore = ctx.getSecretStore();
-  const slots = await ctx.profileStore.listKeySlots(args.tenantId, SIMPLE_SETUP_AUTH_PROVIDER);
-  const existing = slots.find((slot) => slot.name.toLowerCase() === SIMPLE_SETUP_SLOT_NAME);
+  const knownSlots = await ctx.profileStore.listKeySlots(args.tenantId, args.provider);
+  const existing = knownSlots.find((s) => s.name.toLowerCase() === args.slotName.toLowerCase());
 
   const slot = existing
-    ? await ctx.profileStore.updateKeySlot(args.tenantId, SIMPLE_SETUP_AUTH_PROVIDER, existing.slotId, {
+    ? await ctx.profileStore.updateKeySlot(args.tenantId, args.provider, existing.slotId, {
         fingerprint: makeKeyFingerprint(args.keyValue)
       })
     : await ctx.profileStore.addKeySlot(args.tenantId, {
-        provider: SIMPLE_SETUP_AUTH_PROVIDER,
-        name: SIMPLE_SETUP_SLOT_NAME,
+        provider: args.provider,
+        name: args.slotName,
         fingerprint: makeKeyFingerprint(args.keyValue)
       });
 
-  await secretStore.setSlotSecret(args.tenantId, SIMPLE_SETUP_AUTH_PROVIDER, slot.slotId, args.keyValue);
-  steps.push({
-    key: 'slot_written',
-    status: 'ok',
-    detail: slot.slotId
-  });
-  if (args.setActive !== false) {
-    await ctx.profileStore.setActiveKeySlot(args.tenantId, SIMPLE_SETUP_AUTH_PROVIDER, slot.slotId);
-    steps.push({
-      key: 'slot_activated',
-      status: 'ok',
-      detail: slot.slotId
-    });
+  await secretStore.setSlotSecret(args.tenantId, args.provider, slot.slotId, args.keyValue);
+  steps.push({ key: 'slot_written', status: 'ok', detail: slot.slotId });
+
+  if (args.setActive) {
+    await ctx.profileStore.setActiveKeySlot(args.tenantId, args.provider, slot.slotId);
+    steps.push({ key: 'slot_activated', status: 'ok', detail: slot.slotId });
   } else {
-    steps.push({
-      key: 'slot_activated',
-      status: 'skipped',
-      detail: 'setActive=false'
-    });
+    steps.push({ key: 'slot_activated', status: 'skipped', detail: 'setActive=false' });
   }
 
-  const connectivityMode = args.connectivityMode ?? 'auto';
-  const checkConnectivity = connectivityMode !== 'never';
+  const checkConnectivity = args.connectivityMode !== 'never';
   const client = checkConnectivity ? await ctx.withClient({ tenantId: args.tenantId }) : undefined;
   const readiness = await evaluateReadiness({
     profileStore: ctx.profileStore,
@@ -222,20 +203,34 @@ async function runSimpleSetup(ctx: CliContext, args: {
     status: checkConnectivity ? 'ok' : 'skipped',
     detail: checkConnectivity ? readiness.connectivity.message : 'Connectivity probe skipped by setup mode.'
   });
-  steps.push({
-    key: 'readiness_evaluated',
-    status: 'ok',
-    detail: readiness.state
-  });
+  steps.push({ key: 'readiness_evaluated', status: 'ok', detail: readiness.state });
 
   return {
     tenantId: args.tenantId,
-    provider: SIMPLE_SETUP_AUTH_PROVIDER,
+    provider: args.provider,
     slot,
     readiness,
-    connectivityMode,
+    connectivityMode: args.connectivityMode,
     steps
   };
+}
+
+async function runSimpleSetup(ctx: CliContext, args: {
+  tenantId: string;
+  tenantName: string;
+  keyValue: string;
+  setActive?: boolean;
+  connectivityMode?: SetupConnectivityMode;
+}): Promise<SetupRunResult> {
+  return runSetupCore(ctx, {
+    tenantId: args.tenantId,
+    tenantName: args.tenantName,
+    provider: SIMPLE_SETUP_AUTH_PROVIDER,
+    slotName: SIMPLE_SETUP_SLOT_NAME,
+    keyValue: args.keyValue,
+    setActive: args.setActive !== false,
+    connectivityMode: args.connectivityMode ?? 'auto'
+  });
 }
 
 async function handleSetupStatus(ctx: CliContext, options: {
@@ -391,8 +386,6 @@ async function handleSetupRunAdvanced(ctx: CliContext, options: {
     promptQuestion: 'API key',
     stdout: ctx.stdout
   });
-  const steps: SetupStep[] = [];
-
   if (!options.nonInteractive) {
     tenantId = tenantId || (await ctx.prompt({ question: 'Tenant id', stdout: ctx.stdout }));
     tenantName = tenantName || (await ctx.prompt({ question: 'Tenant display name', initial: tenantId, stdout: ctx.stdout }));
@@ -431,93 +424,22 @@ async function handleSetupRunAdvanced(ctx: CliContext, options: {
       : undefined;
   tenantName = resolvedTenantName ?? candidateTenantName;
 
-  await ctx.profileStore.upsertTenant({
-    id: tenantId,
-    name: tenantName
-  });
-  steps.push({
-    key: 'tenant_upserted',
-    status: 'ok',
-    detail: tenantId
-  });
-  await ctx.profileStore.setActiveTenant(tenantId);
-  steps.push({
-    key: 'tenant_activated',
-    status: 'ok',
-    detail: tenantId
-  });
-  const secretStore = ctx.getSecretStore();
-
-  const knownSlots = await ctx.profileStore.listKeySlots(tenantId, provider);
-  const existing = knownSlots.find((item) => item.name.toLowerCase() === slotName.toLowerCase());
-  const slot = existing
-    ? await ctx.profileStore.updateKeySlot(tenantId, provider, existing.slotId, {
-        fingerprint: makeKeyFingerprint(keyValue)
-      })
-    : await ctx.profileStore.addKeySlot(tenantId, {
-        provider,
-        name: slotName,
-        fingerprint: makeKeyFingerprint(keyValue)
-      });
-  await secretStore.setSlotSecret(tenantId, provider, slot.slotId, keyValue);
-  steps.push({
-    key: 'slot_written',
-    status: 'ok',
-    detail: slot.slotId
-  });
-
-  if (options.setActive !== false) {
-    await ctx.profileStore.setActiveKeySlot(tenantId, provider, slot.slotId);
-    steps.push({
-      key: 'slot_activated',
-      status: 'ok',
-      detail: slot.slotId
-    });
-  } else {
-    steps.push({
-      key: 'slot_activated',
-      status: 'skipped',
-      detail: 'setActive=false'
-    });
-  }
-
-  const checkConnectivity = connectivityMode !== 'never';
-  const client = checkConnectivity ? await ctx.withClient({ tenantId }) : undefined;
-  const readiness = await evaluateReadiness({
-    profileStore: ctx.profileStore,
-    secretStore,
+  const result = await runSetupCore(ctx, {
     tenantId,
-    client,
-    checkConnectivity
-  });
-  steps.push({
-    key: 'connectivity_checked',
-    status: checkConnectivity ? 'ok' : 'skipped',
-    detail: checkConnectivity ? readiness.connectivity.message : 'Connectivity probe skipped by setup mode.'
-  });
-  steps.push({
-    key: 'readiness_evaluated',
-    status: 'ok',
-    detail: readiness.state
+    tenantName,
+    provider,
+    slotName,
+    keyValue,
+    setActive: options.setActive !== false,
+    connectivityMode
   });
 
   if (output === 'text') {
-    ctx.stdout.write(formatReadinessText(readiness));
+    ctx.stdout.write(formatReadinessText(result.readiness));
     return;
   }
 
-  printJson(
-    ctx.stdout,
-    {
-      tenantId,
-      provider,
-      slot,
-      readiness,
-      connectivityMode,
-      steps
-    },
-    { strictJson: resolveStrictJson({ settings }) }
-  );
+  printJson(ctx.stdout, result, { strictJson: resolveStrictJson({ settings }) });
 }
 
 async function handleSetupRun(ctx: CliContext, options: {
