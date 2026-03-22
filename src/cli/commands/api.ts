@@ -11,6 +11,7 @@ import { parseJsonObject } from '../../utils/json';
 import {
   type CliContext,
   type CliGlobalOptions,
+  parseQueryJson,
   printJson,
   resolveStrictJson,
   resolveTextJsonOutput
@@ -25,19 +26,6 @@ function parsePathJson(value: string | undefined): Record<string, string | numbe
       continue;
     }
     throw new Error(`Path parameter "${key}" must be string or number.`);
-  }
-  return out;
-}
-
-function parseQueryJson(value: string | undefined): Record<string, string | number | boolean | null | undefined> {
-  const record = parseJsonObject(value);
-  const out: Record<string, string | number | boolean | null | undefined> = {};
-  for (const [key, item] of Object.entries(record)) {
-    if (item === null || item === undefined || typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
-      out[key] = item as string | number | boolean | null | undefined;
-      continue;
-    }
-    throw new Error(`Query parameter "${key}" must be scalar, null, or undefined.`);
   }
   return out;
 }
@@ -98,7 +86,7 @@ async function handleApiCall(ctx: CliContext, key: string, options: Record<strin
     try {
       body = JSON.parse(String(options.bodyJson));
     } catch (error) {
-      const detail = error instanceof SyntaxError ? `: ${error.message}` : '';
+      const detail = error instanceof Error && error.message ? `: ${error.message}` : '';
       throw new Error(`Invalid --body-json${detail}`);
     }
   }

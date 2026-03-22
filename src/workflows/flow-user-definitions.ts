@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
 import { getXyteConfigDir } from '../utils/config-dir';
+import { errorMessage } from '../utils/error-format';
 
 const FLOW_DEFINITION_SCHEMA_VERSION = 'xyte.flow.definition.v1';
 
@@ -240,8 +241,9 @@ export async function importFlowDefinition(args: { filePath: string; force: bool
   try {
     raw = JSON.parse(await readFile(resolved, 'utf8'));
   } catch (error) {
-    const detail = error instanceof SyntaxError ? `: ${error.message}` : '';
-    throw new Error(`Failed to parse flow definition at "${resolved}"${detail}`);
+    const isSyntax = error instanceof SyntaxError;
+    const detail = isSyntax ? `: ${error.message}` : `: ${errorMessage(error)}`;
+    throw new Error(`Failed to ${isSyntax ? 'parse' : 'read'} flow definition at "${resolved}"${detail}`);
   }
   const parsed = validateFlowDefinition(raw);
 

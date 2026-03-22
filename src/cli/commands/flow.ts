@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import type { Command } from 'commander';
 
 import {
@@ -31,7 +33,6 @@ function parseFlowContextJson(value: string | undefined): Record<string, string>
   if (!value) {
     return {};
   }
-  const { readFileSync } = require('node:fs') as typeof import('node:fs');
   const raw = readFileSync(value, 'utf8');
   let parsed: unknown;
   try {

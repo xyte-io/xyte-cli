@@ -24,7 +24,6 @@ import {
 } from '../../workflows/fleet-insights';
 import { runWatch } from '../../workflows/watch';
 import type { SettingKey } from '../../config/settings';
-import { parseJsonObject } from '../../utils/json';
 import {
   type CliContext,
   type CliGlobalOptions,
@@ -33,6 +32,7 @@ import {
   getExplicitGlobalOutput,
   parseCliOutputMode,
   parsePositiveIntegerOption,
+  parseQueryJson,
   printJson,
   resolveStrictJson,
   resolveTextJsonOutput
@@ -93,19 +93,6 @@ function parseWatchMaxPolls(value: string | undefined): number | undefined {
     throw new Error(`Invalid max-polls: ${value}. Maximum is 3600.`);
   }
   return parsed;
-}
-
-function parseQueryJson(value: string | undefined): Record<string, string | number | boolean | null | undefined> {
-  const record = parseJsonObject(value);
-  const out: Record<string, string | number | boolean | null | undefined> = {};
-  for (const [key, item] of Object.entries(record)) {
-    if (item === null || item === undefined || typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
-      out[key] = item as string | number | boolean | null | undefined;
-      continue;
-    }
-    throw new Error(`Query parameter "${key}" must be scalar, null, or undefined.`);
-  }
-  return out;
 }
 
 function stringifyWatchValue(value: unknown, fallback = '-'): string {
@@ -455,16 +442,6 @@ async function handleOpsConsole(
   const overrides: Partial<Record<SettingKey, unknown>> = {};
   if (options.tenant) {
     overrides['defaults.tenant'] = options.tenant;
-  }
-  if (options.screen) {
-    if (!(TUI_SCREEN_IDS as readonly string[]).includes(options.screen)) {
-      throw new CliUserError({
-        summary: 'Invalid console screen.',
-        cause: `Received "${options.screen}".`,
-        suggestedCommands: [`Use one of: ${TUI_SCREEN_IDS.join(', ')}`]
-      });
-    }
-    overrides['console.screen'] = options.screen as TuiScreenId;
   }
   if (options.motion === false) {
     overrides['console.motion'] = false;

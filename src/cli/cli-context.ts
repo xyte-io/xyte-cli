@@ -5,6 +5,7 @@ import type { SecretStore } from '../secure/secret-store';
 import type { XyteClient } from '../types/client';
 import type { CliOutputMode, ResolvedCliSettingsState, SettingKey } from '../config/settings';
 import type { ReadinessCheck } from '../config/readiness';
+import { parseJsonObject } from '../utils/json';
 import { stringifyJsonOutput } from '../utils/json-output';
 import { CliUserError } from '../contracts/user-error';
 
@@ -39,6 +40,19 @@ export interface CliContext {
 
 export interface CliGlobalOptions {
   output?: string;
+}
+
+export function parseQueryJson(value: string | undefined): Record<string, string | number | boolean | null | undefined> {
+  const record = parseJsonObject(value);
+  const out: Record<string, string | number | boolean | null | undefined> = {};
+  for (const [key, item] of Object.entries(record)) {
+    if (item === null || item === undefined || typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
+      out[key] = item as string | number | boolean | null | undefined;
+      continue;
+    }
+    throw new Error(`Query parameter "${key}" must be scalar, null, or undefined.`);
+  }
+  return out;
 }
 
 export function getExplicitGlobalOutput(command: Command): CliOutputMode | undefined {
