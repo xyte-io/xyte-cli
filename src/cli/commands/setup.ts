@@ -1,9 +1,9 @@
 import type { Command } from 'commander';
 
 import { createXyteClient } from '../../client/create-client';
-import { evaluateReadiness } from '../../config/readiness';
+import { evaluateReadiness, type ReadinessCheck } from '../../config/readiness';
 import { makeKeyFingerprint } from '../../secure/key-slots';
-import type { SecretProvider } from '../../types/profile';
+import type { ApiKeySlotMeta, SecretProvider } from '../../types/profile';
 import { parseProvider, PROVIDER_ORG } from '../../types/profile';
 import { isRecord } from '../../utils/json';
 import { firstText } from '../../workflows/fleet-insights-loaders';
@@ -31,6 +31,15 @@ interface SetupStep {
   key: SetupStepKey;
   status: 'ok' | 'skipped';
   detail?: string;
+}
+
+interface SetupRunResult {
+  tenantId: string;
+  provider: SecretProvider;
+  slot: ApiKeySlotMeta;
+  readiness: ReadinessCheck;
+  connectivityMode: SetupConnectivityMode;
+  steps: SetupStep[];
 }
 
 const SIMPLE_SETUP_AUTH_PROVIDER = PROVIDER_ORG;
@@ -151,7 +160,7 @@ async function runSimpleSetup(ctx: CliContext, args: {
   keyValue: string;
   setActive?: boolean;
   connectivityMode?: SetupConnectivityMode;
-}) {
+}): Promise<SetupRunResult> {
   const steps: SetupStep[] = [];
   await ctx.profileStore.upsertTenant({
     id: args.tenantId,

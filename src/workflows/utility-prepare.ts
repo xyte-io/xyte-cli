@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { UTILITY_PREPARE_SCHEMA_VERSION } from '../contracts/versions';
 import { getUtilityActionProfile, listUtilityActionProfiles } from './utility-action-catalog';
-import type { UtilityActionProfile, UtilityPreparePrimaryFormat } from './utility-action-profiles';
+import type { UtilityActionProfile, UtilityExecutionSupport, UtilityPreparePrimaryFormat } from './utility-action-profiles';
 
 type UtilityPrepareInputKind = 'tabular' | 'document' | 'image' | 'unknown';
 
@@ -232,7 +232,17 @@ export function runUtilityPrepare(args: {
   };
 }
 
-export function listUtilityPrepareActions(args: { entity?: string; includeGeneric?: boolean } = {}) {
+interface UtilityActionSummary {
+  actionKey: string;
+  entity: string;
+  title: string;
+  mode: 'friendly' | 'generic';
+  method: string | null;
+  pathTemplate: string | null;
+  executionSupport: UtilityExecutionSupport;
+}
+
+export function listUtilityPrepareActions(args: { entity?: string; includeGeneric?: boolean } = {}): UtilityActionSummary[] {
   return listUtilityActionProfiles({
     entity: args.entity,
     includeGeneric: args.includeGeneric

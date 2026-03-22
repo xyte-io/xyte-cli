@@ -64,8 +64,18 @@ async function handleApiEndpointsDescribe(ctx: CliContext, key: string, options:
   printJson(ctx.stdout, endpoint, { strictJson: resolveStrictJson({ settings }) });
 }
 
-async function handleApiCall(ctx: CliContext, key: string, options: Record<string, unknown>): Promise<void> {
-  const tenantOverride = typeof options.tenant === 'string' ? options.tenant : undefined;
+interface ApiCallOptions {
+  tenant?: string;
+  pathJson?: string;
+  queryJson?: string;
+  bodyJson?: string;
+  outputMode?: string;
+  output?: string;
+  strictJson?: boolean;
+}
+
+async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptions): Promise<void> {
+  const tenantOverride = options.tenant;
   const settings = await ctx.resolveSettings(tenantOverride ? { 'defaults.tenant': tenantOverride } : {});
   const endpoint = getEndpoint(key);
   const method = endpoint.method.toUpperCase();
@@ -79,8 +89,8 @@ async function handleApiCall(ctx: CliContext, key: string, options: Record<strin
   }
   const requestId = randomUUID();
   const tenantId = tenantOverride ?? settings.values.defaults.tenant;
-  const path = parsePathJson(options.pathJson as string | undefined);
-  const query = parseQueryJson(options.queryJson as string | undefined);
+  const path = parsePathJson(options.pathJson);
+  const query = parseQueryJson(options.queryJson);
   let body: unknown;
   if (options.bodyJson) {
     try {
@@ -90,7 +100,7 @@ async function handleApiCall(ctx: CliContext, key: string, options: Record<strin
       throw new Error(`Invalid --body-json${detail}`);
     }
   }
-  const strictJson = resolveStrictJson({ strictJson: options.strictJson === true, settings });
+  const strictJson = resolveStrictJson({ strictJson: !!options.strictJson, settings });
   const mutating = isMutatingMethod(method);
 
   try {
@@ -129,7 +139,7 @@ async function handleApiCall(ctx: CliContext, key: string, options: Record<strin
     }
 
     const output = resolveTextJsonOutput({
-      output: options.output as string | undefined,
+      output: options.output,
       stdoutIsTTY: ctx.stdoutIsTTY,
       settings
     });
@@ -209,7 +219,7 @@ export function registerApiCommands(parent: Command, ctx: CliContext): void {
     .option('--body-json <json>', 'Body JSON object')
     .option('--output-mode <mode>', 'raw|envelope', 'raw')
     .option('--strict-json', 'Fail on non-serializable output')
-    .action(async function (key: string, options: Record<string, unknown>) {
+    .action(async function (key: string, options: ApiCallOptions) {
       await handleApiCall(ctx, key, {
         ...options,
         output: (this.optsWithGlobals() as CliGlobalOptions).output

@@ -32,7 +32,13 @@ function defaultIsCritical(event: InputEvent): boolean {
   return event.ch === 'q' || event.key.name === 'q' || event.key.full === 'C-c';
 }
 
-export function createInputController(options: InputControllerOptions) {
+export interface InputController {
+  dispatch: (event: InputEvent) => InputDispatchResult;
+  getState: () => InputControllerState;
+  clear: () => void;
+}
+
+export function createInputController(options: InputControllerOptions): InputController {
   const maxQueueSize = Math.max(1, options.maxQueueSize ?? DEFAULT_MAX_QUEUE_SIZE);
   const isCritical = options.isCritical ?? defaultIsCritical;
   const queue: InputEvent[] = [];
