@@ -29,6 +29,18 @@ import {
   resolveTextJsonOutput
 } from '../cli-context';
 
+function parseWritableScope(raw: string | undefined): Exclude<CliSettingsScope, 'resolved'> {
+  const scope = (raw ?? 'user').trim().toLowerCase();
+  if (scope !== 'user' && scope !== 'workspace') {
+    throw new CliUserError({
+      summary: 'Invalid config scope.',
+      cause: `Received "${raw}".`,
+      suggestedCommands: ['Use --scope user', 'Use --scope workspace']
+    });
+  }
+  return scope;
+}
+
 interface SlotView {
   tenantId: string;
   provider: SecretProvider;
@@ -290,15 +302,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
           suggestedCommands: [`Supported keys: ${SUPPORTED_SETTING_KEYS.join(', ')}`]
         });
       }
-      const scope = (options.scope ?? 'user').trim().toLowerCase();
-      if (scope !== 'user' && scope !== 'workspace') {
-        throw new CliUserError({
-          summary: 'Invalid config scope.',
-          cause: `Received "${options.scope}".`,
-          suggestedCommands: ['Use --scope user', 'Use --scope workspace']
-        });
-      }
-      const targetScope = scope as Exclude<CliSettingsScope, 'resolved'>;
+      const targetScope = parseWritableScope(options.scope);
       const parsedValue = parseSettingValue(key as SettingKey, value);
       const result = setCliSettingSync({
         scope: targetScope,
@@ -344,15 +348,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
           suggestedCommands: [`Supported keys: ${SUPPORTED_SETTING_KEYS.join(', ')}`]
         });
       }
-      const scope = (options.scope ?? 'user').trim().toLowerCase();
-      if (scope !== 'user' && scope !== 'workspace') {
-        throw new CliUserError({
-          summary: 'Invalid config scope.',
-          cause: `Received "${options.scope}".`,
-          suggestedCommands: ['Use --scope user', 'Use --scope workspace']
-        });
-      }
-      const targetScope = scope as Exclude<CliSettingsScope, 'resolved'>;
+      const targetScope = parseWritableScope(options.scope);
       const result = unsetCliSettingSync({
         scope: targetScope,
         key: key as SettingKey,

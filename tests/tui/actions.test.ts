@@ -16,13 +16,12 @@ describe('tui actions helpers', () => {
       showError: vi.fn()
     };
 
-    const handled = await openActionPalette({
+    await openActionPalette({
       context,
       title: 'Actions',
       actions: [{ label: 'Do thing', run }]
     });
 
-    expect(handled).toBe(true);
     expect(run).toHaveBeenCalledTimes(1);
   });
 

@@ -623,7 +623,7 @@ export function createTicketsScreen(): TuiScreen {
       }
 
       if (ch === 'a') {
-        return openActionPalette({
+        await openActionPalette({
           context,
           title: `Ticket actions (${mode} mode)`,
           actions: [
@@ -641,6 +641,7 @@ export function createTicketsScreen(): TuiScreen {
             }
           ]
         });
+        return true;
       }
 
       if (ch === 'R') {

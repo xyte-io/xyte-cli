@@ -383,7 +383,7 @@ export function createDevicesScreen(): TuiScreen {
       }
 
       if (ch === 'a') {
-        return openActionPalette({
+        await openActionPalette({
           context,
           title: 'Device actions',
           actions: [
@@ -457,6 +457,7 @@ export function createDevicesScreen(): TuiScreen {
             }
           ]
         });
+        return true;
       }
 
       if (key.name === 'enter') {

@@ -445,7 +445,7 @@ export function createIncidentsScreen(): TuiScreen {
       }
 
       if (ch === 'a') {
-        return openActionPalette({
+        await openActionPalette({
           context,
           title: 'Incident actions',
           actions: [
@@ -468,6 +468,7 @@ export function createIncidentsScreen(): TuiScreen {
             }
           ]
         });
+        return true;
       }
 
       if (key.name === 'enter' && activePane === 'incidents-table') {

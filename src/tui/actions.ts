@@ -32,10 +32,10 @@ export async function openActionPalette(args: {
   context: PromptContext & ErrorContext;
   title: string;
   actions: PaletteAction[];
-}): Promise<boolean> {
+}): Promise<void> {
   if (!args.actions.length) {
     args.context.setStatus('No actions are available.');
-    return true;
+    return;
   }
 
   const lines = [args.title, ...args.actions.map((action, index) => {
@@ -46,27 +46,25 @@ export async function openActionPalette(args: {
   const raw = await args.context.prompt(`${lines.join('\n')}\n\nSelect action number:`, '');
   if (raw === undefined || raw.trim() === '') {
     args.context.setStatus('Action menu canceled.');
-    return true;
+    return;
   }
 
   const selectedIndex = parseOneBasedIndex(raw, args.actions.length);
   if (selectedIndex === undefined) {
     args.context.setStatus('Invalid action selection.');
-    return true;
+    return;
   }
 
   const selected = args.actions[selectedIndex];
   if (selected.enabled === false) {
     args.context.setStatus(selected.disabledReason ?? `${selected.label} is disabled.`);
-    return true;
+    return;
   }
 
   try {
     await selected.run();
-    return true;
   } catch (error) {
     args.context.showError(error);
-    return true;
   }
 }
 

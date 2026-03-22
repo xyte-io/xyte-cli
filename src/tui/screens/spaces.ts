@@ -682,7 +682,7 @@ export function createSpacesScreen(): TuiScreen {
       }
 
       if (ch === 'a') {
-        return openActionPalette({
+        await openActionPalette({
           context,
           title: 'Space actions',
           actions: [
@@ -800,6 +800,7 @@ export function createSpacesScreen(): TuiScreen {
             }
           ]
         });
+        return true;
       }
 
       if (key.name === 'enter' && activePane === 'spaces-table') {
