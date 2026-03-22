@@ -4,7 +4,14 @@ import { fitCell, formatBoolTag, sanitizePrintable, shortId } from './table-form
 import { HEADLESS_FRAME_SCHEMA_VERSION } from '../contracts/versions';
 import type { ProviderReadiness } from '../config/readiness';
 
-export function toSetupProviderRows(providers: ProviderReadiness[]) {
+export interface SetupProviderRow {
+  provider: string;
+  slotCount: number;
+  activeSlot: string;
+  hasSecret: 'yes' | 'no';
+}
+
+export function toSetupProviderRows(providers: ProviderReadiness[]): SetupProviderRow[] {
   return providers.map((provider) => ({
     provider: provider.provider,
     slotCount: provider.slotCount,
