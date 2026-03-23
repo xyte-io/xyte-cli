@@ -97,7 +97,11 @@ export async function applyUpgrade(
   );
 
   const warnings: string[] = [];
-  const installSpec = settings.installSpec?.trim() ? settings.installSpec.trim() : `${packageName}@latest`;
+  const installSpec = settings.installSpec?.trim()
+    ? settings.installSpec.trim()
+    : typeof settings.latestVersionOverride === 'string' && settings.latestVersionOverride.trim()
+      ? `${packageName}@${settings.latestVersionOverride.trim()}`
+      : `${packageName}@latest`;
   const updateArgs = ['install', '--global', installSpec];
   let updateCommand: { command: string; args: string[] } | undefined;
 

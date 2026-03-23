@@ -21,13 +21,14 @@ function parseRuntimeFrame(chunks: string[]): (HeadlessFrame & { meta?: Record<s
 async function makeReadyProfile() {
   const profileStore = new MemoryProfileStore();
   const secretStore = new MemorySecretStore();
-  await profileStore.upsertTenant({ id: 'acme' });
+  await profileStore.upsertTenant({ id: 'acme', apiProvider: 'xyte-org' });
   await profileStore.setActiveTenant('acme');
   const slot = await profileStore.addKeySlot('acme', {
     provider: 'xyte-org',
     name: 'primary',
     fingerprint: 'sha256:test'
   });
+  await profileStore.setActiveKeySlot('acme', 'xyte-org', slot.slotId);
   await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key');
   return { profileStore, secretStore };
 }

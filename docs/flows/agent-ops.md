@@ -57,6 +57,7 @@ xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/
   - Continue to incident monitoring only after readiness is healthy.
 - Failure fallback:
   - Run `xyte-cli setup run --tenant <tenant-id>` if key provisioning is missing.
+  - If setup must stay offline, use `xyte-cli setup run --tenant <tenant-id> --provider <xyte-org|xyte-partner> --connectivity never`.
   - Re-run this flow after setup.
 
 ## flow.incidents-delta-watch

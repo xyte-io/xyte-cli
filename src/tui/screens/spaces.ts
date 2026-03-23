@@ -353,7 +353,9 @@ export function createSpacesScreen(): TuiScreen {
       }
 
       const id = getSpaceId(selected);
-      const drilldown = await loadSpaceDrilldownData(context.client, input.tenantId, id, allDevicesCache);
+      const drilldown = await loadSpaceDrilldownData(context.client, input.tenantId, id, allDevicesCache, {
+        profileStore: context.profileStore
+      });
       return {
         selectedSpaceId: id,
         selectedSpaceDetail: drilldown.data.spaceDetail,
@@ -459,7 +461,9 @@ export function createSpacesScreen(): TuiScreen {
           created_before: createdBeforeFilter || undefined
         }
       }),
-      loadDevicesData(context.client, tenantId)
+      loadDevicesData(context.client, tenantId, {
+        profileStore: context.profileStore
+      })
     ]);
 
     spaces = nextSpacesOutcome.data;

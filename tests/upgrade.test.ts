@@ -94,4 +94,48 @@ describe('upgrade utilities', () => {
     expect(result.skills.failedCount).toBe(1);
     expect(result.warnings.length).toBe(1);
   });
+
+  it('uses target version override as install spec when installSpec is unset', async () => {
+    const commandRunner = vi.fn(async (command: string, args: string[]) => {
+      if (/^npm(?:\.cmd)?$/.test(command)) {
+        expect(args).toEqual(['install', '--global', '@xyteai/cli@0.6.0']);
+        return {
+          code: 0,
+          stdout: '',
+          stderr: ''
+        };
+      }
+      if (/^xyte-cli(?:\.cmd)?$/.test(command)) {
+        return {
+          code: 0,
+          stdout: 'xyte-cli 0.6.0\n',
+          stderr: ''
+        };
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+
+    const result = await applyUpgrade(
+      {
+        packageName: '@xyteai/cli',
+        skillSourceDir: '/repo/skills/xyte-cli',
+        latestVersionOverride: '0.6.0'
+      },
+      {
+        fetchImpl: vi.fn() as any,
+        commandRunner,
+        getCurrentVersion: () => '0.5.0',
+        installSkillsImpl: vi.fn().mockResolvedValue({
+          workspaceRoot: '/tmp/workspace',
+          homeRoot: '/tmp/home',
+          sourceDir: '/repo/skills/xyte-cli',
+          outcomes: [],
+          createdRoots: []
+        })
+      }
+    );
+
+    expect(result.updated).toBe(true);
+    expect(result.updateCommand?.args).toEqual(['install', '--global', '@xyteai/cli@0.6.0']);
+  });
 });

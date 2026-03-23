@@ -668,7 +668,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       '',
       'Setup:',
       '  xyte-cli init --scope both --agents all',
-      '  xyte-cli setup run --non-interactive --tenant <tenant-id> --key-stdin',
+      '  xyte-cli setup run --non-interactive --tenant <tenant-id> --key-file <path>',
       '',
       'Everyday Ops:',
       '  xyte-cli ops watch incidents --tenant <tenant-id> --once --output json --strict-json',

@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { XyteAuthError } from '../../src/http/errors';
+import type { SecretProvider } from '../../src/types/profile';
+import { MemoryProfileStore } from '../support/memory-profile-store';
 
 import {
   loadCommandTemplates,
@@ -7,6 +10,12 @@ import {
   loadSpaceDrilldownData,
   loadSpacesData
 } from '../../src/tui/data-loaders';
+
+async function makeProfileStore(provider: SecretProvider = 'xyte-org') {
+  const profileStore = new MemoryProfileStore();
+  await profileStore.upsertTenant({ id: 'acme', apiProvider: provider });
+  return profileStore;
+}
 
 describe('tui data loaders', () => {
   it('loads spaces list from organization API', async () => {
@@ -22,6 +31,7 @@ describe('tui data loaders', () => {
   });
 
   it('loads space drilldown using query result when available', async () => {
+    const profileStore = await makeProfileStore();
     const client: any = {
       organization: {
         getSpace: async () => ({ id: 's1', name: 'HQ' }),
@@ -29,7 +39,7 @@ describe('tui data loaders', () => {
       }
     };
 
-    const result = await loadSpaceDrilldownData(client, 'acme', 's1', []);
+    const result = await loadSpaceDrilldownData(client, 'acme', 's1', [], { profileStore });
     expect(result.data.spaceDetail).toEqual({ id: 's1', name: 'HQ' });
     expect(result.data.devicesInSpace.length).toBe(1);
     expect(result.data.paneStatus).toContain('Loaded');
@@ -37,6 +47,7 @@ describe('tui data loaders', () => {
   });
 
   it('falls back to cached devices when query returns none', async () => {
+    const profileStore = await makeProfileStore();
     const client: any = {
       organization: {
         getSpace: async () => ({ id: 's1', name: 'HQ' }),
@@ -44,10 +55,16 @@ describe('tui data loaders', () => {
       }
     };
 
-    const result = await loadSpaceDrilldownData(client, 'acme', 's1', [
-      { id: 'd1', space_id: 's1' },
-      { id: 'd2', space_id: 's2' }
-    ]);
+    const result = await loadSpaceDrilldownData(
+      client,
+      'acme',
+      's1',
+      [
+        { id: 'd1', space_id: 's1' },
+        { id: 'd2', space_id: 's2' }
+      ],
+      { profileStore }
+    );
 
     expect(result.data.devicesInSpace.map((item: any) => item.id)).toEqual(['d1']);
     expect(result.data.paneStatus).toContain('fallback');
@@ -115,6 +132,7 @@ describe('tui data loaders', () => {
   });
 
   it('passes devices space_id query and preserves local fallback filtering', async () => {
+    const profileStore = await makeProfileStore();
     const client: any = {
       organization: {
         getDevices: async (args: any) => ({
@@ -130,9 +148,60 @@ describe('tui data loaders', () => {
       }
     };
 
-    const devices = await loadDevicesData(client, 'acme', { query: { space_id: 's1' } });
+    const devices = await loadDevicesData(client, 'acme', { profileStore, query: { space_id: 's1' } });
     expect(devices.connectionState).toBe('connected');
     expect(devices.data.map((item) => (item as Record<string, unknown>).id)).toEqual(['d1']);
+  });
+
+  it('routes devices through stored partner provider without touching organization API', async () => {
+    const profileStore = await makeProfileStore('xyte-partner');
+    const client: any = {
+      organization: {
+        getDevices: async () => {
+          throw new Error('organization should not be called');
+        }
+      },
+      partner: {
+        getDevices: async () => ({
+          items: [
+            { id: 'd1', space_id: 's1' },
+            { id: 'd2', space_id: 's2' }
+          ]
+        })
+      }
+    };
+
+    const devices = await loadDevicesData(client, 'acme', {
+      profileStore,
+      query: { space_id: 's1' }
+    });
+
+    expect(devices.connectionState).toBe('connected');
+    expect(devices.data.map((item) => (item as Record<string, unknown>).id)).toEqual(['d1']);
+  });
+
+  it('does not fall back to partner when stored provider is organization', async () => {
+    const profileStore = await makeProfileStore('xyte-org');
+    let partnerCalls = 0;
+    const client: any = {
+      organization: {
+        getDevices: async () => {
+          throw new XyteAuthError('organization auth failed');
+        }
+      },
+      partner: {
+        getDevices: async () => {
+          partnerCalls += 1;
+          return { items: [{ id: 'd1' }] };
+        }
+      }
+    };
+
+    const devices = await loadDevicesData(client, 'acme', { profileStore });
+
+    expect(devices.connectionState).toBe('auth_required');
+    expect(devices.data).toEqual([]);
+    expect(partnerCalls).toBe(0);
   });
 
   it('passes structured spaces query fields', async () => {

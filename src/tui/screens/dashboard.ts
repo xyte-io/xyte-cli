@@ -124,7 +124,9 @@ export function createDashboardScreen(): TuiScreen {
       }
 
       const tenantId = await context.getActiveTenantId();
-      const loaded = await loadDashboardData(context.client, tenantId);
+      const loaded = await loadDashboardData(context.client, tenantId, {
+        profileStore: context.profileStore
+      });
 
       const panels = sceneFromDashboardState({
         tenantId,

@@ -1,4 +1,4 @@
-import { appendFileSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -273,6 +273,56 @@ describe('cli action logging', () => {
     const data = asRecord(result.entries[0]?.data);
     const argv = (data.argv ?? []) as string[];
     expect(argv).toContain('--key-stdin');
+    expect(argv).not.toContain('super-secret-key');
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('does not log API keys read from files', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-key-file-log-'));
+    const logPath = join(dir, 'key-file.ndjson');
+    const keyPath = join(dir, 'org.key');
+    writeFileSync(keyPath, 'super-secret-key\n');
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ id: 'org-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+    );
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      '--log-actions',
+      '--log-actions-verbose',
+      '--log-actions-path',
+      logPath,
+      'setup',
+      'run',
+      '--non-interactive',
+      '--tenant',
+      'acme',
+      '--key-file',
+      keyPath
+    ]);
+
+    const rawLog = readFileSync(logPath, 'utf8');
+    expect(rawLog).not.toContain('super-secret-key');
+
+    const result = readCliActionLog({ path: logPath, event: 'command.start', limit: 1 });
+    const data = asRecord(result.entries[0]?.data);
+    const argv = (data.argv ?? []) as string[];
+    expect(argv).toContain('--key-file');
+    expect(argv).toContain(keyPath);
     expect(argv).not.toContain('super-secret-key');
 
     rmSync(dir, { recursive: true, force: true });

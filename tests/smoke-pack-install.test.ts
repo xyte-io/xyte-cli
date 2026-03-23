@@ -113,7 +113,7 @@ describe('pack install smoke script', () => {
     expect(calls[4].args.join(' ')).toBe('status --mode fast --output json');
     expect(calls[5].args.join(' ')).toBe(`init --scope both --agents all --target ${workspaceDir} --force`);
     expect(calls[6].args.join(' ')).toBe(
-      'setup run --non-interactive --tenant acme --key-stdin --connectivity never --output json'
+      'setup run --non-interactive --tenant acme --provider xyte-org --key-stdin --connectivity never --output json'
     );
     expect(calls[6].input).toBe('smoke-test-key\n');
     expect(calls[7].args.join(' ')).toBe('setup status --tenant acme --field tenantId');

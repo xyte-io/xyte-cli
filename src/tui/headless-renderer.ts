@@ -296,6 +296,7 @@ async function buildOperationalFrame(options: {
   sessionId: string;
   sequence: number;
   client: XyteClient;
+  profileStore: ProfileStore;
   screen: Exclude<TuiScreenId, 'setup' | 'config'>;
   tenantId?: string;
   motionEnabled: boolean;
@@ -304,7 +305,9 @@ async function buildOperationalFrame(options: {
 }): Promise<HeadlessFrame> {
   switch (options.screen) {
     case 'dashboard': {
-      const data = await loadDashboardData(options.client, options.tenantId);
+      const data = await loadDashboardData(options.client, options.tenantId, {
+        profileStore: options.profileStore
+      });
       const panels = sceneFromDashboardState({
         tenantId: options.tenantId,
         devices: data.data.devices,
@@ -320,7 +323,9 @@ async function buildOperationalFrame(options: {
     }
 
     case 'devices': {
-      const devices = await loadDevicesData(options.client, options.tenantId);
+      const devices = await loadDevicesData(options.client, options.tenantId, {
+        profileStore: options.profileStore
+      });
       const panels = sceneFromDevicesState({
         tenantId: options.tenantId,
         searchText: '',
@@ -392,7 +397,9 @@ async function buildOperationalFrame(options: {
       let drilldownRetry: unknown;
 
       if (selected && selectedSpaceId) {
-        const drilldown = await loadSpaceDrilldownData(options.client, options.tenantId, selectedSpaceId, []);
+        const drilldown = await loadSpaceDrilldownData(options.client, options.tenantId, selectedSpaceId, [], {
+          profileStore: options.profileStore
+        });
         detail = drilldown.data.spaceDetail;
         devicesInSpace = drilldown.data.devicesInSpace;
         paneStatus = drilldown.data.paneStatus;
@@ -565,6 +572,7 @@ export async function runHeadlessRenderer(options: HeadlessRenderOptions): Promi
           sessionId,
           sequence: nextSequence(),
           client: options.client,
+          profileStore: options.profileStore,
           screen: actualScreen as Exclude<TuiScreenId, 'setup' | 'config'>,
           tenantId,
           motionEnabled: options.motionEnabled,

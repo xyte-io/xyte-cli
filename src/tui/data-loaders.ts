@@ -14,20 +14,8 @@ import type { XyteClient } from '../types/client';
 import type { SecretProvider } from '../types/profile';
 import type { EndpointNamespace } from '../types/endpoints';
 import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
-import { XyteAuthError, XyteHttpError } from '../http/errors';
 import { extractArray, extractHasNextPage, extractIncidentsArray } from '../utils/json';
-import { errorMessage } from '../utils/error-format';
 import { PROVIDER_ORG } from '../types/profile';
-
-function isAuthError(error: unknown): boolean {
-  if (error instanceof XyteAuthError) {
-    return true;
-  }
-  if (error instanceof XyteHttpError && (error.status === 401 || error.status === 403)) {
-    return true;
-  }
-  return false;
-}
 
 interface LoadOutcome<T> {
   data: T;
@@ -146,12 +134,17 @@ interface DashboardLoadResult {
   tickets: unknown[];
 }
 
+interface DashboardLoadOptions {
+  profileStore: ProfileStore;
+}
+
 export async function loadDashboardData(
   client: XyteClient,
-  tenantId?: string
+  tenantId: string | undefined,
+  options: DashboardLoadOptions
 ): Promise<LoadOutcome<DashboardLoadResult>> {
   const [devicesOutcome, incidentsOutcome, ticketsOutcome] = await Promise.all([
-    loadDevicesData(client, tenantId),
+    loadDevicesData(client, tenantId, { profileStore: options.profileStore }),
     loadIncidentsData(client, tenantId),
     loadTicketsData(client, tenantId)
   ]);
@@ -174,28 +167,43 @@ interface DevicesQuery {
 }
 
 interface DevicesLoadOptions {
+  profileStore: ProfileStore;
   query?: DevicesQuery;
+}
+
+async function resolveTenantProvider(
+  profileStore: ProfileStore,
+  tenantId: string | undefined
+): Promise<SecretProvider> {
+  if (!tenantId) {
+    throw new Error('Device loading requires a tenant id.');
+  }
+
+  const tenant = await profileStore.getTenant(tenantId);
+  if (!tenant) {
+    throw new Error(`Unknown tenant: ${tenantId}`);
+  }
+  if (!tenant.apiProvider) {
+    throw new Error(
+      `Tenant ${tenantId} has no API provider configured. Set an active provider-specific key before loading devices.`
+    );
+  }
+
+  return tenant.apiProvider;
 }
 
 export async function loadDevicesData(
   client: XyteClient,
-  tenantId?: string,
-  options: DevicesLoadOptions = {}
+  tenantId: string | undefined,
+  options: DevicesLoadOptions
 ): Promise<LoadOutcome<unknown[]>> {
   const result = await loadWithOutcome(async () => {
     const query = compactQuery(options.query as QueryShape | undefined);
-    const raw = await client.organization
-      .getDevices({ tenantId, ...(query ? { query } : {}) })
-      .catch((orgError: unknown) => {
-        if (isAuthError(orgError)) {
-          throw orgError;
-        }
-        if (process.env.DEBUG) {
-          const msg = errorMessage(orgError);
-          process.stderr.write(`[data-loaders] org getDevices failed, falling back to partner: ${msg}\n`);
-        }
-        return client.partner.getDevices({ tenantId });
-      });
+    const provider = await resolveTenantProvider(options.profileStore, tenantId);
+    const raw =
+      provider === PROVIDER_ORG
+        ? await client.organization.getDevices({ tenantId, ...(query ? { query } : {}) })
+        : await client.partner.getDevices({ tenantId });
     const devices = extractArray(raw, ['devices', 'data', 'items']);
     const spaceId = String(options.query?.space_id ?? '').trim();
     if (!spaceId) {
@@ -440,7 +448,8 @@ export async function loadSpaceDrilldownData(
   client: XyteClient,
   tenantId: string | undefined,
   spaceId: string,
-  allDevicesCache: unknown[]
+  allDevicesCache: unknown[],
+  options: { profileStore: ProfileStore }
 ): Promise<LoadOutcome<SpaceDrilldownResult>> {
   const [detailOutcome, queriedDevicesOutcome] = await Promise.all([
     loadWithOutcome(() => client.organization.getSpace({ tenantId, path: { space_id: spaceId } }), undefined),
@@ -459,7 +468,9 @@ export async function loadSpaceDrilldownData(
       devicesInSpace = allDevicesCache.filter((device) => matchesSpace(device, spaceId));
       paneStatus = 'Filtered devices by cached space_id fallback.';
     } else {
-      fallbackOutcome = await loadDevicesData(client, tenantId);
+      fallbackOutcome = await loadDevicesData(client, tenantId, {
+        profileStore: options.profileStore
+      });
       devicesInSpace = fallbackOutcome.data.filter((device) => matchesSpace(device, spaceId));
       paneStatus = 'Filtered devices by fetched space_id fallback.';
     }

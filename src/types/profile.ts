@@ -37,6 +37,7 @@ export interface TenantProfile {
   name: string;
   hubBaseUrl?: string;
   entryBaseUrl?: string;
+  apiProvider?: SecretProvider;
   keyRegistry: TenantKeyRegistry;
   createdAt: string;
   updatedAt: string;

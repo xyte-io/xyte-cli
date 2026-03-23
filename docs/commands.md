@@ -39,7 +39,7 @@ xyte-cli flow import --file <path> [--force]
 xyte-cli init [--scope project|user|both] [--agents all|claude|copilot|codex] [--force] [--no-setup] [--require-setup]
 xyte-cli status [--tenant <tenant-id>] [--mode fast|full] [--output json|text]
 xyte-cli setup status [--tenant <tenant-id>] [--output json] [--field tenantId]
-xyte-cli setup run [--non-interactive] [--tenant <tenant-id>] [--name <display-name>] [--provider xyte-org|xyte-partner] [--key <value>|--key-stdin] [--connectivity auto|always|never]
+xyte-cli setup run [--non-interactive] [--tenant <tenant-id>] [--name <display-name>] [--provider xyte-org|xyte-partner] [--key <value>|--key-file <path>|--key-stdin] [--connectivity auto|always|never]
 xyte-cli config doctor --tenant <tenant-id> --output json
 xyte-cli upgrade --check --output json
 xyte-cli upgrade --yes --output json
@@ -52,8 +52,11 @@ xyte-cli logs view [--path <path>] [--limit <n>]
 
 Setup notes:
 - Interactive `xyte-cli setup run` is the primary human onboarding path.
+- `--key-file <path>` is the primary file-based automation path when the key already exists on disk.
 - Piping a key on stdin into `xyte-cli setup run --key-stdin` is the primary shell-neutral automation path.
 - `xyte-cli setup status --field tenantId` is the primary shell-neutral extractor for follow-up commands.
+- If `--provider` is omitted, setup probes `xyte-org` first, then `xyte-partner`.
+- `--connectivity never` requires an explicit `--provider`.
 - Use `--provider xyte-partner` for partner-only tenants.
 - For `xyte-org`, when `--name` is omitted, setup attempts to populate tenant display name from `organization.getOrganizationInfo`.
 - Explicit `--name` always takes precedence over auto-detected names.
@@ -65,17 +68,21 @@ xyte-cli config tenant add <tenant-id> --name "Acme"
 xyte-cli config tenant use <tenant-id>
 xyte-cli config tenant list
 
+xyte-cli config key add --tenant <tenant-id> --name primary --key "<value>" --set-active
+xyte-cli config key add --tenant <tenant-id> --name primary --key-file ~/.config/xyte/acme.key --set-active
 xyte-cli config key add --tenant <tenant-id> --provider xyte-org --name primary --key "<value>" --set-active
 xyte-cli config key list --tenant <tenant-id> --output json
 xyte-cli config key use --tenant <tenant-id> --provider xyte-org --slot primary
 xyte-cli config key update --tenant <tenant-id> --provider xyte-org --slot primary --key "<value>"
+xyte-cli config key update --tenant <tenant-id> --provider xyte-org --slot primary --key-file ~/.config/xyte/acme.key
 xyte-cli config key rename --tenant <tenant-id> --provider xyte-org --slot primary --name prod-primary
 xyte-cli config key test --tenant <tenant-id> --provider xyte-org --slot prod-primary
 xyte-cli config key remove --tenant <tenant-id> --provider xyte-org --slot prod-primary --confirm
 ```
 
 Auth note:
-- Inline `--key "<value>"` examples are shell-sensitive. Prefer `setup run --key-stdin` for cross-platform onboarding and automation.
+- Inline `--key "<value>"` examples are shell-sensitive. Prefer `--key-file` or `setup run --key-stdin` for automation.
+- `config key add` accepts `--provider` when you want a deterministic route; if omitted, it probes `xyte-org` first and then `xyte-partner`.
 
 ## Endpoint Operations
 

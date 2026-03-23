@@ -2,7 +2,6 @@ import path from 'node:path';
 
 import type { Command } from 'commander';
 
-import { createXyteClient } from '../../client/create-client';
 import { evaluateReadiness } from '../../config/readiness';
 import {
   SUPPORTED_SETTING_KEYS,
@@ -16,15 +15,10 @@ import { CliUserError } from '../../contracts/user-error';
 import { makeKeyFingerprint, matchesSlotRef } from '../../secure/key-slots';
 import type { ProfileStore } from '../../secure/profile-store';
 import type { SecretStore } from '../../secure/secret-store';
-import {
-  PROVIDER_ORG,
-  PROVIDER_PARTNER,
-  SUPPORTED_SECRET_PROVIDERS,
-  parseProvider,
-  type SecretProvider
-} from '../../types/profile';
+import { SUPPORTED_SECRET_PROVIDERS, parseProvider, type SecretProvider } from '../../types/profile';
 import { formatReadinessText } from '../format-readiness';
 import { parsePositiveIntegerOption } from '../parse-options';
+import { resolveProviderForKey, runSlotConnectivityTest } from '../provider-resolution';
 import { resolveKeyValue } from '../resolve-key';
 import {
   type CliContext,
@@ -117,42 +111,6 @@ function formatSlotListText(slots: SlotView[]): string {
     );
   }
   return `${lines.join('\n')}\n`;
-}
-
-async function runSlotConnectivityTest(args: {
-  provider: SecretProvider;
-  tenantId: string;
-  key: string;
-  profileStore: ProfileStore;
-}) {
-  if (args.provider === PROVIDER_ORG) {
-    const client = createXyteClient({
-      profileStore: args.profileStore,
-      tenantId: args.tenantId,
-      auth: { organization: args.key }
-    });
-    await client.organization.getOrganizationInfo({ tenantId: args.tenantId });
-    return {
-      strategy: 'organization.getOrganizationInfo',
-      ok: true
-    };
-  }
-
-  if (args.provider === PROVIDER_PARTNER) {
-    const client = createXyteClient({
-      profileStore: args.profileStore,
-      tenantId: args.tenantId,
-      auth: { partner: args.key }
-    });
-    await client.partner.getDevices({ tenantId: args.tenantId });
-    return {
-      strategy: 'partner.getDevices',
-      ok: true
-    };
-  }
-
-  const _exhaustive: never = args.provider;
-  throw new Error(`Unhandled provider: ${_exhaustive}`);
 }
 
 export function registerConfigCommands(parent: Command, ctx: CliContext): void {
@@ -428,25 +386,27 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
   configKey
     .command('add')
     .requiredOption('--tenant <tenantId>', 'Tenant id')
-    .requiredOption('--provider <provider>', SUPPORTED_SECRET_PROVIDERS.join('|'))
+    .option('--provider <provider>', SUPPORTED_SECRET_PROVIDERS.join('|'))
     .requiredOption('--name <name>', 'Slot display name')
     .option('--slot-id <slotId>', 'Optional explicit slot id')
     .option('--key <value>', 'API key value')
+    .option('--key-file <path>', 'Read API key value from a file')
     .option('--key-stdin', 'Read API key value from stdin')
     .option('--set-active', 'Set as active slot for provider')
     .action(
       async (options: {
         tenant: string;
-        provider: string;
+        provider?: string;
         name: string;
         slotId?: string;
         key?: string;
+        keyFile?: string;
         keyStdin?: boolean;
         setActive?: boolean;
       }) => {
-        const provider = parseProvider(options.provider);
         const value = await resolveKeyValue({
           key: options.key,
+          keyFile: options.keyFile,
           keyStdin: options.keyStdin,
           envKey: ctx.env.XYTE_CLI_KEY,
           prompt: ctx.prompt,
@@ -457,11 +417,22 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
         if (!value) {
           throw new CliUserError({
             summary: 'Missing key value.',
-            cause: 'Use --key, --key-stdin, or XYTE_CLI_KEY.',
+            cause: 'Use --key, --key-file, --key-stdin, or XYTE_CLI_KEY.',
             suggestedCommands: ['Use xyte-cli config key add --tenant <tenant-id> --provider xyte-org --name primary']
           });
         }
-        await ctx.profileStore.upsertTenant({ id: options.tenant });
+        const provider = await resolveProviderForKey({
+          profileStore: ctx.profileStore,
+          tenantId: options.tenant,
+          keyValue: value,
+          provider: options.provider ? parseProvider(options.provider) : undefined,
+          allowProbe: true
+        });
+        const existingTenant = await ctx.profileStore.getTenant(options.tenant);
+        await ctx.profileStore.upsertTenant({
+          id: options.tenant,
+          apiProvider: existingTenant?.apiProvider ?? provider
+        });
         const secretStore = ctx.getSecretStore();
         const slot = await ctx.profileStore.addKeySlot(options.tenant, {
           provider,
@@ -550,39 +521,50 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
     .requiredOption('--provider <provider>', 'Provider')
     .requiredOption('--slot <slotRef>', 'Slot id or name')
     .option('--key <value>', 'API key value')
+    .option('--key-file <path>', 'Read API key value from a file')
     .option('--key-stdin', 'Read API key value from stdin')
-    .action(async (options: { tenant: string; provider: string; slot: string; key?: string; keyStdin?: boolean }) => {
-      const provider = parseProvider(options.provider);
-      const slot = await resolveSlotByRef(ctx.profileStore, options.tenant, provider, options.slot);
-      const value = await resolveKeyValue({
-        key: options.key,
-        keyStdin: options.keyStdin,
-        envKey: ctx.env.XYTE_CLI_KEY,
-        prompt: ctx.prompt,
-        readStdin: ctx.readStdin,
-        promptQuestion: 'API key',
-        stdout: ctx.stdout
-      });
-      if (!value) {
-        throw new CliUserError({
-          summary: 'Missing key value.',
-          cause: 'Use --key, --key-stdin, or XYTE_CLI_KEY.',
-          suggestedCommands: [
-            'Use xyte-cli config key update --tenant <tenant-id> --provider xyte-org --slot <slot-id>'
-          ]
+    .action(
+      async (options: {
+        tenant: string;
+        provider: string;
+        slot: string;
+        key?: string;
+        keyFile?: string;
+        keyStdin?: boolean;
+      }) => {
+        const provider = parseProvider(options.provider);
+        const slot = await resolveSlotByRef(ctx.profileStore, options.tenant, provider, options.slot);
+        const value = await resolveKeyValue({
+          key: options.key,
+          keyFile: options.keyFile,
+          keyStdin: options.keyStdin,
+          envKey: ctx.env.XYTE_CLI_KEY,
+          prompt: ctx.prompt,
+          readStdin: ctx.readStdin,
+          promptQuestion: 'API key',
+          stdout: ctx.stdout
+        });
+        if (!value) {
+          throw new CliUserError({
+            summary: 'Missing key value.',
+            cause: 'Use --key, --key-file, --key-stdin, or XYTE_CLI_KEY.',
+            suggestedCommands: [
+              'Use xyte-cli config key update --tenant <tenant-id> --provider xyte-org --slot <slot-id>'
+            ]
+          });
+        }
+        const secretStore = ctx.getSecretStore();
+        await secretStore.setSlotSecret(options.tenant, provider, slot.slotId, value);
+        const updated = await ctx.profileStore.updateKeySlot(options.tenant, provider, slot.slotId, {
+          fingerprint: makeKeyFingerprint(value)
+        });
+        printJson(ctx.stdout, {
+          tenantId: options.tenant,
+          provider,
+          slot: updated
         });
       }
-      const secretStore = ctx.getSecretStore();
-      await secretStore.setSlotSecret(options.tenant, provider, slot.slotId, value);
-      const updated = await ctx.profileStore.updateKeySlot(options.tenant, provider, slot.slotId, {
-        fingerprint: makeKeyFingerprint(value)
-      });
-      printJson(ctx.stdout, {
-        tenantId: options.tenant,
-        provider,
-        slot: updated
-      });
-    });
+    );
 
   configKey
     .command('remove')

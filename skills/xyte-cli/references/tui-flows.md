@@ -62,13 +62,14 @@ xyte-cli ops console --headless --screen setup --output json --once --tenant <te
 2. If auth is missing, use the setup flow or CLI key-slot operations:
 
 ```bash
-xyte-cli setup run --tenant <tenant-id> --provider <xyte-org|xyte-partner>
+xyte-cli setup run --tenant <tenant-id> [--provider <xyte-org|xyte-partner>]
 xyte-cli setup status --tenant <tenant-id> --field tenantId
 xyte-cli config key list --tenant <tenant-id> --output json
 xyte-cli config doctor --tenant <tenant-id> --output json
 ```
 
-For non-interactive automation, pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> --provider <xyte-org|xyte-partner> --key-stdin`.
+For non-interactive automation, use `--key-file <path>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`.
+If `--provider` is omitted, setup probes `xyte-org` first and then `xyte-partner`. If `--connectivity never` is used, require `--provider`.
 
 3. Re-request the operational headless frame.
 

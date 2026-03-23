@@ -126,6 +126,7 @@ function labelForSlot(slot: ApiKeySlotMeta): string {
 
 export async function runKeyCreateWizard(args: RunKeyCreateWizardArgs): Promise<KeyWizardResult> {
   const { context, tenantId } = args;
+  const existingTenant = await context.profileStore.getTenant(tenantId);
   const provider = await promptProvider(context, args.defaultProvider ?? PROVIDER_ORG);
   if (!provider) {
     return canceledResult();
@@ -163,6 +164,8 @@ export async function runKeyCreateWizard(args: RunKeyCreateWizardArgs): Promise<
   await context.secretStore.setSlotSecret(tenantId, provider, slot.slotId, keyValue);
   if (setActive) {
     await context.profileStore.setActiveKeySlot(tenantId, provider, slot.slotId);
+  } else if (!existingTenant?.apiProvider) {
+    await context.profileStore.upsertTenant({ id: tenantId, apiProvider: provider });
   }
 
   const message = `Saved ${provider} slot ${labelForSlot(slot)}.`;

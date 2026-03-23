@@ -9,6 +9,7 @@ import { isRecord } from '../../utils/json';
 import { firstText } from '../../utils/json';
 import { CliUserError } from '../../contracts/user-error';
 import { formatReadinessText } from '../format-readiness';
+import { resolveProviderForKey } from '../provider-resolution';
 import { resolveKeyValue } from '../resolve-key';
 import {
   type CliContext,
@@ -43,7 +44,6 @@ interface SetupRunResult {
   steps: SetupStep[];
 }
 
-const SIMPLE_SETUP_AUTH_PROVIDER = PROVIDER_ORG;
 const SIMPLE_SETUP_SLOT_NAME = 'primary';
 const SIMPLE_SETUP_DEFAULT_TENANT = 'default';
 
@@ -165,7 +165,11 @@ async function runSetupCore(
 ): Promise<SetupRunResult> {
   const steps: SetupStep[] = [];
 
-  await ctx.profileStore.upsertTenant({ id: args.tenantId, name: args.tenantName });
+  await ctx.profileStore.upsertTenant({
+    id: args.tenantId,
+    name: args.tenantName,
+    apiProvider: args.provider
+  });
   steps.push({ key: 'tenant_upserted', status: 'ok', detail: args.tenantId });
 
   await ctx.profileStore.setActiveTenant(args.tenantId);
@@ -227,18 +231,29 @@ async function runSimpleSetup(
     tenantId: string;
     tenantName: string;
     keyValue: string;
+    provider?: SecretProvider;
     setActive?: boolean;
     connectivityMode?: SetupConnectivityMode;
   }
 ): Promise<SetupRunResult> {
+  const connectivityMode = args.connectivityMode ?? 'auto';
+  const provider =
+    args.provider ??
+    (await resolveProviderForKey({
+      profileStore: ctx.profileStore,
+      tenantId: args.tenantId,
+      keyValue: args.keyValue,
+      allowProbe: connectivityMode !== 'never'
+    }));
+
   return runSetupCore(ctx, {
     tenantId: args.tenantId,
     tenantName: args.tenantName,
-    provider: SIMPLE_SETUP_AUTH_PROVIDER,
+    provider,
     slotName: SIMPLE_SETUP_SLOT_NAME,
     keyValue: args.keyValue,
     setActive: args.setActive !== false,
-    connectivityMode: args.connectivityMode ?? 'auto'
+    connectivityMode
   });
 }
 
@@ -288,7 +303,9 @@ async function handleSetupRunSimple(
   options: {
     tenant?: string;
     name?: string;
+    provider?: string;
     key?: string;
+    keyFile?: string;
     keyStdin?: boolean;
     setActive?: boolean;
     connectivity?: string;
@@ -312,6 +329,7 @@ async function handleSetupRunSimple(
     SIMPLE_SETUP_DEFAULT_TENANT;
   const keyValue = await resolveKeyValue({
     key: options.key,
+    keyFile: options.keyFile,
     keyStdin: options.keyStdin,
     envKey: ctx.env.XYTE_CLI_KEY,
     allowPrompt: !options.nonInteractive,
@@ -333,18 +351,25 @@ async function handleSetupRunSimple(
   if (!keyValue) {
     throw new CliUserError({
       summary: 'Missing API key.',
-      cause: 'Setup needs --key, --key-stdin, XYTE_CLI_KEY, or interactive input.',
+      cause: 'Setup needs --key, --key-file, --key-stdin, XYTE_CLI_KEY, or interactive input.',
       suggestedCommands: ['Use xyte-cli setup run --tenant <tenant-id>']
     });
   }
 
   const tenantId = normalizeTenantId(options.tenant?.trim() || tenantLabel);
   const tenantName = tenantLabel.trim() || tenantId;
+  const provider = await resolveProviderForKey({
+    profileStore: ctx.profileStore,
+    tenantId,
+    keyValue,
+    provider: options.provider ? parseProvider(options.provider) : undefined,
+    allowProbe: connectivityMode !== 'never'
+  });
   const resolvedTenantName =
     connectivityMode !== 'never' && !explicitTenantName && tenantName === tenantId
       ? await resolveTenantNameFromKey(ctx, {
           tenantId,
-          provider: SIMPLE_SETUP_AUTH_PROVIDER,
+          provider,
           keyValue
         })
       : undefined;
@@ -352,6 +377,7 @@ async function handleSetupRunSimple(
     tenantId,
     tenantName: resolvedTenantName ?? tenantName,
     keyValue,
+    provider,
     setActive: options.setActive !== false,
     connectivityMode
   });
@@ -372,6 +398,7 @@ async function handleSetupRunAdvanced(
     provider?: string;
     slotName?: string;
     key?: string;
+    keyFile?: string;
     keyStdin?: boolean;
     setActive?: boolean;
     connectivity?: string;
@@ -396,6 +423,7 @@ async function handleSetupRunAdvanced(
   let slotName = options.slotName ?? 'primary';
   const keyValue = await resolveKeyValue({
     key: options.key,
+    keyFile: options.keyFile,
     keyStdin: options.keyStdin,
     envKey: ctx.env.XYTE_CLI_KEY,
     allowPrompt: !options.nonInteractive,
@@ -429,9 +457,18 @@ async function handleSetupRunAdvanced(
   if (!keyValue) {
     throw new CliUserError({
       summary: 'Missing API key.',
+      cause: 'Setup needs --key, --key-file, --key-stdin, XYTE_CLI_KEY, or interactive input.',
       suggestedCommands: ['Use xyte-cli setup run --advanced --tenant <tenant-id> --provider xyte-org']
     });
   }
+
+  provider = await resolveProviderForKey({
+    profileStore: ctx.profileStore,
+    tenantId,
+    keyValue,
+    provider,
+    allowProbe: connectivityMode !== 'never'
+  });
 
   const candidateTenantName = (tenantName?.trim() || tenantId).trim() || tenantId;
   const resolvedTenantName =
@@ -471,6 +508,7 @@ async function handleSetupRun(
     provider?: string;
     slotName?: string;
     key?: string;
+    keyFile?: string;
     keyStdin?: boolean;
     setActive?: boolean;
     connectivity?: string;
@@ -521,6 +559,7 @@ export function registerSetupCommands(parent: Command, ctx: CliContext): void {
     .option('--provider <provider>', 'Primary provider for key setup')
     .option('--slot-name <name>', 'Key slot name', 'primary')
     .option('--key <value>', 'API key value')
+    .option('--key-file <path>', 'Read API key value from a file')
     .option('--key-stdin', 'Read API key value from stdin')
     .option('--set-active', 'Set slot active (default true in setup flow)')
     .option('--connectivity <mode>', 'auto|always|never', 'auto')
@@ -535,6 +574,7 @@ export function registerSetupCommands(parent: Command, ctx: CliContext): void {
           provider?: string;
           slotName?: string;
           key?: string;
+          keyFile?: string;
           keyStdin?: boolean;
           setActive?: boolean;
           connectivity?: string;

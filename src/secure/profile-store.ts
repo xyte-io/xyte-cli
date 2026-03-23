@@ -28,6 +28,7 @@ export interface ProfileStore {
     name?: string;
     hubBaseUrl?: string;
     entryBaseUrl?: string;
+    apiProvider?: SecretProvider;
   }): Promise<TenantProfile>;
   removeTenant(tenantId: string): Promise<void>;
   setActiveTenant(tenantId: string): Promise<void>;
@@ -63,6 +64,25 @@ function cloneRegistry(input: TenantKeyRegistry | undefined): TenantKeyRegistry 
     slots: Array.isArray(input.slots) ? input.slots.map((slot) => ({ ...slot })) : [],
     activeSlotByProvider: { ...(input.activeSlotByProvider ?? {}) }
   };
+}
+
+function deriveTenantProvider(rawProvider: unknown, registry: TenantKeyRegistry): SecretProvider | undefined {
+  if (
+    typeof rawProvider === 'string' &&
+    isSecretProvider(rawProvider) &&
+    (registry.slots.some((slot) => slot.provider === rawProvider) ||
+      typeof registry.activeSlotByProvider[rawProvider] === 'string')
+  ) {
+    return rawProvider;
+  }
+
+  const configuredProviders = SUPPORTED_SECRET_PROVIDERS.filter(
+    (provider) =>
+      registry.slots.some((slot) => slot.provider === provider) ||
+      typeof registry.activeSlotByProvider[provider] === 'string'
+  );
+
+  return configuredProviders.length === 1 ? configuredProviders[0] : undefined;
 }
 
 function normalizeTenant(raw: TenantProfile): { tenant: TenantProfile; changed: boolean } {
@@ -136,6 +156,10 @@ function normalizeTenant(raw: TenantProfile): { tenant: TenantProfile; changed: 
     name: raw.name ?? raw.id,
     hubBaseUrl: raw.hubBaseUrl,
     entryBaseUrl: raw.entryBaseUrl,
+    apiProvider: deriveTenantProvider((raw as TenantProfile & { apiProvider?: unknown }).apiProvider, {
+      slots: normalizedSlots,
+      activeSlotByProvider
+    }),
     keyRegistry: {
       slots: normalizedSlots,
       activeSlotByProvider
@@ -144,7 +168,12 @@ function normalizeTenant(raw: TenantProfile): { tenant: TenantProfile; changed: 
     updatedAt: raw.updatedAt ?? now
   };
 
-  if (tenant.name !== raw.name || tenant.createdAt !== raw.createdAt || tenant.updatedAt !== raw.updatedAt) {
+  if (
+    tenant.name !== raw.name ||
+    tenant.apiProvider !== (raw as TenantProfile & { apiProvider?: SecretProvider }).apiProvider ||
+    tenant.createdAt !== raw.createdAt ||
+    tenant.updatedAt !== raw.updatedAt
+  ) {
     changed = true;
   }
 
@@ -212,6 +241,7 @@ export class FileProfileStore implements ProfileStore {
     name?: string;
     hubBaseUrl?: string;
     entryBaseUrl?: string;
+    apiProvider?: SecretProvider;
   }): Promise<TenantProfile> {
     const data = await this.getData();
     const now = new Date().toISOString();
@@ -223,6 +253,7 @@ export class FileProfileStore implements ProfileStore {
         name: input.name ?? input.id,
         hubBaseUrl: input.hubBaseUrl,
         entryBaseUrl: input.entryBaseUrl,
+        apiProvider: input.apiProvider,
         keyRegistry: createEmptyRegistry(),
         createdAt: now,
         updatedAt: now
@@ -241,6 +272,7 @@ export class FileProfileStore implements ProfileStore {
       name: input.name ?? current.name,
       hubBaseUrl: input.hubBaseUrl ?? current.hubBaseUrl,
       entryBaseUrl: input.entryBaseUrl ?? current.entryBaseUrl,
+      apiProvider: input.apiProvider ?? current.apiProvider,
       keyRegistry: cloneRegistry(current.keyRegistry),
       updatedAt: now
     };
@@ -324,6 +356,7 @@ export class FileProfileStore implements ProfileStore {
     data.tenants[index] = {
       ...tenant,
       keyRegistry: registry,
+      apiProvider: tenant.apiProvider ?? deriveTenantProvider(undefined, registry),
       updatedAt: now
     };
     await this.writeData(data);
@@ -396,6 +429,10 @@ export class FileProfileStore implements ProfileStore {
     data.tenants[index] = {
       ...tenant,
       keyRegistry: registry,
+      apiProvider:
+        tenant.apiProvider === provider && !registry.slots.some((item) => item.provider === provider)
+          ? deriveTenantProvider(undefined, registry)
+          : tenant.apiProvider,
       updatedAt: new Date().toISOString()
     };
     await this.writeData(data);
@@ -427,6 +464,7 @@ export class FileProfileStore implements ProfileStore {
     const now = new Date().toISOString();
     data.tenants[index] = {
       ...tenant,
+      apiProvider: provider,
       keyRegistry: registry,
       updatedAt: now
     };

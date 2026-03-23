@@ -5,6 +5,7 @@ import type {
   TenantKeyRegistry,
   TenantProfile
 } from '../../src/types/profile';
+import { SUPPORTED_SECRET_PROVIDERS } from '../../src/types/profile';
 import type { ProfileStore } from '../../src/secure/profile-store';
 import { buildSlotId, ensureSlotName, matchesSlotRef } from '../../src/secure/key-slots';
 
@@ -43,6 +44,7 @@ export class MemoryProfileStore implements ProfileStore {
     name?: string;
     hubBaseUrl?: string;
     entryBaseUrl?: string;
+    apiProvider?: SecretProvider;
   }): Promise<TenantProfile> {
     const existing = this.data.tenants.find((tenant) => tenant.id === input.id);
     const now = new Date().toISOString();
@@ -51,6 +53,7 @@ export class MemoryProfileStore implements ProfileStore {
       existing.name = input.name ?? existing.name;
       existing.hubBaseUrl = input.hubBaseUrl ?? existing.hubBaseUrl;
       existing.entryBaseUrl = input.entryBaseUrl ?? existing.entryBaseUrl;
+      existing.apiProvider = input.apiProvider ?? existing.apiProvider;
       existing.keyRegistry = existing.keyRegistry ?? emptyRegistry();
       existing.updatedAt = now;
       return structuredClone(existing);
@@ -61,6 +64,7 @@ export class MemoryProfileStore implements ProfileStore {
       name: input.name ?? input.id,
       hubBaseUrl: input.hubBaseUrl,
       entryBaseUrl: input.entryBaseUrl,
+      apiProvider: input.apiProvider,
       keyRegistry: emptyRegistry(),
       createdAt: now,
       updatedAt: now
@@ -185,6 +189,12 @@ export class MemoryProfileStore implements ProfileStore {
         delete registry.activeSlotByProvider[provider];
       }
     }
+    if (tenant.apiProvider === provider && !registry.slots.some((item) => item.provider === provider)) {
+      const configuredProviders = SUPPORTED_SECRET_PROVIDERS.filter((candidate) =>
+        registry.slots.some((item) => item.provider === candidate)
+      );
+      tenant.apiProvider = configuredProviders.length === 1 ? configuredProviders[0] : undefined;
+    }
     tenant.keyRegistry = registry;
     tenant.updatedAt = new Date().toISOString();
   }
@@ -212,6 +222,7 @@ export class MemoryProfileStore implements ProfileStore {
     }
 
     registry.activeSlotByProvider[provider] = slot.slotId;
+    tenant.apiProvider = provider;
     tenant.keyRegistry = registry;
     tenant.updatedAt = new Date().toISOString();
     return structuredClone(slot);

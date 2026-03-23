@@ -233,6 +233,7 @@ export function createDevicesScreen(): TuiScreen {
       spaceFilter
     });
     const loaded = await loadDevicesData(context.client, tenantId, {
+      profileStore: context.profileStore,
       query: {
         space_id: spaceFilter || undefined
       }

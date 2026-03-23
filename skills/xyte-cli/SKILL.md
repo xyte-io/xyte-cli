@@ -23,8 +23,10 @@ This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
 - For fresh users in a new environment, verify readiness with:
   - `xyte-cli status --mode fast --output json`
   - `xyte-cli init --scope both --agents all --force --no-setup`
-  - for humans: `xyte-cli setup run --tenant <tenant-id> --provider <xyte-org|xyte-partner>`
-  - for automation: pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> --provider <xyte-org|xyte-partner> --key-stdin`
+- for humans: `xyte-cli setup run --tenant <tenant-id> [--provider <xyte-org|xyte-partner>]`
+- for automation: use `--key-file <path>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`
+- If `--provider` is omitted, setup probes `xyte-org` first and then `xyte-partner`.
+- If `--connectivity never` is used, require `--provider`.
   - `xyte-cli setup status --tenant <tenant-id> --field tenantId`
 
 ## Purpose And Trigger Conditions
@@ -80,8 +82,8 @@ Rules:
 - `xyte-cli config doctor --tenant <tenant-id> --output json`
 
 2. Auth/tenant (if missing or incomplete):
-- human-guided setup: `xyte-cli setup run --tenant <tenant-id> --provider <xyte-org|xyte-partner>`
-- automation setup: pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> --provider <xyte-org|xyte-partner> --key-stdin`
+- human-guided setup: `xyte-cli setup run --tenant <tenant-id> [--provider <xyte-org|xyte-partner>]`
+- automation setup: use `--key-file <path>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`
 - `xyte-cli setup status --tenant <tenant-id> --field tenantId`
 - `xyte-cli config tenant use <tenant-id>`
 - `xyte-cli config key list --tenant <tenant-id> --output json`
@@ -117,8 +119,8 @@ Provider/report behavior:
 | --- | --- |
 | Deterministic multi-step ops | `xyte-cli flow run <flow-id> --tenant <tenant-id> --plan` |
 | First-time onboarding (interactive) | `xyte-cli` |
-| Setup interactive | `xyte-cli setup run --tenant <tenant-id> --provider <xyte-org\|xyte-partner>` |
-| Setup non-interactive | `pipe key on stdin -> xyte-cli setup run --non-interactive --tenant <tenant-id> --provider <xyte-org\|xyte-partner> --key-stdin` |
+| Setup interactive | `xyte-cli setup run --tenant <tenant-id> [--provider <xyte-org\|xyte-partner>]` |
+| Setup non-interactive | `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org\|xyte-partner>] --key-file <path>` or pipe to `--key-stdin` |
 | Readiness snapshot | `xyte-cli setup status --tenant <tenant-id> --output json` |
 | Tenant ID extraction | `xyte-cli setup status --tenant <tenant-id> --field tenantId` |
 | Connectivity diagnostics | `xyte-cli config doctor --tenant <tenant-id> --output json` |
@@ -278,8 +280,8 @@ Canonical schemas:
 
 - First-run/setup issues:
   - `xyte-cli`
-  - `xyte-cli setup run --tenant <tenant-id> --provider <xyte-org|xyte-partner>`
-  - for automation, pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> --provider <xyte-org|xyte-partner> --key-stdin`
+  - `xyte-cli setup run --tenant <tenant-id> [--provider <xyte-org|xyte-partner>]`
+  - for automation, use `--key-file <path>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`
 - Readiness/connectivity:
   - `xyte-cli setup status --tenant <tenant-id> --output json`
   - `xyte-cli setup status --tenant <tenant-id> --field tenantId`

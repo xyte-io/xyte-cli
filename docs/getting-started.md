@@ -33,7 +33,12 @@ Non-interactive:
 
 Primary automation contract:
 
-Pipe the API key on stdin into `xyte-cli setup run --non-interactive --tenant acme --key-stdin`. `--key-stdin` alone waits for stdin; it does not fetch a key by itself.
+Use `--key-file <path>` when the key already lives on disk, or pipe the API key on stdin into `xyte-cli setup run --non-interactive --tenant acme --key-stdin`. `--key-stdin` alone waits for stdin; it does not fetch a key by itself.
+
+Provider behavior:
+
+- If `--provider` is omitted, setup validates `xyte-org` first and falls through to `xyte-partner`.
+- If you run offline setup with `--connectivity never`, pass `--provider xyte-org|xyte-partner` explicitly.
 
 Check readiness:
 
@@ -61,6 +66,18 @@ Bash/zsh:
 
 ```bash
 printf '%s\n' '<your-key>' | xyte-cli setup run --non-interactive --tenant acme --key-stdin
+```
+
+Key file:
+
+```bash
+xyte-cli setup run --non-interactive --tenant acme --key-file ~/.config/xyte/acme.key
+```
+
+Offline example:
+
+```bash
+printf '%s\n' '<your-key>' | xyte-cli setup run --non-interactive --tenant acme --provider xyte-org --key-stdin --connectivity never
 ```
 
 ## Install Skills (Recommended)
