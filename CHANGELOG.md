@@ -6,6 +6,26 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-03-23
+
+### Added
+- `--key-file` support for `xyte-cli setup run`, `xyte-cli config key add`, and `xyte-cli config key update` so automation can load secrets from disk without putting raw keys on the command line.
+- Tenant-profile migration that records an explicit `apiProvider`, purges invalid provider state, and keeps the active provider aligned when key slots are added, updated, or switched.
+
+### Changed
+- Split the CLI command surface into dedicated command modules with shared option parsing, output handling, and problem mapping across `setup`, `config`, `api`, `ops`, `flow`, `util`, and `logs`.
+- Made provider-aware TUI and inspect/report loading strict against the tenant's stored provider instead of selecting a different provider at runtime.
+- Updated shipped docs and `skills/xyte-cli` guidance to match the explicit-provider and `--key-file` flows.
+
+### Fixed
+- Fixed `xyte-cli upgrade` target-version installs so an explicit version override installs that version instead of falling back to `@latest`.
+- Fixed offline setup, smoke-pack-install, and provider-specific setup flows to require and preserve explicit provider selection consistently.
+- Fixed provider-state migration so legacy profiles are normalized before commands and TUI screens read tenant auth state.
+
+### Breaking Changes
+- `xyte-cli` no longer performs org-to-partner runtime fallback for setup, config, TUI data loading, or inspect/report flows. If a tenant can resolve to more than one provider, callers must choose the intended provider explicitly.
+- `xyte-cli setup run --connectivity never` now requires an explicit `--provider` because offline setup no longer probes providers implicitly.
+
 ## [0.7.0] - 2026-03-20
 
 ### Added
