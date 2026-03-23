@@ -102,5 +102,6 @@ export function printJson(
   value: unknown,
   options: { strictJson?: boolean; compact?: boolean } = {}
 ): void {
-  stream.write(`${stringifyJsonOutput(value, options)}\n`);
+  const json = stringifyJsonOutput(value, options);
+  stream.write(`${json ?? 'null'}\n`);
 }

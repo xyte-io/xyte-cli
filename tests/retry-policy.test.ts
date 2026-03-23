@@ -15,7 +15,7 @@ describe('isRetryableErrorClass', () => {
   it('returns true for retryable error classes', () => {
     expect(isRetryableErrorClass('timeout')).toBe(true);
     expect(isRetryableErrorClass('network')).toBe(true);
-    expect(isRetryableErrorClass('server')).toBe(true);
+    expect(isRetryableErrorClass('rate_limit')).toBe(true);
   });
 });
 
