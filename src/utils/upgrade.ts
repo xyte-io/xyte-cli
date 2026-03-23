@@ -32,7 +32,6 @@ interface UpgradeSettings {
 }
 
 import { compareSemver } from './semver';
-export { compareSemver };
 
 function defaultRunner(command: string, args: string[]): Promise<CommandResult> {
   return runProcess(command, args, { stdinMode: 'ignore' });

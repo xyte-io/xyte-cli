@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { NPM_COMMAND, XYTE_COMMAND, runCommand } from './shared';
+import { NPM_COMMAND, XYTE_COMMAND, normalizeJsonOutput, runCommand } from './shared';
 import { errorMessage } from '../utils/error-format';
 
 interface ParsedArgs {
@@ -63,28 +63,11 @@ function parseArgs(argv: string[]): ParsedArgs {
 }
 
 function parseJsonSafe(raw: unknown): unknown {
-  const trimmed = String(raw ?? '').trim();
-  if (!trimmed) {
+  try {
+    return normalizeJsonOutput(raw);
+  } catch {
     return null;
   }
-
-  try {
-    return JSON.parse(trimmed) as unknown;
-  } catch {
-    const lines = trimmed
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean);
-    for (let index = lines.length - 1; index >= 0; index -= 1) {
-      try {
-        return JSON.parse(lines[index]) as unknown;
-      } catch {
-        // keep scanning
-      }
-    }
-  }
-
-  return null;
 }
 
 function parseNdjson(raw: unknown): unknown[] {
