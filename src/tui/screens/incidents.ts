@@ -36,7 +36,12 @@ export async function closeIncidentWithGuard(args: CloseIncidentWithGuardArgs): 
     return false;
   }
 
-  const ok = await confirmWriteWithToken({ context: args.context, actionLabel: 'Close incident', token: 'close', cancelStatus: 'Close incident canceled.' });
+  const ok = await confirmWriteWithToken({
+    context: args.context,
+    actionLabel: 'Close incident',
+    token: 'close',
+    cancelStatus: 'Close incident canceled.'
+  });
   if (!ok) {
     return false;
   }
@@ -109,7 +114,11 @@ export function createIncidentsScreen(): TuiScreen {
       frozen: renderErrors.frozen
     });
     filtered = severityFilter
-      ? incidents.filter((incident) => String(incident?.severity ?? incident?.priority ?? '').toLowerCase().includes(severityFilter))
+      ? incidents.filter((incident) =>
+          String(incident?.severity ?? incident?.priority ?? '')
+            .toLowerCase()
+            .includes(severityFilter)
+        )
       : incidents;
 
     if (restoreIncidentId) {
@@ -123,18 +132,25 @@ export function createIncidentsScreen(): TuiScreen {
 
     try {
       if (renderErrors.frozen) {
-        setListTableData(list, [
-          ['ID', 'Severity', 'State', 'Device'],
-          ...filtered.map((incident, index) => {
-            const deviceObj = incident.device && typeof incident.device === 'object' ? (incident.device as Record<string, unknown>) : undefined;
-            return [
-              String(incident.id ?? incident._id ?? incident.uuid ?? `row-${index + 1}`),
-              String(incident.severity ?? incident.priority ?? 'unknown'),
-              String(incident.status ?? incident.state ?? 'unknown'),
-              String(incident.device_id ?? deviceObj?.id ?? 'n/a')
-            ];
-          })
-        ], selectionSync);
+        setListTableData(
+          list,
+          [
+            ['ID', 'Severity', 'State', 'Device'],
+            ...filtered.map((incident, index) => {
+              const deviceObj =
+                incident.device && typeof incident.device === 'object'
+                  ? (incident.device as Record<string, unknown>)
+                  : undefined;
+              return [
+                String(incident.id ?? incident._id ?? incident.uuid ?? `row-${index + 1}`),
+                String(incident.severity ?? incident.priority ?? 'unknown'),
+                String(incident.status ?? incident.state ?? 'unknown'),
+                String(incident.device_id ?? deviceObj?.id ?? 'n/a')
+              ];
+            })
+          ],
+          selectionSync
+        );
         detailBox?.setContent('Render fallback mode enabled for incident details.');
       } else {
         const panels = sceneFromIncidentsState({
@@ -151,10 +167,14 @@ export function createIncidentsScreen(): TuiScreen {
         const tablePanel = panels.find((panel) => panel.id === 'incidents-table');
         const detailPanel = panels.find((panel) => panel.id === 'incidents-detail');
 
-        setListTableData(list, [
-          (tablePanel?.table?.columns ?? ['ID', 'Severity', 'State', 'Device']) as [string, string, string, string],
-          ...((tablePanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
-        ], selectionSync);
+        setListTableData(
+          list,
+          [
+            (tablePanel?.table?.columns ?? ['ID', 'Severity', 'State', 'Device']) as [string, string, string, string],
+            ...((tablePanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
+          ],
+          selectionSync
+        );
         detailBox?.setContent((detailPanel?.text?.lines ?? ['No incidents.']).join('\n'));
       }
       renderErrors.recordSuccess();
@@ -173,18 +193,25 @@ export function createIncidentsScreen(): TuiScreen {
       context.debugLog?.('screen.render.fallback.applied', {
         screen: 'incidents'
       });
-      setListTableData(list, [
-        ['ID', 'Severity', 'State', 'Device'],
-        ...filtered.map((incident, index) => {
-          const deviceObj = incident.device && typeof incident.device === 'object' ? (incident.device as Record<string, unknown>) : undefined;
-          return [
-            String(incident.id ?? incident._id ?? incident.uuid ?? `row-${index + 1}`),
-            String(incident.severity ?? incident.priority ?? 'unknown'),
-            String(incident.status ?? incident.state ?? 'unknown'),
-            String(incident.device_id ?? deviceObj?.id ?? 'n/a')
-          ];
-        })
-      ], selectionSync);
+      setListTableData(
+        list,
+        [
+          ['ID', 'Severity', 'State', 'Device'],
+          ...filtered.map((incident, index) => {
+            const deviceObj =
+              incident.device && typeof incident.device === 'object'
+                ? (incident.device as Record<string, unknown>)
+                : undefined;
+            return [
+              String(incident.id ?? incident._id ?? incident.uuid ?? `row-${index + 1}`),
+              String(incident.severity ?? incident.priority ?? 'unknown'),
+              String(incident.status ?? incident.state ?? 'unknown'),
+              String(incident.device_id ?? deviceObj?.id ?? 'n/a')
+            ];
+          })
+        ],
+        selectionSync
+      );
       detailBox?.setContent(`Unable to render incident detail safely.\nReason: ${message}`);
     }
     syncListSelection(list, selectedIndex, selectionSync);

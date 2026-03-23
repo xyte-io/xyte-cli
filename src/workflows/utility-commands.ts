@@ -83,7 +83,11 @@ function extractItemsFromSpacesResponse(data: unknown): Array<Record<string, unk
   return maybeItems.filter((item) => Boolean(item) && typeof item === 'object') as Array<Record<string, unknown>>;
 }
 
-async function listSpacesByParent(client: XyteClient, tenantId: string, parentId: number): Promise<Array<Record<string, unknown>>> {
+async function listSpacesByParent(
+  client: XyteClient,
+  tenantId: string,
+  parentId: number
+): Promise<Array<Record<string, unknown>>> {
   const results: Array<Record<string, unknown>> = [];
   let page = 1;
   for (;;) {

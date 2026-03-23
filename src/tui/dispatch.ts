@@ -14,7 +14,9 @@ interface KeyDispatchArgs {
   handleGlobal: (ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg) => Promise<void>;
 }
 
-export async function dispatchKeypress(args: KeyDispatchArgs): Promise<'screen' | 'arrow' | 'global' | 'modal' | 'blocked'> {
+export async function dispatchKeypress(
+  args: KeyDispatchArgs
+): Promise<'screen' | 'arrow' | 'global' | 'modal' | 'blocked'> {
   if (args.isModalActive) {
     const handledByModal = await args.handleModal?.(args.ch, args.key);
     if (handledByModal) {

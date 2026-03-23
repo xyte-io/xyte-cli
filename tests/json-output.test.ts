@@ -42,7 +42,12 @@ describe('stringifyJsonOutput', () => {
 describe('writeJsonLine', () => {
   it('writes JSON followed by newline', () => {
     const chunks: string[] = [];
-    const stream = { write: (s: string) => { chunks.push(s); return true; } };
+    const stream = {
+      write: (s: string) => {
+        chunks.push(s);
+        return true;
+      }
+    };
     writeJsonLine(stream, { a: 1 }, { compact: true });
     expect(chunks).toEqual(['{"a":1}\n']);
   });

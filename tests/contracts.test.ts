@@ -64,7 +64,15 @@ describe('schema contracts', () => {
       tenantId: 'acme',
       devices: [{ id: 'd1', name: 'Device 1', status: 'offline', space: { full_path: 'Overview/A' } }],
       spaces: [{ id: 's1', name: 'Room A', space_type: 'room' }],
-      incidents: [{ id: 'i1', device_name: 'Device 1', status: 'active', space_tree_path_name: 'Overview/A', created_at: new Date().toISOString() }],
+      incidents: [
+        {
+          id: 'i1',
+          device_name: 'Device 1',
+          status: 'active',
+          space_tree_path_name: 'Overview/A',
+          created_at: new Date().toISOString()
+        }
+      ],
       tickets: [{ id: 't1', title: 'Need help', status: 'open', created_at: new Date().toISOString(), device_id: 'd1' }]
     };
 

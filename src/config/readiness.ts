@@ -95,7 +95,9 @@ export async function evaluateReadiness(options: ReadinessOptions): Promise<Read
       options.profileStore.getActiveKeySlot(tenant.id, provider)
     ]);
 
-    const hasActiveSecret = active ? Boolean(await options.secretStore.getSlotSecret(tenant.id, provider, active.slotId)) : false;
+    const hasActiveSecret = active
+      ? Boolean(await options.secretStore.getSlotSecret(tenant.id, provider, active.slotId))
+      : false;
 
     providers.push({
       provider,

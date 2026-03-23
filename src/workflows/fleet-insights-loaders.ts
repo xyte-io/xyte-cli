@@ -4,7 +4,13 @@ import { asRecord, asRecordOrUndefined, extractArray, extractHasNextPage, firstT
 import { withSpan } from '../observability/tracing';
 import { parseTimestamp } from './report/time-format';
 
-import type { FleetSnapshot, PartnerEnrichmentSnapshot, PartnerEndpointOutcome, ResolvedInspectProviderScope, StatusCounts } from '../types/fleet-inspect';
+import type {
+  FleetSnapshot,
+  PartnerEnrichmentSnapshot,
+  PartnerEndpointOutcome,
+  ResolvedInspectProviderScope,
+  StatusCounts
+} from '../types/fleet-inspect';
 
 export class InspectProviderScopeError extends Error {
   constructor(message: string) {
@@ -99,7 +105,11 @@ function latestTimestamp(items: unknown[]): Date | undefined {
   return latest;
 }
 
-async function mapWithConcurrency<T>(items: T[], concurrency: number, operation: (item: T) => Promise<void>): Promise<void> {
+async function mapWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  operation: (item: T) => Promise<void>
+): Promise<void> {
   let index = 0;
   const workerCount = Math.min(Math.max(1, concurrency), items.length);
 
@@ -169,7 +179,6 @@ function loadAllSpaces(client: XyteClient, tenantId: string): Promise<unknown[]>
   });
 }
 
-
 async function loadAllOrganizationIncidents(client: XyteClient, tenantId: string): Promise<unknown[]> {
   const perPage = 100;
   const to = Math.floor(Date.now() / 1000);
@@ -234,7 +243,9 @@ async function collectPartnerEnrichment(
   tenantId: string,
   devices: unknown[]
 ): Promise<PartnerEnrichmentSnapshot> {
-  const sampledDeviceIds = Array.from(new Set(devices.map((device) => deviceId(device)).filter((id): id is string => Boolean(id))))
+  const sampledDeviceIds = Array.from(
+    new Set(devices.map((device) => deviceId(device)).filter((id): id is string => Boolean(id)))
+  )
     .sort((a, b) => a.localeCompare(b))
     .slice(0, PARTNER_ENRICHMENT_SAMPLE_SIZE);
 
@@ -273,7 +284,10 @@ async function collectPartnerEnrichment(
     }
   }
 
-  async function safeCall(outcome: PartnerEndpointOutcome, operation: () => Promise<unknown>): Promise<unknown | undefined> {
+  async function safeCall(
+    outcome: PartnerEndpointOutcome,
+    operation: () => Promise<unknown>
+  ): Promise<unknown | undefined> {
     outcome.attempted += 1;
     try {
       const value = await withTimeout(operation, PARTNER_ENRICHMENT_TIMEOUT_MS);

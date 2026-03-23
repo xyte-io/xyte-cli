@@ -3,7 +3,11 @@ import path from 'node:path';
 
 import { UTILITY_PREPARE_SCHEMA_VERSION } from '../contracts/versions';
 import { getUtilityActionProfile, listUtilityActionProfiles } from './utility-action-catalog';
-import type { UtilityActionProfile, UtilityExecutionSupport, UtilityPreparePrimaryFormat } from './utility-action-profiles';
+import type {
+  UtilityActionProfile,
+  UtilityExecutionSupport,
+  UtilityPreparePrimaryFormat
+} from './utility-action-profiles';
 
 type UtilityPrepareInputKind = 'tabular' | 'document' | 'image' | 'unknown';
 
@@ -66,7 +70,10 @@ function writeScaffoldFile(filePath: string, content: string, force: boolean): v
 }
 
 function toActionSlug(actionKey: string): string {
-  return actionKey.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return actionKey
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 function buildSuggestedTenant(tenantId?: string): string {
@@ -242,7 +249,9 @@ interface UtilityActionSummary {
   executionSupport: UtilityExecutionSupport;
 }
 
-export function listUtilityPrepareActions(args: { entity?: string; includeGeneric?: boolean } = {}): UtilityActionSummary[] {
+export function listUtilityPrepareActions(
+  args: { entity?: string; includeGeneric?: boolean } = {}
+): UtilityActionSummary[] {
   return listUtilityActionProfiles({
     entity: args.entity,
     includeGeneric: args.includeGeneric

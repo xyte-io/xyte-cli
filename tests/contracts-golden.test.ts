@@ -49,7 +49,10 @@ function normalizeUtilityPrepare(
   result.artifacts.primary = normalizePath(String(result.artifacts.primary)).replace(outputDir, '<OUTPUT_DIR>');
   result.artifacts.rejected = normalizePath(String(result.artifacts.rejected)).replace(outputDir, '<OUTPUT_DIR>');
   result.artifacts.notes = normalizePath(String(result.artifacts.notes)).replace(outputDir, '<OUTPUT_DIR>');
-  result.suggestedCommands.next = normalizePath(String(result.suggestedCommands.next)).replace(outputDir, '<OUTPUT_DIR>');
+  result.suggestedCommands.next = normalizePath(String(result.suggestedCommands.next)).replace(
+    outputDir,
+    '<OUTPUT_DIR>'
+  );
   return result;
 }
 
@@ -297,7 +300,9 @@ describe('golden contracts', () => {
       delta: {
         added: [{ id: 'inc-2', current: { id: 'inc-2', status: 'active' } }],
         removed: [],
-        updated: [{ id: 'inc-1', before: { id: 'inc-1', status: 'active' }, after: { id: 'inc-1', status: 'resolved' } }]
+        updated: [
+          { id: 'inc-1', before: { id: 'inc-1', status: 'active' }, after: { id: 'inc-1', status: 'resolved' } }
+        ]
       }
     });
 
@@ -329,7 +334,8 @@ describe('golden contracts', () => {
           stepId: 'watch_before',
           title: 'Watch Before',
           kind: 'task',
-          command: 'xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --strict-json > /tmp/xyte-watch.before.ndjson',
+          command:
+            'xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --strict-json > /tmp/xyte-watch.before.ndjson',
           status: 'completed'
         },
         {

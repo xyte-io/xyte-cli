@@ -1,6 +1,8 @@
 import type { OrganizationNamespace, XyteCallArgs } from '../../types/client';
 
-export function createOrganizationNamespace(call: (endpointKey: string, args?: XyteCallArgs) => Promise<unknown>): OrganizationNamespace {
+export function createOrganizationNamespace(
+  call: (endpointKey: string, args?: XyteCallArgs) => Promise<unknown>
+): OrganizationNamespace {
   return {
     closeIncident: (args) => call('organization.incidents.closeIncident', args),
     cancelCommand: (args) => call('organization.commands.cancelCommand', args),

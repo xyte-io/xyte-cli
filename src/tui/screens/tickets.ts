@@ -28,12 +28,16 @@ function ticketIdOf(ticket: unknown): string {
 
 function ticketStatusOf(ticket: unknown): string {
   const r = asRecord(ticket);
-  return String(r.status ?? r.state ?? '').trim().toLowerCase();
+  return String(r.status ?? r.state ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 function ticketPriorityOf(ticket: unknown): string {
   const r = asRecord(ticket);
-  return String(r.priority ?? '').trim().toLowerCase();
+  return String(r.priority ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 interface ResolveTicketWithGuardArgs {
@@ -55,7 +59,12 @@ export async function resolveTicketWithGuard(args: ResolveTicketWithGuardArgs): 
     return false;
   }
 
-  const ok = await confirmWriteWithToken({ context, actionLabel: 'Resolve ticket', token: 'resolve', cancelStatus: 'Resolve action canceled.' });
+  const ok = await confirmWriteWithToken({
+    context,
+    actionLabel: 'Resolve ticket',
+    token: 'resolve',
+    cancelStatus: 'Resolve action canceled.'
+  });
   if (!ok) {
     return false;
   }
@@ -98,7 +107,12 @@ export async function sendTicketMessageWithGuard(args: SendTicketMessageWithGuar
     return false;
   }
 
-  const ok = await confirmWriteWithToken({ context, actionLabel: 'Send ticket message', token: 'message', cancelStatus: 'Send message canceled.' });
+  const ok = await confirmWriteWithToken({
+    context,
+    actionLabel: 'Send ticket message',
+    token: 'message',
+    cancelStatus: 'Send message canceled.'
+  });
   if (!ok) {
     return false;
   }
@@ -211,18 +225,22 @@ export function createTicketsScreen(): TuiScreen {
 
     try {
       if (renderErrors.frozen) {
-        setListTableData(list, [
-          ['ID', 'Status', 'Priority', 'Subject'],
-          ...filtered.map((ticket, index) => {
-            const r = asRecord(ticket);
-            return [
-              String(r.id ?? r._id ?? `row-${index + 1}`),
-              String(r.status ?? r.state ?? 'unknown'),
-              String(r.priority ?? 'n/a'),
-              String(r.subject ?? r.title ?? 'n/a')
-            ];
-          })
-        ], selectionSync);
+        setListTableData(
+          list,
+          [
+            ['ID', 'Status', 'Priority', 'Subject'],
+            ...filtered.map((ticket, index) => {
+              const r = asRecord(ticket);
+              return [
+                String(r.id ?? r._id ?? `row-${index + 1}`),
+                String(r.status ?? r.state ?? 'unknown'),
+                String(r.priority ?? 'n/a'),
+                String(r.subject ?? r.title ?? 'n/a')
+              ];
+            })
+          ],
+          selectionSync
+        );
         detail?.setContent('Render fallback mode enabled for ticket details.');
       } else {
         const panels = sceneFromTicketsState({
@@ -242,10 +260,14 @@ export function createTicketsScreen(): TuiScreen {
         const tablePanel = panels.find((panel) => panel.id === 'tickets-table');
         const detailPanel = panels.find((panel) => panel.id === 'tickets-detail');
 
-        setListTableData(list, [
-          (tablePanel?.table?.columns ?? ['ID', 'Status', 'Priority', 'Subject']) as [string, string, string, string],
-          ...((tablePanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
-        ], selectionSync);
+        setListTableData(
+          list,
+          [
+            (tablePanel?.table?.columns ?? ['ID', 'Status', 'Priority', 'Subject']) as [string, string, string, string],
+            ...((tablePanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
+          ],
+          selectionSync
+        );
         detail?.setContent((detailPanel?.text?.lines ?? ['No tickets.']).join('\n'));
       }
       renderErrors.recordSuccess();
@@ -264,18 +286,22 @@ export function createTicketsScreen(): TuiScreen {
       context.debugLog?.('screen.render.fallback.applied', {
         screen: 'tickets'
       });
-      setListTableData(list, [
-        ['ID', 'Status', 'Priority', 'Subject'],
-        ...filtered.map((ticket, index) => {
-          const r = asRecord(ticket);
-          return [
-            String(r.id ?? r._id ?? `row-${index + 1}`),
-            String(r.status ?? r.state ?? 'unknown'),
-            String(r.priority ?? 'n/a'),
-            String(r.subject ?? r.title ?? 'n/a')
-          ];
-        })
-      ], selectionSync);
+      setListTableData(
+        list,
+        [
+          ['ID', 'Status', 'Priority', 'Subject'],
+          ...filtered.map((ticket, index) => {
+            const r = asRecord(ticket);
+            return [
+              String(r.id ?? r._id ?? `row-${index + 1}`),
+              String(r.status ?? r.state ?? 'unknown'),
+              String(r.priority ?? 'n/a'),
+              String(r.subject ?? r.title ?? 'n/a')
+            ];
+          })
+        ],
+        selectionSync
+      );
       detail?.setContent(`Unable to render ticket detail safely.\nReason: ${message}`);
     }
     syncListSelection(list, selectedIndex, selectionSync);
@@ -308,9 +334,10 @@ export function createTicketsScreen(): TuiScreen {
     void (async () => {
       try {
         const tenantId = await context.getActiveTenantId();
-        const full = mode === 'organization'
-          ? await context.client.organization.getTicket({ tenantId, path: { ticket_id: ticketId } })
-          : await context.client.partner.getTicket({ tenantId, path: { ticket_id: ticketId } });
+        const full =
+          mode === 'organization'
+            ? await context.client.organization.getTicket({ tenantId, path: { ticket_id: ticketId } })
+            : await context.client.partner.getTicket({ tenantId, path: { ticket_id: ticketId } });
         if (!isMounted || requestToken !== detailRequestToken || selectedIndex !== index) {
           return;
         }

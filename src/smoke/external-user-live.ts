@@ -54,7 +54,11 @@ export interface ExternalLiveSmokeOptions {
   cwd?: string;
   logger?: LoggerLike;
   env?: NodeJS.ProcessEnv;
-  run?: (command: string, args: string[], options?: RunCommandOptions) => Promise<{ code: number; stdout: string; stderr: string }>;
+  run?: (
+    command: string,
+    args: string[],
+    options?: RunCommandOptions
+  ) => Promise<{ code: number; stdout: string; stderr: string }>;
   pathExistsFn?: typeof pathExists;
   mkdtempFn?: (prefix: string) => Promise<string>;
   mkdirFn?: (path: string, options?: { recursive?: boolean }) => Promise<unknown>;
@@ -142,12 +146,17 @@ export async function runExternalUserLiveSmoke(options: ExternalLiveSmokeOptions
       ['init', '--scope', 'both', '--agents', 'all', '--target', dirs.workspaceDir, '--force', '--no-setup'],
       { cwd, env: runtimeEnv }
     );
-    assertSuccess(
-      skillsInstallResult,
-      'xyte-cli init',
-      XYTE_COMMAND,
-      ['init', '--scope', 'both', '--agents', 'all', '--target', dirs.workspaceDir, '--force', '--no-setup']
-    );
+    assertSuccess(skillsInstallResult, 'xyte-cli init', XYTE_COMMAND, [
+      'init',
+      '--scope',
+      'both',
+      '--agents',
+      'all',
+      '--target',
+      dirs.workspaceDir,
+      '--force',
+      '--no-setup'
+    ]);
 
     const requiredSkillFiles = [
       path.join(dirs.workspaceDir, '.claude', 'skills', 'xyte-cli', 'SKILL.md'),
@@ -170,7 +179,10 @@ export async function runExternalUserLiveSmoke(options: ExternalLiveSmokeOptions
         XYTE_SMOKE_HOME: dirs.homeDir
       }
     });
-    assertSuccess(skillManifestResult, 'xyte-cli skill manifest usability check', NODE_COMMAND, ['-e', 'skill manifest actionable check']);
+    assertSuccess(skillManifestResult, 'xyte-cli skill manifest usability check', NODE_COMMAND, [
+      '-e',
+      'skill manifest actionable check'
+    ]);
 
     printStep(logger, 6, stepTotal, 'Running first-time setup with real key');
     const setupResult = await run(
@@ -182,19 +194,28 @@ export async function runExternalUserLiveSmoke(options: ExternalLiveSmokeOptions
         input: `${key}\n`
       }
     );
-    assertSuccess(
-      setupResult,
-      'xyte-cli setup run',
-      XYTE_COMMAND,
-      ['setup', 'run', '--non-interactive', '--tenant', tenant, '--key-stdin']
-    );
+    assertSuccess(setupResult, 'xyte-cli setup run', XYTE_COMMAND, [
+      'setup',
+      'run',
+      '--non-interactive',
+      '--tenant',
+      tenant,
+      '--key-stdin'
+    ]);
 
     printStep(logger, 7, stepTotal, 'Validating persisted key reuse from second process');
     const setupStatusResult = await run(XYTE_COMMAND, ['setup', 'status', '--tenant', tenant, '--output', 'json'], {
       cwd,
       env: runtimeEnv
     });
-    assertSuccess(setupStatusResult, 'xyte-cli setup status', XYTE_COMMAND, ['setup', 'status', '--tenant', tenant, '--output', 'json']);
+    assertSuccess(setupStatusResult, 'xyte-cli setup status', XYTE_COMMAND, [
+      'setup',
+      'status',
+      '--tenant',
+      tenant,
+      '--output',
+      'json'
+    ]);
     const setupStatusPayload = normalizeJsonOutput(setupStatusResult.stdout) as Record<string, unknown>;
     if (setupStatusPayload.state !== 'ready') {
       throw new Error(`Setup status is not ready after setup run: ${JSON.stringify(setupStatusPayload)}`);
@@ -203,21 +224,39 @@ export async function runExternalUserLiveSmoke(options: ExternalLiveSmokeOptions
     printStep(logger, 8, stepTotal, 'Running real read endpoint call and asserting envelope');
     const callResult = await run(
       XYTE_COMMAND,
-      ['api', 'call', 'organization.devices.getDevices', '--tenant', tenant, '--output-mode', 'envelope', '--strict-json'],
+      [
+        'api',
+        'call',
+        'organization.devices.getDevices',
+        '--tenant',
+        tenant,
+        '--output-mode',
+        'envelope',
+        '--strict-json'
+      ],
       { cwd, env: runtimeEnv }
     );
-    assertSuccess(
-      callResult,
-      'xyte-cli api call organization.devices.getDevices',
-      XYTE_COMMAND,
-      ['api', 'call', 'organization.devices.getDevices', '--tenant', tenant, '--output-mode', 'envelope', '--strict-json']
-    );
+    assertSuccess(callResult, 'xyte-cli api call organization.devices.getDevices', XYTE_COMMAND, [
+      'api',
+      'call',
+      'organization.devices.getDevices',
+      '--tenant',
+      tenant,
+      '--output-mode',
+      'envelope',
+      '--strict-json'
+    ]);
     const callPayload = normalizeJsonOutput(callResult.stdout) as Record<string, unknown>;
     if (callPayload.schemaVersion !== 'xyte.call.envelope.v1') {
       throw new Error(`Unexpected envelope schema version: ${String(callPayload.schemaVersion)}`);
     }
     const callResponse = callPayload.response as Record<string, unknown> | undefined;
-    if (!callResponse || typeof callResponse.status !== 'number' || callResponse.status < 200 || callResponse.status >= 300) {
+    if (
+      !callResponse ||
+      typeof callResponse.status !== 'number' ||
+      callResponse.status < 200 ||
+      callResponse.status >= 300
+    ) {
       throw new Error(`Live endpoint call failed or returned non-2xx status: ${JSON.stringify(callResponse)}`);
     }
 

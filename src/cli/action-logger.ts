@@ -1,14 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import {
-  appendFileSync,
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  renameSync,
-  rmSync,
-  statSync
-} from 'node:fs';
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
 import { basename, dirname, join, resolve as resolvePath } from 'node:path';
 
 import { getXyteConfigDir } from '../utils/config-dir';
@@ -142,7 +133,12 @@ function redactCliOptionValue(value: unknown, inOptionsContext: boolean): unknow
   const output: Record<string, unknown> = {};
   for (const [key, nested] of Object.entries(value)) {
     const nestedInOptions = inOptionsContext || key === 'options';
-    if (nestedInOptions && SENSITIVE_OPTION_FIELDS.has(normalizeSensitiveKey(key)) && nested !== null && nested !== undefined) {
+    if (
+      nestedInOptions &&
+      SENSITIVE_OPTION_FIELDS.has(normalizeSensitiveKey(key)) &&
+      nested !== null &&
+      nested !== undefined
+    ) {
       output[key] = '[REDACTED]';
       continue;
     }
@@ -252,7 +248,7 @@ function maybeRotate(basePath: string, nextPayloadSizeBytes: number, maxFileByte
     return;
   }
 
-  let currentSize = 0;
+  let currentSize: number;
   try {
     currentSize = statSync(basePath).size;
   } catch {
@@ -339,7 +335,9 @@ export function resolveCliActionLogPath(pathOverride?: string): string {
   return resolvePath(pathOverride ?? defaultCliActionLogPath());
 }
 
-export function extractCommandPathFromLogEntry(entry: Pick<CliActionLogEntry, 'commandPath' | 'data'>): string | undefined {
+export function extractCommandPathFromLogEntry(
+  entry: Pick<CliActionLogEntry, 'commandPath' | 'data'>
+): string | undefined {
   return entry.commandPath ?? extractCommandPathFromData(entry.data);
 }
 
@@ -460,8 +458,10 @@ export function createCliActionLogger(options: CreateCliActionLoggerOptions = {}
     try {
       sequence += 1;
       const serializedData = data === undefined ? undefined : sanitizeForJson(data);
-      const withCliOptionRedaction = serializedData === undefined ? undefined : redactCliOptionValue(serializedData, false);
-      const redactedData = withCliOptionRedaction === undefined ? undefined : (redactSensitiveData(withCliOptionRedaction) as unknown);
+      const withCliOptionRedaction =
+        serializedData === undefined ? undefined : redactCliOptionValue(serializedData, false);
+      const redactedData =
+        withCliOptionRedaction === undefined ? undefined : (redactSensitiveData(withCliOptionRedaction) as unknown);
 
       const entry: CliActionLogEntry = {
         seq: sequence,

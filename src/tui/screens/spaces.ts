@@ -12,13 +12,7 @@ import {
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
 import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
-import {
-  getSpaceId,
-  getSpaceName,
-  loadDevicesData,
-  loadSpaceDrilldownData,
-  loadSpacesData
-} from '../data-loaders';
+import { getSpaceId, getSpaceName, loadDevicesData, loadSpaceDrilldownData, loadSpacesData } from '../data-loaders';
 import { sceneFromSpacesState } from '../scene';
 import { safeSearchText } from '../serialize';
 import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput } from '../actions';
@@ -54,7 +48,12 @@ export async function claimDeviceWithGuard(args: ClaimDeviceWithGuardArgs): Prom
     return false;
   }
 
-  const ok = await confirmWriteWithToken({ context: args.context, actionLabel: 'Claim device', token: 'claim', cancelStatus: 'Claim action canceled.' });
+  const ok = await confirmWriteWithToken({
+    context: args.context,
+    actionLabel: 'Claim device',
+    token: 'claim',
+    cancelStatus: 'Claim action canceled.'
+  });
   if (!ok) {
     return false;
   }
@@ -102,7 +101,12 @@ export async function createChildSpaceWithGuard(args: CreateChildSpaceWithGuardA
     return false;
   }
 
-  const ok = await confirmWriteWithToken({ context: args.context, actionLabel: 'Create child space', token: 'create', cancelStatus: 'Create child space canceled.' });
+  const ok = await confirmWriteWithToken({
+    context: args.context,
+    actionLabel: 'Create child space',
+    token: 'create',
+    cancelStatus: 'Create child space canceled.'
+  });
   if (!ok) {
     return false;
   }
@@ -146,7 +150,12 @@ export async function renameSpaceWithGuard(args: RenameSpaceWithGuardArgs): Prom
     return false;
   }
 
-  const ok = await confirmWriteWithToken({ context: args.context, actionLabel: 'Rename space', token: 'rename', cancelStatus: 'Rename space canceled.' });
+  const ok = await confirmWriteWithToken({
+    context: args.context,
+    actionLabel: 'Rename space',
+    token: 'rename',
+    cancelStatus: 'Rename space canceled.'
+  });
   if (!ok) {
     return false;
   }
@@ -276,7 +285,9 @@ export function createSpacesScreen(): TuiScreen {
       parentIdFilter ? `parent=${parentIdFilter}` : '',
       spaceTypeFilter ? `type=${spaceTypeFilter}` : '',
       pathIncludesFilter ? `path~${pathIncludesFilter}` : ''
-    ].filter(Boolean).join(' ');
+    ]
+      .filter(Boolean)
+      .join(' ');
 
     const panels = sceneFromSpacesState({
       tenantId: activeTenantId,
@@ -295,10 +306,14 @@ export function createSpacesScreen(): TuiScreen {
     const detailPanel = panels.find((panel) => panel.id === 'spaces-detail');
     const devicesPanel = panels.find((panel) => panel.id === 'spaces-devices');
 
-    setListTableData(spaceTable, [
-      (listPanel?.table?.columns ?? ['ID', 'Name', 'Type', 'Path']) as [string, string, string, string],
-      ...((listPanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
-    ], spaceSelectionSync);
+    setListTableData(
+      spaceTable,
+      [
+        (listPanel?.table?.columns ?? ['ID', 'Name', 'Type', 'Path']) as [string, string, string, string],
+        ...((listPanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
+      ],
+      spaceSelectionSync
+    );
     syncListSelection(spaceTable, selectedIndex, spaceSelectionSync);
 
     detailBox.setContent((detailPanel?.text?.lines ?? ['No space selected.']).join('\n'));
@@ -315,13 +330,16 @@ export function createSpacesScreen(): TuiScreen {
     context.screen.render();
   };
 
-  const staleSafeDrilldown = createStaleSafeSelectionLoader<{ index: number; tenantId?: string }, {
-    selectedSpaceId: string;
-    selectedSpaceDetail: unknown;
-    devicesInSpace: unknown[];
-    paneStatus: string;
-    index: number;
-  }>({
+  const staleSafeDrilldown = createStaleSafeSelectionLoader<
+    { index: number; tenantId?: string },
+    {
+      selectedSpaceId: string;
+      selectedSpaceDetail: unknown;
+      devicesInSpace: unknown[];
+      paneStatus: string;
+      index: number;
+    }
+  >({
     async load(input) {
       const selected = filtered[input.index];
       if (!selected) {

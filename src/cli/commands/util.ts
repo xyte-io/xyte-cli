@@ -33,15 +33,18 @@ function parseUtilityInputFormat(value: string | undefined): UtilityInputFormat 
   return normalized as UtilityInputFormat;
 }
 
-async function handleUtilPrepare(ctx: CliContext, options: {
-  input: string;
-  action: string;
-  tenant?: string;
-  outputDir?: string;
-  primaryFormat?: string;
-  force?: boolean;
-  strictJson?: boolean;
-}): Promise<void> {
+async function handleUtilPrepare(
+  ctx: CliContext,
+  options: {
+    input: string;
+    action: string;
+    tenant?: string;
+    outputDir?: string;
+    primaryFormat?: string;
+    force?: boolean;
+    strictJson?: boolean;
+  }
+): Promise<void> {
   const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
   const result = runUtilityPrepare({
     inputPath: options.input,
@@ -54,13 +57,16 @@ async function handleUtilPrepare(ctx: CliContext, options: {
   printJson(ctx.stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
 }
 
-async function handleUtilListActions(ctx: CliContext, options: {
-  output?: string;
-  format?: string;
-  entity?: string;
-  includeGeneric?: boolean;
-  strictJson?: boolean;
-}): Promise<void> {
+async function handleUtilListActions(
+  ctx: CliContext,
+  options: {
+    output?: string;
+    format?: string;
+    entity?: string;
+    includeGeneric?: boolean;
+    strictJson?: boolean;
+  }
+): Promise<void> {
   const settings = await ctx.resolveSettings();
   const output = resolveTextJsonOutput({
     output: options.output,
@@ -81,28 +87,36 @@ async function handleUtilListActions(ctx: CliContext, options: {
     return;
   }
   for (const action of actions) {
-    ctx.stdout.write(`${action.actionKey} | entity=${action.entity} | mode=${action.mode} | execution=${action.executionSupport}\n`);
+    ctx.stdout.write(
+      `${action.actionKey} | entity=${action.entity} | mode=${action.mode} | execution=${action.executionSupport}\n`
+    );
   }
 }
 
-async function handleUtilImportTree(ctx: CliContext, options: {
-  tenant?: string;
-  input: string;
-  inputFormat?: string;
-  pathField?: string;
-  spaceTypeField?: string;
-  configField?: string;
-  apply?: boolean;
-  continueOnError?: boolean;
-  report?: string;
-  strictJson?: boolean;
-}): Promise<void> {
+async function handleUtilImportTree(
+  ctx: CliContext,
+  options: {
+    tenant?: string;
+    input: string;
+    inputFormat?: string;
+    pathField?: string;
+    spaceTypeField?: string;
+    configField?: string;
+    apply?: boolean;
+    continueOnError?: boolean;
+    report?: string;
+    strictJson?: boolean;
+  }
+): Promise<void> {
   const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
   if (!tenantId) {
     throw new CliUserError({
       summary: 'Missing tenant for util import-tree.',
-      suggestedCommands: ['Use --tenant <tenant-id>', 'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>']
+      suggestedCommands: [
+        'Use --tenant <tenant-id>',
+        'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>'
+      ]
     });
   }
   const client = await ctx.withClient({ tenantId });
@@ -146,17 +160,19 @@ export function registerUtilCommands(parent: Command, ctx: CliContext): void {
     .option('--primary-format <format>', 'csv|jsonl')
     .option('--force', 'Overwrite scaffold files if they already exist')
     .option('--strict-json', 'Fail on non-serializable output')
-    .action(async (options: {
-      input: string;
-      action: string;
-      tenant?: string;
-      outputDir?: string;
-      primaryFormat?: string;
-      force?: boolean;
-      strictJson?: boolean;
-    }) => {
-      await handleUtilPrepare(ctx, options);
-    });
+    .action(
+      async (options: {
+        input: string;
+        action: string;
+        tenant?: string;
+        outputDir?: string;
+        primaryFormat?: string;
+        force?: boolean;
+        strictJson?: boolean;
+      }) => {
+        await handleUtilPrepare(ctx, options);
+      }
+    );
 
   util
     .command('list-actions')
@@ -166,7 +182,12 @@ export function registerUtilCommands(parent: Command, ctx: CliContext): void {
     .option('--no-include-generic', 'Exclude generic profiles')
     .option('--format <format>', 'json|text')
     .option('--strict-json', 'Fail on non-serializable output')
-    .action(async function (options: { entity?: string; includeGeneric?: boolean; format?: string; strictJson?: boolean }) {
+    .action(async function (options: {
+      entity?: string;
+      includeGeneric?: boolean;
+      format?: string;
+      strictJson?: boolean;
+    }) {
       await handleUtilListActions(ctx, {
         ...options,
         output: (this.optsWithGlobals() as CliGlobalOptions).output
@@ -186,18 +207,20 @@ export function registerUtilCommands(parent: Command, ctx: CliContext): void {
     .option('--continue-on-error', 'Continue processing rows after failures')
     .option('--report <path>', 'Write NDJSON row report file')
     .option('--strict-json', 'Fail on non-serializable output')
-    .action(async (options: {
-      tenant?: string;
-      input: string;
-      inputFormat?: string;
-      pathField?: string;
-      spaceTypeField?: string;
-      configField?: string;
-      apply?: boolean;
-      continueOnError?: boolean;
-      report?: string;
-      strictJson?: boolean;
-    }) => {
-      await handleUtilImportTree(ctx, options);
-    });
+    .action(
+      async (options: {
+        tenant?: string;
+        input: string;
+        inputFormat?: string;
+        pathField?: string;
+        spaceTypeField?: string;
+        configField?: string;
+        apply?: boolean;
+        continueOnError?: boolean;
+        report?: string;
+        strictJson?: boolean;
+      }) => {
+        await handleUtilImportTree(ctx, options);
+      }
+    );
 }

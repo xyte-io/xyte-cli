@@ -35,7 +35,7 @@ import {
   parseDeepDiveForReport
 } from './fleet-insights';
 import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';
-import type { BuiltInFlowDefinition, FlowStep, FlowTaskStep } from './flow-catalog';
+import type { BuiltInFlowDefinition, FlowTaskStep } from './flow-catalog';
 
 export type FlowRunMode = 'plan' | 'apply';
 
@@ -241,7 +241,10 @@ function resolveDerivedFlowContext(ctx: RunContext): void {
 
 function classifyFailure(problem: ReturnType<typeof toProblemDetails>): FlowRunClassification {
   const detail = `${problem.detail} ${JSON.stringify(problem.upstream ?? {})}`.toLowerCase();
-  if (problem.status === 422 && (/valid command/.test(detail) || /friendly_name/.test(detail) || /no device found/.test(detail))) {
+  if (
+    problem.status === 422 &&
+    (/valid command/.test(detail) || /friendly_name/.test(detail) || /no device found/.test(detail))
+  ) {
     return 'needs_data';
   }
   if (problem.xyteCode === 'XYTE_FLOW_NEEDS_INPUT') {
@@ -331,7 +334,9 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
         readiness
       };
       if (readiness.connectionState !== 'connected') {
-        throw new FlowNeedsInputError(`Connectivity is ${readiness.connectionState}. Resolve connectivity before continuing.`);
+        throw new FlowNeedsInputError(
+          `Connectivity is ${readiness.connectionState}. Resolve connectivity before continuing.`
+        );
       }
       return {
         output: payload
@@ -414,10 +419,17 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
         artifactPath: watchStepPath,
         watchFrames: frames,
         contextUpdates:
-          frames.length > 0 && Array.isArray(frames[0].items) && frames[0].items.length > 0 && isRecord(frames[0].items[0])
+          frames.length > 0 &&
+          Array.isArray(frames[0].items) &&
+          frames[0].items.length > 0 &&
+          isRecord(frames[0].items[0])
             ? {
-                ...(typeof frames[0].items[0].device_id === 'string' ? { watch_device_id: String(frames[0].items[0].device_id) } : {}),
-                ...(typeof frames[0].items[0].uuid === 'string' ? { watch_incident_id: String(frames[0].items[0].uuid) } : {}),
+                ...(typeof frames[0].items[0].device_id === 'string'
+                  ? { watch_device_id: String(frames[0].items[0].device_id) }
+                  : {}),
+                ...(typeof frames[0].items[0].uuid === 'string'
+                  ? { watch_incident_id: String(frames[0].items[0].uuid) }
+                  : {}),
                 ...(typeof frames[0].items[0].id === 'string' ? { watch_item_id: String(frames[0].items[0].id) } : {})
               }
             : undefined
@@ -566,10 +578,12 @@ async function findRunBundle(outDir: string, resumeRef: string): Promise<string>
     if (!flowDir.isDirectory()) {
       continue;
     }
-    const runDirs = await readdir(path.join(root, flowDir.name), { withFileTypes: true }).catch((err: NodeJS.ErrnoException) => {
-      if (err.code === 'ENOENT') return [];
-      throw err;
-    });
+    const runDirs = await readdir(path.join(root, flowDir.name), { withFileTypes: true }).catch(
+      (err: NodeJS.ErrnoException) => {
+        if (err.code === 'ENOENT') return [];
+        throw err;
+      }
+    );
     for (const runDir of runDirs) {
       if (!runDir.isDirectory()) {
         continue;
@@ -933,7 +947,9 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
     durationMs: Date.now() - runStartedAt,
     ...(args.resume ? { resumeFrom: args.resume } : {}),
     outcome,
-    ...(nextStepIndex < args.definition.steps.length ? { nextResumeStepId: args.definition.steps[nextStepIndex].id } : {}),
+    ...(nextStepIndex < args.definition.steps.length
+      ? { nextResumeStepId: args.definition.steps[nextStepIndex].id }
+      : {}),
     ...(nextStepIndex < args.definition.steps.length
       ? {
           resumeCommand: `xyte-cli flow run ${args.flowId} --tenant ${args.tenantId} --${args.mode} --inspect-provider-scope ${effectiveInspectProviderScope} --resume ${runId}`

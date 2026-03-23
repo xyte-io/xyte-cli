@@ -23,11 +23,7 @@ describe('smoke shared runner', () => {
       ].join('\n'),
       'utf8'
     );
-    writeFileSync(
-      shimPath,
-      `@echo off\r\n"${process.execPath}" "%~dp0collect-argv.cjs" %*\r\n`,
-      'utf8'
-    );
+    writeFileSync(shimPath, `@echo off\r\n"${process.execPath}" "%~dp0collect-argv.cjs" %*\r\n`, 'utf8');
 
     try {
       const result = await runCommand(

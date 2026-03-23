@@ -14,7 +14,11 @@ export interface ProcessRunResult {
   stderr: string;
 }
 
-export async function runProcess(command: string, args: string[], options: ProcessRunOptions = {}): Promise<ProcessRunResult> {
+export async function runProcess(
+  command: string,
+  args: string[],
+  options: ProcessRunOptions = {}
+): Promise<ProcessRunResult> {
   const stdinMode = options.stdinMode ?? 'pipe';
 
   return await new Promise((resolve, reject) => {

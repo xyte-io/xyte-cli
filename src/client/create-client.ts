@@ -13,7 +13,11 @@ import { isRecord } from '../utils/json';
 const DEFAULT_HUB_BASE_URL = 'https://hub.xyte.io';
 const DEFAULT_ENTRY_BASE_URL = 'https://entry.xyte.io';
 
-function withPathParams(pathTemplate: string, pathParams: PublicEndpointSpec['pathParams'], path: XyteCallArgs['path']): string {
+function withPathParams(
+  pathTemplate: string,
+  pathParams: PublicEndpointSpec['pathParams'],
+  path: XyteCallArgs['path']
+): string {
   let compiled = pathTemplate;
   for (const param of pathParams) {
     const value = path?.[param];
@@ -60,7 +64,8 @@ function directAuthValue(options: XyteClientOptions, scope: PublicEndpointSpec['
 
 export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
   const profileStore: ProfileStore = options.profileStore ?? createProfileStore();
-  const transport = options.transport ??
+  const transport =
+    options.transport ??
     new HttpTransport({
       timeoutMs: options.timeoutMs,
       retryAttempts: options.retryAttempts,
@@ -124,12 +129,16 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
     return value;
   };
 
-  const callWithMeta = async <T = unknown>(endpointKey: string, args: XyteCallArgs = {}): Promise<XyteCallResult<T>> => {
+  const callWithMeta = async <T = unknown>(
+    endpointKey: string,
+    args: XyteCallArgs = {}
+  ): Promise<XyteCallResult<T>> => {
     const endpoint = getEndpoint(endpointKey);
     const { tenantId, tenant } = await resolveTenant(args.tenantId);
-    const baseUrl = endpoint.base === 'entry'
-      ? tenant?.entryBaseUrl ?? options.entryBaseUrl ?? DEFAULT_ENTRY_BASE_URL
-      : tenant?.hubBaseUrl ?? options.hubBaseUrl ?? DEFAULT_HUB_BASE_URL;
+    const baseUrl =
+      endpoint.base === 'entry'
+        ? (tenant?.entryBaseUrl ?? options.entryBaseUrl ?? DEFAULT_ENTRY_BASE_URL)
+        : (tenant?.hubBaseUrl ?? options.hubBaseUrl ?? DEFAULT_HUB_BASE_URL);
 
     const path = withPathParams(endpoint.pathTemplate, endpoint.pathParams, args.path);
     const url = withQueryParams(new URL(path, baseUrl), args.query);

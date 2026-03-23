@@ -94,12 +94,20 @@ describe('install skills', () => {
     expect(existsSync(join(workspace, '.github', 'skills', 'xyte-cli', 'SKILL.md'))).toBe(true);
     expect(existsSync(join(workspace, '.agents', 'skills', 'xyte-cli', 'SKILL.md'))).toBe(true);
     expect(existsSync(join(workspace, '.claude', 'skills', 'xyte-cli', 'agents', 'openai.yaml'))).toBe(true);
-    expect(existsSync(join(workspace, '.github', 'skills', 'xyte-cli', 'references', 'ai-utility-preprocessing.md'))).toBe(true);
+    expect(
+      existsSync(join(workspace, '.github', 'skills', 'xyte-cli', 'references', 'ai-utility-preprocessing.md'))
+    ).toBe(true);
     expect(existsSync(join(workspace, '.github', 'skills', 'xyte-cli', 'references', 'flow-recipes.md'))).toBe(true);
     expect(existsSync(join(workspace, '.agents', 'skills', 'xyte-cli', 'scripts', 'check_headless.mjs'))).toBe(true);
-    expect(existsSync(join(workspace, '.agents', 'skills', 'xyte-cli', 'templates', 'ai-utility-prepare-generic.prompt.md'))).toBe(true);
-    expect(existsSync(join(workspace, '.agents', 'skills', 'xyte-cli', 'templates', 'ai-space-import.prompt.md'))).toBe(true);
-    expect(existsSync(join(workspace, '.agents', 'skills', 'xyte-cli', 'schemas', 'headless-frame.v1.schema.json'))).toBe(true);
+    expect(
+      existsSync(join(workspace, '.agents', 'skills', 'xyte-cli', 'templates', 'ai-utility-prepare-generic.prompt.md'))
+    ).toBe(true);
+    expect(existsSync(join(workspace, '.agents', 'skills', 'xyte-cli', 'templates', 'ai-space-import.prompt.md'))).toBe(
+      true
+    );
+    expect(
+      existsSync(join(workspace, '.agents', 'skills', 'xyte-cli', 'schemas', 'headless-frame.v1.schema.json'))
+    ).toBe(true);
     expect(existsSync(join(workspace, '.agents', 'skills', 'xyte-cli', 'data', 'public-endpoints.json'))).toBe(true);
   });
 

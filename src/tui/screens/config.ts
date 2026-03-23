@@ -119,7 +119,9 @@ export function createConfigScreen(): TuiScreen {
     providerRowsState = [];
     for (const provider of PROVIDERS) {
       const providerSlots = allSlots.filter((slot) => slot.provider === provider);
-      const activeSlot = activeTenantId ? await context.profileStore.getActiveKeySlot(activeTenantId, provider) : undefined;
+      const activeSlot = activeTenantId
+        ? await context.profileStore.getActiveKeySlot(activeTenantId, provider)
+        : undefined;
       const hasActiveSecret =
         activeTenantId && activeSlot
           ? Boolean(await context.secretStore.getSlotSecret(activeTenantId, provider, activeSlot.slotId))
@@ -150,7 +152,9 @@ export function createConfigScreen(): TuiScreen {
         name: slot.name,
         active: activeForProvider?.slotId === slot.slotId ? 'yes' : 'no',
         hasSecret:
-          activeTenantId && (await context.secretStore.getSlotSecret(activeTenantId, slot.provider, slot.slotId)) ? 'yes' : 'no',
+          activeTenantId && (await context.secretStore.getSlotSecret(activeTenantId, slot.provider, slot.slotId))
+            ? 'yes'
+            : 'no',
         fingerprint: slot.fingerprint
       }))
     );

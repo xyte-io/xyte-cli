@@ -34,7 +34,11 @@ describe('pack install smoke script', () => {
         return { code: 0, stdout: '{"status":"ok","sameTarget":true}', stderr: '' };
       }
       if (args[0] === 'status') {
-        return { code: 0, stdout: '{"schemaVersion":"xyte.status.v1","mode":"fast","readiness":{"state":"missing"}}', stderr: '' };
+        return {
+          code: 0,
+          stdout: '{"schemaVersion":"xyte.status.v1","mode":"fast","readiness":{"state":"missing"}}',
+          stderr: ''
+        };
       }
       if (args[0] === 'init') {
         return { code: 0, stdout: 'Skill install summary:\nsetup skipped', stderr: '' };

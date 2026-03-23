@@ -107,4 +107,3 @@ describe('key wizard', () => {
     expect(secret).toBe('new-secret');
   });
 });
-

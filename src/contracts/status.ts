@@ -33,6 +33,7 @@ const StatusReadinessSchema = z.object({
   connectivity: StatusConnectivitySchema
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used for z.infer type derivation
 const StatusContractSchema = z.object({
   schemaVersion: z.literal(STATUS_SCHEMA_VERSION),
   generatedAtUtc: z.string(),

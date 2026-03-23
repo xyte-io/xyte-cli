@@ -31,7 +31,13 @@ export interface DeepDiveResult {
   ticketPosture: {
     openTickets: number;
     overlappingActiveIncidentDevices: number;
-    oldestOpenTickets: Array<{ ticketId: string; title: string; ageHours: number; deviceId: string; createdAtUtc: string }>;
+    oldestOpenTickets: Array<{
+      ticketId: string;
+      title: string;
+      ageHours: number;
+      deviceId: string;
+      createdAtUtc: string;
+    }>;
   };
   dataQuality: {
     statusMismatches: Array<{ device: string; status: string; stateStatus: string; lastSeen: string; space: string }>;

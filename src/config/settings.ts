@@ -4,10 +4,7 @@ import path from 'node:path';
 
 import { getXyteConfigDir } from '../utils/config-dir';
 import { isRecord } from '../utils/json';
-import {
-  INSPECT_PROVIDER_SCOPES,
-  type InspectProviderScope
-} from '../types/settings-enums';
+import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';
 import { TUI_SCREEN_IDS, type TuiScreenId } from '../types/tui-screens';
 import { DEFAULT_WATCH_PROFILE, type WatchProfile } from '../contracts/watch-frame';
 
@@ -482,12 +479,14 @@ function readCliSettingsFile(
   return readSettingsFile(filePath);
 }
 
-export function resolveCliSettingsSync(args: {
-  cwd?: string;
-  env?: NodeJS.ProcessEnv;
-  activeTenantId?: string;
-  flagOverrides?: Partial<Record<SettingPath, unknown>>;
-} = {}): ResolvedCliSettingsState {
+export function resolveCliSettingsSync(
+  args: {
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+    activeTenantId?: string;
+    flagOverrides?: Partial<Record<SettingPath, unknown>>;
+  } = {}
+): ResolvedCliSettingsState {
   const cwd = args.cwd ?? process.cwd();
   const env = args.env ?? process.env;
   const userPath = getUserSettingsPath(env);

@@ -21,6 +21,7 @@ const CallEnvelopeRequestSchema = z.object({
   body: z.unknown().optional()
 });
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used for z.infer type derivation
 const CallEnvelopeSchema = z.object({
   schemaVersion: z.literal(CALL_ENVELOPE_SCHEMA_VERSION),
   timestamp: z.string(),

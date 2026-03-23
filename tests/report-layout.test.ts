@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { buildDeepDive, formatDeepDiveMarkdown } from '../src/workflows/fleet-insights';
-import { buildDeepDiveOverviewPlan, buildDeepDiveReportSectionPlan, buildDeepDiveSummaryPlan } from '../src/workflows/report/pdf-render';
+import {
+  buildDeepDiveOverviewPlan,
+  buildDeepDiveReportSectionPlan,
+  buildDeepDiveSummaryPlan
+} from '../src/workflows/report/pdf-render';
 import { formatUtcForReport, formatWindowLabel } from '../src/workflows/report/time-format';
 import { getWindowFocus } from '../src/workflows/report/theme';
 
@@ -34,8 +38,18 @@ describe('report layout helpers', () => {
         tenantId: 'acme',
         devices: [{ id: 'd1', name: 'Device 1', status: 'offline', space: { full_path: 'Overview/A' } }],
         spaces: [{ id: 's1', name: 'Room A', space_type: 'room' }],
-        incidents: [{ id: 'i1', device_name: 'Device 1', status: 'active', space_tree_path_name: 'Overview/A', created_at: new Date().toISOString() }],
-        tickets: [{ id: 't1', title: 'Need help', status: 'open', created_at: new Date().toISOString(), device_id: 'd1' }]
+        incidents: [
+          {
+            id: 'i1',
+            device_name: 'Device 1',
+            status: 'active',
+            space_tree_path_name: 'Overview/A',
+            created_at: new Date().toISOString()
+          }
+        ],
+        tickets: [
+          { id: 't1', title: 'Need help', status: 'open', created_at: new Date().toISOString(), device_id: 'd1' }
+        ]
       },
       72
     );
@@ -109,7 +123,9 @@ describe('report layout helpers', () => {
       devices: [{ id: 'd1', name: 'Partner Device', status: 'online' }],
       spaces: [],
       incidents: [],
-      tickets: [{ id: 't1', title: 'Need help', status: 'open', created_at: new Date().toISOString(), device_id: 'd1' }],
+      tickets: [
+        { id: 't1', title: 'Need help', status: 'open', created_at: new Date().toISOString(), device_id: 'd1' }
+      ],
       partnerEnrichment: {
         sampledDeviceCount: 1,
         totalDeviceCount: 1,
@@ -160,7 +176,9 @@ describe('report layout helpers', () => {
       devices: [{ id: 'd1', name: 'Partner Device', status: 'online' }],
       spaces: [],
       incidents: [],
-      tickets: [{ id: 't1', title: 'Need help', status: 'open', created_at: new Date().toISOString(), device_id: 'd1' }],
+      tickets: [
+        { id: 't1', title: 'Need help', status: 'open', created_at: new Date().toISOString(), device_id: 'd1' }
+      ],
       partnerEnrichment: {
         sampledDeviceCount: 1,
         totalDeviceCount: 1,
@@ -257,7 +275,15 @@ describe('report layout helpers', () => {
       tenantId: 'acme',
       devices: [{ id: 'd1', name: 'Device 1', status: 'offline', space: { full_path: 'Overview/A' } }],
       spaces: [{ id: 's1', name: 'Room A', space_type: 'room' }],
-      incidents: [{ id: 'i1', device_name: 'Device 1', status: 'active', space_tree_path_name: 'Overview/A', created_at: new Date().toISOString() }],
+      incidents: [
+        {
+          id: 'i1',
+          device_name: 'Device 1',
+          status: 'active',
+          space_tree_path_name: 'Overview/A',
+          created_at: new Date().toISOString()
+        }
+      ],
       tickets: [{ id: 't1', title: 'Need help', status: 'open', created_at: new Date().toISOString(), device_id: 'd1' }]
     });
 

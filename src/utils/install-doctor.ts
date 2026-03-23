@@ -40,7 +40,11 @@ function tryGetRealPath(value: string, realPathResolver: (value: string) => stri
   }
 }
 
-function resolveForReport(value: string, platformPath: typeof path.posix | typeof path.win32, realPathResolver: (value: string) => string): string {
+function resolveForReport(
+  value: string,
+  platformPath: typeof path.posix | typeof path.win32,
+  realPathResolver: (value: string) => string
+): string {
   return tryGetRealPath(value, realPathResolver) ?? platformPath.resolve(value);
 }
 
@@ -52,7 +56,12 @@ function buildWindowsShimTarget(
 ): string {
   const packageSegments = packageName.split('/').filter(Boolean);
   const entrypointSegments = entrypointRelativePath.split(/[\\/]+/).filter(Boolean);
-  return platformPath.resolve(platformPath.dirname(commandPath), 'node_modules', ...packageSegments, ...entrypointSegments);
+  return platformPath.resolve(
+    platformPath.dirname(commandPath),
+    'node_modules',
+    ...packageSegments,
+    ...entrypointSegments
+  );
 }
 
 export function buildInstallDoctorReport(

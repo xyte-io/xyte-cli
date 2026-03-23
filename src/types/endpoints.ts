@@ -24,10 +24,3 @@ export interface PublicEndpointSpec {
   bodyExample?: string;
   notes?: string[];
 }
-
-interface EndpointCallArgs {
-  path?: Record<string, string | number>;
-  query?: Record<string, string | number | boolean | null | undefined>;
-  body?: unknown;
-  headers?: Record<string, string>;
-}

@@ -85,7 +85,11 @@ describe('http transport', () => {
     const transport = new HttpTransport({ retryAttempts: 0 });
 
     await expect(
-      transport.request({ method: 'POST', url: 'https://example.test/v1/devices/dev-1/commands', endpointKey: 'test.key' })
+      transport.request({
+        method: 'POST',
+        url: 'https://example.test/v1/devices/dev-1/commands',
+        endpointKey: 'test.key'
+      })
     ).rejects.toThrow('Either a valid command or friendly_name is required');
   });
 });

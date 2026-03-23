@@ -6,11 +6,7 @@ interface StartupFrame {
   title: string;
 }
 
-const BOOT_STATUS = [
-  'Booting terminal shell...',
-  'Loading tenant profile...',
-  'Hydrating XYTE panels...'
-];
+const BOOT_STATUS = ['Booting terminal shell...', 'Loading tenant profile...', 'Hydrating XYTE panels...'];
 
 export function startupFrames(): StartupFrame[] {
   const logoFrames = xyteLogoRevealFrames();

@@ -3,7 +3,11 @@ import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 
 import { asRecord, safeString } from '../utils/json';
-import { INSPECT_DEEP_DIVE_SCHEMA_VERSION, INSPECT_FLEET_SCHEMA_VERSION, REPORT_SCHEMA_VERSION } from '../contracts/versions';
+import {
+  INSPECT_DEEP_DIVE_SCHEMA_VERSION,
+  INSPECT_FLEET_SCHEMA_VERSION,
+  REPORT_SCHEMA_VERSION
+} from '../contracts/versions';
 import { parseTimestamp } from './report/time-format';
 
 export { collectFleetSnapshot, InspectProviderScopeError } from './fleet-insights-loaders';
@@ -192,14 +196,20 @@ function formatRecency(counter: StatusCounts, sampleSize: number): string | unde
 }
 
 function fieldCounter(items: unknown[], field: string): Record<string, number> {
-  return toCounter(items.map((item) => {
-    const r = asRecord(item);
-    return safeString(typeof r[field] === 'string' ? r[field] : 'unknown');
-  }));
+  return toCounter(
+    items.map((item) => {
+      const r = asRecord(item);
+      return safeString(typeof r[field] === 'string' ? r[field] : 'unknown');
+    })
+  );
 }
 
 function buildPartnerSummaryLines(snapshot: FleetSnapshot): string[] {
-  if (snapshot.providerScope !== 'partner' || !snapshot.partnerEnrichment || snapshot.partnerEnrichment.sampledDeviceCount === 0) {
+  if (
+    snapshot.providerScope !== 'partner' ||
+    !snapshot.partnerEnrichment ||
+    snapshot.partnerEnrichment.sampledDeviceCount === 0
+  ) {
     return [];
   }
 
@@ -295,8 +305,15 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
   const recentSpace = toCounter(recentIncidents.map((item) => safeSpacePath(item)));
   const recentDevice = toCounter(recentIncidents.map((item) => safeDeviceName(item)));
 
-  const activeDeviceIds = new Set(activeIncidents.map((item) => { const r = asRecord(item); return safeString(r.device_id ?? asRecord(r.device).id); }));
-  const overlapDevices = new Set(openTickets.map((item) => safeString(asRecord(item).device_id)).filter((id) => activeDeviceIds.has(id)));
+  const activeDeviceIds = new Set(
+    activeIncidents.map((item) => {
+      const r = asRecord(item);
+      return safeString(r.device_id ?? asRecord(r.device).id);
+    })
+  );
+  const overlapDevices = new Set(
+    openTickets.map((item) => safeString(asRecord(item).device_id)).filter((id) => activeDeviceIds.has(id))
+  );
 
   const mismatches = snapshot.devices
     .map((item) => {
@@ -318,7 +335,9 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
         space: safeSpacePath(item)
       };
     })
-    .filter((item): item is { device: string; status: string; stateStatus: string; lastSeen: string; space: string } => Boolean(item))
+    .filter((item): item is { device: string; status: string; stateStatus: string; lastSeen: string; space: string } =>
+      Boolean(item)
+    )
     .sort((a, b) => a.device.localeCompare(b.device));
 
   const topOfflineSpaces = topEntries(offlineBySpace, 10).map(([space, count]) => ({
@@ -372,7 +391,9 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
       : []),
     `Tickets: ${snapshot.tickets.length} total, ${openTickets.length} open.`,
     ...(includeIncidentAndSpaceSummary
-      ? [`${windowHours}h churn: ${recentIncidents.length} incidents across ${Object.keys(recentDevice).length} devices and ${Object.keys(recentSpace).length} spaces.`]
+      ? [
+          `${windowHours}h churn: ${recentIncidents.length} incidents across ${Object.keys(recentDevice).length} devices and ${Object.keys(recentSpace).length} spaces.`
+        ]
       : []),
     ...(unknownIncidentAgeCount > 0 || unknownOpenTicketAgeCount > 0
       ? [

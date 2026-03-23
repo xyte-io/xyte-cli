@@ -102,7 +102,10 @@ function extractTenantNameFromOrganizationInfo(payload: unknown): string | undef
     firstText(...nameKeys.map((key) => record[key]));
 
   const candidates: Record<string, unknown>[] = [payload];
-  const directNested = [payload.organization, payload.data, payload.result, payload.payload].filter(isRecord) as Record<string, unknown>[];
+  const directNested = [payload.organization, payload.data, payload.result, payload.payload].filter(isRecord) as Record<
+    string,
+    unknown
+  >[];
   candidates.push(...directNested);
   for (const nested of directNested) {
     if (isRecord(nested.organization)) {
@@ -120,17 +123,16 @@ function extractTenantNameFromOrganizationInfo(payload: unknown): string | undef
   return undefined;
 }
 
-export {
-  SIMPLE_SETUP_DEFAULT_TENANT,
-  normalizeTenantId,
-  runSimpleSetup
-};
+export { SIMPLE_SETUP_DEFAULT_TENANT, normalizeTenantId, runSimpleSetup };
 
-async function resolveTenantNameFromKey(ctx: CliContext, args: {
-  tenantId: string;
-  provider: SecretProvider;
-  keyValue: string;
-}): Promise<string | undefined> {
+async function resolveTenantNameFromKey(
+  ctx: CliContext,
+  args: {
+    tenantId: string;
+    provider: SecretProvider;
+    keyValue: string;
+  }
+): Promise<string | undefined> {
   if (args.provider !== PROVIDER_ORG) {
     return undefined;
   }
@@ -149,15 +151,18 @@ async function resolveTenantNameFromKey(ctx: CliContext, args: {
   }
 }
 
-async function runSetupCore(ctx: CliContext, args: {
-  tenantId: string;
-  tenantName: string;
-  provider: SecretProvider;
-  slotName: string;
-  keyValue: string;
-  setActive: boolean;
-  connectivityMode: SetupConnectivityMode;
-}): Promise<SetupRunResult> {
+async function runSetupCore(
+  ctx: CliContext,
+  args: {
+    tenantId: string;
+    tenantName: string;
+    provider: SecretProvider;
+    slotName: string;
+    keyValue: string;
+    setActive: boolean;
+    connectivityMode: SetupConnectivityMode;
+  }
+): Promise<SetupRunResult> {
   const steps: SetupStep[] = [];
 
   await ctx.profileStore.upsertTenant({ id: args.tenantId, name: args.tenantName });
@@ -216,13 +221,16 @@ async function runSetupCore(ctx: CliContext, args: {
   };
 }
 
-async function runSimpleSetup(ctx: CliContext, args: {
-  tenantId: string;
-  tenantName: string;
-  keyValue: string;
-  setActive?: boolean;
-  connectivityMode?: SetupConnectivityMode;
-}): Promise<SetupRunResult> {
+async function runSimpleSetup(
+  ctx: CliContext,
+  args: {
+    tenantId: string;
+    tenantName: string;
+    keyValue: string;
+    setActive?: boolean;
+    connectivityMode?: SetupConnectivityMode;
+  }
+): Promise<SetupRunResult> {
   return runSetupCore(ctx, {
     tenantId: args.tenantId,
     tenantName: args.tenantName,
@@ -234,12 +242,15 @@ async function runSimpleSetup(ctx: CliContext, args: {
   });
 }
 
-async function handleSetupStatus(ctx: CliContext, options: {
-  tenant?: string;
-  output?: string;
-  format?: OutputFormat;
-  field?: string;
-}): Promise<void> {
+async function handleSetupStatus(
+  ctx: CliContext,
+  options: {
+    tenant?: string;
+    output?: string;
+    format?: OutputFormat;
+    field?: string;
+  }
+): Promise<void> {
   const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
   const secretStore = ctx.getSecretStore();
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
@@ -272,17 +283,20 @@ async function handleSetupStatus(ctx: CliContext, options: {
   printJson(ctx.stdout, readiness, { strictJson: resolveStrictJson({ settings }) });
 }
 
-async function handleSetupRunSimple(ctx: CliContext, options: {
-  tenant?: string;
-  name?: string;
-  key?: string;
-  keyStdin?: boolean;
-  setActive?: boolean;
-  connectivity?: string;
-  nonInteractive?: boolean;
-  output?: string;
-  format?: OutputFormat;
-}): Promise<void> {
+async function handleSetupRunSimple(
+  ctx: CliContext,
+  options: {
+    tenant?: string;
+    name?: string;
+    key?: string;
+    keyStdin?: boolean;
+    setActive?: boolean;
+    connectivity?: string;
+    nonInteractive?: boolean;
+    output?: string;
+    format?: OutputFormat;
+  }
+): Promise<void> {
   const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
   const explicitTenantName = typeof options.name === 'string' && options.name.trim().length > 0;
   const connectivityMode = parseSetupConnectivityMode(options.connectivity);
@@ -350,19 +364,22 @@ async function handleSetupRunSimple(ctx: CliContext, options: {
   printJson(ctx.stdout, setupResult, { strictJson: resolveStrictJson({ settings }) });
 }
 
-async function handleSetupRunAdvanced(ctx: CliContext, options: {
-  tenant?: string;
-  name?: string;
-  provider?: string;
-  slotName?: string;
-  key?: string;
-  keyStdin?: boolean;
-  setActive?: boolean;
-  connectivity?: string;
-  nonInteractive?: boolean;
-  output?: string;
-  format?: OutputFormat;
-}): Promise<void> {
+async function handleSetupRunAdvanced(
+  ctx: CliContext,
+  options: {
+    tenant?: string;
+    name?: string;
+    provider?: string;
+    slotName?: string;
+    key?: string;
+    keyStdin?: boolean;
+    setActive?: boolean;
+    connectivity?: string;
+    nonInteractive?: boolean;
+    output?: string;
+    format?: OutputFormat;
+  }
+): Promise<void> {
   const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
   const explicitTenantName = typeof options.name === 'string' && options.name.trim().length > 0;
   const connectivityMode = parseSetupConnectivityMode(options.connectivity);
@@ -389,8 +406,10 @@ async function handleSetupRunAdvanced(ctx: CliContext, options: {
   });
   if (!options.nonInteractive) {
     tenantId = tenantId || (await ctx.prompt({ question: 'Tenant id', stdout: ctx.stdout }));
-    tenantName = tenantName || (await ctx.prompt({ question: 'Tenant display name', initial: tenantId, stdout: ctx.stdout }));
-    const providerAnswer = provider || parseProvider(await ctx.prompt({ question: 'Provider', initial: PROVIDER_ORG, stdout: ctx.stdout }));
+    tenantName =
+      tenantName || (await ctx.prompt({ question: 'Tenant display name', initial: tenantId, stdout: ctx.stdout }));
+    const providerAnswer =
+      provider || parseProvider(await ctx.prompt({ question: 'Provider', initial: PROVIDER_ORG, stdout: ctx.stdout }));
     provider = providerAnswer;
     slotName = await ctx.prompt({ question: 'Slot name', initial: slotName, stdout: ctx.stdout });
   }
@@ -443,20 +462,23 @@ async function handleSetupRunAdvanced(ctx: CliContext, options: {
   printJson(ctx.stdout, result, { strictJson: resolveStrictJson({ settings }) });
 }
 
-async function handleSetupRun(ctx: CliContext, options: {
-  tenant?: string;
-  name?: string;
-  advanced?: boolean;
-  provider?: string;
-  slotName?: string;
-  key?: string;
-  keyStdin?: boolean;
-  setActive?: boolean;
-  connectivity?: string;
-  nonInteractive?: boolean;
-  output?: string;
-  format?: OutputFormat;
-}): Promise<void> {
+async function handleSetupRun(
+  ctx: CliContext,
+  options: {
+    tenant?: string;
+    name?: string;
+    advanced?: boolean;
+    provider?: string;
+    slotName?: string;
+    key?: string;
+    keyStdin?: boolean;
+    setActive?: boolean;
+    connectivity?: string;
+    nonInteractive?: boolean;
+    output?: string;
+    format?: OutputFormat;
+  }
+): Promise<void> {
   if (!options.nonInteractive && !ctx.isInteractive) {
     throw new CliUserError({
       summary: 'Interactive setup requires a TTY.',
@@ -482,7 +504,12 @@ export function registerSetupCommands(parent: Command, ctx: CliContext): void {
     .option('--field <name>', 'Print a single scalar field (for example tenantId)')
     .option('--format <format>', 'json|text', 'json')
     .action(async (options: { tenant?: string; field?: string; format?: OutputFormat }, command: Command) => {
-      await handleSetupStatus(ctx, { tenant: options.tenant, field: options.field, format: options.format, output: getExplicitGlobalOutput(command) });
+      await handleSetupStatus(ctx, {
+        tenant: options.tenant,
+        field: options.field,
+        format: options.format,
+        output: getExplicitGlobalOutput(command)
+      });
     });
 
   setup

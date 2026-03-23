@@ -30,7 +30,10 @@ function parsePathJson(value: string | undefined): Record<string, string | numbe
   return out;
 }
 
-async function handleApiEndpointsList(ctx: CliContext, options: { tenant?: string; output?: string; format?: string }): Promise<void> {
+async function handleApiEndpointsList(
+  ctx: CliContext,
+  options: { tenant?: string; output?: string; format?: string }
+): Promise<void> {
   const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
   const payload = tenantId ? await (await ctx.withClient({ tenantId })).listTenantEndpoints(tenantId) : listEndpoints();
@@ -48,7 +51,11 @@ async function handleApiEndpointsList(ctx: CliContext, options: { tenant?: strin
   printJson(ctx.stdout, payload, { strictJson: resolveStrictJson({ settings }) });
 }
 
-async function handleApiEndpointsDescribe(ctx: CliContext, key: string, options: { output?: string; format?: string } = {}): Promise<void> {
+async function handleApiEndpointsDescribe(
+  ctx: CliContext,
+  key: string,
+  options: { output?: string; format?: string } = {}
+): Promise<void> {
   const settings = await ctx.resolveSettings();
   const endpoint = getEndpoint(key);
   const output = resolveTextJsonOutput({
@@ -79,7 +86,9 @@ async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptio
   const settings = await ctx.resolveSettings(tenantOverride ? { 'defaults.tenant': tenantOverride } : {});
   const endpoint = getEndpoint(key);
   const method = endpoint.method.toUpperCase();
-  const outputMode = String(options.outputMode ?? 'raw').trim().toLowerCase();
+  const outputMode = String(options.outputMode ?? 'raw')
+    .trim()
+    .toLowerCase();
   if (!['raw', 'envelope'].includes(outputMode)) {
     throw new CliUserError({
       summary: 'Invalid API call output mode.',

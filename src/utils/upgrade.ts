@@ -80,7 +80,10 @@ export async function checkForUpgrade(
   });
 }
 
-export async function applyUpgrade(settings: UpgradeSettings, deps: UpgradeDependencies = {}): Promise<UpgradeResultV1> {
+export async function applyUpgrade(
+  settings: UpgradeSettings,
+  deps: UpgradeDependencies = {}
+): Promise<UpgradeResultV1> {
   const packageName = settings.packageName ?? DEFAULT_CLI_PACKAGE;
   const runner = deps.commandRunner ?? defaultRunner;
   const installSkillsImpl = deps.installSkillsImpl ?? installSkills;
@@ -124,7 +127,9 @@ export async function applyUpgrade(settings: UpgradeSettings, deps: UpgradeDepen
     throw new Error(`Upgrade verification failed: could not parse version from "xyte-cli --version" output.`);
   }
   if (compareSemver(detectedVersion, check.latestVersion) < 0) {
-    throw new Error(`Upgrade verification failed: detected ${detectedVersion}, expected at least ${check.latestVersion}.`);
+    throw new Error(
+      `Upgrade verification failed: detected ${detectedVersion}, expected at least ${check.latestVersion}.`
+    );
   }
 
   const skills = await installSkillsImpl({

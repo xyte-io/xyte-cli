@@ -1,7 +1,13 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { classifyConnectivityError, type ConnectivityResult, type ConnectionState } from '../config/connectivity';
-import { computeRetryDelayMs, DEFAULT_RETRY_POLICY, isRetryableErrorClass, type RetryPolicyOptions, type RetryState } from '../config/retry-policy';
+import {
+  computeRetryDelayMs,
+  DEFAULT_RETRY_POLICY,
+  isRetryableErrorClass,
+  type RetryPolicyOptions,
+  type RetryState
+} from '../config/retry-policy';
 import type { ProfileStore } from '../secure/profile-store';
 import type { SecretStore } from '../secure/secret-store';
 import type { XyteClient } from '../types/client';
@@ -140,7 +146,10 @@ interface DashboardLoadResult {
   tickets: unknown[];
 }
 
-export async function loadDashboardData(client: XyteClient, tenantId?: string): Promise<LoadOutcome<DashboardLoadResult>> {
+export async function loadDashboardData(
+  client: XyteClient,
+  tenantId?: string
+): Promise<LoadOutcome<DashboardLoadResult>> {
   const [devicesOutcome, incidentsOutcome, ticketsOutcome] = await Promise.all([
     loadDevicesData(client, tenantId),
     loadIncidentsData(client, tenantId),
@@ -173,30 +182,27 @@ export async function loadDevicesData(
   tenantId?: string,
   options: DevicesLoadOptions = {}
 ): Promise<LoadOutcome<unknown[]>> {
-  const result = await loadWithOutcome(
-    async () => {
-      const query = compactQuery(options.query as QueryShape | undefined);
-      const raw = await client.organization
-        .getDevices({ tenantId, ...(query ? { query } : {}) })
-        .catch((orgError: unknown) => {
-          if (isAuthError(orgError)) {
-            throw orgError;
-          }
-          if (process.env.DEBUG) {
-            const msg = errorMessage(orgError);
-            process.stderr.write(`[data-loaders] org getDevices failed, falling back to partner: ${msg}\n`);
-          }
-          return client.partner.getDevices({ tenantId });
-        });
-      const devices = extractArray(raw, ['devices', 'data', 'items']);
-      const spaceId = String(options.query?.space_id ?? '').trim();
-      if (!spaceId) {
-        return devices;
-      }
-      return devices.filter((device) => matchesSpace(device, spaceId));
-    },
-    []
-  );
+  const result = await loadWithOutcome(async () => {
+    const query = compactQuery(options.query as QueryShape | undefined);
+    const raw = await client.organization
+      .getDevices({ tenantId, ...(query ? { query } : {}) })
+      .catch((orgError: unknown) => {
+        if (isAuthError(orgError)) {
+          throw orgError;
+        }
+        if (process.env.DEBUG) {
+          const msg = errorMessage(orgError);
+          process.stderr.write(`[data-loaders] org getDevices failed, falling back to partner: ${msg}\n`);
+        }
+        return client.partner.getDevices({ tenantId });
+      });
+    const devices = extractArray(raw, ['devices', 'data', 'items']);
+    const spaceId = String(options.query?.space_id ?? '').trim();
+    if (!spaceId) {
+      return devices;
+    }
+    return devices.filter((device) => matchesSpace(device, spaceId));
+  }, []);
   return result;
 }
 
@@ -226,72 +232,69 @@ export async function loadIncidentsData(
   tenantId?: string,
   options: IncidentsLoadOptions = {}
 ): Promise<LoadOutcome<unknown[]>> {
-  return loadWithOutcome(
-    async () => {
-      const nowUnix = Math.floor(Date.now() / 1000);
-      const merged: IncidentsQuery = {
-        status: 'active',
-        from: 0,
-        to: nowUnix,
-        page: 1,
-        per_page: 100,
-        ...(options.query ?? {})
-      };
+  return loadWithOutcome(async () => {
+    const nowUnix = Math.floor(Date.now() / 1000);
+    const merged: IncidentsQuery = {
+      status: 'active',
+      from: 0,
+      to: nowUnix,
+      page: 1,
+      per_page: 100,
+      ...(options.query ?? {})
+    };
 
-      const paginateAll = options.paginateAll !== false;
-      const perPage = Math.max(1, Number(merged.per_page ?? 100));
-      const initialPage = Math.max(1, Number(merged.page ?? 1));
+    const paginateAll = options.paginateAll !== false;
+    const perPage = Math.max(1, Number(merged.per_page ?? 100));
+    const initialPage = Math.max(1, Number(merged.page ?? 1));
 
-      const buildQuery = (page: number) =>
-        compactQuery({
-          from: merged.from,
-          to: merged.to,
-          status: merged.status,
-          priority: merged.priority,
-          title: merged.title,
-          issue: merged.issue,
-          space_id: merged.space_id,
-          page,
-          per_page: perPage
-        });
+    const buildQuery = (page: number) =>
+      compactQuery({
+        from: merged.from,
+        to: merged.to,
+        status: merged.status,
+        priority: merged.priority,
+        title: merged.title,
+        issue: merged.issue,
+        space_id: merged.space_id,
+        page,
+        per_page: perPage
+      });
 
-      if (!paginateAll) {
-        const query = buildQuery(initialPage);
-        const raw = await client.organization.getIncidents({
-          tenantId,
-          ...(query ? { query } : {})
-        });
-        return extractIncidentsArray(raw).map(normalizeIncidentItem);
+    if (!paginateAll) {
+      const query = buildQuery(initialPage);
+      const raw = await client.organization.getIncidents({
+        tenantId,
+        ...(query ? { query } : {})
+      });
+      return extractIncidentsArray(raw).map(normalizeIncidentItem);
+    }
+
+    const all: unknown[] = [];
+
+    for (let page = initialPage; page <= 50; page += 1) {
+      const query = buildQuery(page);
+      const raw = await client.organization.getIncidents({
+        tenantId,
+        ...(query ? { query } : {})
+      });
+      const pageItems = extractIncidentsArray(raw);
+      if (!pageItems.length) {
+        break;
       }
-
-      const all: unknown[] = [];
-
-      for (let page = initialPage; page <= 50; page += 1) {
-        const query = buildQuery(page);
-        const raw = await client.organization.getIncidents({
-          tenantId,
-          ...(query ? { query } : {})
-        });
-        const pageItems = extractIncidentsArray(raw);
-        if (!pageItems.length) {
-          break;
-        }
-        all.push(...pageItems);
-        const hasNext = extractHasNextPage(raw);
-        if (hasNext === false || (hasNext === undefined && pageItems.length < perPage)) {
-          break;
-        }
+      all.push(...pageItems);
+      const hasNext = extractHasNextPage(raw);
+      if (hasNext === false || (hasNext === undefined && pageItems.length < perPage)) {
+        break;
       }
+    }
 
-      if (!all.length) {
-        const raw = await client.organization.getIncidents({ tenantId });
-        return extractIncidentsArray(raw).map(normalizeIncidentItem);
-      }
+    if (!all.length) {
+      const raw = await client.organization.getIncidents({ tenantId });
+      return extractIncidentsArray(raw).map(normalizeIncidentItem);
+    }
 
-      return all.map(normalizeIncidentItem);
-    },
-    []
-  );
+    return all.map(normalizeIncidentItem);
+  }, []);
 }
 
 interface TicketsLoadResult {
@@ -300,13 +303,10 @@ interface TicketsLoadResult {
 }
 
 export async function loadTicketsData(client: XyteClient, tenantId?: string): Promise<LoadOutcome<TicketsLoadResult>> {
-  const orgOutcome = await loadWithOutcome(
-    async () => {
-      const org = await client.organization.getTickets({ tenantId });
-      return extractArray(org, ['tickets', 'data', 'items']);
-    },
-    []
-  );
+  const orgOutcome = await loadWithOutcome(async () => {
+    const org = await client.organization.getTickets({ tenantId });
+    return extractArray(org, ['tickets', 'data', 'items']);
+  }, []);
 
   if (orgOutcome.data.length || orgOutcome.connectionState === 'connected') {
     return {
@@ -320,13 +320,10 @@ export async function loadTicketsData(client: XyteClient, tenantId?: string): Pr
     };
   }
 
-  const partnerOutcome = await loadWithOutcome(
-    async () => {
-      const partner = await client.partner.getTickets({ tenantId });
-      return extractArray(partner, ['tickets', 'data', 'items']);
-    },
-    []
-  );
+  const partnerOutcome = await loadWithOutcome(async () => {
+    const partner = await client.partner.getTickets({ tenantId });
+    return extractArray(partner, ['tickets', 'data', 'items']);
+  }, []);
 
   const worst = pickWorstOutcome([orgOutcome, partnerOutcome]);
   return {
@@ -359,14 +356,11 @@ export async function loadSpacesData(
   tenantId?: string,
   options: SpacesLoadOptions = {}
 ): Promise<LoadOutcome<unknown[]>> {
-  return loadWithOutcome(
-    async () => {
-      const query = compactQuery(options.query as QueryShape | undefined);
-      const raw = await client.organization.getSpaces({ tenantId, ...(query ? { query } : {}) });
-      return extractArray(raw, ['spaces', 'data', 'items']);
-    },
-    []
-  );
+  return loadWithOutcome(async () => {
+    const query = compactQuery(options.query as QueryShape | undefined);
+    const raw = await client.organization.getSpaces({ tenantId, ...(query ? { query } : {}) });
+    return extractArray(raw, ['spaces', 'data', 'items']);
+  }, []);
 }
 
 export interface CommandTemplate {
@@ -417,17 +411,14 @@ export async function loadCommandTemplates(
   tenantId: string | undefined,
   options: { deviceId: string }
 ): Promise<LoadOutcome<CommandTemplate[]>> {
-  return loadWithOutcome(
-    async () => {
-      const raw = await client.organization.getCommands({
-        tenantId,
-        path: { device_id: options.deviceId }
-      });
-      const commands = extractArray(raw, ['commands', 'data', 'items']);
-      return normalizeCommandTemplates(commands);
-    },
-    []
-  );
+  return loadWithOutcome(async () => {
+    const raw = await client.organization.getCommands({
+      tenantId,
+      path: { device_id: options.deviceId }
+    });
+    const commands = extractArray(raw, ['commands', 'data', 'items']);
+    return normalizeCommandTemplates(commands);
+  }, []);
 }
 
 interface SpaceDrilldownResult {
@@ -453,13 +444,10 @@ export async function loadSpaceDrilldownData(
 ): Promise<LoadOutcome<SpaceDrilldownResult>> {
   const [detailOutcome, queriedDevicesOutcome] = await Promise.all([
     loadWithOutcome(() => client.organization.getSpace({ tenantId, path: { space_id: spaceId } }), undefined),
-    loadWithOutcome(
-      async () => {
-        const queried = await client.organization.getDevices({ tenantId, query: { space_id: spaceId } });
-        return extractArray(queried, ['devices', 'data', 'items']);
-      },
-      []
-    )
+    loadWithOutcome(async () => {
+      const queried = await client.organization.getDevices({ tenantId, query: { space_id: spaceId } });
+      return extractArray(queried, ['devices', 'data', 'items']);
+    }, [])
   ]);
 
   let devicesInSpace = queriedDevicesOutcome.data;
@@ -539,7 +527,9 @@ export async function loadConfigData(
       const providerSlots = allSlots.filter((slot) => slot.provider === provider);
       const activeSlot = tenantId ? await profileStore.getActiveKeySlot(tenantId, provider) : undefined;
       const hasActiveSecret =
-        tenantId && activeSlot ? Boolean(await secretStore.getSlotSecret(tenantId, provider, activeSlot.slotId)) : false;
+        tenantId && activeSlot
+          ? Boolean(await secretStore.getSlotSecret(tenantId, provider, activeSlot.slotId))
+          : false;
       return {
         provider,
         slotCount: providerSlots.length,
@@ -557,7 +547,9 @@ export async function loadConfigData(
       .filter((slot) => slot.provider === selectedProvider)
       .map(async (slot) => {
         const active = tenantId ? await profileStore.getActiveKeySlot(tenantId, slot.provider) : undefined;
-        const hasSecret = tenantId ? Boolean(await secretStore.getSlotSecret(tenantId, slot.provider, slot.slotId)) : false;
+        const hasSecret = tenantId
+          ? Boolean(await secretStore.getSlotSecret(tenantId, slot.provider, slot.slotId))
+          : false;
         return {
           provider: slot.provider,
           slotId: slot.slotId,

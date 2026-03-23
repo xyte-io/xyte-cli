@@ -1,10 +1,18 @@
 import { parseJsonObject } from '../utils/json';
 
-export function parseQueryJson(value: string | undefined): Record<string, string | number | boolean | null | undefined> {
+export function parseQueryJson(
+  value: string | undefined
+): Record<string, string | number | boolean | null | undefined> {
   const record = parseJsonObject(value);
   const out: Record<string, string | number | boolean | null | undefined> = {};
   for (const [key, item] of Object.entries(record)) {
-    if (item === null || item === undefined || typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean') {
+    if (
+      item === null ||
+      item === undefined ||
+      typeof item === 'string' ||
+      typeof item === 'number' ||
+      typeof item === 'boolean'
+    ) {
       out[key] = item as string | number | boolean | null | undefined;
       continue;
     }

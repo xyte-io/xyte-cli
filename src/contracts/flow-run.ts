@@ -4,14 +4,7 @@ import { FLOW_RUN_SCHEMA_VERSION } from './versions';
 
 const FlowRunClassificationSchema = z.enum(['needs_data', 'bug']);
 const FlowRunStepKindSchema = z.enum(['task', 'gate']);
-const FlowRunStepStatusSchema = z.enum([
-  'pending',
-  'completed',
-  'failed',
-  'gate_pending',
-  'gate_approved',
-  'skipped'
-]);
+const FlowRunStepStatusSchema = z.enum(['pending', 'completed', 'failed', 'gate_pending', 'gate_approved', 'skipped']);
 
 const FlowRunProblemSchema = z.object({
   type: z.string(),
@@ -97,7 +90,9 @@ export type FlowRunDecision = z.infer<typeof FlowRunDecisionSchema>;
 export type FlowRunErrorEntry = z.infer<typeof FlowRunErrorEntrySchema>;
 export type FlowRunSummary = z.infer<typeof FlowRunSummarySchema>;
 
-export function buildFlowRunSummary(summary: Omit<FlowRunSummary, 'schemaVersion' | 'generatedAtUtc'> & { generatedAtUtc?: string }): FlowRunSummary {
+export function buildFlowRunSummary(
+  summary: Omit<FlowRunSummary, 'schemaVersion' | 'generatedAtUtc'> & { generatedAtUtc?: string }
+): FlowRunSummary {
   return {
     schemaVersion: FLOW_RUN_SCHEMA_VERSION,
     generatedAtUtc: summary.generatedAtUtc ?? new Date().toISOString(),

@@ -81,10 +81,13 @@ describe('flow runner', () => {
 
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       if (url.includes('/organization/incidents')) {
-        return new Response(JSON.stringify({ items: [{ id: 'inc-1', uuid: 'inc-1', device_id: 'dev-1', status: 'active' }] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' }
-        });
+        return new Response(
+          JSON.stringify({ items: [{ id: 'inc-1', uuid: 'inc-1', device_id: 'dev-1', status: 'active' }] }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
       }
       if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'POST') {
         return new Response(JSON.stringify({ ok: true }), {
@@ -203,10 +206,13 @@ describe('flow runner', () => {
 
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       if (url.includes('/organization/incidents')) {
-        return new Response(JSON.stringify({ items: [{ id: 'inc-1', uuid: 'inc-1', device_id: 'dev-1', status: 'active' }] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' }
-        });
+        return new Response(
+          JSON.stringify({ items: [{ id: 'inc-1', uuid: 'inc-1', device_id: 'dev-1', status: 'active' }] }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
       }
       if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'GET') {
         return new Response(JSON.stringify({ items: [{ command: 'restart' }] }), {
@@ -482,10 +488,13 @@ describe('flow runner', () => {
         });
       }
       if (url.includes('/partner/tickets')) {
-        return new Response(JSON.stringify({ items: [{ id: 'pt-1', status: 'open', created_at: new Date().toISOString() }] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' }
-        });
+        return new Response(
+          JSON.stringify({ items: [{ id: 'pt-1', status: 'open', created_at: new Date().toISOString() }] }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
       }
       throw new Error(`Unexpected URL in test: ${url}`);
     });
@@ -654,10 +663,13 @@ describe('flow runner', () => {
         });
       }
       if (url.includes('/partner/tickets')) {
-        return new Response(JSON.stringify({ items: [{ id: 'pt-1', status: 'open', created_at: new Date().toISOString() }] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' }
-        });
+        return new Response(
+          JSON.stringify({ items: [{ id: 'pt-1', status: 'open', created_at: new Date().toISOString() }] }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
       }
       throw new Error(`Unexpected URL in test: ${url}`);
     });
@@ -804,7 +816,9 @@ describe('flow runner', () => {
     const failedStep = result.steps.find((item) => item.stepId === 'report_daily');
     expect(failedStep?.status).toBe('failed');
     expect(failedStep?.classification).toBe('needs_data');
-    expect(String(failedStep?.error?.detail ?? '')).toContain('Step report_daily requires deep-dive output from status_fast.');
+    expect(String(failedStep?.error?.detail ?? '')).toContain(
+      'Step report_daily requires deep-dive output from status_fast.'
+    );
     expect(String(failedStep?.error?.detail ?? '')).toContain(
       'Input JSON must be produced by `xyte-cli ops inspect deep-dive --output json`.'
     );
@@ -857,7 +871,9 @@ describe('flow runner', () => {
     expect(result.classifications.bug).toBe(0);
     const failedStep = result.steps.find((item) => item.stepId === 'inspect_deep_dive_daily');
     expect(failedStep?.status).toBe('failed');
-    expect(String(failedStep?.error?.detail ?? '')).toContain('both organization and partner credentials are configured');
+    expect(String(failedStep?.error?.detail ?? '')).toContain(
+      'both organization and partner credentials are configured'
+    );
   });
 
   it('classifies ambiguous auto inspect fleet scope as needs_input when both provider credentials exist', async () => {
@@ -906,7 +922,9 @@ describe('flow runner', () => {
     expect(result.classifications.bug).toBe(0);
     const failedStep = result.steps.find((item) => item.stepId === 'inspect_fleet_daily');
     expect(failedStep?.status).toBe('failed');
-    expect(String(failedStep?.error?.detail ?? '')).toContain('both organization and partner credentials are configured');
+    expect(String(failedStep?.error?.detail ?? '')).toContain(
+      'both organization and partner credentials are configured'
+    );
   });
 
   it('classifies explicit unavailable organization inspect scope as needs_input for inspect.deep-dive', async () => {
@@ -1190,6 +1208,8 @@ describe('flow runner', () => {
     expect(second.classifications.bug).toBe(0);
     const failedStep = second.steps.find((item) => item.stepId === 'inspect_deep_dive_daily');
     expect(failedStep?.status).toBe('failed');
-    expect(String(failedStep?.error?.detail ?? '')).toContain('both organization and partner credentials are configured');
+    expect(String(failedStep?.error?.detail ?? '')).toContain(
+      'both organization and partner credentials are configured'
+    );
   });
 });

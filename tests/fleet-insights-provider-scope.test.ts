@@ -34,13 +34,17 @@ function makeFixture(options: FixtureOptions): Fixture {
   const organization = {
     getDevices: vi.fn(async () => ({ items: [{ id: 'od1', status: 'online' }] })),
     getSpaces: vi.fn(async () => ({ items: [{ id: 'os1', space_type: 'site' }] })),
-    getIncidents: vi.fn(async () => ({ items: [{ id: 'oi1', status: 'active', created_at: '2024-01-01T00:00:00.000Z' }] })),
+    getIncidents: vi.fn(async () => ({
+      items: [{ id: 'oi1', status: 'active', created_at: '2024-01-01T00:00:00.000Z' }]
+    })),
     getTickets: vi.fn(async () => ({ items: [{ id: 'ot1', status: 'open' }] }))
   };
 
   const partner = {
     getDevices: vi.fn(async () => ({ items: [{ id: 'pd1', status: 'offline' }] })),
-    getDeviceInfo: vi.fn(async () => ({ device: { id: 'pd1', model: 'Model A', firmware_version: '1.0.0', last_seen_at: new Date().toISOString() } })),
+    getDeviceInfo: vi.fn(async () => ({
+      device: { id: 'pd1', model: 'Model A', firmware_version: '1.0.0', last_seen_at: new Date().toISOString() }
+    })),
     getCommands: vi.fn(async () => ({ commands: [{ id: 'c1', status: 'sent' }] })),
     getTelemetries: vi.fn(async () => ({ telemetries: [{ id: 'tm1', timestamp: new Date().toISOString() }] })),
     getStateHistory: vi.fn(async () => ({ history: [{ id: 'h1' }] })),
@@ -97,7 +101,12 @@ describe('fleet insights provider scope', () => {
   it('auto with neither provider configured follows legacy organization fallback and avoids partner endpoints', async () => {
     const fixture = makeFixture({ hasOrganization: false, hasPartner: false });
 
-    const snapshot = await collectFleetSnapshot({ client: fixture.client, tenantId: 'acme', tenantName: 'Acme', providerScope: 'auto' });
+    const snapshot = await collectFleetSnapshot({
+      client: fixture.client,
+      tenantId: 'acme',
+      tenantName: 'Acme',
+      providerScope: 'auto'
+    });
 
     expect(snapshot.providerScope).toBe('organization');
     expect(snapshot.devices.map((item) => (item as Record<string, unknown>).id)).toEqual(['od1']);
@@ -132,7 +141,12 @@ describe('fleet insights provider scope', () => {
   ])('$name', async ({ providerScope, hasOrganization, hasPartner, expectedIds, expectOrganizationCalls }) => {
     const fixture = makeFixture({ hasOrganization, hasPartner });
 
-    const snapshot = await collectFleetSnapshot({ client: fixture.client, tenantId: 'acme', tenantName: 'Acme', providerScope });
+    const snapshot = await collectFleetSnapshot({
+      client: fixture.client,
+      tenantId: 'acme',
+      tenantName: 'Acme',
+      providerScope
+    });
 
     expect(snapshot.providerScope).toBe(providerScope);
     expect(snapshot.devices.map((item) => (item as Record<string, unknown>).id)).toEqual(expectedIds.devices);
@@ -190,9 +204,9 @@ describe('fleet insights provider scope', () => {
   ])('short-circuits before data calls when $name', async ({ providerScope, hasOrganization, hasPartner }) => {
     const fixture = makeFixture({ hasOrganization, hasPartner });
 
-    await expect(collectFleetSnapshot({ client: fixture.client, tenantId: 'acme', tenantName: 'Acme', providerScope })).rejects.toThrow(
-      `Inspect provider scope "${providerScope}" is unavailable`
-    );
+    await expect(
+      collectFleetSnapshot({ client: fixture.client, tenantId: 'acme', tenantName: 'Acme', providerScope })
+    ).rejects.toThrow(`Inspect provider scope "${providerScope}" is unavailable`);
 
     expect(fixture.listTenantEndpoints).toHaveBeenCalledWith('acme');
     expectNoProviderDataCalls(fixture);
@@ -202,7 +216,9 @@ describe('fleet insights provider scope', () => {
     const err = new Error('listTenantEndpoints failed');
     const fixture = makeFixture({ hasOrganization: true, hasPartner: true, listTenantEndpointsError: err });
 
-    await expect(collectFleetSnapshot({ client: fixture.client, tenantId: 'acme', tenantName: 'Acme', providerScope: 'auto' })).rejects.toThrow('listTenantEndpoints failed');
+    await expect(
+      collectFleetSnapshot({ client: fixture.client, tenantId: 'acme', tenantName: 'Acme', providerScope: 'auto' })
+    ).rejects.toThrow('listTenantEndpoints failed');
 
     expect(fixture.listTenantEndpoints).toHaveBeenCalledWith('acme');
     expectNoProviderDataCalls(fixture);
@@ -226,7 +242,12 @@ describe('fleet insights provider scope', () => {
       };
     });
 
-    const snapshot = await collectFleetSnapshot({ client: fixture.client, tenantId: 'acme', tenantName: 'Acme', providerScope: 'partner' });
+    const snapshot = await collectFleetSnapshot({
+      client: fixture.client,
+      tenantId: 'acme',
+      tenantName: 'Acme',
+      providerScope: 'partner'
+    });
     const deepDive = buildDeepDive(snapshot, 24);
 
     expect(snapshot.partnerEnrichment?.sampledDeviceCount).toBe(25);
@@ -247,7 +268,12 @@ describe('fleet insights provider scope', () => {
     fixture.partner.getCommands.mockRejectedValueOnce(new Error('commands unavailable'));
     fixture.partner.getTelemetries.mockRejectedValueOnce(new Error('telemetries unavailable'));
 
-    const snapshot = await collectFleetSnapshot({ client: fixture.client, tenantId: 'acme', tenantName: 'Acme', providerScope: 'partner' });
+    const snapshot = await collectFleetSnapshot({
+      client: fixture.client,
+      tenantId: 'acme',
+      tenantName: 'Acme',
+      providerScope: 'partner'
+    });
     const deepDive = buildDeepDive(snapshot, 24);
 
     expect(snapshot.devices.length).toBe(1);
@@ -283,7 +309,12 @@ describe('fleet insights provider scope', () => {
       return { device: { model: 'Model A', firmware_version: '1.0.0', last_seen_at: new Date().toISOString() } };
     });
 
-    await collectFleetSnapshot({ client: fixture.client, tenantId: 'acme', tenantName: 'Acme', providerScope: 'partner' });
+    await collectFleetSnapshot({
+      client: fixture.client,
+      tenantId: 'acme',
+      tenantName: 'Acme',
+      providerScope: 'partner'
+    });
 
     expect(maxActive).toBeLessThanOrEqual(5);
   });
@@ -299,7 +330,12 @@ describe('fleet insights provider scope', () => {
           })
       );
 
-      const snapshotPromise = collectFleetSnapshot({ client: fixture.client, tenantId: 'acme', tenantName: 'Acme', providerScope: 'partner' });
+      const snapshotPromise = collectFleetSnapshot({
+        client: fixture.client,
+        tenantId: 'acme',
+        tenantName: 'Acme',
+        providerScope: 'partner'
+      });
       await vi.advanceTimersByTimeAsync(3_000);
       const snapshot = await snapshotPromise;
 

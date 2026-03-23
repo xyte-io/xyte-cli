@@ -76,7 +76,9 @@ describe('tickets screen write guard', () => {
 
     expect(result).toBe(false);
     expect(context.client.organization.markResolved).not.toHaveBeenCalled();
-    expect(context.setStatus).toHaveBeenCalledWith('Ticket write actions are disabled in partner mode (organization-only policy).');
+    expect(context.setStatus).toHaveBeenCalledWith(
+      'Ticket write actions are disabled in partner mode (organization-only policy).'
+    );
   });
 
   it('does not attempt resolve when ticket id is missing', async () => {

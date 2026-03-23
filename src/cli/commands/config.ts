@@ -16,7 +16,13 @@ import { CliUserError } from '../../contracts/user-error';
 import { makeKeyFingerprint, matchesSlotRef } from '../../secure/key-slots';
 import type { ProfileStore } from '../../secure/profile-store';
 import type { SecretStore } from '../../secure/secret-store';
-import { PROVIDER_ORG, PROVIDER_PARTNER, SUPPORTED_SECRET_PROVIDERS, parseProvider, type SecretProvider } from '../../types/profile';
+import {
+  PROVIDER_ORG,
+  PROVIDER_PARTNER,
+  SUPPORTED_SECRET_PROVIDERS,
+  parseProvider,
+  type SecretProvider
+} from '../../types/profile';
 import { formatReadinessText } from '../format-readiness';
 import { parsePositiveIntegerOption } from '../parse-options';
 import { resolveKeyValue } from '../resolve-key';
@@ -51,7 +57,6 @@ interface SlotView {
   active: boolean;
   lastValidatedAt?: string;
 }
-
 
 async function resolveSlotByRef(
   profileStore: ProfileStore,
@@ -293,45 +298,47 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
     .argument('<value>', 'Config value')
     .option('--scope <scope>', 'user|workspace', 'user')
     .option('--format <format>', 'json|text')
-    .action(async (key: string, value: string, options: { scope?: string; format?: OutputFormat }, command: Command) => {
-      const explicitOutput = getExplicitGlobalOutput(command);
-      if (!SUPPORTED_SETTING_KEYS.includes(key as SettingKey)) {
-        throw new CliUserError({
-          summary: 'Unknown config key.',
-          cause: `Received "${key}".`,
-          suggestedCommands: [`Supported keys: ${SUPPORTED_SETTING_KEYS.join(', ')}`]
+    .action(
+      async (key: string, value: string, options: { scope?: string; format?: OutputFormat }, command: Command) => {
+        const explicitOutput = getExplicitGlobalOutput(command);
+        if (!SUPPORTED_SETTING_KEYS.includes(key as SettingKey)) {
+          throw new CliUserError({
+            summary: 'Unknown config key.',
+            cause: `Received "${key}".`,
+            suggestedCommands: [`Supported keys: ${SUPPORTED_SETTING_KEYS.join(', ')}`]
+          });
+        }
+        const targetScope = parseWritableScope(options.scope);
+        const parsedValue = parseSettingValue(key as SettingKey, value);
+        const result = setCliSettingSync({
+          scope: targetScope,
+          key: key as SettingKey,
+          value: parsedValue,
+          cwd: ctx.cwd,
+          env: ctx.env
         });
+        const settings = await ctx.resolveSettings();
+        const output = resolveTextJsonOutput({
+          output: explicitOutput,
+          format: options.format,
+          stdoutIsTTY: ctx.stdoutIsTTY,
+          settings
+        });
+        const payload = {
+          schemaVersion: 'xyte.settings.v1',
+          scope: targetScope,
+          path: result.path,
+          key,
+          value: parsedValue,
+          values: result.data
+        };
+        if (output === 'text') {
+          ctx.stdout.write(`Set ${key}=${JSON.stringify(parsedValue)} in ${result.path}\n`);
+          return;
+        }
+        printJson(ctx.stdout, payload, { strictJson: resolveStrictJson({ settings }) });
       }
-      const targetScope = parseWritableScope(options.scope);
-      const parsedValue = parseSettingValue(key as SettingKey, value);
-      const result = setCliSettingSync({
-        scope: targetScope,
-        key: key as SettingKey,
-        value: parsedValue,
-        cwd: ctx.cwd,
-        env: ctx.env
-      });
-      const settings = await ctx.resolveSettings();
-      const output = resolveTextJsonOutput({
-        output: explicitOutput,
-        format: options.format,
-        stdoutIsTTY: ctx.stdoutIsTTY,
-        settings
-      });
-      const payload = {
-        schemaVersion: 'xyte.settings.v1',
-        scope: targetScope,
-        path: result.path,
-        key,
-        value: parsedValue,
-        values: result.data
-      };
-      if (output === 'text') {
-        ctx.stdout.write(`Set ${key}=${JSON.stringify(parsedValue)} in ${result.path}\n`);
-        return;
-      }
-      printJson(ctx.stdout, payload, { strictJson: resolveStrictJson({ settings }) });
-    });
+    );
 
   config
     .command('unset')
@@ -393,15 +400,13 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
       printJson(ctx.stdout, tenantProfile);
     });
 
-  configTenant
-    .command('list')
-    .action(async () => {
-      const data = await ctx.profileStore.getData();
-      printJson(ctx.stdout, {
-        activeTenantId: data.activeTenantId,
-        tenants: data.tenants
-      });
+  configTenant.command('list').action(async () => {
+    const data = await ctx.profileStore.getData();
+    printJson(ctx.stdout, {
+      activeTenantId: data.activeTenantId,
+      tenants: data.tenants
     });
+  });
 
   configTenant
     .command('use')
@@ -453,9 +458,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
           throw new CliUserError({
             summary: 'Missing key value.',
             cause: 'Use --key, --key-stdin, or XYTE_CLI_KEY.',
-            suggestedCommands: [
-              'Use xyte-cli config key add --tenant <tenant-id> --provider xyte-org --name primary'
-            ]
+            suggestedCommands: ['Use xyte-cli config key add --tenant <tenant-id> --provider xyte-org --name primary']
           });
         }
         await ctx.profileStore.upsertTenant({ id: options.tenant });
@@ -548,40 +551,38 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
     .requiredOption('--slot <slotRef>', 'Slot id or name')
     .option('--key <value>', 'API key value')
     .option('--key-stdin', 'Read API key value from stdin')
-    .action(
-      async (options: { tenant: string; provider: string; slot: string; key?: string; keyStdin?: boolean }) => {
-        const provider = parseProvider(options.provider);
-        const slot = await resolveSlotByRef(ctx.profileStore, options.tenant, provider, options.slot);
-        const value = await resolveKeyValue({
-          key: options.key,
-          keyStdin: options.keyStdin,
-          envKey: ctx.env.XYTE_CLI_KEY,
-          prompt: ctx.prompt,
-          readStdin: ctx.readStdin,
-          promptQuestion: 'API key',
-          stdout: ctx.stdout
-        });
-        if (!value) {
-          throw new CliUserError({
-            summary: 'Missing key value.',
-            cause: 'Use --key, --key-stdin, or XYTE_CLI_KEY.',
-            suggestedCommands: [
-              'Use xyte-cli config key update --tenant <tenant-id> --provider xyte-org --slot <slot-id>'
-            ]
-          });
-        }
-        const secretStore = ctx.getSecretStore();
-        await secretStore.setSlotSecret(options.tenant, provider, slot.slotId, value);
-        const updated = await ctx.profileStore.updateKeySlot(options.tenant, provider, slot.slotId, {
-          fingerprint: makeKeyFingerprint(value)
-        });
-        printJson(ctx.stdout, {
-          tenantId: options.tenant,
-          provider,
-          slot: updated
+    .action(async (options: { tenant: string; provider: string; slot: string; key?: string; keyStdin?: boolean }) => {
+      const provider = parseProvider(options.provider);
+      const slot = await resolveSlotByRef(ctx.profileStore, options.tenant, provider, options.slot);
+      const value = await resolveKeyValue({
+        key: options.key,
+        keyStdin: options.keyStdin,
+        envKey: ctx.env.XYTE_CLI_KEY,
+        prompt: ctx.prompt,
+        readStdin: ctx.readStdin,
+        promptQuestion: 'API key',
+        stdout: ctx.stdout
+      });
+      if (!value) {
+        throw new CliUserError({
+          summary: 'Missing key value.',
+          cause: 'Use --key, --key-stdin, or XYTE_CLI_KEY.',
+          suggestedCommands: [
+            'Use xyte-cli config key update --tenant <tenant-id> --provider xyte-org --slot <slot-id>'
+          ]
         });
       }
-    );
+      const secretStore = ctx.getSecretStore();
+      await secretStore.setSlotSecret(options.tenant, provider, slot.slotId, value);
+      const updated = await ctx.profileStore.updateKeySlot(options.tenant, provider, slot.slotId, {
+        fingerprint: makeKeyFingerprint(value)
+      });
+      printJson(ctx.stdout, {
+        tenantId: options.tenant,
+        provider,
+        slot: updated
+      });
+    });
 
   configKey
     .command('remove')

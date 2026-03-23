@@ -111,7 +111,10 @@ export function classifyConnectivityError(error: unknown): ConnectivityResult {
   }
 
   const maybeErrno = error as NodeJS.ErrnoException;
-  if (typeof maybeErrno?.code === 'string' && ['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT'].includes(maybeErrno.code)) {
+  if (
+    typeof maybeErrno?.code === 'string' &&
+    ['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT'].includes(maybeErrno.code)
+  ) {
     const kind: ConnectionErrorClass = maybeErrno.code === 'ETIMEDOUT' ? 'timeout' : 'network';
     return {
       state: classToState(kind),

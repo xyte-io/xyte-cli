@@ -14,13 +14,7 @@ export class XyteHttpError extends XyteError {
   readonly endpointKey?: string;
   readonly details?: unknown;
 
-  constructor(args: {
-    message: string;
-    status: number;
-    statusText: string;
-    endpointKey?: string;
-    details?: unknown;
-  }) {
+  constructor(args: { message: string; status: number; statusText: string; endpointKey?: string; details?: unknown }) {
     super(args.message, 'XYTE_HTTP_ERROR');
     this.status = args.status;
     this.statusText = args.statusText;

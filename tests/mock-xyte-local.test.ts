@@ -69,14 +69,18 @@ async function waitForServerReady(child: ReturnType<typeof spawn>, timeoutMs = 1
 describe('local mock server', () => {
   it('supports canceling commands through the organization command routes', async () => {
     const port = await getFreePort();
-    const child = spawn(process.execPath, ['scripts/mock_xyte_local.mjs', '--host', '127.0.0.1', '--port', String(port), '--strict-auth'], {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        XYTE_LOCAL_AUTH_TOKEN: 'local-key'
-      },
-      stdio: ['ignore', 'pipe', 'pipe']
-    });
+    const child = spawn(
+      process.execPath,
+      ['scripts/mock_xyte_local.mjs', '--host', '127.0.0.1', '--port', String(port), '--strict-auth'],
+      {
+        cwd: process.cwd(),
+        env: {
+          ...process.env,
+          XYTE_LOCAL_AUTH_TOKEN: 'local-key'
+        },
+        stdio: ['ignore', 'pipe', 'pipe']
+      }
+    );
 
     let stderr = '';
     child.stderr?.on('data', (chunk) => {

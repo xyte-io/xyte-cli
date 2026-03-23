@@ -148,7 +148,7 @@ interface RunWatchOptions {
 export async function runWatch(options: RunWatchOptions): Promise<void> {
   const profile = options.profile ?? 'incidents-active';
   const intervalMs = Math.max(WATCH_MIN_INTERVAL_MS, options.intervalMs ?? 2000);
-  const requestedMaxPolls = options.once ? 1 : options.maxPolls ?? WATCH_DEFAULT_MAX_POLLS;
+  const requestedMaxPolls = options.once ? 1 : (options.maxPolls ?? WATCH_DEFAULT_MAX_POLLS);
   const maxPolls = Math.max(1, Math.min(WATCH_MAX_POLLS, requestedMaxPolls));
   const queryOverrides = options.query ?? {};
 

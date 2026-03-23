@@ -24,7 +24,9 @@ function isFlowId(value: string): boolean {
 function normalizeFlowId(value: string): string {
   const normalized = value.trim();
   if (!isFlowId(normalized)) {
-    throw new Error(`Invalid flow id: ${value}. Use flow.<name> with lowercase letters, numbers, dots, underscores, or dashes.`);
+    throw new Error(
+      `Invalid flow id: ${value}. Use flow.<name> with lowercase letters, numbers, dots, underscores, or dashes.`
+    );
   }
   return normalized;
 }
@@ -46,7 +48,8 @@ function validateFlowDefinition(value: unknown): FlowDefinitionV1 {
     throw new Error('Flow definition requires basedOn.');
   }
   const title = typeof record.title === 'string' && record.title.trim() ? record.title.trim() : id;
-  const description = typeof record.description === 'string' && record.description.trim() ? record.description.trim() : undefined;
+  const description =
+    typeof record.description === 'string' && record.description.trim() ? record.description.trim() : undefined;
 
   const defaultsRaw = record.defaults;
   const defaults: Record<string, string> = {};
@@ -56,14 +59,20 @@ function validateFlowDefinition(value: unknown): FlowDefinitionV1 {
     }
     for (const [key, item] of Object.entries(defaultsRaw as Record<string, unknown>)) {
       if (typeof item !== 'string') {
-        throw new Error(`Flow definition default \"${key}\" must be a string.`);
+        throw new Error(`Flow definition default "${key}" must be a string.`);
       }
       defaults[key] = item;
     }
   }
 
-  const createdAtUtc = typeof record.createdAtUtc === 'string' && record.createdAtUtc.trim() ? record.createdAtUtc : new Date().toISOString();
-  const updatedAtUtc = typeof record.updatedAtUtc === 'string' && record.updatedAtUtc.trim() ? record.updatedAtUtc : new Date().toISOString();
+  const createdAtUtc =
+    typeof record.createdAtUtc === 'string' && record.createdAtUtc.trim()
+      ? record.createdAtUtc
+      : new Date().toISOString();
+  const updatedAtUtc =
+    typeof record.updatedAtUtc === 'string' && record.updatedAtUtc.trim()
+      ? record.updatedAtUtc
+      : new Date().toISOString();
 
   return {
     schemaVersion: FLOW_DEFINITION_SCHEMA_VERSION,
@@ -152,7 +161,11 @@ export async function saveFlowDefinition(args: {
     schemaVersion: FLOW_DEFINITION_SCHEMA_VERSION,
     id,
     title: args.title?.trim() || existing?.title || id,
-    ...(args.description?.trim() ? { description: args.description.trim() } : existing?.description ? { description: existing.description } : {}),
+    ...(args.description?.trim()
+      ? { description: args.description.trim() }
+      : existing?.description
+        ? { description: existing.description }
+        : {}),
     basedOn: args.basedOn.trim(),
     defaults: args.defaults ?? existing?.defaults ?? {},
     createdAtUtc: existing?.createdAtUtc ?? now,
@@ -185,7 +198,7 @@ export async function updateFlowDefinition(args: {
 
   const now = new Date().toISOString();
   const mergedDefaults = args.replaceDefaults
-    ? args.defaults ?? {}
+    ? (args.defaults ?? {})
     : {
         ...existing.defaults,
         ...(args.defaults ?? {})
@@ -195,7 +208,11 @@ export async function updateFlowDefinition(args: {
     schemaVersion: FLOW_DEFINITION_SCHEMA_VERSION,
     id: existing.id,
     title: args.title?.trim() || existing.title,
-    ...(args.description?.trim() ? { description: args.description.trim() } : existing.description ? { description: existing.description } : {}),
+    ...(args.description?.trim()
+      ? { description: args.description.trim() }
+      : existing.description
+        ? { description: existing.description }
+        : {}),
     basedOn: args.basedOn?.trim() || existing.basedOn,
     defaults: mergedDefaults,
     createdAtUtc: existing.createdAtUtc,
@@ -209,7 +226,10 @@ export async function updateFlowDefinition(args: {
   };
 }
 
-export async function exportFlowDefinition(args: { flowId: string; outPath: string }): Promise<{ flow: FlowDefinitionV1; outPath: string }> {
+export async function exportFlowDefinition(args: {
+  flowId: string;
+  outPath: string;
+}): Promise<{ flow: FlowDefinitionV1; outPath: string }> {
   const { flowId, outPath } = args;
   const existing = await getFlowDefinition(flowId);
   if (!existing) {
@@ -235,7 +255,10 @@ export async function exportFlowDefinition(args: { flowId: string; outPath: stri
   };
 }
 
-export async function importFlowDefinition(args: { filePath: string; force: boolean }): Promise<FlowDefinitionV1 & { path: string; status: 'created' | 'updated' }> {
+export async function importFlowDefinition(args: {
+  filePath: string;
+  force: boolean;
+}): Promise<FlowDefinitionV1 & { path: string; status: 'created' | 'updated' }> {
   const resolved = path.resolve(args.filePath);
   let raw: unknown;
   try {

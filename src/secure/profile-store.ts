@@ -33,7 +33,10 @@ export interface ProfileStore {
   setActiveTenant(tenantId: string): Promise<void>;
   getActiveTenant(): Promise<TenantProfile | undefined>;
   listKeySlots(tenantId: string, provider?: SecretProvider): Promise<ApiKeySlotMeta[]>;
-  addKeySlot(tenantId: string, input: { provider: SecretProvider; name: string; slotId?: string; fingerprint: string }): Promise<ApiKeySlotMeta>;
+  addKeySlot(
+    tenantId: string,
+    input: { provider: SecretProvider; name: string; slotId?: string; fingerprint: string }
+  ): Promise<ApiKeySlotMeta>;
   updateKeySlot(
     tenantId: string,
     provider: SecretProvider,
@@ -166,7 +169,9 @@ export class FileProfileStore implements ProfileStore {
         parsed = JSON.parse(content) as ProfileStoreData;
       } catch (error) {
         const detail = errorMessage(error);
-        throw new Error(`Profile store is invalid at ${this.filePath}: ${detail}. Delete or fix this file and rerun setup.`);
+        throw new Error(
+          `Profile store is invalid at ${this.filePath}: ${detail}. Delete or fix this file and rerun setup.`
+        );
       }
       return this.normalize(parsed).data;
     } catch (error) {
@@ -281,7 +286,10 @@ export class FileProfileStore implements ProfileStore {
     return provider ? all.filter((slot) => slot.provider === provider) : all;
   }
 
-  async addKeySlot(tenantId: string, input: { provider: SecretProvider; name: string; slotId?: string; fingerprint: string }): Promise<ApiKeySlotMeta> {
+  async addKeySlot(
+    tenantId: string,
+    input: { provider: SecretProvider; name: string; slotId?: string; fingerprint: string }
+  ): Promise<ApiKeySlotMeta> {
     const data = await this.getData();
     const { tenant, index } = this.getRequiredTenantFromData(data, tenantId);
     const registry = cloneRegistry(tenant.keyRegistry);
@@ -340,7 +348,8 @@ export class FileProfileStore implements ProfileStore {
     const nextName = update.name !== undefined ? ensureSlotName(update.name) : slot.name;
     if (nextName.toLowerCase() !== slot.name.toLowerCase()) {
       const duplicate = registry.slots.some(
-        (item, idx) => idx !== slotIndex && item.provider === provider && item.name.toLowerCase() === nextName.toLowerCase()
+        (item, idx) =>
+          idx !== slotIndex && item.provider === provider && item.name.toLowerCase() === nextName.toLowerCase()
       );
       if (duplicate) {
         throw new Error(`A key slot named "${nextName}" already exists for provider ${provider}.`);
@@ -485,7 +494,10 @@ export class FileProfileStore implements ProfileStore {
     return tenant;
   }
 
-  private getRequiredTenantFromData(data: ProfileStoreData, tenantId: string): { tenant: TenantProfile; index: number } {
+  private getRequiredTenantFromData(
+    data: ProfileStoreData,
+    tenantId: string
+  ): { tenant: TenantProfile; index: number } {
     const index = data.tenants.findIndex((tenant) => tenant.id === tenantId);
     if (index === -1) {
       throw new Error(`Unknown tenant: ${tenantId}`);

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { ellipsizeEnd, ellipsizeMiddle, fitCell, formatBoolTag, sanitizePrintable, shortId } from '../../src/tui/table-format';
+import {
+  ellipsizeEnd,
+  ellipsizeMiddle,
+  fitCell,
+  formatBoolTag,
+  sanitizePrintable,
+  shortId
+} from '../../src/tui/table-format';
 
 describe('table-format helpers', () => {
   it('applies middle ellipsis deterministically', () => {
@@ -32,4 +39,3 @@ describe('table-format helpers', () => {
     expect(shortId('1234567890abcdef', { head: 4, tail: 3 })).toBe('1234…def');
   });
 });
-

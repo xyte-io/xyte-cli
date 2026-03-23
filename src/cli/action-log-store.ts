@@ -1,10 +1,6 @@
 import { closeSync, existsSync, openSync, readSync, statSync } from 'node:fs';
 
-import {
-  extractCommandPathFromLogEntry,
-  resolveCliActionLogPath,
-  type CliActionLogEntry
-} from './action-logger';
+import { extractCommandPathFromLogEntry, resolveCliActionLogPath, type CliActionLogEntry } from './action-logger';
 
 interface ReadCliActionLogOptions {
   path?: string;
@@ -52,7 +48,11 @@ function parseEntry(line: string): CliActionLogEntry | undefined {
   }
 }
 
-function entryMatchesFilters(entry: CliActionLogEntry, eventFilter: string | undefined, commandFilter: string | undefined): boolean {
+function entryMatchesFilters(
+  entry: CliActionLogEntry,
+  eventFilter: string | undefined,
+  commandFilter: string | undefined
+): boolean {
   if (eventFilter && entry.event !== eventFilter) {
     return false;
   }

@@ -148,7 +148,10 @@ function drawBadge(
   const maxLabelWidth = Math.max(20, args.width - textPaddingX * 2);
   const fitted = fitBadgeLabel(doc, ctx, maxLabelWidth, args.fontSize);
   doc.save();
-  doc.roundedRect(args.x, args.y, args.width, args.height, 7).lineWidth(1).fillAndStroke(REPORT_THEME.surface.badge, REPORT_THEME.accent.primary);
+  doc
+    .roundedRect(args.x, args.y, args.width, args.height, 7)
+    .lineWidth(1)
+    .fillAndStroke(REPORT_THEME.surface.badge, REPORT_THEME.accent.primary);
   doc.restore();
   useFont(doc, ctx, 'medium', fitted.fontSize, REPORT_THEME.accent.strong);
   const textHeight = doc.currentLineHeight();
@@ -196,7 +199,10 @@ export function drawPdfHeader(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, mo
 
   if (mode === 'minimal') {
     doc.save();
-    doc.roundedRect(left, top, width, PDF_LAYOUT.minimalHeaderHeight, 12).lineWidth(1).fillAndStroke(REPORT_THEME.surface.subtle, REPORT_THEME.border.default);
+    doc
+      .roundedRect(left, top, width, PDF_LAYOUT.minimalHeaderHeight, 12)
+      .lineWidth(1)
+      .fillAndStroke(REPORT_THEME.surface.subtle, REPORT_THEME.border.default);
     doc.restore();
 
     useFont(doc, ctx, 'semibold', 9, REPORT_THEME.text.secondary);
@@ -228,11 +234,17 @@ export function drawPdfHeader(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, mo
   const topRowY = heroY + 16;
 
   doc.save();
-  doc.roundedRect(heroX, heroY, heroWidth, heroHeight, PDF_LAYOUT.heroRadius).lineWidth(1).fillAndStroke(REPORT_THEME.surface.hero, REPORT_THEME.border.default);
+  doc
+    .roundedRect(heroX, heroY, heroWidth, heroHeight, PDF_LAYOUT.heroRadius)
+    .lineWidth(1)
+    .fillAndStroke(REPORT_THEME.surface.hero, REPORT_THEME.border.default);
   doc.restore();
 
   doc.save();
-  doc.roundedRect(heroX + innerPadding, topRowY, logoChipWidth, logoChipHeight, 12).lineWidth(1).fillAndStroke(REPORT_THEME.surface.page, REPORT_THEME.border.strong);
+  doc
+    .roundedRect(heroX + innerPadding, topRowY, logoChipWidth, logoChipHeight, 12)
+    .lineWidth(1)
+    .fillAndStroke(REPORT_THEME.surface.page, REPORT_THEME.border.strong);
   doc.restore();
 
   drawHeaderLogo(doc, ctx, heroX + innerPadding + 12, topRowY + 5);
@@ -243,7 +255,10 @@ export function drawPdfHeader(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, mo
   const focusCardX = heroX + heroWidth - innerPadding - focusCardWidth;
   const focusCardY = topRowY - 2;
   doc.save();
-  doc.roundedRect(focusCardX, focusCardY, focusCardWidth, focusCardHeight, 12).lineWidth(1).fillAndStroke(REPORT_THEME.surface.heroSoft, REPORT_THEME.border.strong);
+  doc
+    .roundedRect(focusCardX, focusCardY, focusCardWidth, focusCardHeight, 12)
+    .lineWidth(1)
+    .fillAndStroke(REPORT_THEME.surface.heroSoft, REPORT_THEME.border.strong);
   doc.restore();
 
   useFont(doc, ctx, 'medium', 7.2, REPORT_THEME.text.inverseMuted);
@@ -276,16 +291,26 @@ export function drawPdfHeader(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, mo
 
   const tenantLabel = tenantName ? tenantName : ctx.tenantId;
   useFont(doc, ctx, 'regular', 8.5, REPORT_THEME.text.inverseMuted);
-  doc.text(`Operational snapshot for ${tenantLabel} - Generated ${formatUtcForReport(ctx.generatedAtUtc)}`, titleX, heroY + 80, {
-    width: titleWidth,
-    lineBreak: false,
-    ellipsis: true
-  });
+  doc.text(
+    `Operational snapshot for ${tenantLabel} - Generated ${formatUtcForReport(ctx.generatedAtUtc)}`,
+    titleX,
+    heroY + 80,
+    {
+      width: titleWidth,
+      lineBreak: false,
+      ellipsis: true
+    }
+  );
 
   doc.y = PDF_LAYOUT.contentTopFirstPage;
 }
 
-export function drawPdfFooter(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, pageNumber: number, pageCount: number): void {
+export function drawPdfFooter(
+  doc: PDFKit.PDFDocument,
+  ctx: PdfRenderContext,
+  pageNumber: number,
+  pageCount: number
+): void {
   const left = textLeft(doc);
   const right = textRight(doc);
   const safeBottom = Math.min(doc.page.height - doc.page.margins.bottom, doc.page.height - 72);
@@ -373,8 +398,18 @@ export function drawSectionTitle(
 
   const underlineY = titleY + PDF_LAYOUT.sectionHeadingLineHeight + PDF_LAYOUT.sectionUnderlineGap - 2;
   doc.save();
-  doc.moveTo(x, underlineY).lineTo(x + PDF_LAYOUT.sectionUnderlineWidth, underlineY).lineWidth(PDF_LAYOUT.sectionUnderlineThickness).strokeColor(REPORT_THEME.accent.primary).stroke();
-  doc.moveTo(x + PDF_LAYOUT.sectionUnderlineWidth + 8, underlineY).lineTo(x + width, underlineY).lineWidth(1).strokeColor(REPORT_THEME.border.default).stroke();
+  doc
+    .moveTo(x, underlineY)
+    .lineTo(x + PDF_LAYOUT.sectionUnderlineWidth, underlineY)
+    .lineWidth(PDF_LAYOUT.sectionUnderlineThickness)
+    .strokeColor(REPORT_THEME.accent.primary)
+    .stroke();
+  doc
+    .moveTo(x + PDF_LAYOUT.sectionUnderlineWidth + 8, underlineY)
+    .lineTo(x + width, underlineY)
+    .lineWidth(1)
+    .strokeColor(REPORT_THEME.border.default)
+    .stroke();
   doc.restore();
 
   doc.y = y + headingBlockHeight;
@@ -407,7 +442,10 @@ export function drawKpiGrid(
       const x = textLeft(doc) + index * (cardWidth + gap);
       const tone = getPanelTone(card.tone ?? 'normal');
       doc.save();
-      doc.roundedRect(x, rowY, cardWidth, cardHeight, PDF_LAYOUT.cardRadius).lineWidth(1).fillAndStroke(tone.panel, tone.border);
+      doc
+        .roundedRect(x, rowY, cardWidth, cardHeight, PDF_LAYOUT.cardRadius)
+        .lineWidth(1)
+        .fillAndStroke(tone.panel, tone.border);
       doc.roundedRect(x + 1, rowY + 1, cardWidth - 2, 4, 4).fill(tone.accent);
       doc.restore();
 
@@ -473,10 +511,7 @@ export function drawInsightPanelGrid(
       lineGap: 0.8
     });
 
-    return Math.max(
-      PDF_LAYOUT.insightCardMinHeight,
-      16 + eyebrowHeight + 8 + titleHeight + 8 + bodyHeight + 16
-    );
+    return Math.max(PDF_LAYOUT.insightCardMinHeight, 16 + eyebrowHeight + 8 + titleHeight + 8 + bodyHeight + 16);
   });
 
   const cardHeight = Math.max(...panelHeights);
@@ -490,7 +525,10 @@ export function drawInsightPanelGrid(
     const tone = getPanelTone(panel.tone ?? 'normal');
 
     doc.save();
-    doc.roundedRect(x, topY, panelWidth, cardHeight, PDF_LAYOUT.cardRadius).lineWidth(1).fillAndStroke(tone.panel, tone.border);
+    doc
+      .roundedRect(x, topY, panelWidth, cardHeight, PDF_LAYOUT.cardRadius)
+      .lineWidth(1)
+      .fillAndStroke(tone.panel, tone.border);
     doc.roundedRect(x + 1, topY + 1, panelWidth - 2, 4, 4).fill(tone.accent);
     doc.restore();
 
@@ -573,7 +611,11 @@ function drawBarRightRounded(
   doc.restore();
 }
 
-export function drawSpaceBars(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, rows: Array<{ space: string; incidents: number }>): void {
+export function drawSpaceBars(
+  doc: PDFKit.PDFDocument,
+  ctx: PdfRenderContext,
+  rows: Array<{ space: string; incidents: number }>
+): void {
   if (!rows.length) {
     return;
   }
@@ -596,7 +638,10 @@ export function drawSpaceBars(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, ro
 
   const panelY = doc.y;
   doc.save();
-  doc.roundedRect(x, panelY, width, panelHeight, 14).lineWidth(1).fillAndStroke(REPORT_THEME.surface.subtle, REPORT_THEME.border.default);
+  doc
+    .roundedRect(x, panelY, width, panelHeight, 14)
+    .lineWidth(1)
+    .fillAndStroke(REPORT_THEME.surface.subtle, REPORT_THEME.border.default);
   doc.restore();
 
   chartRows.forEach((row, index) => {
@@ -637,7 +682,12 @@ export function drawEndOfReportDivider(doc: PDFKit.PDFDocument): void {
   }
 
   doc.save();
-  doc.moveTo(x, y).lineTo(x + width, y).lineWidth(1).strokeColor(REPORT_THEME.border.default).stroke();
+  doc
+    .moveTo(x, y)
+    .lineTo(x + width, y)
+    .lineWidth(1)
+    .strokeColor(REPORT_THEME.border.default)
+    .stroke();
   doc.restore();
   doc.y = y + 8;
 }

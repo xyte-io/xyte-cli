@@ -157,10 +157,30 @@ interface SetupSceneState {
 
 interface ConfigSceneState {
   tenantId?: string;
-  providerRows: Array<{ provider: string; slotCount: number; activeSlot: string; hasSecret: 'yes' | 'no'; lastValidatedAt?: string }>;
+  providerRows: Array<{
+    provider: string;
+    slotCount: number;
+    activeSlot: string;
+    hasSecret: 'yes' | 'no';
+    lastValidatedAt?: string;
+  }>;
   selectedProvider?: string;
-  slotRows: Array<{ provider: string; slotId: string; name: string; active: 'yes' | 'no'; hasSecret: 'yes' | 'no'; fingerprint: string }>;
-  selectedSlot?: { provider: string; slotId: string; name: string; active: 'yes' | 'no'; hasSecret: 'yes' | 'no'; fingerprint: string };
+  slotRows: Array<{
+    provider: string;
+    slotId: string;
+    name: string;
+    active: 'yes' | 'no';
+    hasSecret: 'yes' | 'no';
+    fingerprint: string;
+  }>;
+  selectedSlot?: {
+    provider: string;
+    slotId: string;
+    name: string;
+    active: 'yes' | 'no';
+    hasSecret: 'yes' | 'no';
+    fingerprint: string;
+  };
   doctorStatus?: string;
 }
 
@@ -362,7 +382,7 @@ export function sceneFromIncidentsState(state: IncidentsSceneState): ScenePanel[
       text: {
         lines: detailLines
       }
-    },
+    }
   ];
 }
 
@@ -429,7 +449,11 @@ export function sceneFromSpacesState(state: SpacesSceneState): ScenePanel[] {
   const selectedIndex = clampSelection(state.selectedIndex, state.spaces.length);
   const selected = state.spaces[selectedIndex];
   const sel = asRec(selected);
-  const detailPreview = state.spaceDetail ? safePreviewLines(state.spaceDetail) : selected ? safePreviewLines(selected) : undefined;
+  const detailPreview = state.spaceDetail
+    ? safePreviewLines(state.spaceDetail)
+    : selected
+      ? safePreviewLines(selected)
+      : undefined;
   const detailLines = selected
     ? detailBlock(
         [

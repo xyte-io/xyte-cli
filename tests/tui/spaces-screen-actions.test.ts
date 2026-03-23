@@ -1,10 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  claimDeviceWithGuard,
-  createChildSpaceWithGuard,
-  renameSpaceWithGuard
-} from '../../src/tui/screens/spaces';
+import { claimDeviceWithGuard, createChildSpaceWithGuard, renameSpaceWithGuard } from '../../src/tui/screens/spaces';
 
 describe('spaces screen actions', () => {
   it('claims device with guided fields and confirmation', async () => {

@@ -445,7 +445,18 @@ describe('cli action logging', () => {
     expect(statsPayload.totalBytes).toBeGreaterThan(0);
 
     stdout.write.mockClear();
-    await program.parseAsync(['node', 'xyte-cli', 'logs', 'gc', '--path', logPath, '--max-files', '2', '--format', 'json']);
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'logs',
+      'gc',
+      '--path',
+      logPath,
+      '--max-files',
+      '2',
+      '--format',
+      'json'
+    ]);
     const gcOutput = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     const gcPayload = JSON.parse(gcOutput) as { removedCount: number; kept: string[] };
     expect(gcPayload.removedCount).toBeGreaterThan(0);

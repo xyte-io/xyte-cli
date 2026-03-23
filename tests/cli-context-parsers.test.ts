@@ -2,11 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { parseCliOutputMode } from '../src/cli/cli-context';
 import { formatBytes } from '../src/cli/format-bytes';
-import {
-  parseQueryJson,
-  parsePositiveIntegerOption,
-  parsePositiveNumberOption
-} from '../src/cli/parse-options';
+import { parseQueryJson, parsePositiveIntegerOption, parsePositiveNumberOption } from '../src/cli/parse-options';
 
 describe('parseQueryJson', () => {
   it('returns empty object for undefined', () => {

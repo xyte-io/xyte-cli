@@ -121,7 +121,8 @@ export class HttpTransport {
   }
 
   async request<T = unknown>(request: TransportRequest): Promise<TransportResponse<T>> {
-    const idempotent = request.idempotent ?? ['GET', 'HEAD', 'PUT', 'DELETE', 'OPTIONS'].includes(request.method.toUpperCase());
+    const idempotent =
+      request.idempotent ?? ['GET', 'HEAD', 'PUT', 'DELETE', 'OPTIONS'].includes(request.method.toUpperCase());
     const maxAttempts = idempotent ? this.retryAttempts + 1 : 1;
     const started = Date.now();
     const requestId = request.requestId ?? 'none';

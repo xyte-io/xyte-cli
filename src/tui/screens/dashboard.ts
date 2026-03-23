@@ -140,7 +140,9 @@ export function createDashboardScreen(): TuiScreen {
 
       kpis.setContent(linesFromStats(kpiPanel?.stats));
       providerBox.setContent((providerPanel?.text?.lines ?? ['No provider state available.']).join('\n'));
-      incidentsBox.setContent(linesFromTableRows(incidentPanel?.table?.rows, 'No incidents available for this tenant.'));
+      incidentsBox.setContent(
+        linesFromTableRows(incidentPanel?.table?.rows, 'No incidents available for this tenant.')
+      );
       ticketsBox.setContent(linesFromTableRows(ticketPanel?.table?.rows, 'No tickets available for this tenant.'));
 
       if (loaded.error) {

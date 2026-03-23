@@ -31,20 +31,17 @@ function toSerializable(value: unknown): unknown {
 
 function serialize(data: Record<string, unknown> | undefined): string {
   const seen = new WeakSet<object>();
-  return JSON.stringify(
-    data,
-    (_key, value) => {
-      const serializable = toSerializable(value);
-      if (!serializable || typeof serializable !== 'object') {
-        return serializable;
-      }
-      if (seen.has(serializable as object)) {
-        return '[Circular]';
-      }
-      seen.add(serializable as object);
+  return JSON.stringify(data, (_key, value) => {
+    const serializable = toSerializable(value);
+    if (!serializable || typeof serializable !== 'object') {
       return serializable;
     }
-  );
+    if (seen.has(serializable as object)) {
+      return '[Circular]';
+    }
+    seen.add(serializable as object);
+    return serializable;
+  });
 }
 
 function noopLogger(): TuiLogger {

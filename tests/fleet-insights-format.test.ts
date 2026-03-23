@@ -58,9 +58,7 @@ describe('formatFleetInspectAscii', () => {
   });
 
   it('handles zero totals gracefully', () => {
-    const result = formatFleetInspectAscii(
-      makeResult({ totals: { devices: 0, spaces: 0, incidents: 0, tickets: 0 } })
-    );
+    const result = formatFleetInspectAscii(makeResult({ totals: { devices: 0, spaces: 0, incidents: 0, tickets: 0 } }));
     expect(result).toContain('DEVICES');
   });
 });

@@ -8,4 +8,3 @@ export function parseInspectProviderScope(value: string | undefined): InspectPro
   }
   return normalized as InspectProviderScope;
 }
-

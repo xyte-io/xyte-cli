@@ -155,9 +155,15 @@ function formatWatchFrameText(frame: WatchFrameV1): string {
       `[delta] poll ${frame.pollIndex} | ${summary.total} active incidents | +${summary.added} -${summary.removed} ~${summary.updated}`
     );
     const previewEntries = [
-      ...(frame.delta?.added ?? []).slice(0, 3).map((entry) => `+ ${formatWatchIncidentText(entry.current ?? entry.after ?? entry.previous)}`),
-      ...(frame.delta?.updated ?? []).slice(0, 3).map((entry) => `~ ${formatWatchIncidentText(entry.after ?? entry.current ?? entry.before)}`),
-      ...(frame.delta?.removed ?? []).slice(0, 3).map((entry) => `- ${formatWatchIncidentText(entry.previous ?? entry.before ?? entry.current ?? entry.id)}`)
+      ...(frame.delta?.added ?? [])
+        .slice(0, 3)
+        .map((entry) => `+ ${formatWatchIncidentText(entry.current ?? entry.after ?? entry.previous)}`),
+      ...(frame.delta?.updated ?? [])
+        .slice(0, 3)
+        .map((entry) => `~ ${formatWatchIncidentText(entry.after ?? entry.current ?? entry.before)}`),
+      ...(frame.delta?.removed ?? [])
+        .slice(0, 3)
+        .map((entry) => `- ${formatWatchIncidentText(entry.previous ?? entry.before ?? entry.current ?? entry.id)}`)
     ];
     if (previewEntries.length === 0) {
       lines.push('No incident detail changes captured.');
@@ -175,17 +181,20 @@ function formatWatchFrameText(frame: WatchFrameV1): string {
   return `${JSON.stringify(frame)}\n`;
 }
 
-async function handleOpsWatchIncidents(ctx: CliContext, options: {
-  tenant?: string;
-  profile?: string;
-  queryJson?: string;
-  intervalMs?: string;
-  maxPolls?: string;
-  once?: boolean;
-  output?: string;
-  out?: string;
-  strictJson?: boolean;
-}): Promise<void> {
+async function handleOpsWatchIncidents(
+  ctx: CliContext,
+  options: {
+    tenant?: string;
+    profile?: string;
+    queryJson?: string;
+    intervalMs?: string;
+    maxPolls?: string;
+    once?: boolean;
+    output?: string;
+    out?: string;
+    strictJson?: boolean;
+  }
+): Promise<void> {
   const overrides: Partial<Record<SettingKey, unknown>> = {};
   if (options.tenant) {
     overrides['defaults.tenant'] = options.tenant;
@@ -221,7 +230,9 @@ async function handleOpsWatchIncidents(ctx: CliContext, options: {
     maxPolls: settings.values.watch.maxPolls,
     onFrame: (frame) => {
       const renderFrame =
-        output === 'text' ? formatWatchFrameText(frame) : `${stringifyJsonOutput(frame, { strictJson, compact: true })}\n`;
+        output === 'text'
+          ? formatWatchFrameText(frame)
+          : `${stringifyJsonOutput(frame, { strictJson, compact: true })}\n`;
       if (outPath && !wroteOutPath) {
         writeRenderedOutput(ctx.stdout, renderFrame, outPath);
         wroteOutPath = true;
@@ -232,11 +243,14 @@ async function handleOpsWatchIncidents(ctx: CliContext, options: {
   });
 }
 
-async function resolveInspectContext(ctx: CliContext, options: {
-  tenant?: string;
-  providerScope?: string;
-  commandLabel: string;
-}) {
+async function resolveInspectContext(
+  ctx: CliContext,
+  options: {
+    tenant?: string;
+    providerScope?: string;
+    commandLabel: string;
+  }
+) {
   const overrides: Partial<Record<SettingKey, unknown>> = {};
   if (options.tenant) {
     overrides['defaults.tenant'] = options.tenant;
@@ -249,7 +263,10 @@ async function resolveInspectContext(ctx: CliContext, options: {
   if (!tenantId) {
     throw new CliUserError({
       summary: `Missing tenant for ${options.commandLabel}.`,
-      suggestedCommands: ['Use --tenant <tenant-id>', 'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>']
+      suggestedCommands: [
+        'Use --tenant <tenant-id>',
+        'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>'
+      ]
     });
   }
   const providerScope =
@@ -260,15 +277,18 @@ async function resolveInspectContext(ctx: CliContext, options: {
   return { settings, overrides, snapshot };
 }
 
-async function handleOpsInspectFleet(ctx: CliContext, options: {
-  tenant?: string;
-  providerScope?: string;
-  render?: string;
-  format?: string;
-  output?: string;
-  out?: string;
-  strictJson?: boolean;
-}): Promise<void> {
+async function handleOpsInspectFleet(
+  ctx: CliContext,
+  options: {
+    tenant?: string;
+    providerScope?: string;
+    render?: string;
+    format?: string;
+    output?: string;
+    out?: string;
+    strictJson?: boolean;
+  }
+): Promise<void> {
   const render = resolveRenderMode(options, ['json', 'ascii'], 'json');
   const { settings, snapshot } = await resolveInspectContext(ctx, {
     tenant: options.tenant,
@@ -294,16 +314,19 @@ async function handleOpsInspectFleet(ctx: CliContext, options: {
   );
 }
 
-async function handleOpsInspectDeepDive(ctx: CliContext, options: {
-  tenant?: string;
-  providerScope?: string;
-  window?: string;
-  render?: string;
-  format?: string;
-  output?: string;
-  out?: string;
-  strictJson?: boolean;
-}): Promise<void> {
+async function handleOpsInspectDeepDive(
+  ctx: CliContext,
+  options: {
+    tenant?: string;
+    providerScope?: string;
+    window?: string;
+    render?: string;
+    format?: string;
+    output?: string;
+    out?: string;
+    strictJson?: boolean;
+  }
+): Promise<void> {
   const render = resolveRenderMode(options, ['json', 'ascii', 'markdown'], 'json');
   const { settings, snapshot } = await resolveInspectContext(ctx, {
     tenant: options.tenant,
@@ -335,15 +358,18 @@ async function handleOpsInspectDeepDive(ctx: CliContext, options: {
   );
 }
 
-async function handleOpsReportGenerate(ctx: CliContext, options: {
-  tenant?: string;
-  input: string;
-  out: string;
-  render?: string;
-  format?: string;
-  includeSensitive?: boolean;
-  strictJson?: boolean;
-}): Promise<void> {
+async function handleOpsReportGenerate(
+  ctx: CliContext,
+  options: {
+    tenant?: string;
+    input: string;
+    out: string;
+    render?: string;
+    format?: string;
+    includeSensitive?: boolean;
+    strictJson?: boolean;
+  }
+): Promise<void> {
   const overrides: Partial<Record<SettingKey, unknown>> = {};
   if (options.tenant) {
     overrides['defaults.tenant'] = options.tenant;
@@ -356,7 +382,10 @@ async function handleOpsReportGenerate(ctx: CliContext, options: {
   if (!tenantId) {
     throw new CliUserError({
       summary: 'Missing tenant for ops report generate.',
-      suggestedCommands: ['Use --tenant <tenant-id>', 'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>']
+      suggestedCommands: [
+        'Use --tenant <tenant-id>',
+        'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>'
+      ]
     });
   }
   const inputPath = path.resolve(options.input);
@@ -443,14 +472,16 @@ async function handleOpsConsole(
     });
   }
   const screen = screenRaw as TuiScreenId;
-  const requestedOutput = parseCliOutputMode(options.output ?? options.format ?? (options.headless ? 'json' : undefined));
+  const requestedOutput = parseCliOutputMode(
+    options.output ?? options.format ?? (options.headless ? 'json' : undefined)
+  );
   if (Boolean(options.headless) && requestedOutput && requestedOutput !== 'json') {
     throw new CliUserError({
       summary: 'Headless mode is JSON-only.',
       suggestedCommands: ['Use xyte-cli ops console --headless --output json']
     });
   }
-  const follow = options.once ? false : options.follow ?? settings.values.console.follow;
+  const follow = options.once ? false : (options.follow ?? settings.values.console.follow);
   const intervalMs = settings.values.console.intervalMs;
   const motionEnabled = options.motion === false ? false : settings.values.console.motion;
 

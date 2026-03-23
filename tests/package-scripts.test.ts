@@ -15,7 +15,9 @@ describe('package scripts', () => {
     expect(pkg.scripts?.['smoke:local:flow-pack']).toBe('tsx src/smoke/flow-pack-local.ts');
     expect(pkg.scripts?.['smoke:pack-install']).toBe('tsx src/smoke/pack-install.ts');
     expect(pkg.scripts?.['smoke:external-live']).toBe('tsx src/smoke/external-user-live.ts');
-    expect(pkg.scripts?.prepublishOnly).toBe('npm run typecheck && npm test && npm run build && npm run smoke:pack-install');
+    expect(pkg.scripts?.prepublishOnly).toBe(
+      'npm run typecheck && npm test && npm run build && npm run smoke:pack-install'
+    );
     expect(pkg.scripts?.['test:commit']).toBe('npm run typecheck && npm test && npm run smoke:pack-install');
     expect(pkg.scripts?.['release:check']).toBe('node scripts/release_check.mjs');
     expect(pkg.scripts?.['release:publish']).toBe('node scripts/publish.mjs all');

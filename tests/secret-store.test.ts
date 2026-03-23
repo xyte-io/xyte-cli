@@ -133,9 +133,7 @@ describe('secret store backends', () => {
       const filePath = join(root, 'secrets.v1.json');
       const store = new FileSecretStore(filePath);
 
-      await expect(store.getSlotSecret('acme', 'xyte-org', 'primary')).rejects.toThrow(
-        'Cannot read secret store at'
-      );
+      await expect(store.getSlotSecret('acme', 'xyte-org', 'primary')).rejects.toThrow('Cannot read secret store at');
 
       expect(readFileSpy).toHaveBeenCalledTimes(1);
     } finally {

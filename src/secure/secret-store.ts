@@ -129,8 +129,15 @@ export class FileSecretStore implements SecretStore {
       if (maybeErrno.code === 'ENOENT') {
         return cloneData(EMPTY_SECRETS);
       }
-      if (maybeErrno.code === 'EACCES' || maybeErrno.code === 'EPERM' || maybeErrno.code === 'EROFS' || maybeErrno.code === 'ENOTDIR') {
-        throw new Error(`Cannot read secret store at ${this.filePath}. Check file permissions or directory access (error=${maybeErrno.code}).`);
+      if (
+        maybeErrno.code === 'EACCES' ||
+        maybeErrno.code === 'EPERM' ||
+        maybeErrno.code === 'EROFS' ||
+        maybeErrno.code === 'ENOTDIR'
+      ) {
+        throw new Error(
+          `Cannot read secret store at ${this.filePath}. Check file permissions or directory access (error=${maybeErrno.code}).`
+        );
       }
       if (maybeErrno instanceof Error) {
         throw new Error(`Failed to read secret store at ${this.filePath}: ${maybeErrno.message}`);
@@ -143,7 +150,9 @@ export class FileSecretStore implements SecretStore {
       parsed = JSON.parse(content) as PersistedSecrets;
     } catch (error) {
       const detail = errorMessage(error);
-      throw new Error(`Secret store is invalid at ${this.filePath}: ${detail}. Delete or fix this file and rerun setup.`);
+      throw new Error(
+        `Secret store is invalid at ${this.filePath}: ${detail}. Delete or fix this file and rerun setup.`
+      );
     }
 
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -168,11 +177,8 @@ export class FileSecretStore implements SecretStore {
       } catch (writeError) {
         // Best-effort migration: continue returning normalized data even if we cannot write.
         // This avoids breaking reads when the secrets file is readable but not writable (e.g. read-only filesystem).
-        // eslint-disable-next-line no-console
-        console.warn(
-          `Failed to persist normalized secret data to ${this.filePath}:`,
-          writeError
-        );
+         
+        console.warn(`Failed to persist normalized secret data to ${this.filePath}:`, writeError);
       }
     }
     return normalized;

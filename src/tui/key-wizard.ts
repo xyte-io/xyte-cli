@@ -5,8 +5,10 @@ import type { TuiContext } from './types';
 
 const PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
 
-interface WizardContext
-  extends Pick<TuiContext, 'prompt' | 'promptSecret' | 'confirmWrite' | 'setStatus' | 'profileStore' | 'secretStore'> {}
+interface WizardContext extends Pick<
+  TuiContext,
+  'prompt' | 'promptSecret' | 'confirmWrite' | 'setStatus' | 'profileStore' | 'secretStore'
+> {}
 
 interface KeyWizardResult {
   canceled: boolean;
@@ -54,7 +56,10 @@ function parseProviderInput(input: string): SecretProvider | undefined {
   return PROVIDERS.find((provider) => provider === trimmed);
 }
 
-async function promptProvider(context: WizardContext, defaultProvider: SecretProvider): Promise<SecretProvider | undefined> {
+async function promptProvider(
+  context: WizardContext,
+  defaultProvider: SecretProvider
+): Promise<SecretProvider | undefined> {
   while (true) {
     const menu = [
       'Provider:',
@@ -94,7 +99,11 @@ async function promptSecretNonEmpty(context: WizardContext, message: string): Pr
   }
 }
 
-async function promptYesNo(context: WizardContext, message: string, defaultValue: boolean): Promise<boolean | undefined> {
+async function promptYesNo(
+  context: WizardContext,
+  message: string,
+  defaultValue: boolean
+): Promise<boolean | undefined> {
   while (true) {
     const input = await context.prompt(`${message} (y/n)`, defaultValue ? 'y' : 'n');
     if (input === undefined || !input.trim()) {

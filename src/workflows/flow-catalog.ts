@@ -152,7 +152,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
           once: true
         },
         mutating: false,
-        command: 'xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json'
+        command:
+          'xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json'
       },
       {
         kind: 'task',
@@ -166,7 +167,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
           maxPolls: 30
         },
         mutating: false,
-        command: 'xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 30 --output json --strict-json --out ./artifacts/xyte-watch.incidents.ndjson'
+        command:
+          'xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 30 --output json --strict-json --out ./artifacts/xyte-watch.incidents.ndjson'
       }
     ]
   },
@@ -192,7 +194,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
           once: true
         },
         mutating: false,
-        command: 'xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json --out ./artifacts/xyte-watch.triage.ndjson'
+        command:
+          'xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json --out ./artifacts/xyte-watch.triage.ndjson'
       },
       {
         kind: 'task',
@@ -201,7 +204,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         task: 'inspect.fleet',
         inspect: { mode: 'fleet' },
         mutating: false,
-        command: 'xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/xyte-fleet.triage.json'
+        command:
+          'xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/xyte-fleet.triage.json'
       },
       {
         kind: 'task',
@@ -213,7 +217,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
           windowHours: 24
         },
         mutating: false,
-        command: 'xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json --out ./artifacts/xyte-deep-dive.triage.json'
+        command:
+          'xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json --out ./artifacts/xyte-deep-dive.triage.json'
       },
       {
         kind: 'task',
@@ -226,7 +231,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
           format: 'markdown'
         },
         mutating: false,
-        command: 'xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/xyte-deep-dive.triage.json --out ./reports/xyte-triage.md --render markdown'
+        command:
+          'xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/xyte-deep-dive.triage.json --out ./reports/xyte-triage.md --render markdown'
       },
       {
         kind: 'gate',
@@ -292,7 +298,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
           once: true
         },
         mutating: false,
-        command: 'xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json --out ./artifacts/xyte-watch.before.ndjson'
+        command:
+          'xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json --out ./artifacts/xyte-watch.before.ndjson'
       },
       {
         kind: 'task',
@@ -312,7 +319,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         },
         requiresContext: ['device_id'],
         mutating: false,
-        command: 'xyte-cli api call organization.commands.getCommands --tenant <tenant-id> --path-json {"device_id":"<device-id>"} --query-json {"page":1,"per_page":20}'
+        command:
+          'xyte-cli api call organization.commands.getCommands --tenant <tenant-id> --path-json {"device_id":"<device-id>"} --query-json {"page":1,"per_page":20}'
       },
       {
         kind: 'gate',
@@ -339,7 +347,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         },
         requiresContext: ['device_id', 'command'],
         mutating: true,
-        command: 'xyte-cli api call organization.commands.sendCommand --tenant <tenant-id> --path-json {"device_id":"<device-id>"} --body-json {"command":"<valid-command-from-history>"}'
+        command:
+          'xyte-cli api call organization.commands.sendCommand --tenant <tenant-id> --path-json {"device_id":"<device-id>"} --body-json {"command":"<valid-command-from-history>"}'
       },
       {
         kind: 'gate',
@@ -366,7 +375,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         },
         requiresContext: ['device_id', 'updated_device_name'],
         mutating: true,
-        command: 'xyte-cli api call organization.devices.updateDevice --tenant <tenant-id> --path-json {"device_id":"<device-id>"} --body-json {"name":"<updated-device-name>"}'
+        command:
+          'xyte-cli api call organization.devices.updateDevice --tenant <tenant-id> --path-json {"device_id":"<device-id>"} --body-json {"name":"<updated-device-name>"}'
       },
       {
         kind: 'task',
@@ -382,7 +392,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         },
         requiresContext: ['device_id'],
         mutating: false,
-        command: 'xyte-cli api call organization.devices.getDevice --tenant <tenant-id> --path-json {"device_id":"<device-id>"}'
+        command:
+          'xyte-cli api call organization.devices.getDevice --tenant <tenant-id> --path-json {"device_id":"<device-id>"}'
       },
       {
         kind: 'gate',
@@ -409,7 +420,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         },
         requiresContext: ['ticket_id', 'incident_id', 'device_id'],
         mutating: true,
-        command: 'xyte-cli api call organization.tickets.sendMessage --tenant <tenant-id> --path-json {"ticket_id":"<ticket-id>"} --query-json {"message":"Operator approved remediation for incident <incident-id> on device <device-id>."}'
+        command:
+          'xyte-cli api call organization.tickets.sendMessage --tenant <tenant-id> --path-json {"ticket_id":"<ticket-id>"} --query-json {"message":"Operator approved remediation for incident <incident-id> on device <device-id>."}'
       },
       {
         kind: 'gate',
@@ -433,7 +445,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         },
         requiresContext: ['incident_id'],
         mutating: true,
-        command: 'xyte-cli api call organization.incidents.closeIncident --tenant <tenant-id> --path-json {"incident_id":"<incident-id>"}'
+        command:
+          'xyte-cli api call organization.incidents.closeIncident --tenant <tenant-id> --path-json {"incident_id":"<incident-id>"}'
       },
       {
         kind: 'task',
@@ -445,7 +458,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
           once: true
         },
         mutating: false,
-        command: 'xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json --out ./artifacts/xyte-watch.after.ndjson'
+        command:
+          'xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json --out ./artifacts/xyte-watch.after.ndjson'
       }
     ]
   },
@@ -479,7 +493,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
           windowHours: 24
         },
         mutating: false,
-        command: 'xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json --out ./artifacts/xyte-deep-dive.daily.json'
+        command:
+          'xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json --out ./artifacts/xyte-deep-dive.daily.json'
       },
       {
         kind: 'task',
@@ -492,7 +507,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
           format: 'markdown'
         },
         mutating: false,
-        command: 'xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/xyte-deep-dive.daily.json --out ./reports/xyte-daily.md --render markdown'
+        command:
+          'xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/xyte-deep-dive.daily.json --out ./reports/xyte-daily.md --render markdown'
       },
       {
         kind: 'task',

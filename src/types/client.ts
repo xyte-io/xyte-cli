@@ -65,9 +65,6 @@ export interface PartnerNamespace {
   updateTicket: NamespaceCall;
 }
 
-interface XyteNamespace {
-  [method: string]: NamespaceCall;
-}
 
 export interface XyteClientOptions {
   tenantId?: string;

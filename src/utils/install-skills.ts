@@ -40,7 +40,12 @@ interface InstallSkillsResult {
 
 const AGENT_ORDER: SkillAgent[] = ['claude', 'copilot', 'codex'];
 
-function rootForDestination(destination: { scope: 'project' | 'user'; agent: SkillAgent; workspaceRoot: string; homeRoot: string }) {
+function rootForDestination(destination: {
+  scope: 'project' | 'user';
+  agent: SkillAgent;
+  workspaceRoot: string;
+  homeRoot: string;
+}) {
   if (destination.scope === 'project') {
     if (destination.agent === 'claude') {
       return path.join(destination.workspaceRoot, '.claude', 'skills');

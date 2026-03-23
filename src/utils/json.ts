@@ -83,7 +83,10 @@ export function extractHasNextPage(value: unknown): boolean | undefined {
   return undefined;
 }
 
-export function parseJsonObject(value: string | undefined, fallback: Record<string, unknown> = {}): Record<string, unknown> {
+export function parseJsonObject(
+  value: string | undefined,
+  fallback: Record<string, unknown> = {}
+): Record<string, unknown> {
   if (!value) {
     return fallback;
   }

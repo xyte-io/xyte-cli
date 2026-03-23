@@ -134,7 +134,12 @@ export function safeInspect(value: unknown, options: SafeInspectOptions = {}): S
   };
 }
 
-export function payloadSummary(value: unknown): { kind: string; approxSize: number; keyCount: number; truncated: boolean } {
+export function payloadSummary(value: unknown): {
+  kind: string;
+  approxSize: number;
+  keyCount: number;
+  truncated: boolean;
+} {
   const inspected = safeInspect(value, {
     compact: true,
     maxOutputChars: 8_000
@@ -178,7 +183,10 @@ function summarizeObject(value: unknown): string[] {
   return lines;
 }
 
-export function safePreviewLines(value: unknown, options: SafeInspectOptions = {}): { lines: string[]; truncated: boolean } {
+export function safePreviewLines(
+  value: unknown,
+  options: SafeInspectOptions = {}
+): { lines: string[]; truncated: boolean } {
   const inspected = safeInspect(value, options);
   const result = {
     lines: inspected.text.split('\n'),

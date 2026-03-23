@@ -22,7 +22,10 @@ export const GLOBAL_KEYMAP: Array<{ keys: string; description: string }> = [
 
 export const SCREEN_ACTION_KEYMAP: Array<{ keys: string; description: string }> = [
   { keys: 'Setup: a/u/k/p/c/r', description: 'Tenant setup + guided key wizard + connectivity checks' },
-  { keys: 'Config: a/n/u/e/t/x/c/r', description: 'Provider-first key slot add/rename/use/rotate/test/remove + doctor' },
+  {
+    keys: 'Config: a/n/u/e/t/x/c/r',
+    description: 'Provider-first key slot add/rename/use/rotate/test/remove + doctor'
+  },
   { keys: 'Spaces: a/f/Enter', description: 'Claim device, create/rename space, endpoint filters, and drilldown' },
   { keys: 'Devices: a/f/Enter', description: 'Send command via templates, endpoint space filter, and details' },
   { keys: 'Tickets: a/f/R/rr/[ ]/p', description: 'Resolve/send message, local filters and paging controls' },

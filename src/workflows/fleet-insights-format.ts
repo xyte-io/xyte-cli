@@ -18,7 +18,11 @@ export function formatFleetInspectAscii(result: FleetInspectResult): string {
     'DEVICES',
     asciiBar('offline', result.status.devices.offline ?? 0, result.totals.devices),
     asciiBar('online', result.status.devices.online ?? 0, result.totals.devices),
-    asciiBar('other', result.totals.devices - (result.status.devices.offline ?? 0) - (result.status.devices.online ?? 0), result.totals.devices),
+    asciiBar(
+      'other',
+      result.totals.devices - (result.status.devices.offline ?? 0) - (result.status.devices.online ?? 0),
+      result.totals.devices
+    ),
     '',
     'INCIDENTS',
     asciiBar('active', result.status.incidents.active ?? 0, result.totals.incidents),
@@ -51,7 +55,9 @@ export function formatDeepDiveAscii(result: DeepDiveResult): string {
   if (hasOfflineSpaceData) {
     lines.push('');
     lines.push('TOP OFFLINE SPACES');
-    result.topOfflineSpaces.forEach((row) => lines.push(`${row.space} | offline=${row.offlineDevices} | share=${row.shareOfOfflinePct}%`));
+    result.topOfflineSpaces.forEach((row) =>
+      lines.push(`${row.space} | offline=${row.offlineDevices} | share=${row.shareOfOfflinePct}%`)
+    );
   }
 
   if (hasIncidentData) {
@@ -61,7 +67,9 @@ export function formatDeepDiveAscii(result: DeepDiveResult): string {
       lines.push(`${row.device} | incidents=${row.incidentCount} | active=${row.activeIncidents}`)
     );
     lines.push('');
-    lines.push(`${result.windowHours}H CHURN: incidents=${result.churnWindow.incidents} devices=${result.churnWindow.devices} spaces=${result.churnWindow.spaces}`);
+    lines.push(
+      `${result.windowHours}H CHURN: incidents=${result.churnWindow.incidents} devices=${result.churnWindow.devices} spaces=${result.churnWindow.spaces}`
+    );
     result.churnWindow.bySpace.forEach((row) => lines.push(`space: ${row.space} -> ${row.incidents}`));
   }
 
@@ -112,7 +120,9 @@ export function formatDeepDiveMarkdown(result: DeepDiveResult, includeSensitive 
     markdown.push('');
     markdown.push('| Space | Offline Devices | Share |');
     markdown.push('| --- | ---: | ---: |');
-    result.topOfflineSpaces.forEach((row) => markdown.push(`| ${row.space} | ${row.offlineDevices} | ${row.shareOfOfflinePct}% |`));
+    result.topOfflineSpaces.forEach((row) =>
+      markdown.push(`| ${row.space} | ${row.offlineDevices} | ${row.shareOfOfflinePct}% |`)
+    );
   }
 
   if (hasIncidentData) {
@@ -121,7 +131,9 @@ export function formatDeepDiveMarkdown(result: DeepDiveResult, includeSensitive 
     markdown.push('');
     markdown.push('| Device | Incidents | Active |');
     markdown.push('| --- | ---: | ---: |');
-    result.topIncidentDevices.forEach((row) => markdown.push(`| ${row.device} | ${row.incidentCount} | ${row.activeIncidents} |`));
+    result.topIncidentDevices.forEach((row) =>
+      markdown.push(`| ${row.device} | ${row.incidentCount} | ${row.activeIncidents} |`)
+    );
     markdown.push('');
     markdown.push(`## ${result.windowHours}-Hour Churn`);
     markdown.push('');
@@ -148,7 +160,9 @@ export function formatDeepDiveMarkdown(result: DeepDiveResult, includeSensitive 
     markdown.push('');
     markdown.push(`- Open tickets: **${result.ticketPosture.openTickets}**`);
     if (hasIncidentData) {
-      markdown.push(`- Overlapping active-incident devices: **${result.ticketPosture.overlappingActiveIncidentDevices}**`);
+      markdown.push(
+        `- Overlapping active-incident devices: **${result.ticketPosture.overlappingActiveIncidentDevices}**`
+      );
     }
     if (result.ticketPosture.oldestOpenTickets.length > 0) {
       markdown.push('');

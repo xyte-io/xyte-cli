@@ -190,7 +190,10 @@ export function buildDeepDiveOverviewPlan(deepDive: DeepDiveResult): DeepDiveOve
       ? {
           label: 'Active incidents',
           value: String(metrics.activeIncidents),
-          detail: metrics.totalIncidents > 0 ? `${metrics.activeIncidentPct}% of incident volume` : 'No incident baseline returned.',
+          detail:
+            metrics.totalIncidents > 0
+              ? `${metrics.activeIncidentPct}% of incident volume`
+              : 'No incident baseline returned.',
           tone: incidentTone
         }
       : {
@@ -251,7 +254,8 @@ export function buildDeepDiveOverviewPlan(deepDive: DeepDiveResult): DeepDiveOve
         }
       : {
           eyebrow: 'Data quality',
-          title: metrics.mismatches > 0 ? `${metrics.mismatches} mismatches need review` : 'No status mismatches detected',
+          title:
+            metrics.mismatches > 0 ? `${metrics.mismatches} mismatches need review` : 'No status mismatches detected',
           body:
             metrics.mismatches > 0
               ? 'Device status and state disagree for part of the fleet. Review these before triage automation depends on them.'
@@ -287,9 +291,7 @@ export function buildDeepDiveSummaryPlan(deepDive: DeepDiveResult): DeepDiveSumm
   const windowLabel = formatWindowLabel(deepDive.windowHours);
   const dedupedSummary = Array.from(
     new Set(
-      deepDive.summary
-        .map((line) => line.replace(/^(\d+)h churn:/i, `${windowLabel} churn:`).trim())
-        .filter(Boolean)
+      deepDive.summary.map((line) => line.replace(/^(\d+)h churn:/i, `${windowLabel} churn:`).trim()).filter(Boolean)
     )
   );
 
@@ -302,7 +304,11 @@ export function buildDeepDiveSummaryPlan(deepDive: DeepDiveResult): DeepDiveSumm
   };
 }
 
-export function renderBrandedPdfReport(deepDive: DeepDiveResult, outputPath: string, includeSensitive: boolean): Promise<void> {
+export function renderBrandedPdfReport(
+  deepDive: DeepDiveResult,
+  outputPath: string,
+  includeSensitive: boolean
+): Promise<void> {
   return new Promise((resolvePromise, rejectPromise) => {
     ensureDir(outputPath);
     const sectionPlan = buildDeepDiveReportSectionPlan(deepDive);

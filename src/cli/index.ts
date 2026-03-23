@@ -4,11 +4,7 @@ import { Writable } from 'node:stream';
 
 import { Command } from 'commander';
 
-import {
-  createCliActionLogger,
-  sanitizeArgvForLog,
-  type CliActionLogger
-} from './action-logger';
+import { createCliActionLogger, sanitizeArgvForLog, type CliActionLogger } from './action-logger';
 import { createXyteClient } from '../client/create-client';
 import { toProblemDetails } from '../http/problem-mapper';
 import { buildStatusContract, type StatusMode } from '../contracts/status';
@@ -37,7 +33,12 @@ import { errorMessage } from '../utils/error-format';
 import { registerLogsCommands } from './commands/logs';
 import { registerConfigCommands } from './commands/config';
 import { registerFlowCommands } from './commands/flow';
-import { registerSetupCommands, SIMPLE_SETUP_DEFAULT_TENANT, normalizeTenantId, runSimpleSetup } from './commands/setup';
+import {
+  registerSetupCommands,
+  SIMPLE_SETUP_DEFAULT_TENANT,
+  normalizeTenantId,
+  runSimpleSetup
+} from './commands/setup';
 import { registerOpsCommands } from './commands/ops';
 import { registerApiCommands } from './commands/api';
 import { registerUtilCommands } from './commands/util';
@@ -216,7 +217,12 @@ function runInstallDoctor(): InstallDoctorResult {
   return buildInstallDoctorReport(expectedPath);
 }
 
-async function promptValue(args: { question: string; initial?: string; stdout: OutputStream; secret?: boolean }): Promise<string> {
+async function promptValue(args: {
+  question: string;
+  initial?: string;
+  stdout: OutputStream;
+  secret?: boolean;
+}): Promise<string> {
   const mutedOutput = new Writable({
     write(_chunk, _encoding, callback) {
       callback();
@@ -338,7 +344,10 @@ function buildRootLauncherPayload(args: {
         {
           title: 'Raw API',
           description: 'Once credentials exist, raw API calls live under api.',
-          commands: [`xyte-cli api endpoints list --tenant ${tenantId}`, `xyte-cli api call organization.getOrganizationInfo --tenant ${tenantId}`]
+          commands: [
+            `xyte-cli api endpoints list --tenant ${tenantId}`,
+            `xyte-cli api call organization.getOrganizationInfo --tenant ${tenantId}`
+          ]
         },
         {
           title: 'Config & Credentials',
@@ -352,7 +361,10 @@ function buildRootLauncherPayload(args: {
         {
           title: 'Console / Headless',
           description: 'Root no longer auto-opens the console.',
-          commands: [`xyte-cli ops console --screen setup`, `xyte-cli ops console --headless --screen setup --output json`]
+          commands: [
+            `xyte-cli ops console --screen setup`,
+            `xyte-cli ops console --headless --screen setup --output json`
+          ]
         },
         {
           title: 'Examples',
@@ -545,7 +557,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       return;
     }
 
-    let keyValue = await resolveKeyValue({
+    const keyValue = await resolveKeyValue({
       envKey: env.XYTE_CLI_KEY,
       allowPrompt: isInteractive,
       prompt,
@@ -557,11 +569,13 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
     if (isInteractive) {
       tenantLabel =
-        (await prompt({
-          question: 'Tenant label (optional)',
-          initial: tenantLabel,
-          stdout
-        })).trim() || SIMPLE_SETUP_DEFAULT_TENANT;
+        (
+          await prompt({
+            question: 'Tenant label (optional)',
+            initial: tenantLabel,
+            stdout
+          })
+        ).trim() || SIMPLE_SETUP_DEFAULT_TENANT;
     }
 
     if (!keyValue) {
@@ -593,7 +607,10 @@ export function createCli(runtime: CliRuntime = {}): Command {
         throw new CliUserError({
           summary: 'Init setup did not complete.',
           cause: setupResult.readiness.connectivity.message || 'Connectivity validation failed.',
-          suggestedCommands: [`xyte-cli setup status --tenant ${tenantId}`, `xyte-cli config doctor --tenant ${tenantId}`]
+          suggestedCommands: [
+            `xyte-cli setup status --tenant ${tenantId}`,
+            `xyte-cli config doctor --tenant ${tenantId}`
+          ]
         });
       }
       stdout.write(`Setup needs follow-up for tenant \`${tenantId}\`.\n`);
@@ -995,11 +1012,7 @@ export async function runCli(argv = process.argv, runtime: CliRuntime = {}): Pro
         baseErrorPayload.error = errorMessage(error);
       }
 
-      state.logger.log(
-        'command.error',
-        baseErrorPayload,
-        'error'
-      );
+      state.logger.log('command.error', baseErrorPayload, 'error');
     }
     throw error;
   } finally {

@@ -29,14 +29,22 @@ export interface PackInstallSmokeOptions {
   cwd?: string;
   logger?: LoggerLike;
   env?: NodeJS.ProcessEnv;
-  run?: (command: string, args: string[], options?: RunCommandOptions) => Promise<{ code: number; stdout: string; stderr: string }>;
+  run?: (
+    command: string,
+    args: string[],
+    options?: RunCommandOptions
+  ) => Promise<{ code: number; stdout: string; stderr: string }>;
   pathExistsFn?: typeof pathExists;
   readFileFn?: (path: string, encoding: BufferEncoding) => Promise<string>;
   mkdtempFn?: (prefix: string) => Promise<string>;
   mkdirFn?: (path: string, options?: { recursive?: boolean }) => Promise<unknown>;
   rmFn?: (path: string, options?: { recursive?: boolean; force?: boolean }) => Promise<unknown>;
   unlinkFn?: (path: string) => Promise<unknown>;
-  startMockServerFn?: (options?: { cwd?: string; env?: NodeJS.ProcessEnv; authToken?: string }) => Promise<MockServerHandle>;
+  startMockServerFn?: (options?: {
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+    authToken?: string;
+  }) => Promise<MockServerHandle>;
 }
 
 async function reserveFreePort(host = '127.0.0.1'): Promise<number> {
@@ -121,19 +129,25 @@ async function stopMockServer(child: ReturnType<typeof spawn>): Promise<void> {
   });
 }
 
-async function startMockServer(options: { cwd?: string; env?: NodeJS.ProcessEnv; authToken?: string } = {}): Promise<MockServerHandle> {
+async function startMockServer(
+  options: { cwd?: string; env?: NodeJS.ProcessEnv; authToken?: string } = {}
+): Promise<MockServerHandle> {
   const cwd = options.cwd ?? process.cwd();
   const env = options.env ?? process.env;
   const port = await reserveFreePort();
   const mockScriptPath = path.resolve(cwd, 'scripts', 'mock_xyte_local.mjs');
-  const child = spawn(process.execPath, [mockScriptPath, '--host', '127.0.0.1', '--port', String(port), '--strict-auth'], {
-    cwd,
-    env: {
-      ...env,
-      XYTE_LOCAL_AUTH_TOKEN: options.authToken ?? 'smoke-test-key'
-    },
-    stdio: ['ignore', 'pipe', 'pipe']
-  });
+  const child = spawn(
+    process.execPath,
+    [mockScriptPath, '--host', '127.0.0.1', '--port', String(port), '--strict-auth'],
+    {
+      cwd,
+      env: {
+        ...env,
+        XYTE_LOCAL_AUTH_TOKEN: options.authToken ?? 'smoke-test-key'
+      },
+      stdio: ['ignore', 'pipe', 'pipe']
+    }
+  );
 
   let stderr = '';
   child.stderr?.on('data', (chunk) => {
@@ -241,7 +255,16 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
       ['init', '--scope', 'both', '--agents', 'all', '--target', dirs.workspaceDir, '--force'],
       { cwd: runtimeCwd, env: runtimeEnv }
     );
-    assertSuccess(initResult, 'xyte-cli init', XYTE_COMMAND, ['init', '--scope', 'both', '--agents', 'all', '--target', dirs.workspaceDir, '--force']);
+    assertSuccess(initResult, 'xyte-cli init', XYTE_COMMAND, [
+      'init',
+      '--scope',
+      'both',
+      '--agents',
+      'all',
+      '--target',
+      dirs.workspaceDir,
+      '--force'
+    ]);
 
     const requiredSkillRoots = [
       path.join(dirs.workspaceDir, '.claude', 'skills', 'xyte-cli'),
@@ -271,19 +294,36 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
     printStep(logger, 7, stepTotal, 'Running shell-neutral setup via stdin');
     const setupResult = await run(
       XYTE_COMMAND,
-      ['setup', 'run', '--non-interactive', '--tenant', 'acme', '--key-stdin', '--connectivity', 'never', '--output', 'json'],
+      [
+        'setup',
+        'run',
+        '--non-interactive',
+        '--tenant',
+        'acme',
+        '--key-stdin',
+        '--connectivity',
+        'never',
+        '--output',
+        'json'
+      ],
       {
         cwd: runtimeCwd,
         env: runtimeEnv,
         input: 'smoke-test-key\n'
       }
     );
-    assertSuccess(
-      setupResult,
-      'xyte-cli setup run',
-      XYTE_COMMAND,
-      ['setup', 'run', '--non-interactive', '--tenant', 'acme', '--key-stdin', '--connectivity', 'never', '--output', 'json']
-    );
+    assertSuccess(setupResult, 'xyte-cli setup run', XYTE_COMMAND, [
+      'setup',
+      'run',
+      '--non-interactive',
+      '--tenant',
+      'acme',
+      '--key-stdin',
+      '--connectivity',
+      'never',
+      '--output',
+      'json'
+    ]);
     const setupPayload = normalizeJsonOutput(setupResult.stdout) as Record<string, unknown>;
     const setupReadiness = setupPayload.readiness as Record<string, unknown> | undefined;
     if (setupPayload.tenantId !== 'acme' || setupReadiness?.tenantId !== 'acme') {
@@ -295,7 +335,14 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
       cwd: runtimeCwd,
       env: runtimeEnv
     });
-    assertSuccess(fieldResult, 'xyte-cli setup status --field tenantId', XYTE_COMMAND, ['setup', 'status', '--tenant', 'acme', '--field', 'tenantId']);
+    assertSuccess(fieldResult, 'xyte-cli setup status --field tenantId', XYTE_COMMAND, [
+      'setup',
+      'status',
+      '--tenant',
+      'acme',
+      '--field',
+      'tenantId'
+    ]);
     if (String(fieldResult.stdout).trim() !== 'acme') {
       throw new Error(`Field extraction returned an unexpected value: ${fieldResult.stdout}`);
     }
@@ -308,29 +355,69 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
     });
     const tenantConfigResult = await run(
       XYTE_COMMAND,
-      ['config', 'tenant', 'add', 'acme', '--name', 'Acme Mock', '--hub-url', mockServer.baseUrl, '--entry-url', mockServer.baseUrl],
+      [
+        'config',
+        'tenant',
+        'add',
+        'acme',
+        '--name',
+        'Acme Mock',
+        '--hub-url',
+        mockServer.baseUrl,
+        '--entry-url',
+        mockServer.baseUrl
+      ],
       { cwd: runtimeCwd, env: runtimeEnv }
     );
-    assertSuccess(
-      tenantConfigResult,
-      'xyte-cli config tenant add',
-      XYTE_COMMAND,
-      ['config', 'tenant', 'add', 'acme', '--name', 'Acme Mock', '--hub-url', mockServer.baseUrl, '--entry-url', mockServer.baseUrl]
-    );
+    assertSuccess(tenantConfigResult, 'xyte-cli config tenant add', XYTE_COMMAND, [
+      'config',
+      'tenant',
+      'add',
+      'acme',
+      '--name',
+      'Acme Mock',
+      '--hub-url',
+      mockServer.baseUrl,
+      '--entry-url',
+      mockServer.baseUrl
+    ]);
 
     printStep(logger, 10, stepTotal, 'Checking watch --out with nested NDJSON output');
     const watchPath = path.join(dirs.workspaceDir, 'artifacts', 'xyte-watch.incidents.ndjson');
     const watchResult = await run(
       XYTE_COMMAND,
-      ['ops', 'watch', 'incidents', '--tenant', 'acme', '--profile', 'incidents-active', '--once', '--output', 'json', '--strict-json', '--out', watchPath],
+      [
+        'ops',
+        'watch',
+        'incidents',
+        '--tenant',
+        'acme',
+        '--profile',
+        'incidents-active',
+        '--once',
+        '--output',
+        'json',
+        '--strict-json',
+        '--out',
+        watchPath
+      ],
       { cwd: runtimeCwd, env: runtimeEnv }
     );
-    assertSuccess(
-      watchResult,
-      'xyte-cli ops watch incidents',
-      XYTE_COMMAND,
-      ['ops', 'watch', 'incidents', '--tenant', 'acme', '--profile', 'incidents-active', '--once', '--output', 'json', '--strict-json', '--out', watchPath]
-    );
+    assertSuccess(watchResult, 'xyte-cli ops watch incidents', XYTE_COMMAND, [
+      'ops',
+      'watch',
+      'incidents',
+      '--tenant',
+      'acme',
+      '--profile',
+      'incidents-active',
+      '--once',
+      '--output',
+      'json',
+      '--strict-json',
+      '--out',
+      watchPath
+    ]);
     if (!(await pathExistsFn(watchPath))) {
       throw new Error(`Watch command did not create the nested output path: ${watchPath}`);
     }
@@ -349,11 +436,25 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
 
     printStep(logger, 11, stepTotal, 'Checking inspect fleet --out with nested JSON output');
     const fleetPath = path.join(dirs.workspaceDir, 'artifacts', 'xyte-fleet.json');
-    const fleetResult = await run(XYTE_COMMAND, ['ops', 'inspect', 'fleet', '--tenant', 'acme', '--output', 'json', '--out', fleetPath], {
-      cwd: runtimeCwd,
-      env: runtimeEnv
-    });
-    assertSuccess(fleetResult, 'xyte-cli ops inspect fleet', XYTE_COMMAND, ['ops', 'inspect', 'fleet', '--tenant', 'acme', '--output', 'json', '--out', fleetPath]);
+    const fleetResult = await run(
+      XYTE_COMMAND,
+      ['ops', 'inspect', 'fleet', '--tenant', 'acme', '--output', 'json', '--out', fleetPath],
+      {
+        cwd: runtimeCwd,
+        env: runtimeEnv
+      }
+    );
+    assertSuccess(fleetResult, 'xyte-cli ops inspect fleet', XYTE_COMMAND, [
+      'ops',
+      'inspect',
+      'fleet',
+      '--tenant',
+      'acme',
+      '--output',
+      'json',
+      '--out',
+      fleetPath
+    ]);
     if (!(await pathExistsFn(fleetPath))) {
       throw new Error(`Fleet inspect did not create the nested output path: ${fleetPath}`);
     }
@@ -369,12 +470,19 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
       ['ops', 'inspect', 'deep-dive', '--tenant', 'acme', '--window', '24', '--output', 'json', '--out', deepDivePath],
       { cwd: runtimeCwd, env: runtimeEnv }
     );
-    assertSuccess(
-      deepDiveResult,
-      'xyte-cli ops inspect deep-dive',
-      XYTE_COMMAND,
-      ['ops', 'inspect', 'deep-dive', '--tenant', 'acme', '--window', '24', '--output', 'json', '--out', deepDivePath]
-    );
+    assertSuccess(deepDiveResult, 'xyte-cli ops inspect deep-dive', XYTE_COMMAND, [
+      'ops',
+      'inspect',
+      'deep-dive',
+      '--tenant',
+      'acme',
+      '--window',
+      '24',
+      '--output',
+      'json',
+      '--out',
+      deepDivePath
+    ]);
     if (!(await pathExistsFn(deepDivePath))) {
       throw new Error(`Deep-dive inspect did not create the nested output path: ${deepDivePath}`);
     }
@@ -387,15 +495,34 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
     const reportPath = path.join(dirs.workspaceDir, 'reports', 'fleet-report.md');
     const reportResult = await run(
       XYTE_COMMAND,
-      ['ops', 'report', 'generate', '--tenant', 'acme', '--input', deepDivePath, '--out', reportPath, '--render', 'markdown'],
+      [
+        'ops',
+        'report',
+        'generate',
+        '--tenant',
+        'acme',
+        '--input',
+        deepDivePath,
+        '--out',
+        reportPath,
+        '--render',
+        'markdown'
+      ],
       { cwd: runtimeCwd, env: runtimeEnv }
     );
-    assertSuccess(
-      reportResult,
-      'xyte-cli ops report generate',
-      XYTE_COMMAND,
-      ['ops', 'report', 'generate', '--tenant', 'acme', '--input', deepDivePath, '--out', reportPath, '--render', 'markdown']
-    );
+    assertSuccess(reportResult, 'xyte-cli ops report generate', XYTE_COMMAND, [
+      'ops',
+      'report',
+      'generate',
+      '--tenant',
+      'acme',
+      '--input',
+      deepDivePath,
+      '--out',
+      reportPath,
+      '--render',
+      'markdown'
+    ]);
     if (!(await pathExistsFn(reportPath))) {
       throw new Error(`Report generation did not create the nested output path: ${reportPath}`);
     }

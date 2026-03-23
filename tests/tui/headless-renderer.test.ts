@@ -15,7 +15,7 @@ function parseRuntimeFrame(chunks: string[]): (HeadlessFrame & { meta?: Record<s
     .split('\n')
     .filter(Boolean)
     .map((line) => JSON.parse(line) as HeadlessFrame & { meta?: Record<string, unknown> });
-  return parsed.find((frame) => !((frame.meta as Record<string, unknown> | undefined)?.startup));
+  return parsed.find((frame) => !(frame.meta as Record<string, unknown> | undefined)?.startup);
 }
 
 async function makeReadyProfile() {
@@ -85,7 +85,15 @@ describe('headless renderer', () => {
     expect((runtimeFrame?.meta as any)?.navigationMode).toBe('pane-focus');
     expect((runtimeFrame?.meta as any)?.refreshState).toBeDefined();
     expect((runtimeFrame?.meta as any)?.tabId).toBe('spaces');
-    expect((runtimeFrame?.meta as any)?.tabOrder).toEqual(['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets']);
+    expect((runtimeFrame?.meta as any)?.tabOrder).toEqual([
+      'setup',
+      'config',
+      'dashboard',
+      'spaces',
+      'devices',
+      'incidents',
+      'tickets'
+    ]);
     expect((runtimeFrame?.meta as any)?.tabNavBoundary).toBeNull();
     expect((runtimeFrame?.meta as any)?.renderSafety).toBeDefined();
     expect((runtimeFrame?.meta as any)?.tableFormat).toBe('compact-v1');
@@ -260,7 +268,15 @@ describe('headless renderer', () => {
       expect((runtimeFrame?.meta as any)?.activePane).toBe(SCREEN_PANE_CONFIG[screen].defaultPane);
       expect((runtimeFrame?.meta as any)?.availablePanes).toEqual(SCREEN_PANE_CONFIG[screen].panes);
       expect((runtimeFrame?.meta as any)?.tabId).toBe(screen);
-      expect((runtimeFrame?.meta as any)?.tabOrder).toEqual(['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets']);
+      expect((runtimeFrame?.meta as any)?.tabOrder).toEqual([
+        'setup',
+        'config',
+        'dashboard',
+        'spaces',
+        'devices',
+        'incidents',
+        'tickets'
+      ]);
       expect((runtimeFrame?.meta as any)?.renderSafety).toBeDefined();
       expect((runtimeFrame?.meta as any)?.tableFormat).toBe('compact-v1');
       expect((runtimeFrame?.meta as any)?.headlessWrite).toBe(false);

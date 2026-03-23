@@ -26,9 +26,7 @@ describe('computeRetryDelayMs', () => {
   });
 
   it('increases delay with attempt number', () => {
-    const delays = Array.from({ length: 5 }, (_, i) =>
-      computeRetryDelayMs(i + 1, { jitterRatio: 0 })
-    );
+    const delays = Array.from({ length: 5 }, (_, i) => computeRetryDelayMs(i + 1, { jitterRatio: 0 }));
     for (let i = 1; i < delays.length; i++) {
       expect(delays[i]).toBeGreaterThanOrEqual(delays[i - 1]);
     }

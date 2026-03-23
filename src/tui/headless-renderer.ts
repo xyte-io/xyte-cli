@@ -50,7 +50,10 @@ interface HeadlessRenderOptions {
 
 type SafeWrite = (text: string) => boolean;
 
-function getRefreshState(args: { connectionState: ReadinessCheck['connectionState']; retried?: boolean }): 'idle' | 'retrying' | 'error' {
+function getRefreshState(args: {
+  connectionState: ReadinessCheck['connectionState'];
+  retried?: boolean;
+}): 'idle' | 'retrying' | 'error' {
   if (args.connectionState === 'connected' || args.connectionState === 'not_checked') {
     return 'idle';
   }
@@ -79,7 +82,9 @@ function withNavigationMeta(screen: TuiScreenId, meta: Record<string, unknown> =
 
 function inferRenderSafety(panels: ScenePanel[]): 'ok' | 'truncated' {
   const truncated = panels.some((panel) =>
-    (panel.text?.lines ?? []).some((line) => line.includes('Preview truncated for stability.') || line.includes('[Truncated]'))
+    (panel.text?.lines ?? []).some(
+      (line) => line.includes('Preview truncated for stability.') || line.includes('[Truncated]')
+    )
   );
   return truncated ? 'truncated' : 'ok';
 }
@@ -363,9 +368,10 @@ async function buildOperationalFrame(options: {
         page: 1,
         perPage: 25,
         totalFiltered: tickets.data.tickets.length,
-        actionsHint: tickets.data.mode === 'organization'
-          ? 'interactive-only: a resolve/message, f local filters, [ ] pages, p per-page'
-          : 'interactive-only: ticket writes disabled in partner mode'
+        actionsHint:
+          tickets.data.mode === 'organization'
+            ? 'interactive-only: a resolve/message, f local filters, [ ] pages, p per-page'
+            : 'interactive-only: ticket writes disabled in partner mode'
       });
       return buildFrameFromLoad(options, 'tickets', 'Tickets', {
         panels,
@@ -414,7 +420,6 @@ async function buildOperationalFrame(options: {
         extraMeta: { connection: { state: spaces.connectionState, error: spaces.error?.message, drilldownError } }
       });
     }
-
   }
 }
 

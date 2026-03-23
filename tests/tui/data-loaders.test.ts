@@ -168,10 +168,7 @@ describe('tui data loaders', () => {
     const client: any = {
       organization: {
         getCommands: async () => ({
-          items: [
-            { command: 'reboot' },
-            { friendly_name: 'power_cycle' }
-          ]
+          items: [{ command: 'reboot' }, { friendly_name: 'power_cycle' }]
         })
       }
     };

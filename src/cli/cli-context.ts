@@ -104,4 +104,3 @@ export function printJson(
 ): void {
   stream.write(`${stringifyJsonOutput(value, options)}\n`);
 }
-

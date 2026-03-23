@@ -102,14 +102,17 @@ export async function runUtilityBatch(args: {
       if (args.apply) {
         const response = await operation.execute(args.client, args.tenantId);
         totals.succeeded += 1;
-        writeReportLine(args.reportPath, reportLine(operation, 'succeeded', {
-          response: {
-            status: response.status,
-            durationMs: response.durationMs,
-            retryCount: response.retryCount,
-            data: response.data
-          }
-        }));
+        writeReportLine(
+          args.reportPath,
+          reportLine(operation, 'succeeded', {
+            response: {
+              status: response.status,
+              durationMs: response.durationMs,
+              retryCount: response.retryCount,
+              data: response.data
+            }
+          })
+        );
       } else {
         totals.skipped += 1;
         writeReportLine(args.reportPath, reportLine(operation, 'dry-run'));
@@ -128,9 +131,12 @@ export async function runUtilityBatch(args: {
         const remaining = args.operations.slice(index + 1);
         totals.skipped += remaining.length;
         for (const skippedOp of remaining) {
-          writeReportLine(args.reportPath, reportLine(skippedOp, 'skipped', {
-            error: { message: 'Skipped because processing stopped after first failure (fail-fast mode).' }
-          }));
+          writeReportLine(
+            args.reportPath,
+            reportLine(skippedOp, 'skipped', {
+              error: { message: 'Skipped because processing stopped after first failure (fail-fast mode).' }
+            })
+          );
         }
         break;
       }

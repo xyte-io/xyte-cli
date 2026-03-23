@@ -330,9 +330,7 @@ describe('cli integration', () => {
     const inputPath = join(tmpRoot, 'source.csv');
     writeFileSync(inputPath, 'raw', 'utf8');
 
-    await expect(
-      program.parseAsync(['node', 'xyte-cli', 'util', 'prepare', '--input', inputPath])
-    ).rejects.toThrow();
+    await expect(program.parseAsync(['node', 'xyte-cli', 'util', 'prepare', '--input', inputPath])).rejects.toThrow();
   });
 
   it('runs space import-tree in dry-run mode', async () => {
@@ -345,16 +343,7 @@ describe('cli integration', () => {
     const inputPath = join(tmpRoot, 'space-import.csv');
     writeFileSync(inputPath, 'path,space_type\nHQ/Floor 1/Room 1,office\n', 'utf8');
 
-    await program.parseAsync([
-      'node',
-      'xyte-cli',
-      'util',
-      'import-tree',
-      '--tenant',
-      'acme',
-      '--input',
-      inputPath
-    ]);
+    await program.parseAsync(['node', 'xyte-cli', 'util', 'import-tree', '--tenant', 'acme', '--input', inputPath]);
 
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     const parsed = JSON.parse(output);
@@ -595,9 +584,9 @@ describe('cli integration', () => {
       stderr: { write: vi.fn() }
     });
 
-    await expect(program.parseAsync(['node', 'xyte-cli', 'ops', 'console', '--headless', '--output', 'text'])).rejects.toThrow(
-      'Headless mode is JSON-only'
-    );
+    await expect(
+      program.parseAsync(['node', 'xyte-cli', 'ops', 'console', '--headless', '--output', 'text'])
+    ).rejects.toThrow('Headless mode is JSON-only');
     expect(runTui).not.toHaveBeenCalled();
   });
 
@@ -789,7 +778,17 @@ describe('cli integration', () => {
     expect(parsed.readiness.tenantId).toBe('env-tenant');
 
     stdout.write.mockClear();
-    await program.parseAsync(['node', 'xyte-cli', 'status', '--mode', 'fast', '--tenant', 'cli-tenant', '--output', 'json']);
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'status',
+      '--mode',
+      'fast',
+      '--tenant',
+      'cli-tenant',
+      '--output',
+      'json'
+    ]);
     output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     parsed = JSON.parse(output);
     expect(parsed.readiness.tenantId).toBe('cli-tenant');
@@ -1019,11 +1018,11 @@ describe('cli integration', () => {
 
     await expect(
       program.parseAsync([
-      'node',
-      'xyte-cli',
-      'config',
-      'key',
-      'add',
+        'node',
+        'xyte-cli',
+        'config',
+        'key',
+        'add',
         '--tenant',
         'acme',
         '--provider',
@@ -1116,10 +1115,7 @@ describe('cli integration', () => {
       );
     vi.stubGlobal('fetch', fetchMock);
 
-    await program.parseAsync(['node', 'xyte-cli',
-      'ops',
-      'watch',
-      'incidents', '--tenant', 'acme', '--once']);
+    await program.parseAsync(['node', 'xyte-cli', 'ops', 'watch', 'incidents', '--tenant', 'acme', '--once']);
 
     const lines = stdout.write.mock.calls.map((call) => String(call[0]).trim()).filter(Boolean);
     expect(lines).toHaveLength(1);
@@ -1158,7 +1154,18 @@ describe('cli integration', () => {
       );
     vi.stubGlobal('fetch', fetchMock);
 
-    await program.parseAsync(['node', 'xyte-cli', 'ops', 'watch', 'incidents', '--tenant', 'acme', '--once', '--out', outPath]);
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'ops',
+      'watch',
+      'incidents',
+      '--tenant',
+      'acme',
+      '--once',
+      '--out',
+      outPath
+    ]);
 
     const stdoutOutput = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     expect(readFileSync(outPath, 'utf8')).toBe(stdoutOutput);
@@ -1273,10 +1280,18 @@ describe('cli integration', () => {
         })
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ items: [{ id: 'inc-1', status: 'resolved' }, { id: 'inc-2', status: 'active' }] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' }
-        })
+        new Response(
+          JSON.stringify({
+            items: [
+              { id: 'inc-1', status: 'resolved' },
+              { id: 'inc-2', status: 'active' }
+            ]
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          }
+        )
       );
     vi.stubGlobal('fetch', fetchMock);
 
@@ -1377,10 +1392,7 @@ describe('cli integration', () => {
     const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
 
     await expect(
-      program.parseAsync(['node', 'xyte-cli',
-      'ops',
-      'watch',
-      'incidents', '--profile', 'devices', '--once'])
+      program.parseAsync(['node', 'xyte-cli', 'ops', 'watch', 'incidents', '--profile', 'devices', '--once'])
     ).rejects.toThrow('Invalid watch profile');
   });
 
@@ -1390,10 +1402,7 @@ describe('cli integration', () => {
     const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
 
     await expect(
-      program.parseAsync(['node', 'xyte-cli',
-      'ops',
-      'watch',
-      'incidents', '--interval-ms', '100', '--once'])
+      program.parseAsync(['node', 'xyte-cli', 'ops', 'watch', 'incidents', '--interval-ms', '100', '--once'])
     ).rejects.toThrow('Minimum is 1000ms');
   });
 
@@ -1403,10 +1412,7 @@ describe('cli integration', () => {
     const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
 
     await expect(
-      program.parseAsync(['node', 'xyte-cli',
-      'ops',
-      'watch',
-      'incidents', '--max-polls', '3601', '--once'])
+      program.parseAsync(['node', 'xyte-cli', 'ops', 'watch', 'incidents', '--max-polls', '3601', '--once'])
     ).rejects.toThrow('Maximum is 3600');
   });
 
@@ -1436,16 +1442,22 @@ describe('cli integration', () => {
           });
         }
         if (url.includes('/incidents')) {
-          return new Response(JSON.stringify({ items: [{ id: 'i1', status: 'active', created_at: new Date().toISOString() }] }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' }
-          });
+          return new Response(
+            JSON.stringify({ items: [{ id: 'i1', status: 'active', created_at: new Date().toISOString() }] }),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' }
+            }
+          );
         }
         if (url.includes('/tickets')) {
-          return new Response(JSON.stringify({ items: [{ id: 't1', status: 'open', created_at: new Date().toISOString() }] }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' }
-          });
+          return new Response(
+            JSON.stringify({ items: [{ id: 't1', status: 'open', created_at: new Date().toISOString() }] }),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' }
+            }
+          );
         }
         return new Response(JSON.stringify({}), {
           status: 200,
@@ -1454,10 +1466,7 @@ describe('cli integration', () => {
       })
     );
 
-    await program.parseAsync(['node', 'xyte-cli',
-      'ops',
-      'inspect',
-      'fleet', '--tenant', 'acme', '--render', 'json']);
+    await program.parseAsync(['node', 'xyte-cli', 'ops', 'inspect', 'fleet', '--tenant', 'acme', '--render', 'json']);
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     const parsed = JSON.parse(output);
     expect(parsed.schemaVersion).toBe('xyte.inspect.fleet.v1');
@@ -1491,16 +1500,22 @@ describe('cli integration', () => {
           });
         }
         if (url.includes('/incidents')) {
-          return new Response(JSON.stringify({ items: [{ id: 'i1', status: 'active', created_at: new Date().toISOString() }] }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' }
-          });
+          return new Response(
+            JSON.stringify({ items: [{ id: 'i1', status: 'active', created_at: new Date().toISOString() }] }),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' }
+            }
+          );
         }
         if (url.includes('/tickets')) {
-          return new Response(JSON.stringify({ items: [{ id: 't1', status: 'open', created_at: new Date().toISOString() }] }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' }
-          });
+          return new Response(
+            JSON.stringify({ items: [{ id: 't1', status: 'open', created_at: new Date().toISOString() }] }),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' }
+            }
+          );
         }
         return new Response(JSON.stringify({}), {
           status: 200,
@@ -1509,7 +1524,19 @@ describe('cli integration', () => {
       })
     );
 
-    await program.parseAsync(['node', 'xyte-cli', 'ops', 'inspect', 'fleet', '--tenant', 'acme', '--render', 'json', '--out', outPath]);
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'ops',
+      'inspect',
+      'fleet',
+      '--tenant',
+      'acme',
+      '--render',
+      'json',
+      '--out',
+      outPath
+    ]);
 
     const stdoutOutput = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     expect(readFileSync(outPath, 'utf8')).toBe(stdoutOutput);
@@ -1541,10 +1568,13 @@ describe('cli integration', () => {
         });
       }
       if (url.includes('/partner/tickets')) {
-        return new Response(JSON.stringify({ items: [{ id: 'pt1', status: 'open', created_at: new Date().toISOString() }] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' }
-        });
+        return new Response(
+          JSON.stringify({ items: [{ id: 'pt1', status: 'open', created_at: new Date().toISOString() }] }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
       }
       throw new Error(`Unexpected URL in test: ${url}`);
     });
@@ -1607,7 +1637,9 @@ describe('cli integration', () => {
       }
       if (url.includes('/partner/devices/')) {
         return new Response(
-          JSON.stringify({ device: { id: 'pd1', model: 'Model-X', firmware_version: '1.0.0', last_seen_at: new Date().toISOString() } }),
+          JSON.stringify({
+            device: { id: 'pd1', model: 'Model-X', firmware_version: '1.0.0', last_seen_at: new Date().toISOString() }
+          }),
           {
             status: 200,
             headers: { 'content-type': 'application/json' }
@@ -1622,7 +1654,9 @@ describe('cli integration', () => {
       }
       if (url.includes('/partner/tickets')) {
         return new Response(
-          JSON.stringify({ items: [{ id: 'pt1', status: 'open', title: 'Partner ticket', created_at: new Date().toISOString() }] }),
+          JSON.stringify({
+            items: [{ id: 'pt1', status: 'open', title: 'Partner ticket', created_at: new Date().toISOString() }]
+          }),
           {
             status: 200,
             headers: { 'content-type': 'application/json' }
@@ -1694,7 +1728,9 @@ describe('cli integration', () => {
       }
       if (url.includes('/partner/devices/')) {
         return new Response(
-          JSON.stringify({ device: { id: 'pd1', model: 'Model-X', firmware_version: '1.0.0', last_seen_at: new Date().toISOString() } }),
+          JSON.stringify({
+            device: { id: 'pd1', model: 'Model-X', firmware_version: '1.0.0', last_seen_at: new Date().toISOString() }
+          }),
           {
             status: 200,
             headers: { 'content-type': 'application/json' }
@@ -1709,7 +1745,9 @@ describe('cli integration', () => {
       }
       if (url.includes('/partner/tickets')) {
         return new Response(
-          JSON.stringify({ items: [{ id: 'pt1', status: 'open', title: 'Partner ticket', created_at: new Date().toISOString() }] }),
+          JSON.stringify({
+            items: [{ id: 'pt1', status: 'open', title: 'Partner ticket', created_at: new Date().toISOString() }]
+          }),
           {
             status: 200,
             headers: { 'content-type': 'application/json' }
@@ -1789,7 +1827,9 @@ describe('cli integration', () => {
       }
       if (url.includes('/partner/tickets')) {
         return new Response(
-          JSON.stringify({ items: [{ id: 'pt1', status: 'open', title: 'Partner ticket', created_at: new Date().toISOString() }] }),
+          JSON.stringify({
+            items: [{ id: 'pt1', status: 'open', title: 'Partner ticket', created_at: new Date().toISOString() }]
+          }),
           {
             status: 200,
             headers: { 'content-type': 'application/json' }
@@ -1867,10 +1907,7 @@ describe('cli integration', () => {
     const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
 
     await expect(
-      program.parseAsync(['node', 'xyte-cli',
-      'ops',
-      'inspect',
-      'fleet', '--tenant', 'acme', '--render', 'json'])
+      program.parseAsync(['node', 'xyte-cli', 'ops', 'inspect', 'fleet', '--tenant', 'acme', '--render', 'json'])
     ).rejects.toThrow('both organization and partner credentials are configured');
   });
 
@@ -1896,10 +1933,19 @@ describe('cli integration', () => {
     const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
 
     await expect(
-      program.parseAsync(['node', 'xyte-cli',
-      'ops',
-      'inspect',
-      'deep-dive', '--tenant', 'acme', '--window', '24', '--render', 'json'])
+      program.parseAsync([
+        'node',
+        'xyte-cli',
+        'ops',
+        'inspect',
+        'deep-dive',
+        '--tenant',
+        'acme',
+        '--window',
+        '24',
+        '--render',
+        'json'
+      ])
     ).rejects.toThrow('both organization and partner credentials are configured');
   });
 
@@ -1921,9 +1967,9 @@ describe('cli integration', () => {
       program.parseAsync([
         'node',
         'xyte-cli',
-      'ops',
-      'inspect',
-      'fleet',
+        'ops',
+        'inspect',
+        'fleet',
         '--tenant',
         'acme',
         '--provider-scope',
@@ -1954,9 +2000,9 @@ describe('cli integration', () => {
       program.parseAsync([
         'node',
         'xyte-cli',
-      'ops',
-      'inspect',
-      'fleet',
+        'ops',
+        'inspect',
+        'fleet',
         '--tenant',
         'acme',
         '--provider-scope',
@@ -2042,9 +2088,9 @@ describe('cli integration', () => {
       program.parseAsync([
         'node',
         'xyte-cli',
-      'ops',
-      'inspect',
-      'fleet',
+        'ops',
+        'inspect',
+        'fleet',
         '--tenant',
         'acme',
         '--provider-scope',
@@ -2070,7 +2116,15 @@ describe('cli integration', () => {
       tenantId: 'acme',
       devices: [{ id: 'd1', name: 'Device 1', status: 'offline', space: { full_path: 'Overview/A' } }],
       spaces: [{ id: 's1', name: 'Room A', space_type: 'room' }],
-      incidents: [{ id: 'i1', device_name: 'Device 1', status: 'active', space_tree_path_name: 'Overview/A', created_at: new Date().toISOString() }],
+      incidents: [
+        {
+          id: 'i1',
+          device_name: 'Device 1',
+          status: 'active',
+          space_tree_path_name: 'Overview/A',
+          created_at: new Date().toISOString()
+        }
+      ],
       tickets: [{ id: 't1', title: 'Need help', status: 'open', created_at: new Date().toISOString(), device_id: 'd1' }]
     });
     writeFileSync(inputPath, JSON.stringify(deepDive, null, 2), 'utf8');
@@ -2111,7 +2165,15 @@ describe('cli integration', () => {
       tenantId: 'acme',
       devices: [{ id: 'd1', name: 'Device 1', status: 'offline', space: { full_path: 'Overview/A' } }],
       spaces: [{ id: 's1', name: 'Room A', space_type: 'room' }],
-      incidents: [{ id: 'i1', device_name: 'Device 1', status: 'active', space_tree_path_name: 'Overview/A', created_at: new Date().toISOString() }],
+      incidents: [
+        {
+          id: 'i1',
+          device_name: 'Device 1',
+          status: 'active',
+          space_tree_path_name: 'Overview/A',
+          created_at: new Date().toISOString()
+        }
+      ],
       tickets: [{ id: 't1', title: 'Need help', status: 'open', created_at: new Date().toISOString(), device_id: 'd1' }]
     });
     writeFileSync(inputPath, JSON.stringify(deepDive, null, 2), 'utf8');
@@ -2653,9 +2715,9 @@ describe('cli integration', () => {
     const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
     const target = mkdtempSync(join(tmpdir(), 'xyte-cli-install-strict-init-'));
 
-    await expect(program.parseAsync(['node', 'xyte-cli', 'init', '--target', target, '--require-setup'])).rejects.toThrow(
-      'Missing API key for init setup'
-    );
+    await expect(
+      program.parseAsync(['node', 'xyte-cli', 'init', '--target', target, '--require-setup'])
+    ).rejects.toThrow('Missing API key for init setup');
   });
 
   it('installs only codex skill in user scope when requested', async () => {
@@ -2707,10 +2769,7 @@ describe('cli integration', () => {
     const secretStore = new MemorySecretStore();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const promptValue = vi
-      .fn()
-      .mockResolvedValueOnce('project')
-      .mockResolvedValueOnce('claude,codex');
+    const promptValue = vi.fn().mockResolvedValueOnce('project').mockResolvedValueOnce('claude,codex');
     const program = createCli({
       profileStore,
       secretStore,
@@ -2735,16 +2794,7 @@ describe('cli integration', () => {
     const program = createCli({ profileStore, secretStore, stdout: { write: vi.fn() }, stderr: { write: vi.fn() } });
 
     await expect(
-      program.parseAsync([
-        'node',
-        'xyte-cli',
-        'init',
-        '--scope',
-        'project',
-        '--agents',
-        'claude,unknown',
-        '--no-setup'
-      ])
+      program.parseAsync(['node', 'xyte-cli', 'init', '--scope', 'project', '--agents', 'claude,unknown', '--no-setup'])
     ).rejects.toThrow('Invalid agents');
   });
 
@@ -2845,11 +2895,12 @@ describe('cli integration', () => {
       stdout,
       stderr,
       upgradeDependencies: {
-        fetchImpl: vi.fn().mockImplementation(async () =>
-          new Response(JSON.stringify({ version: '0.5.0' }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' }
-          })
+        fetchImpl: vi.fn().mockImplementation(
+          async () =>
+            new Response(JSON.stringify({ version: '0.5.0' }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' }
+            })
         ),
         commandRunner,
         getCurrentVersion: () => '0.4.0'
@@ -2915,11 +2966,12 @@ describe('cli integration', () => {
       stdout,
       stderr,
       upgradeDependencies: {
-        fetchImpl: vi.fn().mockImplementation(async () =>
-          new Response(JSON.stringify({ version: '0.5.0' }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' }
-          })
+        fetchImpl: vi.fn().mockImplementation(
+          async () =>
+            new Response(JSON.stringify({ version: '0.5.0' }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' }
+            })
         ),
         commandRunner,
         installSkillsImpl,
@@ -3145,10 +3197,13 @@ describe('cli integration', () => {
         });
       }
       if (url.includes('/partner/tickets')) {
-        return new Response(JSON.stringify({ items: [{ id: 'pt-1', status: 'open', created_at: new Date().toISOString() }] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' }
-        });
+        return new Response(
+          JSON.stringify({ items: [{ id: 'pt-1', status: 'open', created_at: new Date().toISOString() }] }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
       }
       throw new Error(`Unexpected URL in test: ${url}`);
     });
@@ -3233,7 +3288,9 @@ describe('cli integration', () => {
     expect(parsed.classifications.bug).toBe(0);
     const inspectStep = parsed.steps.find((item: any) => item.stepId === 'inspect_deep_dive_daily');
     expect(inspectStep?.status).toBe('failed');
-    expect(String(inspectStep?.error?.detail ?? '')).toContain('both organization and partner credentials are configured');
+    expect(String(inspectStep?.error?.detail ?? '')).toContain(
+      'both organization and partner credentials are configured'
+    );
   });
 
   it('unblocks flow.daily-deep-dive-report with explicit partner inspect scope when both providers are configured', async () => {
@@ -3321,10 +3378,13 @@ describe('cli integration', () => {
       'fetch',
       vi.fn(async (url: string, init?: RequestInit) => {
         if (url.includes('/organization/incidents')) {
-          return new Response(JSON.stringify({ items: [{ id: 'inc-1', uuid: 'inc-1', device_id: 'dev-1', status: 'active' }] }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' }
-          });
+          return new Response(
+            JSON.stringify({ items: [{ id: 'inc-1', uuid: 'inc-1', device_id: 'dev-1', status: 'active' }] }),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' }
+            }
+          );
         }
         if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'GET') {
           return new Response(JSON.stringify({ items: [{ command: 'restart' }] }), {

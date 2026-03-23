@@ -1,11 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  confirmWriteWithToken,
-  openActionPalette,
-  parseJsonObjectInput,
-  promptChoice
-} from '../../src/tui/actions';
+import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, promptChoice } from '../../src/tui/actions';
 
 describe('tui actions helpers', () => {
   it('runs selected palette action', async () => {
@@ -49,7 +44,12 @@ describe('tui actions helpers', () => {
       setStatus: vi.fn()
     };
 
-    const ok = await confirmWriteWithToken({ context, actionLabel: 'Resolve ticket', token: 'resolve', cancelStatus: 'canceled' });
+    const ok = await confirmWriteWithToken({
+      context,
+      actionLabel: 'Resolve ticket',
+      token: 'resolve',
+      cancelStatus: 'canceled'
+    });
     expect(ok).toBe(false);
     expect(context.setStatus).toHaveBeenCalledWith('canceled');
   });

@@ -38,10 +38,13 @@ export async function openActionPalette(args: {
     return;
   }
 
-  const lines = [args.title, ...args.actions.map((action, index) => {
-    const disabled = action.enabled === false ? ' (disabled)' : '';
-    return `${index + 1}. ${action.label}${disabled}`;
-  })];
+  const lines = [
+    args.title,
+    ...args.actions.map((action, index) => {
+      const disabled = action.enabled === false ? ' (disabled)' : '';
+      return `${index + 1}. ${action.label}${disabled}`;
+    })
+  ];
 
   const raw = await args.context.prompt(`${lines.join('\n')}\n\nSelect action number:`, '');
   if (raw === undefined || raw.trim() === '') {
@@ -107,7 +110,9 @@ export async function promptChoice(
   return args.choices[selectedIndex];
 }
 
-export function parseJsonObjectInput(value: string): { ok: true; value: Record<string, unknown> } | { ok: false; error: string } {
+export function parseJsonObjectInput(
+  value: string
+): { ok: true; value: Record<string, unknown> } | { ok: false; error: string } {
   try {
     const parsed = JSON.parse(value);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {

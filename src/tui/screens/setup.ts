@@ -63,10 +63,19 @@ export function createSetupScreen(): TuiScreen {
     const checklist = panels.find((panel) => panel.id === 'setup-checklist');
 
     statsBox?.setContent((overview?.stats ?? []).map((stat) => `${stat.label}: ${stat.value}`).join('\n'));
-    setListTableData(providerTable, [
-      (providers?.table?.columns ?? ['Provider', 'Slots', 'Active Slot', 'Has Secret']) as [string, string, string, string],
-      ...((providers?.table?.rows ?? []) as Array<[string, string, string, string]>)
-    ], providerSelectionSync);
+    setListTableData(
+      providerTable,
+      [
+        (providers?.table?.columns ?? ['Provider', 'Slots', 'Active Slot', 'Has Secret']) as [
+          string,
+          string,
+          string,
+          string
+        ],
+        ...((providers?.table?.rows ?? []) as Array<[string, string, string, string]>)
+      ],
+      providerSelectionSync
+    );
     selectedProviderIndex = clampIndex(selectedProviderIndex, readiness.providers.length);
     syncListSelection(providerTable, selectedProviderIndex, providerSelectionSync);
     checklistBox?.setContent((checklist?.text?.lines ?? []).join('\n'));
@@ -251,7 +260,8 @@ export function createSetupScreen(): TuiScreen {
             context.setStatus('Set an active tenant first (a/u).');
             return true;
           }
-          const selectedProvider = providerRowsState[clampIndex(selectedProviderIndex, providerRowsState.length)] ?? PROVIDER_ORG;
+          const selectedProvider =
+            providerRowsState[clampIndex(selectedProviderIndex, providerRowsState.length)] ?? PROVIDER_ORG;
           const result = await runKeyCreateWizard({
             context,
             tenantId,

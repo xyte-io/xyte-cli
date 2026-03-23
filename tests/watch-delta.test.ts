@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  computeDelta,
-  normalizeIncidents,
-  resolveIncidentId,
-  stableNormalize
-} from '../src/workflows/watch';
+import { computeDelta, normalizeIncidents, resolveIncidentId, stableNormalize } from '../src/workflows/watch';
 
 describe('stableNormalize', () => {
   it('sorts object keys deterministically', () => {

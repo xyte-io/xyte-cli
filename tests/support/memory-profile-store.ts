@@ -98,7 +98,10 @@ export class MemoryProfileStore implements ProfileStore {
     return structuredClone(provider ? slots.filter((slot) => slot.provider === provider) : slots);
   }
 
-  async addKeySlot(tenantId: string, input: { provider: SecretProvider; name: string; slotId?: string; fingerprint: string }): Promise<ApiKeySlotMeta> {
+  async addKeySlot(
+    tenantId: string,
+    input: { provider: SecretProvider; name: string; slotId?: string; fingerprint: string }
+  ): Promise<ApiKeySlotMeta> {
     const tenant = this.getRequiredTenant(tenantId);
     tenant.keyRegistry = tenant.keyRegistry ?? emptyRegistry();
     const registry = tenant.keyRegistry;

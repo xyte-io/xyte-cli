@@ -68,17 +68,21 @@ export function buildIsolatedEnv(
   const appData = path.join(dirs.homeDir, 'AppData', 'Roaming');
   const xdgConfigHome = path.join(dirs.homeDir, '.config');
 
-  return setEnvPathValue({
-    ...baseEnv,
-    HOME: dirs.homeDir,
-    USERPROFILE: dirs.homeDir,
-    APPDATA: appData,
-    XDG_CONFIG_HOME: xdgConfigHome,
-    XYTE_CLI_CONFIG_DIR: dirs.configDir,
-    NPM_CONFIG_PREFIX: dirs.prefixDir,
-    npm_config_prefix: dirs.prefixDir,
-    npm_config_cache: dirs.npmCacheDir
-  }, getEnvPathValue(baseEnv, platform), platform);
+  return setEnvPathValue(
+    {
+      ...baseEnv,
+      HOME: dirs.homeDir,
+      USERPROFILE: dirs.homeDir,
+      APPDATA: appData,
+      XDG_CONFIG_HOME: xdgConfigHome,
+      XYTE_CLI_CONFIG_DIR: dirs.configDir,
+      NPM_CONFIG_PREFIX: dirs.prefixDir,
+      npm_config_prefix: dirs.prefixDir,
+      npm_config_cache: dirs.npmCacheDir
+    },
+    getEnvPathValue(baseEnv, platform),
+    platform
+  );
 }
 
 export function runCommand(command: string, args: string[], options: RunCommandOptions = {}): Promise<CommandResult> {

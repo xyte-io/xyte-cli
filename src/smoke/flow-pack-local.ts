@@ -112,7 +112,8 @@ function parseEnvelopeStatus(result: CommandOutcome): number | null {
     return null;
   }
   const rec = payload as Record<string, unknown>;
-  const responseObj = rec.response && typeof rec.response === 'object' ? (rec.response as Record<string, unknown>) : undefined;
+  const responseObj =
+    rec.response && typeof rec.response === 'object' ? (rec.response as Record<string, unknown>) : undefined;
   if (typeof responseObj?.status === 'number') {
     return responseObj.status;
   }
@@ -172,7 +173,13 @@ function ensure(condition: unknown, message: string): asserts condition {
   }
 }
 
-function pushStep(steps: SmokeSummaryStep[], id: string, status: SmokeSummaryStep['status'], reason: string, extra: Record<string, unknown> = {}): void {
+function pushStep(
+  steps: SmokeSummaryStep[],
+  id: string,
+  status: SmokeSummaryStep['status'],
+  reason: string,
+  extra: Record<string, unknown> = {}
+): void {
   steps.push({
     id,
     status,
@@ -216,7 +223,11 @@ async function getMockState(baseUrl: string): Promise<Record<string, unknown>> {
   return (await response.json()) as Record<string, unknown>;
 }
 
-async function runChecked(command: string, args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): Promise<CommandOutcome> {
+async function runChecked(
+  command: string,
+  args: string[],
+  options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}
+): Promise<CommandOutcome> {
   const result = await runCommand(command, args, {
     cwd: options.cwd ?? process.cwd(),
     env: options.env ?? process.env,
@@ -235,8 +246,23 @@ async function runChecked(command: string, args: string[], options: { cwd?: stri
   return result;
 }
 
-async function runFlow(env: NodeJS.ProcessEnv, outDir: string, flowId: string, extraArgs: string[] = []): Promise<Record<string, unknown>> {
-  const args = ['flow', 'run', flowId, '--tenant', env.XYTE_FLOW_TENANT ?? '', '--out-dir', outDir, '--strict-json', ...extraArgs];
+async function runFlow(
+  env: NodeJS.ProcessEnv,
+  outDir: string,
+  flowId: string,
+  extraArgs: string[] = []
+): Promise<Record<string, unknown>> {
+  const args = [
+    'flow',
+    'run',
+    flowId,
+    '--tenant',
+    env.XYTE_FLOW_TENANT ?? '',
+    '--out-dir',
+    outDir,
+    '--strict-json',
+    ...extraArgs
+  ];
   const result = await runChecked(XYTE_COMMAND, args, { env });
   const raw = parseJsonSafe(result.stdout);
   const payload = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
@@ -275,12 +301,29 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   await resetMock(args.baseUrl);
   pushStep(steps, 'mock_reset', 'pass', 'Mock state reset.');
 
-  await runChecked(XYTE_COMMAND, ['config', 'tenant', 'add', args.tenant, '--hub-url', args.baseUrl, '--entry-url', args.baseUrl], { env });
+  await runChecked(
+    XYTE_COMMAND,
+    ['config', 'tenant', 'add', args.tenant, '--hub-url', args.baseUrl, '--entry-url', args.baseUrl],
+    { env }
+  );
   pushStep(steps, 'tenant_add', 'pass', `Tenant ${args.tenant} added for ${args.baseUrl}.`);
 
   await runChecked(
     XYTE_COMMAND,
-    ['config', 'key', 'add', '--tenant', args.tenant, '--provider', 'xyte-org', '--name', 'local', '--key', 'local-key', '--set-active'],
+    [
+      'config',
+      'key',
+      'add',
+      '--tenant',
+      args.tenant,
+      '--provider',
+      'xyte-org',
+      '--name',
+      'local',
+      '--key',
+      'local-key',
+      '--set-active'
+    ],
     { env }
   );
   pushStep(steps, 'key_add', 'pass', 'Local org key configured.');
@@ -288,13 +331,21 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const setupFlow = await runFlow(env, outDir, 'flow.setup-readiness-10m');
   ensure(setupFlow.outcome === 'completed', 'flow.setup-readiness-10m did not complete.');
   const setupSteps = setupFlow.steps as Array<{ status: string }>;
-  ensure(setupSteps.every((step) => step.status === 'completed'), 'setup flow had non-completed steps.');
+  ensure(
+    setupSteps.every((step) => step.status === 'completed'),
+    'setup flow had non-completed steps.'
+  );
   ensure(existsSync(String(setupFlow.bundleDir)), 'setup flow bundle was not created.');
   pushStep(steps, 'flow_setup', 'pass', 'Setup readiness flow completed.');
 
-  const watchOnce = await runChecked(XYTE_COMMAND, ['ops', 'watch', 'incidents', '--tenant', args.tenant, '--profile', 'incidents-active', '--once', '--strict-json'], { env });
+  const watchOnce = await runChecked(
+    XYTE_COMMAND,
+    ['ops', 'watch', 'incidents', '--tenant', args.tenant, '--profile', 'incidents-active', '--once', '--strict-json'],
+    { env }
+  );
   const watchOnceRaw = parseJsonSafe(watchOnce.stdout);
-  const watchOnceFrame = watchOnceRaw && typeof watchOnceRaw === 'object' ? (watchOnceRaw as Record<string, unknown>) : {};
+  const watchOnceFrame =
+    watchOnceRaw && typeof watchOnceRaw === 'object' ? (watchOnceRaw as Record<string, unknown>) : {};
   ensure(watchOnceFrame.schemaVersion === 'xyte.watch.frame.v1', 'watch once did not emit xyte.watch.frame.v1.');
   ensure(watchOnceFrame.eventType === 'snapshot', 'watch once did not emit a snapshot frame.');
   const watchOnceItems = watchOnceFrame.items as unknown[];
@@ -303,47 +354,105 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 
   const watchLoop = await runChecked(
     XYTE_COMMAND,
-    ['ops', 'watch', 'incidents', '--tenant', args.tenant, '--profile', 'incidents-active', '--interval-ms', '1000', '--max-polls', '3', '--strict-json'],
+    [
+      'ops',
+      'watch',
+      'incidents',
+      '--tenant',
+      args.tenant,
+      '--profile',
+      'incidents-active',
+      '--interval-ms',
+      '1000',
+      '--max-polls',
+      '3',
+      '--strict-json'
+    ],
     { env }
   );
   const loopFrames = parseNdjson(watchLoop.stdout) as Array<Record<string, unknown>>;
   ensure(loopFrames.length === 3, `Expected 3 loop watch frames, got ${loopFrames.length}.`);
   ensure(loopFrames[0]?.eventType === 'snapshot', 'Loop watch first frame was not snapshot.');
-  ensure(loopFrames.slice(1).every((frame) => frame.eventType === 'heartbeat' || frame.eventType === 'delta'), 'Loop watch follow-up frames were invalid.');
-  pushStep(steps, 'watch_loop', 'pass', `Loop watch emitted ${loopFrames.length} frames (${loopFrames.map((frame) => frame.eventType).join(', ')}).`);
+  ensure(
+    loopFrames.slice(1).every((frame) => frame.eventType === 'heartbeat' || frame.eventType === 'delta'),
+    'Loop watch follow-up frames were invalid.'
+  );
+  pushStep(
+    steps,
+    'watch_loop',
+    'pass',
+    `Loop watch emitted ${loopFrames.length} frames (${loopFrames.map((frame) => frame.eventType).join(', ')}).`
+  );
 
   const watchFlow = await runFlow(env, outDir, 'flow.incidents-delta-watch', ['--once']);
   ensure(watchFlow.outcome === 'completed', 'flow.incidents-delta-watch did not complete.');
   const watchSteps = watchFlow.steps as Array<{ status: string }>;
-  ensure(watchSteps.every((step) => step.status === 'completed'), 'watch flow had non-completed steps.');
+  ensure(
+    watchSteps.every((step) => step.status === 'completed'),
+    'watch flow had non-completed steps.'
+  );
   pushStep(steps, 'flow_watch', 'pass', 'Incidents delta watch flow completed.');
 
   const triagePlan = await runFlow(env, outDir, 'flow.watch-to-triage', ['--once']);
   ensure(triagePlan.outcome === 'pending_gate', 'flow.watch-to-triage did not stop at the human gate.');
-  ensure(existsSync(path.join(String(triagePlan.bundleDir), 'outputs', 'xyte-triage.md')), 'Triage report was not generated.');
-  const triageApply = await runFlow(env, outDir, 'flow.watch-to-triage', ['--apply', '--resume', String(triagePlan.runId)]);
+  ensure(
+    existsSync(path.join(String(triagePlan.bundleDir), 'outputs', 'xyte-triage.md')),
+    'Triage report was not generated.'
+  );
+  const triageApply = await runFlow(env, outDir, 'flow.watch-to-triage', [
+    '--apply',
+    '--resume',
+    String(triagePlan.runId)
+  ]);
   ensure(triageApply.outcome === 'completed', 'flow.watch-to-triage did not complete on resume.');
   pushStep(steps, 'flow_triage', 'pass', 'Watch-to-triage flow produced artifacts and resumed cleanly.');
 
   const dailyPlan = await runFlow(env, outDir, 'flow.daily-deep-dive-report', ['--once']);
   ensure(dailyPlan.outcome === 'pending_gate', 'flow.daily-deep-dive-report did not stop at the human gate.');
-  ensure(existsSync(path.join(String(dailyPlan.bundleDir), 'outputs', 'xyte-daily.md')), 'Daily markdown report was not generated.');
-  const dailyApply = await runFlow(env, outDir, 'flow.daily-deep-dive-report', ['--apply', '--resume', String(dailyPlan.runId)]);
+  ensure(
+    existsSync(path.join(String(dailyPlan.bundleDir), 'outputs', 'xyte-daily.md')),
+    'Daily markdown report was not generated.'
+  );
+  const dailyApply = await runFlow(env, outDir, 'flow.daily-deep-dive-report', [
+    '--apply',
+    '--resume',
+    String(dailyPlan.runId)
+  ]);
   ensure(dailyApply.outcome === 'completed', 'flow.daily-deep-dive-report did not complete on resume.');
   pushStep(steps, 'flow_daily', 'pass', 'Daily deep-dive report flow produced artifacts and resumed cleanly.');
 
-  let remediation = await runFlow(env, outDir, 'flow.guided-remediation', ['--once', '--var', 'ticket_id=t1', '--var', 'command=restart']);
+  let remediation = await runFlow(env, outDir, 'flow.guided-remediation', [
+    '--once',
+    '--var',
+    'ticket_id=t1',
+    '--var',
+    'command=restart'
+  ]);
   ensure(remediation.outcome === 'pending_gate', 'flow.guided-remediation did not stop at the first gate.');
-  ensure(remediation.nextResumeStepId === 'gate_send_command', 'Guided remediation did not stop at send-command gate first.');
+  ensure(
+    remediation.nextResumeStepId === 'gate_send_command',
+    'Guided remediation did not stop at send-command gate first.'
+  );
 
   const remediationGateOrder = ['gate_update_device', 'gate_ticket_message', 'gate_close_incident'];
   for (const expectedGate of remediationGateOrder) {
-    remediation = await runFlow(env, outDir, 'flow.guided-remediation', ['--apply', '--resume', String(remediation.runId)]);
+    remediation = await runFlow(env, outDir, 'flow.guided-remediation', [
+      '--apply',
+      '--resume',
+      String(remediation.runId)
+    ]);
     ensure(remediation.outcome === 'pending_gate', `Guided remediation did not stop at ${expectedGate}.`);
-    ensure(remediation.nextResumeStepId === expectedGate, `Guided remediation expected next gate ${expectedGate}, got ${String(remediation.nextResumeStepId)}.`);
+    ensure(
+      remediation.nextResumeStepId === expectedGate,
+      `Guided remediation expected next gate ${expectedGate}, got ${String(remediation.nextResumeStepId)}.`
+    );
   }
 
-  remediation = await runFlow(env, outDir, 'flow.guided-remediation', ['--apply', '--resume', String(remediation.runId)]);
+  remediation = await runFlow(env, outDir, 'flow.guided-remediation', [
+    '--apply',
+    '--resume',
+    String(remediation.runId)
+  ]);
   ensure(remediation.outcome === 'completed', 'Guided remediation did not complete after final approval.');
 
   const state = await getMockState(args.baseUrl);
@@ -353,13 +462,20 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const deviceTwo = stateDevices.find((device) => device.id === 'd2');
   const stateTickets = Array.isArray(state.tickets) ? (state.tickets as Array<Record<string, unknown>>) : [];
   const ticket = stateTickets.find((item) => item.id === 't1');
-  const commandsObj = state.commands && typeof state.commands === 'object' ? (state.commands as Record<string, unknown>) : {};
+  const commandsObj =
+    state.commands && typeof state.commands === 'object' ? (state.commands as Record<string, unknown>) : {};
   const commands = Array.isArray(commandsObj.d2) ? (commandsObj.d2 as Array<Record<string, unknown>>) : [];
   ensure(activeIncidents.length === 0, 'Guided remediation did not clear the active incident in mock state.');
-  ensure(deviceTwo?.name === 'Remediated d2', `Guided remediation did not update device name, got ${String(deviceTwo?.name ?? 'missing')}.`);
+  ensure(
+    deviceTwo?.name === 'Remediated d2',
+    `Guided remediation did not update device name, got ${String(deviceTwo?.name ?? 'missing')}.`
+  );
   const ticketMessages = Array.isArray(ticket?.messages) ? (ticket.messages as unknown[]) : [];
   ensure(ticketMessages.length === 1, 'Guided remediation did not send a ticket message.');
-  ensure(commands.some((item) => item.command === 'restart'), 'Guided remediation did not record the restart command.');
+  ensure(
+    commands.some((item) => item.command === 'restart'),
+    'Guided remediation did not record the restart command.'
+  );
   pushStep(steps, 'flow_guided', 'pass', 'Guided remediation completed and mutated mock state as expected.');
 
   process.stdout.write(`${renderSummary(steps)}\n`);

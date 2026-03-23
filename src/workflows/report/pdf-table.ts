@@ -119,7 +119,12 @@ function tableWidth(columns: TableColumn[]): number {
   return columns.reduce((sum, column) => sum + column.width, 0);
 }
 
-function measureTableRowHeight(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, columns: TableColumn[], row: string[]): number {
+function measureTableRowHeight(
+  doc: PDFKit.PDFDocument,
+  ctx: PdfRenderContext,
+  columns: TableColumn[],
+  row: string[]
+): number {
   doc.font(ctx.fonts.regular).fontSize(9.5);
   const lineHeight = doc.currentLineHeight();
   let maxTextHeight = lineHeight;
@@ -145,11 +150,21 @@ function measureTableRowHeight(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, c
 
 function drawHorizontalRule(doc: PDFKit.PDFDocument, x: number, y: number, width: number, thickness: number): void {
   doc.save();
-  doc.moveTo(x, y).lineTo(x + width, y).lineWidth(thickness).strokeColor(REPORT_THEME.border.default).stroke();
+  doc
+    .moveTo(x, y)
+    .lineTo(x + width, y)
+    .lineWidth(thickness)
+    .strokeColor(REPORT_THEME.border.default)
+    .stroke();
   doc.restore();
 }
 
-function fitHeaderCellFontSize(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, text: string, innerWidth: number): number {
+function fitHeaderCellFontSize(
+  doc: PDFKit.PDFDocument,
+  ctx: PdfRenderContext,
+  text: string,
+  innerWidth: number
+): number {
   for (let size = 9; size >= 7; size -= 0.5) {
     doc.font(ctx.fonts.medium).fontSize(size);
     if (doc.widthOfString(text, { characterSpacing: 0.3 }) <= innerWidth) {
@@ -174,13 +189,17 @@ function drawTableHeader(doc: PDFKit.PDFDocument, ctx: PdfRenderContext, columns
     const header = column.header.toUpperCase();
     const innerWidth = column.width - PDF_LAYOUT.tableCellPadLeft - PDF_LAYOUT.tableCellPadRight;
     const fontSize = fitHeaderCellFontSize(doc, ctx, header, innerWidth);
-    doc.font(ctx.fonts.medium).fontSize(fontSize).fillColor(REPORT_THEME.accent.strong).text(header, cursorX + PDF_LAYOUT.tableCellPadLeft, y + PDF_LAYOUT.tableCellPadTop, {
-      width: innerWidth,
-      align: column.align ?? 'left',
-      lineBreak: false,
-      ellipsis: false,
-      characterSpacing: 0.3
-    });
+    doc
+      .font(ctx.fonts.medium)
+      .fontSize(fontSize)
+      .fillColor(REPORT_THEME.accent.strong)
+      .text(header, cursorX + PDF_LAYOUT.tableCellPadLeft, y + PDF_LAYOUT.tableCellPadTop, {
+        width: innerWidth,
+        align: column.align ?? 'left',
+        lineBreak: false,
+        ellipsis: false,
+        characterSpacing: 0.3
+      });
     cursorX += column.width;
   });
 
@@ -211,14 +230,18 @@ function drawTableRow(
     const value = row[columnIndex] ?? '';
     const customColor = getCellTextColor?.({ rowIndex, columnIndex, value });
     const wraps = column.wrap !== false;
-    doc.font(ctx.fonts.regular).fontSize(9.5).fillColor(customColor ?? REPORT_THEME.text.primary).text(value, cursorX + PDF_LAYOUT.tableCellPadLeft, y + PDF_LAYOUT.tableCellPadTop, {
-      width: column.width - PDF_LAYOUT.tableCellPadLeft - PDF_LAYOUT.tableCellPadRight,
-      height: rowHeight - PDF_LAYOUT.tableCellPadTop - PDF_LAYOUT.tableCellPadBottom,
-      align: column.align ?? 'left',
-      lineBreak: wraps,
-      ellipsis: false,
-      lineGap: 0
-    });
+    doc
+      .font(ctx.fonts.regular)
+      .fontSize(9.5)
+      .fillColor(customColor ?? REPORT_THEME.text.primary)
+      .text(value, cursorX + PDF_LAYOUT.tableCellPadLeft, y + PDF_LAYOUT.tableCellPadTop, {
+        width: column.width - PDF_LAYOUT.tableCellPadLeft - PDF_LAYOUT.tableCellPadRight,
+        height: rowHeight - PDF_LAYOUT.tableCellPadTop - PDF_LAYOUT.tableCellPadBottom,
+        align: column.align ?? 'left',
+        lineBreak: wraps,
+        ellipsis: false,
+        lineGap: 0
+      });
     cursorX += column.width;
   });
 
@@ -242,9 +265,13 @@ export function drawTable(
   if (!args.rows.length) {
     drawSectionTitle(doc, ctx, args.title);
     ensurePageSpace(doc, ctx, 30);
-    doc.font(ctx.fonts.regular).fontSize(10).fillColor(REPORT_THEME.text.secondary).text(args.emptyMessage ?? 'No data available.', {
-      width: availableWidth
-    });
+    doc
+      .font(ctx.fonts.regular)
+      .fontSize(10)
+      .fillColor(REPORT_THEME.text.secondary)
+      .text(args.emptyMessage ?? 'No data available.', {
+        width: availableWidth
+      });
     doc.y += PDF_LAYOUT.sectionGap;
     return;
   }

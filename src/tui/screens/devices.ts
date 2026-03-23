@@ -39,14 +39,18 @@ export async function sendCommandWithGuard(args: SendCommandWithGuardArgs): Prom
     return false;
   }
 
-  const ok = await confirmWriteWithToken({ context: args.context, actionLabel: 'Send command', token: 'command', cancelStatus: 'Send command canceled.' });
+  const ok = await confirmWriteWithToken({
+    context: args.context,
+    actionLabel: 'Send command',
+    token: 'command',
+    cancelStatus: 'Send command canceled.'
+  });
   if (!ok) {
     return false;
   }
 
-  const body: Record<string, unknown> = args.template.mode === 'command'
-    ? { command: args.template.value }
-    : { friendly_name: args.template.value };
+  const body: Record<string, unknown> =
+    args.template.mode === 'command' ? { command: args.template.value } : { friendly_name: args.template.value };
   if (args.params && Object.keys(args.params).length > 0) {
     body.params = args.params;
   }
@@ -120,18 +124,25 @@ export function createDevicesScreen(): TuiScreen {
 
     try {
       if (renderErrors.frozen) {
-        setListTableData(table, [
-          ['ID', 'Name', 'Status', 'Space'],
-          ...filtered.map((device, index) => {
-            const d = device && typeof device === 'object' ? (device as Record<string, unknown>) : {} as Record<string, unknown>;
-            return [
-              String(d.id ?? d._id ?? `row-${index + 1}`),
-              String(d.name ?? d.title ?? 'n/a'),
-              String(d.status ?? d.state ?? 'unknown'),
-              String(d.space_name ?? d.space_id ?? 'n/a')
-            ];
-          })
-        ], selectionSync);
+        setListTableData(
+          table,
+          [
+            ['ID', 'Name', 'Status', 'Space'],
+            ...filtered.map((device, index) => {
+              const d =
+                device && typeof device === 'object'
+                  ? (device as Record<string, unknown>)
+                  : ({} as Record<string, unknown>);
+              return [
+                String(d.id ?? d._id ?? `row-${index + 1}`),
+                String(d.name ?? d.title ?? 'n/a'),
+                String(d.status ?? d.state ?? 'unknown'),
+                String(d.space_name ?? d.space_id ?? 'n/a')
+              ];
+            })
+          ],
+          selectionSync
+        );
         detail?.setContent(
           [
             'Render fallback mode enabled.',
@@ -150,10 +161,14 @@ export function createDevicesScreen(): TuiScreen {
         const tablePanel = panels.find((panel) => panel.id === 'devices-table');
         const detailPanel = panels.find((panel) => panel.id === 'devices-detail');
 
-        setListTableData(table, [
-          (tablePanel?.table?.columns ?? ['ID', 'Name', 'Status', 'Space']) as [string, string, string, string],
-          ...((tablePanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
-        ], selectionSync);
+        setListTableData(
+          table,
+          [
+            (tablePanel?.table?.columns ?? ['ID', 'Name', 'Status', 'Space']) as [string, string, string, string],
+            ...((tablePanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
+          ],
+          selectionSync
+        );
         detail?.setContent((detailPanel?.text?.lines ?? ['No matching devices.']).join('\n'));
       }
       renderErrors.recordSuccess();
@@ -174,20 +189,31 @@ export function createDevicesScreen(): TuiScreen {
         screen: 'devices'
       });
 
-      setListTableData(table, [
-        ['ID', 'Name', 'Status', 'Space'],
-        ...filtered.map((device, index) => {
-          const d = device && typeof device === 'object' ? (device as Record<string, unknown>) : {} as Record<string, unknown>;
-          return [
-            String(d.id ?? d._id ?? `row-${index + 1}`),
-            String(d.name ?? d.title ?? 'n/a'),
-            String(d.status ?? d.state ?? 'unknown'),
-            String(d.space_name ?? d.space_id ?? 'n/a')
-          ];
-        })
-      ], selectionSync);
+      setListTableData(
+        table,
+        [
+          ['ID', 'Name', 'Status', 'Space'],
+          ...filtered.map((device, index) => {
+            const d =
+              device && typeof device === 'object'
+                ? (device as Record<string, unknown>)
+                : ({} as Record<string, unknown>);
+            return [
+              String(d.id ?? d._id ?? `row-${index + 1}`),
+              String(d.name ?? d.title ?? 'n/a'),
+              String(d.status ?? d.state ?? 'unknown'),
+              String(d.space_name ?? d.space_id ?? 'n/a')
+            ];
+          })
+        ],
+        selectionSync
+      );
       detail?.setContent(
-        ['Unable to render device detail safely.', `Reason: ${message}`, 'Try narrowing search/filter and refresh.'].join('\n')
+        [
+          'Unable to render device detail safely.',
+          `Reason: ${message}`,
+          'Try narrowing search/filter and refresh.'
+        ].join('\n')
       );
     }
     syncListSelection(table, selectedIndex, selectionSync);

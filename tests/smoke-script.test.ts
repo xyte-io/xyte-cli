@@ -29,7 +29,11 @@ describe('external live smoke script', () => {
         return { code: 0, stdout: 'Skill manifests are present and actionable for xyte-cli automation.', stderr: '' };
       }
       if (args[0] === 'status') {
-        return { code: 0, stdout: '{"schemaVersion":"xyte.status.v1","mode":"fast","readiness":{"state":"missing"}}', stderr: '' };
+        return {
+          code: 0,
+          stdout: '{"schemaVersion":"xyte.status.v1","mode":"fast","readiness":{"state":"missing"}}',
+          stderr: ''
+        };
       }
       if (args[0] === 'setup' && args[1] === 'run') {
         return { code: 0, stdout: '{}', stderr: '' };
@@ -71,15 +75,15 @@ describe('external live smoke script', () => {
     expect(calls[0].args.join(' ')).toBe('pack --json');
     expect(calls[1].args.join(' ')).toBe(`install --global ${tarballPath}`);
     expect(calls[2].args.join(' ')).toBe('status --mode fast --output json');
-    expect(calls[3].args.join(' ')).toBe(
-      `init --scope both --agents all --target ${workspaceDir} --force --no-setup`
-    );
+    expect(calls[3].args.join(' ')).toBe(`init --scope both --agents all --target ${workspaceDir} --force --no-setup`);
     expect(calls[4].command).toMatch(/node(\.exe)?/);
     expect(calls[4].args[0]).toBe('-e');
     expect(calls[5].args.join(' ')).toBe('setup run --non-interactive --tenant acme --key-stdin');
     expect(calls[5].input).toBe('real-key\n');
     expect(calls[6].args.join(' ')).toBe('setup status --tenant acme --output json');
-    expect(calls[7].args.join(' ')).toBe('api call organization.devices.getDevices --tenant acme --output-mode envelope --strict-json');
+    expect(calls[7].args.join(' ')).toBe(
+      'api call organization.devices.getDevices --tenant acme --output-mode envelope --strict-json'
+    );
     expect(pathExistsFn).toHaveBeenCalled();
     expect(rmFn).toHaveBeenCalledWith(tempRoot, { recursive: true, force: true });
     expect(unlinkFn).toHaveBeenCalledWith(tarballPath);
@@ -150,7 +154,11 @@ describe('external live smoke script', () => {
         return { code: 0, stdout: '', stderr: '' };
       }
       if (args[0] === 'status') {
-        return { code: 0, stdout: '{"schemaVersion":"xyte.status.v1","mode":"fast","readiness":{"state":"missing"}}', stderr: '' };
+        return {
+          code: 0,
+          stdout: '{"schemaVersion":"xyte.status.v1","mode":"fast","readiness":{"state":"missing"}}',
+          stderr: ''
+        };
       }
       if (args[0] === 'install') {
         return { code: 0, stdout: '', stderr: '' };

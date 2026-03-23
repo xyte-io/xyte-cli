@@ -1,6 +1,8 @@
 import type { PartnerNamespace, XyteCallArgs } from '../../types/client';
 
-export function createPartnerNamespace(call: (endpointKey: string, args?: XyteCallArgs) => Promise<unknown>): PartnerNamespace {
+export function createPartnerNamespace(
+  call: (endpointKey: string, args?: XyteCallArgs) => Promise<unknown>
+): PartnerNamespace {
   return {
     deleteDevice: (args) => call('partner.devices.deleteDevice', args),
     getCommands: (args) => call('partner.devices.getCommands', args),

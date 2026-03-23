@@ -178,10 +178,7 @@ export function registerLogsCommands(parent: Command, ctx: CliContext): void {
           maxAgeMs,
           dryRun: options.dryRun === true
         });
-        const removedBytes = result.removed.reduce(
-          (sum, item) => sum + (beforeMap.get(item)?.sizeBytes ?? 0),
-          0
-        );
+        const removedBytes = result.removed.reduce((sum, item) => sum + (beforeMap.get(item)?.sizeBytes ?? 0), 0);
 
         if (
           resolveTextJsonOutput({
