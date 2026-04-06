@@ -2,6 +2,7 @@ import rawEndpoints from '../spec/public-endpoints.json';
 import type { PublicEndpointSpec } from '../types/endpoints';
 import {
   buildFriendlyClaimDeviceProfile,
+  buildFriendlyMoveDeviceProfile,
   buildFriendlySpaceImportProfile,
   buildGenericEndpointProfile,
   type UtilityActionProfile
@@ -27,6 +28,9 @@ function buildProfiles(): UtilityActionProfile[] {
     if (endpoint.key === 'organization.devices.claimDevice') {
       profiles.set(endpoint.key, buildFriendlyClaimDeviceProfile(endpoint));
       continue;
+    }
+    if (endpoint.key === 'organization.devices.moveDevice') {
+      profiles.set('device.move', buildFriendlyMoveDeviceProfile(endpoint));
     }
     profiles.set(endpoint.key, buildGenericEndpointProfile(endpoint));
   }

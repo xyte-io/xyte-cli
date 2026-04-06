@@ -5,7 +5,12 @@ import { UTILITY_BATCH_SCHEMA_VERSION } from '../contracts/versions';
 import { errorMessage } from '../utils/error-format';
 import type { XyteClient, XyteCallResult } from '../types/client';
 
-export type UtilityBatchCommand = 'space.import-tree';
+export type UtilityBatchCommand = 'space.import-tree' | 'device.move';
+
+export interface UtilityBatchValidationOutcome {
+  skip: true;
+  reason: string;
+}
 
 export interface UtilityBatchOperation {
   rowIndex: number;
@@ -16,7 +21,10 @@ export interface UtilityBatchOperation {
     query?: Record<string, string | number | boolean | null | undefined>;
     body?: unknown;
   };
-  validate?: () => void;
+  validate?: (
+    client: XyteClient,
+    tenantId: string
+  ) => void | UtilityBatchValidationOutcome | Promise<void | UtilityBatchValidationOutcome>;
   execute: (client: XyteClient, tenantId: string) => Promise<XyteCallResult<unknown>>;
 }
 
@@ -98,7 +106,12 @@ export async function runUtilityBatch(args: {
     const operation = args.operations[index];
 
     try {
-      operation.validate?.();
+      const validation = await operation.validate?.(args.client, args.tenantId);
+      if (validation?.skip) {
+        totals.skipped += 1;
+        writeReportLine(args.reportPath, reportLine(operation, 'skipped', { reason: validation.reason }));
+        continue;
+      }
       if (args.apply) {
         const response = await operation.execute(args.client, args.tenantId);
         totals.succeeded += 1;

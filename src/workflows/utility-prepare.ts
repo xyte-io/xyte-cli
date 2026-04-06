@@ -41,7 +41,7 @@ interface UtilityPrepareResult {
     apply: string;
     verify: string;
   };
-  executionSupport: 'space.import-tree' | 'call-loop-only';
+  executionSupport: UtilityExecutionSupport;
 }
 
 const TABULAR_EXTENSIONS = new Set(['.csv', '.tsv', '.xlsx', '.xls', '.json', '.jsonl', '.ndjson']);
@@ -118,6 +118,18 @@ function buildSuggestedCommands(
         'After each update, read back the device and verify the targeted fields changed as expected.'
       ].join(' '),
       apply: `xyte-cli api call organization.devices.updateDevice --tenant ${tenant} --path-json '{"device_id":"<device_id>"}' --body-json '{"name":"<updated-name>"}'`,
+      verify: `xyte-cli api call organization.devices.getDevice --tenant ${tenant} --path-json '{"device_id":"<device_id>"}'`
+    };
+  }
+
+  if (profile.actionKey === 'device.move') {
+    return {
+      next: [
+        `Review ${primaryPath}.`,
+        'Validate the target_space_id column before any writes.',
+        'Run util move-devices without --apply first and only execute after the dry-run report looks correct.'
+      ].join(' '),
+      apply: `xyte-cli util move-devices --tenant ${tenant} --input ${primaryPath} --apply --report ${path.join(outputDir, 'device-move.apply.ndjson')}`,
       verify: `xyte-cli api call organization.devices.getDevice --tenant ${tenant} --path-json '{"device_id":"<device_id>"}'`
     };
   }

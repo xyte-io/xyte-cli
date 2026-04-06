@@ -1,0 +1,224 @@
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+
+import Fuse from 'fuse.js';
+
+import { DEVICE_MATCH_SCHEMA_VERSION } from '../contracts/versions';
+import { isRecord } from '../utils/json';
+import { loadInputRows } from '../utils/input-parser';
+
+type MatchStatus = 'exact' | 'fuzzy' | 'unmatched';
+const EXACT_SCORE_TOLERANCE = 1e-9;
+
+interface DeviceMatchRow {
+  deviceId: string;
+  deviceName: string;
+  targetSpaceId?: string;
+  targetSpaceName?: string;
+  confidence: number;
+  status: MatchStatus;
+}
+
+export interface DeviceMatchResult {
+  schemaVersion: typeof DEVICE_MATCH_SCHEMA_VERSION;
+  generatedAtUtc: string;
+  tenantId?: string;
+  sourcePath: string;
+  targetPath: string;
+  sourceField: string;
+  targetField: string;
+  outputPath: string;
+  summaryPath: string;
+  totals: {
+    rows: number;
+    exact: number;
+    fuzzy: number;
+    unmatched: number;
+  };
+  matches: DeviceMatchRow[];
+}
+
+interface MatchTarget {
+  id: string;
+  name: string;
+  [key: string]: string;
+}
+
+function quoteCsvField(value: string): string {
+  if (!/[",\n\r]/.test(value)) {
+    return value;
+  }
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+function writeCsv(outputPath: string, rows: DeviceMatchRow[]): void {
+  const lines = ['device_id,device_name,target_space_id,target_space_name,confidence'];
+  for (const row of rows) {
+    lines.push(
+      [
+        row.deviceId,
+        row.deviceName,
+        row.targetSpaceId ?? '',
+        row.targetSpaceName ?? '',
+        row.confidence.toFixed(3)
+      ]
+        .map((value) => quoteCsvField(value))
+        .join(',')
+    );
+  }
+  writeFileSync(outputPath, `${lines.join('\n')}\n`, 'utf8');
+}
+
+function toObjectRows(items: unknown[]): Array<Record<string, unknown>> {
+  return items.map((item, index) => {
+    if (!isRecord(item)) {
+      throw new Error(`JSON row ${index + 1} must be an object.`);
+    }
+    return item;
+  });
+}
+
+function extractRowsFromJson(value: unknown): Array<Record<string, unknown>> | undefined {
+  if (Array.isArray(value)) {
+    return toObjectRows(value);
+  }
+
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  if (Array.isArray(value.items)) {
+    return toObjectRows(value.items);
+  }
+
+  if (isRecord(value.response)) {
+    const nested = extractRowsFromJson(value.response);
+    if (nested) {
+      return nested;
+    }
+  }
+
+  if (isRecord(value.data)) {
+    const nested = extractRowsFromJson(value.data);
+    if (nested) {
+      return nested;
+    }
+  }
+
+  return undefined;
+}
+
+function loadMatchRows(inputPath: string): Array<Record<string, unknown>> {
+  const resolved = path.resolve(inputPath);
+  const raw = readFileSync(resolved, 'utf8');
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    const parsed = JSON.parse(trimmed) as unknown;
+    const extracted = extractRowsFromJson(parsed);
+    if (extracted) {
+      return extracted;
+    }
+  }
+
+  return loadInputRows(resolved, 'auto').rows;
+}
+
+function requireStringField(row: Record<string, unknown>, fieldName: string, rowIndex: number): string {
+  const value = row[fieldName];
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    throw new Error(`Row ${rowIndex}: field "${fieldName}" must be a string or number.`);
+  }
+  const normalized = String(value).trim();
+  if (!normalized) {
+    throw new Error(`Row ${rowIndex}: field "${fieldName}" cannot be empty.`);
+  }
+  return normalized;
+}
+
+export function runDeviceMatch(args: {
+  sourcePath: string;
+  targetPath: string;
+  sourceField: string;
+  targetField: string;
+  outputPath: string;
+  tenantId?: string;
+}): DeviceMatchResult {
+  const sourcePath = path.resolve(args.sourcePath);
+  const targetPath = path.resolve(args.targetPath);
+  const outputPath = path.resolve(args.outputPath);
+  const summaryPath = `${outputPath}.summary.json`;
+
+  const sourceRows = loadMatchRows(sourcePath);
+  const targetRows = loadMatchRows(targetPath);
+  const targets: MatchTarget[] = targetRows.map((row, index) => {
+    const targetName = requireStringField(row, args.targetField, index + 1);
+    return {
+      id: requireStringField(row, 'id', index + 1),
+      name: targetName,
+      [args.targetField]: targetName
+    };
+  });
+  const fuse = new Fuse(targets, {
+    keys: [args.targetField],
+    includeScore: true
+  });
+
+  const matches: DeviceMatchRow[] = sourceRows.map((row, index) => {
+    const rowIndex = index + 1;
+    const deviceId = requireStringField(row, 'id', rowIndex);
+    const deviceName = requireStringField(row, args.sourceField, rowIndex);
+    const bestMatch = fuse.search(deviceName, { limit: 1 })[0];
+
+    if (!bestMatch) {
+      return {
+        deviceId,
+        deviceName,
+        confidence: 0,
+        status: 'unmatched'
+      };
+    }
+
+    if (typeof bestMatch.score !== 'number') {
+      throw new Error(`Fuse result for device ${deviceId} is missing a score.`);
+    }
+
+    const status: MatchStatus = bestMatch.score <= EXACT_SCORE_TOLERANCE ? 'exact' : 'fuzzy';
+    return {
+      deviceId,
+      deviceName,
+      targetSpaceId: bestMatch.item.id,
+      targetSpaceName: bestMatch.item.name,
+      confidence: Number((1 - bestMatch.score).toFixed(3)),
+      status
+    };
+  });
+
+  mkdirSync(path.dirname(outputPath), { recursive: true });
+  writeCsv(outputPath, matches);
+
+  const result: DeviceMatchResult = {
+    schemaVersion: DEVICE_MATCH_SCHEMA_VERSION,
+    generatedAtUtc: new Date().toISOString(),
+    ...(args.tenantId ? { tenantId: args.tenantId } : {}),
+    sourcePath,
+    targetPath,
+    sourceField: args.sourceField,
+    targetField: args.targetField,
+    outputPath,
+    summaryPath,
+    totals: {
+      rows: matches.length,
+      exact: matches.filter((row) => row.status === 'exact').length,
+      fuzzy: matches.filter((row) => row.status === 'fuzzy').length,
+      unmatched: matches.filter((row) => row.status === 'unmatched').length
+    },
+    matches
+  };
+
+  writeFileSync(summaryPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
+  return result;
+}

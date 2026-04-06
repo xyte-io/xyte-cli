@@ -5,6 +5,8 @@ import type { UtilityInputFormat } from '../../utils/input-parser';
 import type { UtilityPreparePrimaryFormat } from '../../workflows/utility-action-profiles';
 import { runUtilityPrepare, listUtilityPrepareActions } from '../../workflows/utility-prepare';
 import { runSpaceImportTree } from '../../workflows/utility-commands';
+import { runDeviceMatch } from '../../workflows/match';
+import { runMoveDevices } from '../../workflows/move-devices';
 import {
   type CliContext,
   type CliGlobalOptions,
@@ -138,6 +140,81 @@ async function handleUtilImportTree(
   }
 }
 
+async function handleUtilMoveDevices(
+  ctx: CliContext,
+  options: {
+    tenant?: string;
+    input: string;
+    inputFormat?: string;
+    apply?: boolean;
+    continueOnError?: boolean;
+    report?: string;
+    strictJson?: boolean;
+  }
+): Promise<void> {
+  const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
+  const tenantId = options.tenant ?? settings.values.defaults.tenant;
+  if (!tenantId) {
+    throw new CliUserError({
+      summary: 'Missing tenant for util move-devices.',
+      suggestedCommands: [
+        'Use --tenant <tenant-id>',
+        'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>'
+      ]
+    });
+  }
+  const client = await ctx.withClient({ tenantId });
+  const result = await runMoveDevices({
+    client,
+    tenantId,
+    inputPath: options.input,
+    inputFormat: parseUtilityInputFormat(options.inputFormat),
+    apply: options.apply === true,
+    continueOnError: options.continueOnError === true,
+    reportPath: options.report
+  });
+  printJson(ctx.stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+  if (result.totals.failed > 0) {
+    process.exitCode = 1;
+  }
+}
+
+async function handleUtilMatch(
+  ctx: CliContext,
+  options: {
+    tenant?: string;
+    source: string;
+    target: string;
+    sourceField: string;
+    targetField: string;
+    output?: string;
+    globalOutput?: string;
+    strictJson?: boolean;
+  }
+): Promise<void> {
+  const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
+  const outputPath =
+    options.output ??
+    (options.globalOutput && options.globalOutput !== 'auto' && options.globalOutput !== 'json' && options.globalOutput !== 'text'
+      ? options.globalOutput
+      : undefined);
+  if (!outputPath) {
+    throw new CliUserError({
+      summary: 'Missing output path for util match.',
+      suggestedCommands: ['Use --output <path>']
+    });
+  }
+  const result = runDeviceMatch({
+    sourcePath: options.source,
+    targetPath: options.target,
+    sourceField: options.sourceField,
+    targetField: options.targetField,
+    outputPath,
+    tenantId: options.tenant ?? settings.values.defaults.tenant
+  });
+  printJson(ctx.stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+}
+
 export function registerUtilCommands(parent: Command, ctx: CliContext): void {
   const util = parent.command('util').description('Utility preprocessing and import workflows');
   util.addHelpText(
@@ -147,7 +224,9 @@ export function registerUtilCommands(parent: Command, ctx: CliContext): void {
       'Examples:',
       '  xyte-cli util list-actions --output text',
       '  xyte-cli util prepare --action organization.devices.claimDevice --tenant <tenant-id> --input ./claims.csv',
-      '  xyte-cli util import-tree --tenant <tenant-id> --input ./space-import.csv'
+      '  xyte-cli util import-tree --tenant <tenant-id> --input ./space-import.csv',
+      '  xyte-cli util move-devices --tenant <tenant-id> --input ./device-moves.csv',
+      '  xyte-cli util match --source ./source-devices.json --target ./target-spaces.json --source-field name --target-field name --output ./device-moves.csv'
     ].join('\n')
   );
   util
@@ -223,4 +302,53 @@ export function registerUtilCommands(parent: Command, ctx: CliContext): void {
         await handleUtilImportTree(ctx, options);
       }
     );
+
+  util
+    .command('move-devices')
+    .description('Validate and move devices into target spaces from a file-defined mapping')
+    .requiredOption('--input <path>', 'Input path (CSV/JSON/JSONL)')
+    .option('--tenant <tenantId>', 'Tenant id override')
+    .option('--input-format <format>', 'auto|csv|json|jsonl', 'auto')
+    .option('--apply', 'Apply changes (default is dry-run)')
+    .option('--continue-on-error', 'Continue processing rows after failures')
+    .option('--report <path>', 'Write NDJSON row report file')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(
+      async (options: {
+        tenant?: string;
+        input: string;
+        inputFormat?: string;
+        apply?: boolean;
+        continueOnError?: boolean;
+        report?: string;
+        strictJson?: boolean;
+      }) => {
+        await handleUtilMoveDevices(ctx, options);
+      }
+    );
+
+  util
+    .command('match')
+    .description('Compute deterministic device-to-space matches and emit a move CSV plus JSON summary')
+    .requiredOption('--source <path>', 'Source device JSON path')
+    .requiredOption('--target <path>', 'Target space JSON path')
+    .requiredOption('--source-field <name>', 'Source field containing the device name')
+    .requiredOption('--target-field <name>', 'Target field containing the target space name')
+    .option('--output <path>', 'Output CSV path')
+    .option('--tenant <tenantId>', 'Tenant id override for summary metadata')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(async function (options: {
+      tenant?: string;
+      source: string;
+      target: string;
+      sourceField: string;
+      targetField: string;
+      output?: string;
+      strictJson?: boolean;
+    }) {
+      await handleUtilMatch(ctx, {
+        ...options,
+        globalOutput: (this.optsWithGlobals() as CliGlobalOptions).output
+      });
+    });
 }
