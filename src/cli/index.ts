@@ -704,7 +704,13 @@ export function createCli(runtime: CliRuntime = {}): Command {
     prompt,
     readStdin,
     resolveSettings,
-    withClient
+    withClient,
+    logAction(event, data, level) {
+      if (!actionLogger?.enabled) {
+        return;
+      }
+      actionLogger.log(event, data, level);
+    }
   };
 
   program

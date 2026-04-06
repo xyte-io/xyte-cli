@@ -21,6 +21,39 @@ export function parseQueryJson(
   return out;
 }
 
+export function parseQueryString(values: string[] | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+
+  for (const entry of values ?? []) {
+    const segments = String(entry)
+      .split('&')
+      .map((segment) => segment.trim());
+
+    for (const segment of segments) {
+      if (!segment) {
+        throw new Error('Invalid --query segment: expected key=value.');
+      }
+
+      const separator = segment.indexOf('=');
+      if (separator <= 0) {
+        throw new Error(`Invalid --query segment: ${segment}. Use key=value.`);
+      }
+
+      const key = segment.slice(0, separator).trim();
+      const value = segment.slice(separator + 1);
+      if (!key) {
+        throw new Error(`Invalid --query segment: ${segment}. Key cannot be empty.`);
+      }
+      if (Object.prototype.hasOwnProperty.call(out, key)) {
+        throw new Error(`Duplicate query parameter: ${key}.`);
+      }
+      out[key] = value;
+    }
+  }
+
+  return out;
+}
+
 export function parsePositiveIntegerOption(value: string | undefined, fallback: number, label: string): number {
   if (!value) {
     return fallback;

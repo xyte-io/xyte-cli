@@ -1,5 +1,6 @@
 import type { Command } from 'commander';
 
+import type { CliActionLogLevel } from './action-logger';
 import type { ProfileStore } from '../secure/profile-store';
 import type { SecretStore } from '../secure/secret-store';
 import type { XyteClient } from '../types/client';
@@ -34,6 +35,7 @@ export interface CliContext {
     retry?: { attempts?: number; backoffMs?: number };
     flagOverrides?: Partial<Record<SettingKey, unknown>>;
   }) => Promise<XyteClient>;
+  logAction?: (event: string, data?: Record<string, unknown>, level?: CliActionLogLevel) => void;
 }
 
 export interface CliGlobalOptions {

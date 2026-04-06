@@ -8,7 +8,7 @@ import { toProblemDetails } from '../../http/problem-mapper';
 import { CliUserError } from '../../contracts/user-error';
 import { isMutatingMethod } from '../../client/catalog';
 import { parseJsonObject } from '../../utils/json';
-import { parseQueryJson } from '../parse-options';
+import { parseQueryJson, parseQueryString } from '../parse-options';
 import {
   type CliContext,
   type CliGlobalOptions,
@@ -74,11 +74,17 @@ async function handleApiEndpointsDescribe(
 interface ApiCallOptions {
   tenant?: string;
   pathJson?: string;
+  query?: string[];
   queryJson?: string;
   bodyJson?: string;
+  note?: string;
   outputMode?: string;
   output?: string;
   strictJson?: boolean;
+}
+
+function collectQueryEntries(value: string, previous: string[] = []): string[] {
+  return [...previous, value];
 }
 
 async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptions): Promise<void> {
@@ -99,7 +105,14 @@ async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptio
   const requestId = randomUUID();
   const tenantId = tenantOverride ?? settings.values.defaults.tenant;
   const path = parsePathJson(options.pathJson);
-  const query = parseQueryJson(options.queryJson);
+  if ((options.query?.length ?? 0) > 0 && options.queryJson) {
+    throw new CliUserError({
+      summary: 'Conflicting query flags.',
+      cause: 'Use either --query or --query-json, not both.',
+      suggestedCommands: ['Use --query key=value', 'Use --query-json \'{"key":"value"}\'']
+    });
+  }
+  const query = (options.query?.length ?? 0) > 0 ? parseQueryString(options.query) : parseQueryJson(options.queryJson);
   let body: unknown;
   if (options.bodyJson) {
     try {
@@ -111,15 +124,35 @@ async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptio
   }
   const strictJson = resolveStrictJson({ strictJson: options.strictJson, settings });
   const mutating = isMutatingMethod(method);
+  const note = options.note?.trim() || undefined;
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
 
   const envelopeBase = {
     requestId,
     tenantId,
     endpointKey: key,
     method,
+    ...(note ? { note } : {}),
     guard: { allowWrite: mutating },
     request: { path, query, body }
   };
+
+  if (note) {
+    ctx.logAction?.('api.call.note', {
+      commandPath: 'xyte-cli api call',
+      endpointKey: key,
+      note,
+      mutating,
+      outputMode
+    });
+    if (mutating && outputMode === 'raw' && output === 'text') {
+      ctx.stdout.write(`Note: ${note}\n`);
+    }
+  }
 
   try {
     const client = await ctx.withClient({ tenantId });
@@ -145,11 +178,6 @@ async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptio
       return;
     }
 
-    const output = resolveTextJsonOutput({
-      output: options.output,
-      stdoutIsTTY: ctx.stdoutIsTTY,
-      settings
-    });
     if (output === 'text') {
       ctx.stdout.write(`${JSON.stringify(result.data, null, 2)}\n`);
       return;
@@ -211,8 +239,10 @@ export function registerApiCommands(parent: Command, ctx: CliContext): void {
     .description('Call endpoint by key')
     .option('--tenant <tenantId>', 'Tenant id')
     .option('--path-json <json>', 'Path params JSON object')
+    .option('--query <entry>', 'Query param key=value (repeatable or ampersand-separated)', collectQueryEntries, [])
     .option('--query-json <json>', 'Query params JSON object')
     .option('--body-json <json>', 'Body JSON object')
+    .option('--note <text>', 'Attach a human note to the call and action log')
     .option('--output-mode <mode>', 'raw|envelope', 'raw')
     .option('--strict-json', 'Fail on non-serializable output')
     .action(async function (key: string, options: ApiCallOptions) {
