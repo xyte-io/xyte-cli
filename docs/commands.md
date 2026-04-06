@@ -9,6 +9,7 @@ Use it as a unified map for flow runner execution, utility pipelines, and endpoi
 - [`flow.incidents-delta-watch`](flows/agent-ops.md#flowincidents-delta-watch): stream incident snapshots and deltas as watch frames.
 - [`flow.watch-to-triage`](flows/agent-ops.md#flowwatch-to-triage): convert watch output into inspect/report triage artifacts.
 - [`flow.guided-remediation`](flows/agent-ops.md#flowguided-remediation): execute org command/ticket/incident actions with verification.
+- [`flow.device-migration`](flows/agent-ops.md#flowdevice-migration): inventory, match, dry-run, execute, and verify device migration.
 - [`flow.daily-deep-dive-report`](flows/agent-ops.md#flowdaily-deep-dive-report): produce daily deep-dive JSON and markdown report outputs.
 
 ## Flow Commands

@@ -18,8 +18,8 @@ import {
   formatDeepDiveAscii,
   formatDeepDiveMarkdown,
   formatFleetInspectAscii,
-  generateFleetReport,
-  parseDeepDiveForReport
+  generateOpsReport,
+  parseReportInput
 } from '../../workflows/fleet-insights';
 import { runWatch, WATCH_MIN_INTERVAL_MS, WATCH_MAX_POLLS } from '../../workflows/watch';
 import type { SettingKey } from '../../config/settings';
@@ -404,19 +404,20 @@ async function handleOpsReportGenerate(
 
   const render = resolveRenderMode(options, ['markdown', 'pdf'], 'pdf');
 
-  let deepDive = parseDeepDiveForReport(raw, tenantId);
-  if (!deepDive.tenantName) {
+  let reportInput = parseReportInput(raw, tenantId);
+  if (reportInput.schemaVersion === 'xyte.inspect.deep-dive.v1' && !reportInput.tenantName) {
     const tenantProfile = await ctx.profileStore.getTenant(tenantId);
     if (tenantProfile?.name) {
-      deepDive = {
-        ...deepDive,
+      reportInput = {
+        ...reportInput,
         tenantName: tenantProfile.name
       };
     }
   }
 
-  const generated = await generateFleetReport({
-    deepDive,
+  const generated = await generateOpsReport({
+    input: reportInput,
+    tenantId,
     format: render as 'markdown' | 'pdf',
     outPath: options.out,
     includeSensitive: options.includeSensitive === true || settings.values.report.includeSensitive

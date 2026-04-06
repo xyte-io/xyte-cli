@@ -16,7 +16,7 @@ import { buildFlowRunSummary } from '../src/contracts/flow-run';
 import { buildStatusContract } from '../src/contracts/status';
 import { buildWatchFrame } from '../src/contracts/watch-frame';
 import { buildUpgradeCheck } from '../src/contracts/upgrade';
-import { buildDeepDive, buildFleetInspect, generateFleetReport } from '../src/workflows/fleet-insights';
+import { buildDeepDive, buildFleetInspect, generateFleetReport, generateOpsReport } from '../src/workflows/fleet-insights';
 import { runHeadlessRenderer } from '../src/tui/headless-renderer';
 import { MemorySecretStore } from '../src/secure/secret-store';
 import { MemoryProfileStore } from './support/memory-profile-store';
@@ -89,6 +89,67 @@ describe('schema contracts', () => {
     });
 
     expect(validateReport(report)).toBe(true);
+  });
+
+  it('validates migration report payloads from match and move summaries', async () => {
+    const matchReport = await generateOpsReport({
+      input: {
+        schemaVersion: 'xyte.device.match.v1',
+        generatedAtUtc: new Date().toISOString(),
+        tenantId: 'acme',
+        sourcePath: '/tmp/source.json',
+        targetPath: '/tmp/target.json',
+        sourceField: 'name',
+        targetField: 'name',
+        outputPath: '/tmp/device-moves.csv',
+        summaryPath: '/tmp/device-moves.csv.summary.json',
+        totals: {
+          rows: 1,
+          exact: 1,
+          fuzzy: 0,
+          unmatched: 0
+        },
+        matches: [
+          {
+            deviceId: 'dev-1',
+            deviceName: 'South Wing Display',
+            targetSpaceId: '99592',
+            targetSpaceName: 'South Wing',
+            confidence: 1,
+            status: 'exact'
+          }
+        ]
+      },
+      tenantId: 'acme',
+      format: 'markdown',
+      outPath: '/tmp/xyte-match-report.md',
+      includeSensitive: false
+    });
+
+    const moveReport = await generateOpsReport({
+      input: {
+        schemaVersion: 'xyte.utility.batch.v1',
+        generatedAtUtc: new Date().toISOString(),
+        tenantId: 'acme',
+        command: 'device.move',
+        mode: 'apply',
+        totals: {
+          rows: 3,
+          succeeded: 2,
+          failed: 0,
+          skipped: 1
+        },
+        stoppedEarly: false,
+        reportPath: '/tmp/device-migration.apply.ndjson'
+      },
+      tenantId: 'acme',
+      format: 'markdown',
+      outPath: '/tmp/xyte-move-report.md',
+      includeSensitive: false
+    });
+
+    expect(validateReport(matchReport)).toBe(true);
+    expect(validateReport(moveReport)).toBe(true);
   });
 
   it('validates headless runtime frame payload', async () => {

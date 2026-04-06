@@ -26,13 +26,15 @@ import { isRecord } from '../utils/json';
 import { runWatch } from './watch';
 import { runUtilityPrepare } from './utility-prepare';
 import { runSpaceImportTree } from './utility-commands';
+import { runDeviceMatch } from './match';
+import { runMoveDevices } from './move-devices';
 import {
   buildDeepDive,
   buildFleetInspect,
   collectFleetSnapshot,
-  generateFleetReport,
+  generateOpsReport,
   InspectProviderScopeError,
-  parseDeepDiveForReport
+  parseReportInput
 } from './fleet-insights';
 import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';
 import type { BuiltInFlowDefinition, FlowTaskStep } from './flow-catalog';
@@ -275,7 +277,7 @@ async function appendNdjson(targetPath: string, payload: unknown): Promise<void>
 }
 
 function buildReportInputNeedsDataMessage(stepId: string, inputStepId: string, cause: unknown): string {
-  const base = `Step ${stepId} requires deep-dive output from ${inputStepId}.`;
+  const base = `Step ${stepId} requires report-compatible output from ${inputStepId}.`;
   if (!(cause instanceof Error) || cause.message.trim().length === 0) {
     return base;
   }
@@ -367,15 +369,16 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
         throw new Error(`Flow step ${step.id} is missing report configuration.`);
       }
       const input = ctx.taskOutputs.get(step.report.inputFromStepId);
-      let deepDiveForReport;
+      let reportInput;
       try {
-        deepDiveForReport = parseDeepDiveForReport(input, ctx.args.tenantId);
+        reportInput = parseReportInput(input, ctx.args.tenantId);
       } catch (error) {
         throw new FlowNeedsInputError(buildReportInputNeedsDataMessage(step.id, step.report.inputFromStepId, error));
       }
       const outPath = path.join(ctx.outputsDir, step.report.outFileName);
-      const generated = await generateFleetReport({
-        deepDive: deepDiveForReport,
+      const generated = await generateOpsReport({
+        input: reportInput,
+        tenantId: ctx.args.tenantId,
         format: step.report.format,
         outPath,
         includeSensitive: step.report.includeSensitive === true
@@ -513,9 +516,58 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
       if (step.utilityPrepare.actionKey === 'organization.devices.claimDevice') {
         contextUpdates.claim_prepare_csv = result.artifacts.primary;
       }
+      if (step.utilityPrepare.actionKey === 'device.move') {
+        contextUpdates.device_move_csv = result.artifacts.primary;
+      }
       return {
         output: result,
         contextUpdates
+      };
+    }
+    case 'device.match': {
+      if (!step.deviceMatch) {
+        throw new Error(`Flow step ${step.id} is missing device match configuration.`);
+      }
+      const sourcePath = path.resolve(resolveTemplateString(step.deviceMatch.sourcePath, ctx.resolvedContext));
+      const targetPath = path.resolve(resolveTemplateString(step.deviceMatch.targetPath, ctx.resolvedContext));
+      const outputPath = path.join(ctx.outputsDir, path.basename(step.deviceMatch.outputPath));
+      const result = runDeviceMatch({
+        sourcePath,
+        targetPath,
+        sourceField: step.deviceMatch.sourceField,
+        targetField: step.deviceMatch.targetField,
+        outputPath,
+        tenantId: ctx.args.tenantId
+      });
+      return {
+        output: result,
+        contextUpdates: {
+          match_csv: result.outputPath,
+          match_summary_json: result.summaryPath
+        }
+      };
+    }
+    case 'device.move-batch': {
+      if (!step.deviceMoveBatch) {
+        throw new Error(`Flow step ${step.id} is missing device move batch configuration.`);
+      }
+      const inputPath = path.resolve(resolveTemplateString(step.deviceMoveBatch.inputPath, ctx.resolvedContext));
+      const reportPath = path.join(ctx.outputsDir, path.basename(step.deviceMoveBatch.reportPath));
+      const result = await runMoveDevices({
+        client: ctx.args.client,
+        tenantId: ctx.args.tenantId,
+        inputPath,
+        apply: step.deviceMoveBatch.apply,
+        continueOnError: step.deviceMoveBatch.continueOnError === true,
+        reportPath
+      });
+      return {
+        output: result,
+        contextUpdates: {
+          ...(step.deviceMoveBatch.apply
+            ? { execute_moves_report_path: reportPath }
+            : { dry_run_moves_report_path: reportPath })
+        }
       };
     }
     case 'space.import-tree': {
@@ -872,6 +924,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
         stepState.endedAtUtc = nowIso();
         stepState.durationMs = Date.now() - stepStartedAt;
         stepState.artifactPath = artifactPath;
+        ctx.resolvedContext[`${step.id}_artifact`] = artifactPath;
 
         if (result.watchFrames && result.watchFrames.length > 0) {
           for (const frame of result.watchFrames) {
@@ -892,7 +945,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
           ctx.resolvedContext[`${step.id}_output`] = primaryOutputPath;
         }
 
-        if (result.contextUpdates || primaryOutputPath) {
+        if (result.contextUpdates || primaryOutputPath || artifactPath) {
           await persistFlowRunInputs(ctx, args, effectiveInspectProviderScope);
         }
 

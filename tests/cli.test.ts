@@ -83,6 +83,92 @@ describe('cli integration', () => {
     expect(calledUrl).toContain('space_type=customer');
   });
 
+  it('passes --query shorthand filters through call requests', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ items: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'api',
+      'call',
+      'organization.spaces.getSpaces',
+      '--tenant',
+      'acme',
+      '--query',
+      'path_includes=Regional Offices&name=South Wing'
+    ]);
+
+    const calledUrl = String(fetchMock.mock.calls[0][0]);
+    expect(calledUrl).toContain('path_includes=Regional+Offices');
+    expect(calledUrl).toContain('name=South+Wing');
+  });
+
+  it('records api call notes in envelope output and action logs', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const tmpRoot = mkdtempSync(join(tmpdir(), 'xyte-cli-note-log-'));
+    const logPath = join(tmpRoot, 'actions.ndjson');
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      '--log-actions-path',
+      logPath,
+      'api',
+      'call',
+      'organization.devices.moveDevice',
+      '--tenant',
+      'acme',
+      '--path-json',
+      '{"device_id":"dev-1"}',
+      '--body-json',
+      '{"space_id":99592}',
+      '--note',
+      'Moving dev-1 into South Wing',
+      '--output-mode',
+      'envelope'
+    ]);
+
+    const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(parsed.note).toBe('Moving dev-1 into South Wing');
+    const logEntries = readFileSync(logPath, 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    expect(logEntries.some((entry) => entry.event === 'api.call.note' && entry.data?.note === 'Moving dev-1 into South Wing')).toBe(true);
+  });
+
   it('rejects removed device endpoint metadata lookups', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();
@@ -270,6 +356,38 @@ describe('cli integration', () => {
     expect(existsSync(join(outputDir, 'organization-devices-claimdevice.notes.md'))).toBe(true);
   });
 
+  it('builds utility prepare for device.move and scaffolds files', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const tmpRoot = mkdtempSync(join(tmpdir(), 'xyte-cli-utility-prepare-move-'));
+    const inputPath = join(tmpRoot, 'source.json');
+    const outputDir = join(tmpRoot, 'out');
+    writeFileSync(inputPath, '[]', 'utf8');
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'util',
+      'prepare',
+      '--input',
+      inputPath,
+      '--action',
+      'device.move',
+      '--tenant',
+      'acme',
+      '--output-dir',
+      outputDir
+    ]);
+
+    const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(parsed.actionKey).toBe('device.move');
+    expect(parsed.executionSupport).toBe('device.move');
+    expect(existsSync(join(outputDir, 'device-move.csv'))).toBe(true);
+  });
+
   it('builds utility prepare for space.import-tree and scaffolds files', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();
@@ -318,6 +436,7 @@ describe('cli integration', () => {
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     const parsed = JSON.parse(output);
     expect(Array.isArray(parsed)).toBe(true);
+    expect(parsed.some((item: any) => item.actionKey === 'device.move')).toBe(true);
     expect(parsed.some((item: any) => item.actionKey === 'organization.devices.claimDevice')).toBe(true);
     expect(parsed.some((item: any) => item.actionKey === 'space.import-tree')).toBe(true);
   });
@@ -350,6 +469,92 @@ describe('cli integration', () => {
     expect(parsed.schemaVersion).toBe('xyte.utility.batch.v1');
     expect(parsed.command).toBe('space.import-tree');
     expect(parsed.mode).toBe('dry-run');
+  });
+
+  it('runs util match and writes csv plus summary sidecar', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const tmpRoot = mkdtempSync(join(tmpdir(), 'xyte-cli-match-'));
+    const sourcePath = join(tmpRoot, 'devices.json');
+    const targetPath = join(tmpRoot, 'target-spaces.json');
+    const outputPath = join(tmpRoot, 'device-moves.csv');
+    writeFileSync(sourcePath, '[{"id":"dev-1","name":"South Wing Display"}]', 'utf8');
+    writeFileSync(targetPath, '[{"id":"99592","name":"South Wing"}]', 'utf8');
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'util',
+      'match',
+      '--source',
+      sourcePath,
+      '--target',
+      targetPath,
+      '--source-field',
+      'name',
+      '--target-field',
+      'name',
+      '--output',
+      outputPath
+    ]);
+
+    const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(parsed.schemaVersion).toBe('xyte.device.match.v1');
+    expect(existsSync(outputPath)).toBe(true);
+    expect(existsSync(`${outputPath}.summary.json`)).toBe(true);
+  });
+
+  it('runs util move-devices in dry-run mode against the move endpoint contract', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const tmpRoot = mkdtempSync(join(tmpdir(), 'xyte-cli-move-devices-'));
+    const inputPath = join(tmpRoot, 'device-moves.csv');
+    const reportPath = join(tmpRoot, 'move-report.ndjson');
+    writeFileSync(inputPath, 'device_id,target_space_id\ndev-1,99592\n', 'utf8');
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/organization/devices/dev-1')) {
+        return new Response(JSON.stringify({ id: 'dev-1', name: 'Room 1', space_id: 55123 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/spaces?') && url.includes('id=99592')) {
+        return new Response(JSON.stringify({ items: [{ id: 99592, name: 'Room 1' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'util',
+      'move-devices',
+      '--tenant',
+      'acme',
+      '--input',
+      inputPath,
+      '--report',
+      reportPath
+    ]);
+
+    const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(parsed.command).toBe('device.move');
+    expect(parsed.mode).toBe('dry-run');
+    expect(existsSync(reportPath)).toBe(true);
   });
 
   it('does not expose device bulk-rename command', async () => {
@@ -3507,6 +3712,58 @@ describe('cli integration', () => {
     expect(parsed.classifications.bug).toBe(0);
     const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
     expect(calledUrls.every((url) => url.includes('/partner/'))).toBe(true);
+  });
+
+  it('runs flow.device-migration in plan mode and stops at the mapping gate', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const outDir = mkdtempSync(join(tmpdir(), 'xyte-flow-run-device-migration-'));
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/organization/devices?') && url.includes('space_id=900')) {
+        return new Response(JSON.stringify({ items: [{ id: 'dev-1', name: 'South Wing Display', space_id: 900 }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/spaces?') && url.includes('path_includes=Regional+Offices')) {
+        return new Response(JSON.stringify({ items: [{ id: 99592, name: 'South Wing' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'flow',
+      'run',
+      'flow.device-migration',
+      '--tenant',
+      'acme',
+      '--out-dir',
+      outDir,
+      '--var',
+      'source_space_id=900',
+      '--var',
+      'target_path_includes=Regional Offices'
+    ]);
+
+    const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(parsed.resolvedFlowId).toBe('flow.device-migration');
+    expect(parsed.outcome).toBe('pending_gate');
+    expect(parsed.nextResumeStepId).toBe('gate_approve_mapping');
+    expect(parsed.steps.find((item: any) => item.stepId === 'match_devices')?.status).toBe('completed');
+    expect(parsed.steps.find((item: any) => item.stepId === 'pre_migration_report')?.status).toBe('completed');
   });
 
   it('returns needs_input when flow inspect scope is auto and both providers are configured', async () => {

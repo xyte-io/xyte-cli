@@ -4,9 +4,11 @@ import { z } from 'zod';
 
 import { asRecord, safeString } from '../utils/json';
 import {
+  DEVICE_MATCH_SCHEMA_VERSION,
   INSPECT_DEEP_DIVE_SCHEMA_VERSION,
   INSPECT_FLEET_SCHEMA_VERSION,
-  REPORT_SCHEMA_VERSION
+  REPORT_SCHEMA_VERSION,
+  UTILITY_BATCH_SCHEMA_VERSION
 } from '../contracts/versions';
 import { parseTimestamp } from './report/time-format';
 
@@ -105,6 +107,56 @@ const DeepDiveResultSchema = z.object({
   })
 });
 
+const DeviceMatchRowSchema = z.object({
+  deviceId: z.string(),
+  deviceName: z.string(),
+  targetSpaceId: z.string().optional(),
+  targetSpaceName: z.string().optional(),
+  confidence: z.number(),
+  status: z.enum(['exact', 'fuzzy', 'unmatched'])
+});
+
+const DeviceMatchResultSchema = z.object({
+  schemaVersion: z.literal(DEVICE_MATCH_SCHEMA_VERSION),
+  generatedAtUtc: z.string(),
+  tenantId: z.string().optional(),
+  sourcePath: z.string(),
+  targetPath: z.string(),
+  sourceField: z.string(),
+  targetField: z.string(),
+  outputPath: z.string(),
+  summaryPath: z.string(),
+  totals: z.object({
+    rows: z.number(),
+    exact: z.number(),
+    fuzzy: z.number(),
+    unmatched: z.number()
+  }),
+  matches: z.array(DeviceMatchRowSchema)
+});
+
+const DeviceMoveBatchReportSchema = z.object({
+  schemaVersion: z.literal(UTILITY_BATCH_SCHEMA_VERSION),
+  generatedAtUtc: z.string(),
+  tenantId: z.string(),
+  command: z.literal('device.move'),
+  mode: z.enum(['dry-run', 'apply']),
+  totals: z.object({
+    rows: z.number(),
+    succeeded: z.number(),
+    failed: z.number(),
+    skipped: z.number()
+  }),
+  stoppedEarly: z.boolean(),
+  firstError: z
+    .object({
+      rowIndex: z.number(),
+      message: z.string()
+    })
+    .optional(),
+  reportPath: z.string().optional()
+});
+
 interface FleetReportResult {
   schemaVersion: typeof REPORT_SCHEMA_VERSION;
   generatedAtUtc: string;
@@ -113,6 +165,11 @@ interface FleetReportResult {
   outputPath: string;
   includeSensitive: boolean;
 }
+
+export type OpsReportInput =
+  | DeepDiveResult
+  | z.infer<typeof DeviceMatchResultSchema>
+  | z.infer<typeof DeviceMoveBatchReportSchema>;
 
 function toCounter(items: string[]): StatusCounts {
   const counter: StatusCounts = {};
@@ -447,6 +504,66 @@ function ensureDir(filePath: string): void {
   mkdirSync(dirname(resolve(filePath)), { recursive: true });
 }
 
+function formatDeviceMatchReportMarkdown(result: z.infer<typeof DeviceMatchResultSchema>, tenantId: string): string {
+  const sampleRows = result.matches.slice(0, 12);
+  const lines = [
+    '# Device Migration Matching Report',
+    '',
+    `Generated: ${result.generatedAtUtc}`,
+    `Tenant: ${tenantId}`,
+    '',
+    '## Inputs',
+    `- Source file: ${result.sourcePath}`,
+    `- Target file: ${result.targetPath}`,
+    `- Source field: ${result.sourceField}`,
+    `- Target field: ${result.targetField}`,
+    `- Output CSV: ${result.outputPath}`,
+    '',
+    '## Totals',
+    `- Rows: ${result.totals.rows}`,
+    `- Exact matches: ${result.totals.exact}`,
+    `- Fuzzy matches: ${result.totals.fuzzy}`,
+    `- Unmatched: ${result.totals.unmatched}`
+  ];
+
+  if (sampleRows.length > 0) {
+    lines.push('', '## Sample Matches', '', '| Device | Target Space | Confidence | Status |', '| --- | --- | ---: | --- |');
+    sampleRows.forEach((row) => {
+      lines.push(
+        `| ${row.deviceName} (${row.deviceId}) | ${row.targetSpaceName ?? 'Unmatched'} | ${row.confidence.toFixed(3)} | ${row.status} |`
+      );
+    });
+  }
+
+  return `${lines.join('\n')}\n`;
+}
+
+function formatDeviceMoveBatchReportMarkdown(result: z.infer<typeof DeviceMoveBatchReportSchema>): string {
+  const lines = [
+    '# Device Migration Execution Report',
+    '',
+    `Generated: ${result.generatedAtUtc}`,
+    `Tenant: ${result.tenantId}`,
+    '',
+    '## Execution',
+    `- Mode: ${result.mode}`,
+    `- Rows: ${result.totals.rows}`,
+    `- Succeeded: ${result.totals.succeeded}`,
+    `- Failed: ${result.totals.failed}`,
+    `- Skipped: ${result.totals.skipped}`,
+    `- Stopped early: ${result.stoppedEarly ? 'yes' : 'no'}`
+  ];
+
+  if (result.reportPath) {
+    lines.push(`- NDJSON report: ${result.reportPath}`);
+  }
+  if (result.firstError) {
+    lines.push('', '## First Error', `- Row ${result.firstError.rowIndex}: ${result.firstError.message}`);
+  }
+
+  return `${lines.join('\n')}\n`;
+}
+
 export function parseDeepDiveForReport(raw: unknown, expectedTenantId?: string): DeepDiveResult {
   const parsed = DeepDiveResultSchema.safeParse(raw);
   if (!parsed.success) {
@@ -458,6 +575,36 @@ export function parseDeepDiveForReport(raw: unknown, expectedTenantId?: string):
   }
 
   return parsed.data;
+}
+
+export function parseReportInput(raw: unknown, expectedTenantId?: string): OpsReportInput {
+  const deepDive = DeepDiveResultSchema.safeParse(raw);
+  if (deepDive.success) {
+    if (expectedTenantId && deepDive.data.tenantId !== expectedTenantId) {
+      throw new Error(`Input tenant mismatch. Expected ${expectedTenantId}, got ${deepDive.data.tenantId}.`);
+    }
+    return deepDive.data;
+  }
+
+  const deviceMatch = DeviceMatchResultSchema.safeParse(raw);
+  if (deviceMatch.success) {
+    if (expectedTenantId && deviceMatch.data.tenantId && deviceMatch.data.tenantId !== expectedTenantId) {
+      throw new Error(`Input tenant mismatch. Expected ${expectedTenantId}, got ${deviceMatch.data.tenantId}.`);
+    }
+    return deviceMatch.data;
+  }
+
+  const deviceMoveBatch = DeviceMoveBatchReportSchema.safeParse(raw);
+  if (deviceMoveBatch.success) {
+    if (expectedTenantId && deviceMoveBatch.data.tenantId !== expectedTenantId) {
+      throw new Error(`Input tenant mismatch. Expected ${expectedTenantId}, got ${deviceMoveBatch.data.tenantId}.`);
+    }
+    return deviceMoveBatch.data;
+  }
+
+  throw new Error(
+    'Input JSON must be produced by `xyte-cli ops inspect deep-dive --output json`, `xyte-cli util match`, or `xyte-cli util move-devices`.'
+  );
 }
 
 export async function generateFleetReport(args: {
@@ -480,6 +627,43 @@ export async function generateFleetReport(args: {
     schemaVersion: REPORT_SCHEMA_VERSION,
     generatedAtUtc: new Date().toISOString(),
     tenantId: args.deepDive.tenantId,
+    format: args.format,
+    outputPath: resolve(args.outPath),
+    includeSensitive: args.includeSensitive
+  };
+}
+
+export async function generateOpsReport(args: {
+  input: OpsReportInput;
+  tenantId: string;
+  format: 'markdown' | 'pdf';
+  outPath: string;
+  includeSensitive: boolean;
+}): Promise<FleetReportResult> {
+  if (args.input.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION) {
+    return generateFleetReport({
+      deepDive: args.input,
+      format: args.format,
+      outPath: args.outPath,
+      includeSensitive: args.includeSensitive
+    });
+  }
+
+  if (args.format === 'pdf') {
+    throw new Error('PDF rendering is only supported for deep-dive report input.');
+  }
+
+  ensureDir(args.outPath);
+  const markdown =
+    args.input.schemaVersion === DEVICE_MATCH_SCHEMA_VERSION
+      ? formatDeviceMatchReportMarkdown(args.input, args.input.tenantId ?? args.tenantId)
+      : formatDeviceMoveBatchReportMarkdown(args.input);
+  writeFileSync(args.outPath, markdown, 'utf8');
+
+  return {
+    schemaVersion: REPORT_SCHEMA_VERSION,
+    generatedAtUtc: new Date().toISOString(),
+    tenantId: args.input.tenantId ?? args.tenantId,
     format: args.format,
     outputPath: resolve(args.outPath),
     includeSensitive: args.includeSensitive

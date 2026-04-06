@@ -477,6 +477,144 @@ describe('flow runner', () => {
     expect(envelope.requestId).toBe(requestId);
   });
 
+  it('runs flow.device-migration across gates and persists match artifacts for resume', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition = getBuiltInFlowDefinition('flow.device-migration');
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-migration`);
+    let currentSpaceId = 900;
+
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/organization/devices?') && url.includes('space_id=900')) {
+        return new Response(
+          JSON.stringify({
+            items:
+              currentSpaceId === 900
+                ? [{ id: 'dev-1', name: 'South Wing', space_id: 900 }]
+                : []
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
+      }
+      if (url.includes('/organization/devices') && !url.includes('/organization/devices/dev-1')) {
+        return new Response(
+          JSON.stringify({ items: [{ id: 'dev-1', name: 'South Wing', space_id: currentSpaceId }] }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
+      }
+      if (url.includes('/organization/spaces?') && url.includes('path_includes=Regional+Offices')) {
+        return new Response(JSON.stringify({ items: [{ id: 99592, name: 'South Wing' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/spaces?') && url.includes('id=99592')) {
+        return new Response(JSON.stringify({ items: [{ id: 99592, name: 'South Wing' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/spaces')) {
+        return new Response(JSON.stringify({ items: [{ id: 99592, name: 'South Wing' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/incidents') || url.includes('/organization/tickets')) {
+        return new Response(JSON.stringify({ items: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/devices/dev-1/move') && (init?.method ?? 'GET') === 'POST') {
+        currentSpaceId = 99592;
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/devices/dev-1')) {
+        return new Response(JSON.stringify({ id: 'dev-1', name: 'South Wing', space_id: currentSpaceId }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const plan = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: {
+        source_space_id: '900',
+        target_path_includes: 'Regional Offices'
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(plan.outcome).toBe('pending_gate');
+    expect(plan.cursor.nextStepId).toBe('gate_approve_mapping');
+    const plannedInputs = JSON.parse(readFileSync(plan.inputsPath, 'utf8'));
+    expect(plannedInputs.context.inventory_source_artifact).toBeDefined();
+    expect(plannedInputs.context.inventory_target_artifact).toBeDefined();
+    expect(plannedInputs.context.match_csv).toContain('device-moves.csv');
+
+    const dryRun = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: plan.runId,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(dryRun.outcome).toBe('pending_gate');
+    expect(dryRun.cursor.nextStepId).toBe('gate_approve_execution');
+    expect(dryRun.steps.find((item) => item.stepId === 'dry_run_moves')?.status).toBe('completed');
+
+    const applied = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: plan.runId,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(applied.outcome).toBe('completed');
+    expect(applied.steps.find((item) => item.stepId === 'execute_moves')?.status).toBe('completed');
+    expect(applied.steps.find((item) => item.stepId === 'post_migration_report')?.status).toBe('completed');
+    expect(currentSpaceId).toBe(99592);
+  });
+
   it('runs inspect.deep-dive and report.generate with partner-only provider scope', async () => {
     const { profileStore, secretStore, client } = await makeClientWithProviders(['xyte-partner']);
 
@@ -817,10 +955,10 @@ describe('flow runner', () => {
     expect(failedStep?.status).toBe('failed');
     expect(failedStep?.classification).toBe('needs_data');
     expect(String(failedStep?.error?.detail ?? '')).toContain(
-      'Step report_daily requires deep-dive output from status_fast.'
+      'Step report_daily requires report-compatible output from status_fast.'
     );
     expect(String(failedStep?.error?.detail ?? '')).toContain(
-      'Input JSON must be produced by `xyte-cli ops inspect deep-dive --output json`.'
+      'Input JSON must be produced by `xyte-cli ops inspect deep-dive --output json`, `xyte-cli util match`, or `xyte-cli util move-devices`.'
     );
   });
 

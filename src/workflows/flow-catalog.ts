@@ -5,6 +5,7 @@ export type BuiltInFlowId =
   | 'flow.incidents-delta-watch'
   | 'flow.watch-to-triage'
   | 'flow.guided-remediation'
+  | 'flow.device-migration'
   | 'flow.daily-deep-dive-report';
 
 export type FlowTaskType =
@@ -18,6 +19,8 @@ export type FlowTaskType =
   | 'report.generate'
   | 'call'
   | 'utility.prepare'
+  | 'device.match'
+  | 'device.move-batch'
   | 'space.import-tree';
 
 interface FlowStepBase {
@@ -59,6 +62,19 @@ export interface FlowTaskStep extends FlowStepBase {
     inputPath: string;
     outputDir: string;
     primaryFormat?: 'csv' | 'jsonl';
+  };
+  deviceMatch?: {
+    sourcePath: string;
+    targetPath: string;
+    sourceField: string;
+    targetField: string;
+    outputPath: string;
+  };
+  deviceMoveBatch?: {
+    inputPath: string;
+    apply: boolean;
+    reportPath: string;
+    continueOnError?: boolean;
   };
   spaceImportTree?: {
     inputPath: string;
@@ -460,6 +476,170 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         mutating: false,
         command:
           'xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json --out ./artifacts/xyte-watch.after.ndjson'
+      }
+    ]
+  },
+  'flow.device-migration': {
+    id: 'flow.device-migration',
+    title: 'Device Migration',
+    intent: 'Inventory, match, dry-run, execute, and verify device-to-space migration with human gates.',
+    writeCapable: true,
+    recipeCommands: [
+      'xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id>',
+      'xyte-cli api call organization.spaces.getSpaces --tenant <tenant-id> --query path_includes=<target-path>',
+      'xyte-cli util match --tenant <tenant-id> --source ./artifacts/source-devices.json --target ./artifacts/target-spaces.json --source-field name --target-field name --output ./artifacts/device-moves.csv',
+      'xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/device-moves.csv.summary.json --out ./reports/device-migration-pre.md --render markdown',
+      'xyte-cli util move-devices --tenant <tenant-id> --input ./artifacts/device-moves.csv --report ./artifacts/device-migration.dry-run.ndjson',
+      'xyte-cli util move-devices --tenant <tenant-id> --input ./artifacts/device-moves.csv --apply --report ./artifacts/device-migration.apply.ndjson > ./artifacts/device-migration.apply.json',
+      'xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/xyte-fleet.device-migration.json',
+      'xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id>',
+      'xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/device-migration.apply.json --out ./reports/device-migration-post.md --render markdown'
+    ],
+    steps: [
+      {
+        kind: 'task',
+        id: 'inventory_source',
+        title: 'Inventory Source Devices',
+        task: 'call',
+        call: {
+          endpointKey: 'organization.devices.getDevices',
+          query: {
+            space_id: '{{source_space_id}}'
+          },
+          outputMode: 'envelope'
+        },
+        requiresContext: ['source_space_id'],
+        mutating: false,
+        command: 'xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id>'
+      },
+      {
+        kind: 'task',
+        id: 'inventory_target',
+        title: 'Inventory Target Spaces',
+        task: 'call',
+        call: {
+          endpointKey: 'organization.spaces.getSpaces',
+          query: {
+            path_includes: '{{target_path_includes}}'
+          },
+          outputMode: 'envelope'
+        },
+        requiresContext: ['target_path_includes'],
+        mutating: false,
+        command: 'xyte-cli api call organization.spaces.getSpaces --tenant <tenant-id> --query path_includes=<target-path>'
+      },
+      {
+        kind: 'task',
+        id: 'match_devices',
+        title: 'Match Devices',
+        task: 'device.match',
+        deviceMatch: {
+          sourcePath: '{{inventory_source_artifact}}',
+          targetPath: '{{inventory_target_artifact}}',
+          sourceField: 'name',
+          targetField: 'name',
+          outputPath: 'device-moves.csv'
+        },
+        mutating: false,
+        command:
+          'xyte-cli util match --tenant <tenant-id> --source ./artifacts/source-devices.json --target ./artifacts/target-spaces.json --source-field name --target-field name --output ./artifacts/device-moves.csv'
+      },
+      {
+        kind: 'task',
+        id: 'pre_migration_report',
+        title: 'Pre-Migration Report',
+        task: 'report.generate',
+        report: {
+          inputFromStepId: 'match_devices',
+          outFileName: 'device-migration-pre.md',
+          format: 'markdown'
+        },
+        mutating: false,
+        command:
+          'xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/device-moves.csv.summary.json --out ./reports/device-migration-pre.md --render markdown'
+      },
+      {
+        kind: 'gate',
+        id: 'gate_approve_mapping',
+        title: 'Approve Mapping',
+        mutating: false,
+        detail: 'Human approval required before dry-running the move batch.',
+        command: 'Human decision gate before dry-run device migration'
+      },
+      {
+        kind: 'task',
+        id: 'dry_run_moves',
+        title: 'Dry Run Device Moves',
+        task: 'device.move-batch',
+        deviceMoveBatch: {
+          inputPath: '{{match_devices_output}}',
+          apply: false,
+          reportPath: 'device-migration.dry-run.ndjson'
+        },
+        mutating: false,
+        command:
+          'xyte-cli util move-devices --tenant <tenant-id> --input ./artifacts/device-moves.csv --report ./artifacts/device-migration.dry-run.ndjson'
+      },
+      {
+        kind: 'gate',
+        id: 'gate_approve_execution',
+        title: 'Approve Execution',
+        mutating: true,
+        detail: 'Human approval required before executing device moves.',
+        command: 'Human decision gate before apply device migration'
+      },
+      {
+        kind: 'task',
+        id: 'execute_moves',
+        title: 'Execute Device Moves',
+        task: 'device.move-batch',
+        deviceMoveBatch: {
+          inputPath: '{{match_devices_output}}',
+          apply: true,
+          reportPath: 'device-migration.apply.ndjson'
+        },
+        mutating: true,
+        command:
+          'xyte-cli util move-devices --tenant <tenant-id> --input ./artifacts/device-moves.csv --apply --report ./artifacts/device-migration.apply.ndjson'
+      },
+      {
+        kind: 'task',
+        id: 'verify_fleet',
+        title: 'Verify Fleet',
+        task: 'inspect.fleet',
+        inspect: { mode: 'fleet' },
+        mutating: false,
+        command: 'xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/xyte-fleet.device-migration.json'
+      },
+      {
+        kind: 'task',
+        id: 'verify_source_empty',
+        title: 'Verify Source Empty',
+        task: 'call',
+        call: {
+          endpointKey: 'organization.devices.getDevices',
+          query: {
+            space_id: '{{source_space_id}}'
+          },
+          outputMode: 'envelope'
+        },
+        requiresContext: ['source_space_id'],
+        mutating: false,
+        command: 'xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id>'
+      },
+      {
+        kind: 'task',
+        id: 'post_migration_report',
+        title: 'Post-Migration Report',
+        task: 'report.generate',
+        report: {
+          inputFromStepId: 'execute_moves',
+          outFileName: 'device-migration-post.md',
+          format: 'markdown'
+        },
+        mutating: false,
+        command:
+          'xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/device-migration.apply.json --out ./reports/device-migration-post.md --render markdown'
       }
     ]
   },

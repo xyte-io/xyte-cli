@@ -146,6 +146,7 @@ Use this selector when the user asks for repeatable operator workflows. Full rec
 | Continuous incident monitoring | `flow.incidents-delta-watch` | `xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json` |
 | Convert watch deltas into triage artifacts | `flow.watch-to-triage` | `xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json` |
 | Operator-approved remediation writes | `flow.guided-remediation` | `xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json` |
+| Deterministic device migration with human gates | `flow.device-migration` | `xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id>` |
 | Daily analytics summary and report artifact | `flow.daily-deep-dive-report` | `xyte-cli setup status --tenant <tenant-id> --output json` |
 
 ## Agent-Only Flow Authoring
