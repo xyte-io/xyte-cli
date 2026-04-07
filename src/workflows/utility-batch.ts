@@ -127,7 +127,7 @@ export async function runUtilityBatch(args: {
           })
         );
       } else {
-        totals.skipped += 1;
+        totals.succeeded += 1;
         writeReportLine(args.reportPath, reportLine(operation, 'dry-run'));
       }
     } catch (error) {

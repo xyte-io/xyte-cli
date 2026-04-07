@@ -162,6 +162,7 @@ describe('cli integration', () => {
 
     const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
     expect(parsed.note).toBe('Moving dev-1 into South Wing');
+    expect(stderr.write).toHaveBeenCalledWith('Note: Moving dev-1 into South Wing\n');
     const logEntries = readFileSync(logPath, 'utf8')
       .trim()
       .split('\n')
@@ -555,6 +556,125 @@ describe('cli integration', () => {
     expect(parsed.command).toBe('device.move');
     expect(parsed.mode).toBe('dry-run');
     expect(existsSync(reportPath)).toBe(true);
+    expect(parsed.totals.succeeded).toBe(1);
+    expect(parsed.totals.skipped).toBe(0);
+  });
+
+  it('runs util move-devices --apply against the move endpoint contract', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const tmpRoot = mkdtempSync(join(tmpdir(), 'xyte-cli-move-devices-apply-'));
+    const inputPath = join(tmpRoot, 'device-moves.csv');
+    writeFileSync(inputPath, 'device_id,target_space_id\ndev-1,99592\n', 'utf8');
+
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/organization/devices/dev-1/move')) {
+        expect(init?.method).toBe('POST');
+        expect(init?.body).toBe(JSON.stringify({ space_id: 99592 }));
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/devices/dev-1')) {
+        return new Response(JSON.stringify({ id: 'dev-1', name: 'Room 1', space_id: 55123 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/spaces?') && url.includes('id=99592')) {
+        return new Response(JSON.stringify({ items: [{ id: 99592, name: 'Room 1' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'util',
+      'move-devices',
+      '--tenant',
+      'acme',
+      '--input',
+      inputPath,
+      '--apply'
+    ]);
+
+    const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(parsed.mode).toBe('apply');
+    expect(parsed.totals.succeeded).toBe(1);
+  });
+
+  it('defaults ops report generate to markdown for migration summaries', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const tmpRoot = mkdtempSync(join(tmpdir(), 'xyte-cli-report-generate-'));
+    const inputPath = join(tmpRoot, 'device-moves.summary.json');
+    const outPath = join(tmpRoot, 'device-migration.md');
+
+    writeFileSync(
+      inputPath,
+      JSON.stringify({
+        schemaVersion: 'xyte.device.match.v1',
+        generatedAtUtc: '2026-04-06T00:00:00.000Z',
+        tenantId: 'acme',
+        sourcePath: '/tmp/source.json',
+        targetPath: '/tmp/target.json',
+        sourceField: 'name',
+        targetField: 'name',
+        outputPath: '/tmp/device-moves.csv',
+        summaryPath: '/tmp/device-moves.csv.summary.json',
+        totals: {
+          rows: 1,
+          exact: 1,
+          fuzzy: 0,
+          unmatched: 0
+        },
+        matches: [
+          {
+            deviceId: 'dev-1',
+            deviceName: 'South Wing',
+            targetSpaceId: '99592',
+            targetSpaceName: 'South Wing',
+            confidence: 1,
+            status: 'exact'
+          }
+        ]
+      }),
+      'utf8'
+    );
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'ops',
+      'report',
+      'generate',
+      '--tenant',
+      'acme',
+      '--input',
+      inputPath,
+      '--out',
+      outPath
+    ]);
+
+    expect(readFileSync(outPath, 'utf8')).toContain('# Device Migration Matching Report');
   });
 
   it('does not expose device bulk-rename command', async () => {

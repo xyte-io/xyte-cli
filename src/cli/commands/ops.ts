@@ -402,8 +402,6 @@ async function handleOpsReportGenerate(
     });
   }
 
-  const render = resolveRenderMode(options, ['markdown', 'pdf'], 'pdf');
-
   let reportInput = parseReportInput(raw, tenantId);
   if (reportInput.schemaVersion === 'xyte.inspect.deep-dive.v1' && !reportInput.tenantName) {
     const tenantProfile = await ctx.profileStore.getTenant(tenantId);
@@ -414,6 +412,11 @@ async function handleOpsReportGenerate(
       };
     }
   }
+  const render = resolveRenderMode(
+    options,
+    ['markdown', 'pdf'],
+    reportInput.schemaVersion === 'xyte.inspect.deep-dive.v1' ? 'pdf' : 'markdown'
+  );
 
   const generated = await generateOpsReport({
     input: reportInput,
@@ -587,7 +590,7 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
     .requiredOption('--input <path>', 'Path to deep-dive JSON input')
     .requiredOption('--out <path>', 'Output path')
     .option('--tenant <tenantId>', 'Tenant id override')
-    .option('--render <render>', 'markdown|pdf', 'pdf')
+    .option('--render <render>', 'markdown|pdf')
     .option('--include-sensitive', 'Include full ticket/device IDs in report')
     .option('--strict-json', 'Fail on non-serializable output')
     .action(async function (options: {

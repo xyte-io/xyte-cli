@@ -68,7 +68,8 @@ describe('space import workflow', () => {
     expect(result.mode).toBe('dry-run');
     expect(result.command).toBe('space.import-tree');
     expect(result.totals.rows).toBe(1);
-    expect(result.totals.skipped).toBe(1);
+    expect(result.totals.succeeded).toBe(1);
+    expect(result.totals.skipped).toBe(0);
   });
 
   it('parses config json and imports spaces', async () => {
@@ -247,8 +248,27 @@ describe('device move workflow', () => {
     expect(result.mode).toBe('dry-run');
     expect(result.totals.rows).toBe(1);
     expect(result.totals.failed).toBe(0);
-    expect(result.totals.skipped).toBe(1);
+    expect(result.totals.succeeded).toBe(1);
+    expect(result.totals.skipped).toBe(0);
     expect(client.callWithMeta).not.toHaveBeenCalledWith('organization.devices.moveDevice', expect.anything());
+  });
+
+  it('rejects malformed target space ids instead of truncating them', async () => {
+    const inputPath = writeFixture(tempPath('device-moves.csv'), 'device_id,target_space_id\ndev-1,99592abc\n');
+    const client = {
+      callWithMeta: vi.fn()
+    } as unknown as XyteClient;
+
+    const result = await runMoveDevices({
+      client,
+      tenantId: 'acme',
+      inputPath,
+      apply: false,
+      continueOnError: false
+    });
+
+    expect(result.totals.failed).toBe(1);
+    expect(result.firstError?.message).toContain('must be a positive integer');
   });
 
   it('executes moveDevice with integer space_id and skips already-moved rows', async () => {
@@ -329,5 +349,66 @@ describe('device move workflow', () => {
 
     expect(result.totals.failed).toBe(1);
     expect(result.firstError?.message).toContain('duplicated in the input');
+  });
+
+  it('continues after row failures when continueOnError is enabled and records row statuses', async () => {
+    const inputPath = writeFixture(
+      tempPath('device-moves.csv'),
+      ['device_id,target_space_id', 'dev-1,99592', 'dev-2,99592'].join('\n') + '\n'
+    );
+    const reportPath = tempPath('device-moves.ndjson');
+
+    const client = {
+      callWithMeta: vi.fn(async (endpointKey: string, args: any) => {
+        if (endpointKey === 'organization.devices.getDevice') {
+          if (args.path.device_id === 'dev-1') {
+            throw new Error('Device dev-1 not found.');
+          }
+          return {
+            status: 200,
+            durationMs: 1,
+            retryCount: 0,
+            data: { id: 'dev-2', name: 'dev-2', space_id: 55123 },
+            headers: {},
+            attempts: 1
+          };
+        }
+        if (endpointKey === 'organization.spaces.getSpaces') {
+          return {
+            status: 200,
+            durationMs: 1,
+            retryCount: 0,
+            data: { items: [{ id: 99592, name: 'Room 99592' }] },
+            headers: {},
+            attempts: 1
+          };
+        }
+        if (endpointKey === 'organization.devices.moveDevice') {
+          return {
+            status: 200,
+            durationMs: 1,
+            retryCount: 0,
+            data: { success: true },
+            headers: {},
+            attempts: 1
+          };
+        }
+        throw new Error(`Unexpected endpoint ${endpointKey}`);
+      })
+    } as unknown as XyteClient;
+
+    const result = await runMoveDevices({
+      client,
+      tenantId: 'acme',
+      inputPath,
+      apply: true,
+      continueOnError: true,
+      reportPath
+    });
+
+    expect(result.totals.failed).toBe(1);
+    expect(result.totals.succeeded).toBe(1);
+    const lines = readFileSync(reportPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+    expect(lines.map((line) => line.status)).toEqual(['failed', 'succeeded']);
   });
 });

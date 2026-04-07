@@ -15,23 +15,26 @@ function requireNonEmptyString(value: unknown, fieldName: string, rowIndex: numb
 }
 
 function parseRequiredInteger(value: unknown, fieldName: string, rowIndex: number): number {
+  if (typeof value === 'number') {
+    if (!Number.isInteger(value) || value <= 0) {
+      throw new Error(`Row ${rowIndex}: field "${fieldName}" must be a positive integer.`);
+    }
+    return value;
+  }
+
   const normalized = requireNonEmptyString(value, fieldName, rowIndex);
-  const parsed = Number.parseInt(normalized, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
+  if (!/^\d+$/.test(normalized)) {
     throw new Error(`Row ${rowIndex}: field "${fieldName}" must be a positive integer.`);
   }
-  return parsed;
+  return Number(normalized);
 }
 
 function parseOptionalInteger(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) {
+  if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
     return value;
   }
-  if (typeof value === 'string' && value.trim()) {
-    const parsed = Number.parseInt(value.trim(), 10);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
+  if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
+    return Number(value.trim());
   }
   return undefined;
 }
@@ -154,9 +157,6 @@ export async function runMoveDevices(args: {
       await loadSpace(targetSpaceId);
 
       prepared = { deviceId: device.id, targetSpaceId };
-      if (device.currentSpaceId === targetSpaceId) {
-        return prepared;
-      }
       return prepared;
     };
 

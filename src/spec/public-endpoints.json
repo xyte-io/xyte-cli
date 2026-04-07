@@ -115,9 +115,10 @@
     "authScope": "organization",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "server/app/controllers/core/v1/organization/devices_controller.rb",
+    "sourceFile": "https://docs.xyte.io/reference/move-device",
     "bodyExample": "{\n  \"space_id\": 99592\n}",
     "notes": [
+      "Docs page expected at https://docs.xyte.io/reference/move-device.",
       "Derived from backend route POST /core/v1/organization/devices/:id/move in server/config/routes.rb.",
       "Backend controller requires JSON body with integer space_id."
     ]

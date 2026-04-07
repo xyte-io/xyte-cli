@@ -60,6 +60,9 @@ describe('public endpoint catalog', () => {
     expect(endpoint?.bodyType).toBe('json');
     expect(endpoint?.hasBody).toBe(true);
     expect(endpoint?.pathParams).toEqual(['device_id']);
+    expect(endpoint?.queryParams).toEqual([]);
+    expect(endpoint?.bodyExample).toContain('"space_id": 99592');
+    expect(endpoint?.sourceFile).toBe('https://docs.xyte.io/reference/move-device');
   });
 
   it('includes documented filter params for key read endpoints', () => {

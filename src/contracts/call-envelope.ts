@@ -47,7 +47,7 @@ const CallEnvelopeSchema = z.object({
     .optional()
 });
 
-type CallEnvelopeV1 = z.infer<typeof CallEnvelopeSchema>;
+type CallEnvelopeV2 = z.infer<typeof CallEnvelopeSchema>;
 
 interface BuildCallEnvelopeArgs {
   requestId: string;
@@ -73,7 +73,7 @@ interface BuildCallEnvelopeArgs {
   error?: ProblemDetails;
 }
 
-export function buildCallEnvelope(args: BuildCallEnvelopeArgs): CallEnvelopeV1 {
+export function buildCallEnvelope(args: BuildCallEnvelopeArgs): CallEnvelopeV2 {
   const query: Record<string, string | number | boolean | null> = {};
   for (const [key, value] of Object.entries(args.request.query ?? {})) {
     if (value === undefined) {

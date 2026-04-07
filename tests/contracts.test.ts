@@ -58,6 +58,36 @@ describe('schema contracts', () => {
     expect(validateCallEnvelope(envelope)).toBe(true);
   });
 
+  it('validates call envelope payloads that include notes', () => {
+    const envelope = buildCallEnvelope({
+      requestId: 'req-2',
+      tenantId: 'acme',
+      endpointKey: 'organization.devices.moveDevice',
+      method: 'POST',
+      note: 'Moving device into target space',
+      guard: {
+        allowWrite: true
+      },
+      request: {
+        path: {
+          device_id: 'dev-1'
+        },
+        query: {},
+        body: {
+          space_id: 99592
+        }
+      },
+      response: {
+        status: 200,
+        durationMs: 12,
+        retryCount: 0,
+        data: { success: true }
+      }
+    });
+
+    expect(validateCallEnvelope(envelope)).toBe(true);
+  });
+
   it('validates inspect and report payloads', async () => {
     const snapshot = {
       generatedAtUtc: new Date().toISOString(),

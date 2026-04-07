@@ -70,6 +70,52 @@ describe('runDeviceMatch', () => {
     expect(result.matches[0]?.confidence).toBeLessThan(1);
   });
 
+  it('does not overstate confidence for low-information partial matches', () => {
+    const root = makeRoot('xyte-match-partial-');
+    const sourcePath = join(root, 'source.json');
+    const targetPath = join(root, 'target.json');
+    const outputPath = join(root, 'device-moves.csv');
+
+    writeFileSync(sourcePath, '[{"id":"dev-1","name":"Wing"}]\n', 'utf8');
+    writeFileSync(targetPath, '[{"id":"99592","name":"South Wing"}]\n', 'utf8');
+
+    const result = runDeviceMatch({
+      sourcePath,
+      targetPath,
+      sourceField: 'name',
+      targetField: 'name',
+      outputPath
+    });
+
+    expect(result.matches[0]?.status).toBe('fuzzy');
+    expect(result.matches[0]?.confidence).toBeLessThan(0.6);
+  });
+
+  it('rejects one-character partial matches as unmatched', () => {
+    const root = makeRoot('xyte-match-short-');
+    const sourcePath = join(root, 'source.json');
+    const targetPath = join(root, 'target.json');
+    const outputPath = join(root, 'device-moves.csv');
+
+    writeFileSync(sourcePath, '[{"id":"dev-1","name":"S"}]\n', 'utf8');
+    writeFileSync(targetPath, '[{"id":"99592","name":"South Wing"}]\n', 'utf8');
+
+    const result = runDeviceMatch({
+      sourcePath,
+      targetPath,
+      sourceField: 'name',
+      targetField: 'name',
+      outputPath
+    });
+
+    expect(result.matches[0]).toEqual({
+      deviceId: 'dev-1',
+      deviceName: 'S',
+      confidence: 0,
+      status: 'unmatched'
+    });
+  });
+
   it('emits unmatched rows when Fuse returns no target', () => {
     const root = makeRoot('xyte-match-unmatched-');
     const sourcePath = join(root, 'source.json');

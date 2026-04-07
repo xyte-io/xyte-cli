@@ -149,8 +149,8 @@ async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptio
       mutating,
       outputMode
     });
-    if (mutating && outputMode === 'raw' && output === 'text') {
-      ctx.stdout.write(`Note: ${note}\n`);
+    if (mutating) {
+      ctx.stderr.write(`Note: ${note}\n`);
     }
   }
 

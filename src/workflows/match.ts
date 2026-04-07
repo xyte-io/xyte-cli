@@ -8,7 +8,6 @@ import { isRecord } from '../utils/json';
 import { loadInputRows } from '../utils/input-parser';
 
 type MatchStatus = 'exact' | 'fuzzy' | 'unmatched';
-const EXACT_SCORE_TOLERANCE = 1e-9;
 
 interface DeviceMatchRow {
   deviceId: string;
@@ -42,6 +41,24 @@ interface MatchTarget {
   id: string;
   name: string;
   [key: string]: string;
+}
+
+function normalizeName(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function countCoveredCharacters(indices: ReadonlyArray<readonly [number, number]> | undefined): number {
+  if (!indices || indices.length === 0) {
+    return 0;
+  }
+
+  const covered = new Set<number>();
+  for (const [start, end] of indices) {
+    for (let index = start; index <= end; index += 1) {
+      covered.add(index);
+    }
+  }
+  return covered.size;
 }
 
 function quoteCsvField(value: string): string {
@@ -162,15 +179,33 @@ export function runDeviceMatch(args: {
       [args.targetField]: targetName
     };
   });
+  const exactTargets = new Map<string, MatchTarget>();
+  for (const target of targets) {
+    exactTargets.set(normalizeName(target.name), target);
+  }
   const fuse = new Fuse(targets, {
     keys: [args.targetField],
-    includeScore: true
+    includeScore: true,
+    includeMatches: true,
+    minMatchCharLength: 3
   });
 
   const matches: DeviceMatchRow[] = sourceRows.map((row, index) => {
     const rowIndex = index + 1;
     const deviceId = requireStringField(row, 'id', rowIndex);
     const deviceName = requireStringField(row, args.sourceField, rowIndex);
+    const normalizedDeviceName = normalizeName(deviceName);
+    const exactTarget = exactTargets.get(normalizedDeviceName);
+    if (exactTarget) {
+      return {
+        deviceId,
+        deviceName,
+        targetSpaceId: exactTarget.id,
+        targetSpaceName: exactTarget.name,
+        confidence: 1,
+        status: 'exact'
+      };
+    }
     const bestMatch = fuse.search(deviceName, { limit: 1 })[0];
 
     if (!bestMatch) {
@@ -182,18 +217,17 @@ export function runDeviceMatch(args: {
       };
     }
 
-    if (typeof bestMatch.score !== 'number') {
-      throw new Error(`Fuse result for device ${deviceId} is missing a score.`);
-    }
-
-    const status: MatchStatus = bestMatch.score <= EXACT_SCORE_TOLERANCE ? 'exact' : 'fuzzy';
+    const normalizedTargetName = normalizeName(bestMatch.item.name);
+    const matchedCharacters = countCoveredCharacters(bestMatch.matches?.[0]?.indices);
+    const denominator = Math.max(normalizedDeviceName.length, normalizedTargetName.length, 1);
+    const confidence = Number((matchedCharacters / denominator).toFixed(3));
     return {
       deviceId,
       deviceName,
       targetSpaceId: bestMatch.item.id,
       targetSpaceName: bestMatch.item.name,
-      confidence: Number((1 - bestMatch.score).toFixed(3)),
-      status
+      confidence,
+      status: 'fuzzy'
     };
   });
 
