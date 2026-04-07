@@ -2,55 +2,12 @@ import type { XyteClient } from '../types/client';
 import { loadInputRows, type UtilityInputFormat } from '../utils/input-parser';
 import { isRecord } from '../utils/json';
 import { runUtilityBatch, type UtilityBatchOperation, type UtilityBatchResult } from './utility-batch';
-
-function requireNonEmptyString(value: unknown, fieldName: string, rowIndex: number): string {
-  if (typeof value !== 'string' && typeof value !== 'number') {
-    throw new Error(`Row ${rowIndex}: field "${fieldName}" must be a string or number.`);
-  }
-  const trimmed = String(value).trim();
-  if (!trimmed) {
-    throw new Error(`Row ${rowIndex}: field "${fieldName}" cannot be empty.`);
-  }
-  return trimmed;
-}
-
-function parseRequiredInteger(value: unknown, fieldName: string, rowIndex: number): number {
-  if (typeof value === 'number') {
-    if (!Number.isInteger(value) || value <= 0) {
-      throw new Error(`Row ${rowIndex}: field "${fieldName}" must be a positive integer.`);
-    }
-    return value;
-  }
-
-  const normalized = requireNonEmptyString(value, fieldName, rowIndex);
-  if (!/^\d+$/.test(normalized)) {
-    throw new Error(`Row ${rowIndex}: field "${fieldName}" must be a positive integer.`);
-  }
-  return Number(normalized);
-}
-
-function parseOptionalInteger(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
-    return value;
-  }
-  if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
-    return Number(value.trim());
-  }
-  return undefined;
-}
-
-function parseDeviceRecord(data: unknown, deviceId: string): { id: string; name?: string; currentSpaceId?: number } {
-  if (!isRecord(data)) {
-    throw new Error(`Device ${deviceId} returned an unexpected response payload.`);
-  }
-
-  const nestedSpace = isRecord(data.space) ? data.space : undefined;
-  return {
-    id: deviceId,
-    name: typeof data.name === 'string' ? data.name.trim() || undefined : undefined,
-    currentSpaceId: parseOptionalInteger(data.space_id ?? nestedSpace?.id)
-  };
-}
+import {
+  parseDeviceRecord,
+  parseOptionalInteger,
+  parseRequiredInteger,
+  requireNonEmptyString
+} from './device-move-shared';
 
 function extractSpaceRecord(data: unknown, spaceId: number): { id: number; name?: string } {
   if (!isRecord(data)) {
@@ -89,7 +46,14 @@ export async function runMoveDevices(args: {
   const deviceCounts = new Map<string, number>();
 
   for (let index = 0; index < rows.length; index += 1) {
-    const deviceId = requireNonEmptyString(rows[index].device_id, 'device_id', index + 1);
+    const rawDeviceId = rows[index].device_id;
+    if (typeof rawDeviceId !== 'string' && typeof rawDeviceId !== 'number') {
+      continue;
+    }
+    const deviceId = String(rawDeviceId).trim();
+    if (!deviceId) {
+      continue;
+    }
     deviceCounts.set(deviceId, (deviceCounts.get(deviceId) ?? 0) + 1);
   }
 

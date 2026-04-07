@@ -271,6 +271,24 @@ describe('device move workflow', () => {
     expect(result.firstError?.message).toContain('must be a positive integer');
   });
 
+  it('reports invalid device ids as row failures instead of throwing before batch execution', async () => {
+    const inputPath = writeFixture(tempPath('device-moves.csv'), 'device_id,target_space_id\n,99592\n');
+    const client = {
+      callWithMeta: vi.fn()
+    } as unknown as XyteClient;
+
+    const result = await runMoveDevices({
+      client,
+      tenantId: 'acme',
+      inputPath,
+      apply: false,
+      continueOnError: false
+    });
+
+    expect(result.totals.failed).toBe(1);
+    expect(result.firstError?.message).toContain('field "device_id" cannot be empty');
+  });
+
   it('executes moveDevice with integer space_id and skips already-moved rows', async () => {
     const inputPath = writeFixture(
       tempPath('device-moves.csv'),
