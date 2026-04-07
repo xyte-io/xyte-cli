@@ -66,17 +66,25 @@ function extractRecipeCommands(section: string): string[] {
 }
 
 describe('flow catalog recipe parity', () => {
-  it('keeps built-in recipe command lists aligned with docs/flows/agent-ops.md', () => {
-    const markdown = readFileSync(resolve(__dirname, '../docs/flows/agent-ops.md'), 'utf8');
+  function expectRecipeParity(markdownPath: string): void {
+    const markdown = readFileSync(resolve(__dirname, markdownPath), 'utf8');
     const sections = extractFlowSections(markdown);
 
     for (const flow of listBuiltInFlowDefinitions()) {
       const section = sections[flow.id];
-      expect(section, `Missing section for ${flow.id}`).toBeDefined();
+      expect(section, `Missing section for ${flow.id} in ${markdownPath}`).toBeDefined();
       const docsCommands = extractRecipeCommands(section);
-      expect(docsCommands.length, `Missing recipe commands for ${flow.id}`).toBeGreaterThan(0);
+      expect(docsCommands.length, `Missing recipe commands for ${flow.id} in ${markdownPath}`).toBeGreaterThan(0);
 
       expect(flow.recipeCommands.map(normalizeRecipeLine)).toEqual(docsCommands.map(normalizeRecipeLine));
     }
+  }
+
+  it('keeps built-in recipe command lists aligned with docs/flows/agent-ops.md', () => {
+    expectRecipeParity('../docs/flows/agent-ops.md');
+  });
+
+  it('keeps built-in recipe command lists aligned with skills/xyte-cli/references/flow-recipes.md', () => {
+    expectRecipeParity('../skills/xyte-cli/references/flow-recipes.md');
   });
 });

@@ -193,32 +193,35 @@ xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --o
 - Intent: inventory, match, dry-run, execute, and verify device-to-space migration with human gates.
 - Prerequisites:
   - `<tenant-id>` is active and authorized.
-  - `<source-space-id>` identifies the source space to migrate from.
+  - `<source-space-id>` identifies the source space to inventory from.
   - `<target-path>` scopes the target space inventory (for example `Regional Offices`).
 - Exact commands:
 
 ```bash
-xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id>
-xyte-cli api call organization.spaces.getSpaces --tenant <tenant-id> --query path_includes=<target-path>
+mkdir -p ./artifacts ./reports
+xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id> --output json > ./artifacts/source-devices.json
+xyte-cli api call organization.spaces.getSpaces --tenant <tenant-id> --query path_includes=<target-path> --output json > ./artifacts/target-spaces.json
 xyte-cli util match --tenant <tenant-id> --source ./artifacts/source-devices.json --target ./artifacts/target-spaces.json --source-field name --target-field name --output ./artifacts/device-moves.csv
 xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/device-moves.csv.summary.json --out ./reports/device-migration-pre.md --render markdown
 xyte-cli util move-devices --tenant <tenant-id> --input ./artifacts/device-moves.csv --report ./artifacts/device-migration.dry-run.ndjson
 xyte-cli util move-devices --tenant <tenant-id> --input ./artifacts/device-moves.csv --apply --report ./artifacts/device-migration.apply.ndjson > ./artifacts/device-migration.apply.json
 xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/xyte-fleet.device-migration.json
-xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id>
-xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/device-migration.apply.json --out ./reports/device-migration-post.md --render markdown
 ```
 
 - Expected artifacts:
   - source device inventory JSON and target space inventory JSON.
   - deterministic move CSV at `./artifacts/device-moves.csv` plus summary JSON sidecar.
+  - pre-migration markdown report at `./reports/device-migration-pre.md`.
   - dry-run and apply NDJSON row reports for move execution.
-  - pre/post migration markdown reports.
   - fleet verification JSON at `./artifacts/xyte-fleet.device-migration.json`.
+  - when run through `xyte-cli flow run flow.device-migration`, the flow bundle also includes the planned-device verification artifact and the post-migration markdown report composed from the internal execution and verification steps.
 - Stop/decision gates:
   - Human decision gate before dry-run review (`gate_approve_mapping`).
   - Human decision gate before execution (`gate_approve_execution`).
   - Stop on any failed move row unless `--continue-on-error` is explicitly used.
+- Verification semantics:
+  - the flow verifies only the devices listed in `./artifacts/device-moves.csv`
+  - devices not listed in the move plan are irrelevant to flow success, even if they remain in the source space
 - Failure fallback:
   - Re-run `xyte-cli util match` after correcting names or target spaces.
   - Re-run `xyte-cli util move-devices` without `--apply` if the dry-run report shows invalid targets or duplicate device rows.
