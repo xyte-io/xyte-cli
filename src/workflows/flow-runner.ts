@@ -28,10 +28,12 @@ import { runUtilityPrepare } from './utility-prepare';
 import { runSpaceImportTree } from './utility-commands';
 import { runDeviceMatch } from './match';
 import { runMoveDevices } from './move-devices';
+import { runVerifyMovedDevices } from './verify-device-moves';
 import {
   buildDeepDive,
   buildFleetInspect,
   collectFleetSnapshot,
+  generateDeviceMigrationReport,
   generateOpsReport,
   InspectProviderScopeError,
   parseReportInput
@@ -67,6 +69,7 @@ interface TaskExecutionResult {
   artifactPath?: string;
   watchFrames?: WatchFrameV1[];
   contextUpdates?: Record<string, string>;
+  failureDetail?: string;
 }
 
 interface FlowRunInputsPayload {
@@ -368,21 +371,40 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
       if (!step.report) {
         throw new Error(`Flow step ${step.id} is missing report configuration.`);
       }
-      const input = ctx.taskOutputs.get(step.report.inputFromStepId);
+      const report = step.report;
+      const input = ctx.taskOutputs.get(report.inputFromStepId);
       let reportInput;
       try {
         reportInput = parseReportInput(input, ctx.args.tenantId);
       } catch (error) {
-        throw new FlowNeedsInputError(buildReportInputNeedsDataMessage(step.id, step.report.inputFromStepId, error));
+        throw new FlowNeedsInputError(buildReportInputNeedsDataMessage(step.id, report.inputFromStepId, error));
       }
-      const outPath = path.join(ctx.outputsDir, step.report.outFileName);
-      const generated = await generateOpsReport({
-        input: reportInput,
-        tenantId: ctx.args.tenantId,
-        format: step.report.format,
-        outPath,
-        includeSensitive: step.report.includeSensitive === true
-      });
+      const outPath = path.join(ctx.outputsDir, report.outFileName);
+      const fleetFromStepId = report.fleetFromStepId;
+      const verificationFromStepId = report.verificationFromStepId;
+      const generated =
+        fleetFromStepId && verificationFromStepId
+          ? await (async () => {
+              if (reportInput.schemaVersion !== 'xyte.utility.batch.v1' || reportInput.command !== 'device.move') {
+                throw new FlowNeedsInputError(
+                  `Step ${step.id} requires device.move batch output from ${report.inputFromStepId}.`
+                );
+              }
+              return generateDeviceMigrationReport({
+                execution: reportInput,
+                fleet: ctx.taskOutputs.get(fleetFromStepId),
+                verification: ctx.taskOutputs.get(verificationFromStepId),
+                tenantId: ctx.args.tenantId,
+                outPath
+              });
+            })()
+          : await generateOpsReport({
+              input: reportInput,
+              tenantId: ctx.args.tenantId,
+              format: step.report.format,
+              outPath,
+              includeSensitive: step.report.includeSensitive === true
+            });
       return {
         output: generated,
         artifactPath: outPath
@@ -567,7 +589,34 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
           ...(step.deviceMoveBatch.apply
             ? { execute_moves_report_path: reportPath }
             : { dry_run_moves_report_path: reportPath })
-        }
+        },
+        failureDetail:
+          step.deviceMoveBatch.apply && (result.totals.failed > 0 || result.stoppedEarly)
+            ? `Step ${step.id} failed because move execution reported ${result.totals.failed} failed row(s).`
+            : undefined
+      };
+    }
+    case 'device.verify-batch': {
+      if (!step.deviceVerifyBatch) {
+        throw new Error(`Flow step ${step.id} is missing device verification configuration.`);
+      }
+      const inputPath = path.resolve(resolveTemplateString(step.deviceVerifyBatch.inputPath, ctx.resolvedContext));
+      const artifactPath = buildStepArtifactPath(ctx, stepIndex, step.id, 'json');
+      const result = await runVerifyMovedDevices({
+        client: ctx.args.client,
+        tenantId: ctx.args.tenantId,
+        inputPath,
+        outputPath: artifactPath
+      });
+      const mismatchCount = result.totals.mismatched;
+      const missingCount = result.totals.missing;
+      return {
+        output: result,
+        artifactPath,
+        failureDetail:
+          mismatchCount > 0 || missingCount > 0
+            ? `Step ${step.id} found ${mismatchCount} mismatched and ${missingCount} missing planned device(s).`
+            : undefined
       };
     }
     case 'space.import-tree': {
@@ -918,6 +967,31 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
 
         if (!result.artifactPath) {
           await writeFile(artifactPath, `${JSON.stringify(result.output ?? {}, null, 2)}\n`, 'utf8');
+        }
+
+        if (result.failureDetail) {
+          const problem = toProblemDetails(new Error(result.failureDetail), `/flow/${args.flowId}/${step.id}`);
+          const classification = classifyFailure(problem);
+
+          stepState.status = 'failed';
+          stepState.endedAtUtc = nowIso();
+          stepState.durationMs = Date.now() - stepStartedAt;
+          stepState.artifactPath = artifactPath;
+          stepState.error = problem;
+          stepState.classification = classification;
+
+          const errorEntry: FlowRunErrorEntry = {
+            timestamp: nowIso(),
+            stepId: step.id,
+            classification,
+            error: problem
+          };
+          errors.push(errorEntry);
+          await appendNdjson(ctx.errorsPath, errorEntry);
+
+          outcome = classification === 'needs_data' ? 'needs_input' : 'failed';
+          nextStepIndex = index;
+          break;
         }
 
         stepState.status = 'completed';

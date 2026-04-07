@@ -21,6 +21,7 @@ export type FlowTaskType =
   | 'utility.prepare'
   | 'device.match'
   | 'device.move-batch'
+  | 'device.verify-batch'
   | 'space.import-tree';
 
 interface FlowStepBase {
@@ -49,6 +50,8 @@ export interface FlowTaskStep extends FlowStepBase {
     inputFromStepId: string;
     outFileName: string;
     includeSensitive?: boolean;
+    fleetFromStepId?: string;
+    verificationFromStepId?: string;
   };
   call?: {
     endpointKey: string;
@@ -75,6 +78,9 @@ export interface FlowTaskStep extends FlowStepBase {
     apply: boolean;
     reportPath: string;
     continueOnError?: boolean;
+  };
+  deviceVerifyBatch?: {
+    inputPath: string;
   };
   spaceImportTree?: {
     inputPath: string;
@@ -485,15 +491,14 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
     intent: 'Inventory, match, dry-run, execute, and verify device-to-space migration with human gates.',
     writeCapable: true,
     recipeCommands: [
-      'xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id>',
-      'xyte-cli api call organization.spaces.getSpaces --tenant <tenant-id> --query path_includes=<target-path>',
+      'mkdir -p ./artifacts ./reports',
+      'xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id> --output json > ./artifacts/source-devices.json',
+      'xyte-cli api call organization.spaces.getSpaces --tenant <tenant-id> --query path_includes=<target-path> --output json > ./artifacts/target-spaces.json',
       'xyte-cli util match --tenant <tenant-id> --source ./artifacts/source-devices.json --target ./artifacts/target-spaces.json --source-field name --target-field name --output ./artifacts/device-moves.csv',
       'xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/device-moves.csv.summary.json --out ./reports/device-migration-pre.md --render markdown',
       'xyte-cli util move-devices --tenant <tenant-id> --input ./artifacts/device-moves.csv --report ./artifacts/device-migration.dry-run.ndjson',
       'xyte-cli util move-devices --tenant <tenant-id> --input ./artifacts/device-moves.csv --apply --report ./artifacts/device-migration.apply.ndjson > ./artifacts/device-migration.apply.json',
-      'xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/xyte-fleet.device-migration.json',
-      'xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id>',
-      'xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/device-migration.apply.json --out ./reports/device-migration-post.md --render markdown'
+      'xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/xyte-fleet.device-migration.json'
     ],
     steps: [
       {
@@ -510,7 +515,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         },
         requiresContext: ['source_space_id'],
         mutating: false,
-        command: 'xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id>'
+        command:
+          'xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id> --output json > ./artifacts/source-devices.json'
       },
       {
         kind: 'task',
@@ -526,7 +532,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         },
         requiresContext: ['target_path_includes'],
         mutating: false,
-        command: 'xyte-cli api call organization.spaces.getSpaces --tenant <tenant-id> --query path_includes=<target-path>'
+        command:
+          'xyte-cli api call organization.spaces.getSpaces --tenant <tenant-id> --query path_includes=<target-path> --output json > ./artifacts/target-spaces.json'
       },
       {
         kind: 'task',
@@ -613,19 +620,15 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
       },
       {
         kind: 'task',
-        id: 'verify_source_empty',
-        title: 'Verify Source Empty',
-        task: 'call',
-        call: {
-          endpointKey: 'organization.devices.getDevices',
-          query: {
-            space_id: '{{source_space_id}}'
-          },
-          outputMode: 'envelope'
+        id: 'verify_moved_devices',
+        title: 'Verify Moved Devices',
+        task: 'device.verify-batch',
+        deviceVerifyBatch: {
+          inputPath: '{{match_devices_output}}'
         },
-        requiresContext: ['source_space_id'],
         mutating: false,
-        command: 'xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id>'
+        command:
+          'Flow runner verifies the planned device set against their target spaces using ./artifacts/device-moves.csv.'
       },
       {
         kind: 'task',
@@ -635,11 +638,12 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         report: {
           inputFromStepId: 'execute_moves',
           outFileName: 'device-migration-post.md',
-          format: 'markdown'
+          format: 'markdown',
+          fleetFromStepId: 'verify_fleet',
+          verificationFromStepId: 'verify_moved_devices'
         },
         mutating: false,
-        command:
-          'xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/device-migration.apply.json --out ./reports/device-migration-post.md --render markdown'
+        command: 'Flow runner composes the post-migration report from execution and verification artifacts.'
       }
     ]
   },
