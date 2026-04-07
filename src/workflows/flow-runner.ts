@@ -591,8 +591,8 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
             : { dry_run_moves_report_path: reportPath })
         },
         failureDetail:
-          step.deviceMoveBatch.apply && (result.totals.failed > 0 || result.stoppedEarly)
-            ? `Step ${step.id} failed because move execution reported ${result.totals.failed} failed row(s).`
+          result.totals.failed > 0 || result.stoppedEarly
+            ? `Step ${step.id} failed because the move batch reported ${result.totals.failed} failed row(s).`
             : undefined
       };
     }

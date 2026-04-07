@@ -769,6 +769,100 @@ describe('flow runner', () => {
     expect(postReport).toContain('Fleet devices: 2');
   });
 
+  it('fails flow.device-migration when dry_run_moves reports failed move rows', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition = getBuiltInFlowDefinition('flow.device-migration');
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-migration-dry-run-fail`);
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/organization/devices?') && url.includes('space_id=900')) {
+        return new Response(JSON.stringify({ items: [{ id: 'dev-1', name: 'South Wing', space_id: 900 }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/devices') && !url.includes('/organization/devices/dev-1')) {
+        return new Response(JSON.stringify({ items: [{ id: 'dev-1', name: 'South Wing', space_id: 900 }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/spaces?') && url.includes('path_includes=Regional+Offices')) {
+        return new Response(JSON.stringify({ items: [{ id: 99592, name: 'South Wing' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/spaces?') && url.includes('id=99592')) {
+        return new Response(JSON.stringify({ items: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/spaces')) {
+        return new Response(JSON.stringify({ items: [{ id: 99592, name: 'South Wing' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/incidents') || url.includes('/organization/tickets')) {
+        return new Response(JSON.stringify({ items: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/devices/dev-1')) {
+        return new Response(JSON.stringify({ id: 'dev-1', name: 'South Wing', space_id: 900 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const plan = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: {
+        source_space_id: '900',
+        target_path_includes: 'Regional Offices'
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    const failed = await runDeterministicFlow({
+      flowId: definition.id,
+      resolvedFlowId: definition.id,
+      definition,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: plan.runId,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(failed.outcome).toBe('failed');
+    expect(failed.steps.find((item) => item.stepId === 'dry_run_moves')?.error?.detail).toContain(
+      'Step dry_run_moves failed because the move batch reported 1 failed row(s).'
+    );
+    expect(failed.steps.find((item) => item.stepId === 'gate_approve_execution')?.status).not.toBe('completed');
+    expect(failed.steps.find((item) => item.stepId === 'execute_moves')?.status).not.toBe('completed');
+  });
+
   it('fails flow.device-migration when execute_moves reports failed move rows', async () => {
     const { profileStore, secretStore, client } = await makeClient();
     const definition = getBuiltInFlowDefinition('flow.device-migration');
@@ -876,7 +970,7 @@ describe('flow runner', () => {
 
     expect(failed.outcome).toBe('failed');
     expect(failed.steps.find((item) => item.stepId === 'execute_moves')?.error?.detail).toContain(
-      'Step execute_moves failed because move execution reported 1 failed row(s).'
+      'Step execute_moves failed because the move batch reported 1 failed row(s).'
     );
     expect(failed.steps.find((item) => item.stepId === 'verify_fleet')?.status).not.toBe('completed');
     expect(failed.steps.find((item) => item.stepId === 'post_migration_report')?.status).not.toBe('completed');

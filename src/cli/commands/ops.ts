@@ -398,7 +398,11 @@ async function handleOpsReportGenerate(
     throw new CliUserError({
       summary: isSyntax ? `Input JSON is invalid${detail}` : `Cannot read input file${detail}`,
       cause: `Failed to ${isSyntax ? 'parse' : 'read'} ${inputPath}.`,
-      suggestedCommands: ['Generate fresh input with xyte-cli ops inspect deep-dive --output json']
+      suggestedCommands: [
+        'Generate fresh input with xyte-cli ops inspect deep-dive --output json',
+        'Generate fresh input with xyte-cli util match',
+        'Generate fresh input with xyte-cli util move-devices'
+      ]
     });
   }
 
@@ -586,8 +590,8 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
   const opsReport = ops.command('report').description('Generate reports from inspect outputs');
   opsReport
     .command('generate')
-    .description('Generate report from deep-dive JSON input')
-    .requiredOption('--input <path>', 'Path to deep-dive JSON input')
+    .description('Generate report from inspect or migration JSON input')
+    .requiredOption('--input <path>', 'Path to report input JSON')
     .requiredOption('--out <path>', 'Output path')
     .option('--tenant <tenantId>', 'Tenant id override')
     .option('--render <render>', 'markdown|pdf')
