@@ -1,7 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { randomUUID } from 'node:crypto';
 
-import type { ConnectionState } from '../config/connectivity';
+import type { ConnectionState } from '../contracts/status';
 import { evaluateReadiness, type ReadinessCheck } from '../config/readiness';
 import type { SecretStore } from '../secure/secret-store';
 import type { ProfileStore } from '../secure/profile-store';

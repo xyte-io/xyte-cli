@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { classifyConnectivityError, type ConnectivityResult, type ConnectionState } from '../config/connectivity';
+import { classifyConnectivityError } from '../config/connectivity';
+import type { ConnectivityResult, ConnectionState } from '../contracts/status';
 import {
   computeRetryDelayMs,
   DEFAULT_RETRY_POLICY,

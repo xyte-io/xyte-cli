@@ -1,27 +1,9 @@
 import { XyteAuthError, XyteHttpError } from '../http/errors';
 import type { XyteClient } from '../types/client';
 import { errorMessage } from '../utils/error-format';
+import type { ConnectionErrorClass, ConnectionState, ConnectivityResult } from '../contracts/status';
 
-export type ConnectionErrorClass = 'auth' | 'missing_key' | 'network' | 'timeout' | 'rate_limit' | 'unknown';
-
-export type ConnectionState =
-  | 'connected'
-  | 'auth_required'
-  | 'missing_key'
-  | 'network_error'
-  | 'timeout'
-  | 'rate_limited'
-  | 'unknown_error'
-  | 'not_checked';
-
-export interface ConnectivityResult {
-  state: ConnectionState;
-  class?: ConnectionErrorClass;
-  message: string;
-  retriable: boolean;
-  endpointKey?: string;
-  statusCode?: number;
-}
+export type { ConnectionErrorClass, ConnectionState, ConnectivityResult };
 
 interface ConnectivityProbeOptions {
   client: XyteClient;

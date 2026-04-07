@@ -1,8 +1,28 @@
 import { z } from 'zod';
 
-import type { ConnectivityResult } from '../config/connectivity';
 import type { SecretProvider, TenantProfile } from '../types/profile';
 import { STATUS_SCHEMA_VERSION } from './versions';
+
+export type ConnectionErrorClass = 'auth' | 'missing_key' | 'network' | 'timeout' | 'rate_limit' | 'unknown';
+
+export type ConnectionState =
+  | 'connected'
+  | 'auth_required'
+  | 'missing_key'
+  | 'network_error'
+  | 'timeout'
+  | 'rate_limited'
+  | 'unknown_error'
+  | 'not_checked';
+
+export interface ConnectivityResult {
+  state: ConnectionState;
+  class?: ConnectionErrorClass;
+  message: string;
+  retriable: boolean;
+  endpointKey?: string;
+  statusCode?: number;
+}
 
 export type ReadinessState = 'ready' | 'needs_setup' | 'degraded';
 

@@ -3,7 +3,8 @@ import type { ProfileStore } from '../secure/profile-store';
 import type { SecretProvider } from '../types/profile';
 import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
 import type { XyteClient } from '../types/client';
-import { probeConnectivity, type ConnectivityResult } from './connectivity';
+import { probeConnectivity } from './connectivity';
+import type { ConnectivityResult } from '../contracts/status';
 import type { ReadinessState, ProviderReadiness, ReadinessCheck } from '../contracts/status';
 
 export type { ReadinessState, ProviderReadiness, ReadinessCheck };
