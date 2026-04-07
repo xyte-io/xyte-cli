@@ -7,7 +7,8 @@ import { createSecretStore, type SecretStore } from '../secure/secret-store';
 import { createProfileStore, type ProfileStore } from '../secure/profile-store';
 import type { PublicEndpointSpec } from '../types/endpoints';
 import { PROVIDER_ORG, PROVIDER_PARTNER, type SecretProvider } from '../types/profile';
-import type { XyteCallArgs, XyteCallResult, XyteClient, XyteClientOptions } from '../types/client';
+import type { XyteCallArgs, XyteCallResult, XyteClient } from '../types/client';
+import type { XyteClientOptions } from './options';
 import { isRecord } from '../utils/json';
 
 const DEFAULT_HUB_BASE_URL = 'https://hub.xyte.io';

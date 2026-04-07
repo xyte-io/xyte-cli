@@ -11,7 +11,7 @@ import { parseJsonObject } from '../../utils/json';
 import { parseQueryJson, parseQueryString } from '../parse-options';
 import {
   type CliContext,
-  type CliGlobalOptions,
+  getExplicitGlobalOutput,
   printJson,
   resolveStrictJson,
   resolveTextJsonOutput
@@ -218,7 +218,7 @@ export function registerApiCommands(parent: Command, ctx: CliContext): void {
     .action(async function (options: { tenant?: string; format?: string }) {
       await handleApiEndpointsList(ctx, {
         ...options,
-        output: (this.optsWithGlobals() as CliGlobalOptions).output
+        output: getExplicitGlobalOutput(this)
       });
     });
 
@@ -229,7 +229,7 @@ export function registerApiCommands(parent: Command, ctx: CliContext): void {
     .action(async function (key: string, options: { format?: string }) {
       await handleApiEndpointsDescribe(ctx, key, {
         ...options,
-        output: (this.optsWithGlobals() as CliGlobalOptions).output
+        output: getExplicitGlobalOutput(this)
       });
     });
 
@@ -248,7 +248,7 @@ export function registerApiCommands(parent: Command, ctx: CliContext): void {
     .action(async function (key: string, options: ApiCallOptions) {
       await handleApiCall(ctx, key, {
         ...options,
-        output: (this.optsWithGlobals() as CliGlobalOptions).output
+        output: getExplicitGlobalOutput(this)
       });
     });
 }

@@ -577,13 +577,13 @@ function parseFleetInspectResult(value: unknown): FleetInspectResult['totals'] {
   };
 }
 
-export async function generateDeviceMigrationReport(args: {
+export function generateDeviceMigrationReport(args: {
   execution: z.infer<typeof DeviceMoveBatchReportSchema>;
   fleet: unknown;
   verification: unknown;
   tenantId: string;
   outPath: string;
-}): Promise<FleetReportResult> {
+}): FleetReportResult {
   const fleetTotals = parseFleetInspectResult(args.fleet);
   const verification = parseMoveVerificationResult(args.verification);
   const issueRows = verification.rows.filter((row) => row.status !== 'verified');

@@ -1,6 +1,6 @@
 import blessed from 'blessed';
 
-import { createXyteClient } from '../../client/create-client';
+import { runSlotConnectivityTest } from '../../cli/provider-resolution';
 import {
   clampIndex,
   movePaneWithBoundary,
@@ -34,30 +34,8 @@ async function runSlotConnectivityProbe(args: {
   if (!secret) {
     throw new Error(`No secret found for slot ${slotId} (${provider}).`);
   }
-
-  if (provider === PROVIDER_ORG) {
-    const client = createXyteClient({
-      profileStore: context.profileStore,
-      secretStore: context.secretStore,
-      tenantId,
-      auth: { organization: secret }
-    });
-    await client.organization.getOrganizationInfo({ tenantId });
-    return 'organization.getOrganizationInfo ok';
-  }
-
-  if (provider === PROVIDER_PARTNER) {
-    const client = createXyteClient({
-      profileStore: context.profileStore,
-      secretStore: context.secretStore,
-      tenantId,
-      auth: { partner: secret }
-    });
-    await client.partner.getDevices({ tenantId });
-    return 'partner.getDevices ok';
-  }
-
-  throw new Error(`Unrecognized provider: ${provider}`);
+  const result = await runSlotConnectivityTest({ provider, tenantId, key: secret, profileStore: context.profileStore });
+  return result.strategy;
 }
 
 export function createConfigScreen(): TuiScreen {

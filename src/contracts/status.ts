@@ -1,7 +1,29 @@
 import { z } from 'zod';
 
-import type { ReadinessCheck } from '../config/readiness';
+import type { ConnectivityResult } from '../config/connectivity';
+import type { SecretProvider, TenantProfile } from '../types/profile';
 import { STATUS_SCHEMA_VERSION } from './versions';
+
+export type ReadinessState = 'ready' | 'needs_setup' | 'degraded';
+
+export interface ProviderReadiness {
+  provider: SecretProvider;
+  slotCount: number;
+  activeSlotId?: string;
+  activeSlotName?: string;
+  hasActiveSecret: boolean;
+}
+
+export interface ReadinessCheck {
+  state: ReadinessState;
+  activeTenant?: TenantProfile;
+  tenantId?: string;
+  missingItems: string[];
+  recommendedActions: string[];
+  providers: ProviderReadiness[];
+  connectionState: ConnectivityResult['state'];
+  connectivity: ConnectivityResult;
+}
 
 const StatusModeSchema = z.enum(['fast', 'full']);
 

@@ -225,7 +225,7 @@ function resolveFlowWindowHours(step: FlowTaskStep, context: Record<string, stri
   return parsed;
 }
 
-function resolveDerivedFlowContext(ctx: RunContext): void {
+function applyDerivedFlowContext(ctx: RunContext): void {
   const context = ctx.resolvedContext;
 
   if (!context.device_id && context.watch_device_id) {
@@ -313,7 +313,7 @@ function resolveReadiness(ctx: RunContext, checkConnectivity: boolean) {
 }
 
 async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
-  resolveDerivedFlowContext(ctx);
+  applyDerivedFlowContext(ctx);
   ensureContextKeys(step, ctx.resolvedContext);
 
   switch (step.task) {
@@ -382,29 +382,29 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
       const outPath = path.join(ctx.outputsDir, report.outFileName);
       const fleetFromStepId = report.fleetFromStepId;
       const verificationFromStepId = report.verificationFromStepId;
-      const generated =
-        fleetFromStepId && verificationFromStepId
-          ? await (async () => {
-              if (reportInput.schemaVersion !== 'xyte.utility.batch.v1' || reportInput.command !== 'device.move') {
-                throw new FlowNeedsInputError(
-                  `Step ${step.id} requires device.move batch output from ${report.inputFromStepId}.`
-                );
-              }
-              return generateDeviceMigrationReport({
-                execution: reportInput,
-                fleet: ctx.taskOutputs.get(fleetFromStepId),
-                verification: ctx.taskOutputs.get(verificationFromStepId),
-                tenantId: ctx.args.tenantId,
-                outPath
-              });
-            })()
-          : await generateOpsReport({
-              input: reportInput,
-              tenantId: ctx.args.tenantId,
-              format: step.report.format,
-              outPath,
-              includeSensitive: step.report.includeSensitive === true
-            });
+      let generated;
+      if (fleetFromStepId && verificationFromStepId) {
+        if (reportInput.schemaVersion !== 'xyte.utility.batch.v1' || reportInput.command !== 'device.move') {
+          throw new FlowNeedsInputError(
+            `Step ${step.id} requires device.move batch output from ${report.inputFromStepId}.`
+          );
+        }
+        generated = generateDeviceMigrationReport({
+          execution: reportInput,
+          fleet: ctx.taskOutputs.get(fleetFromStepId),
+          verification: ctx.taskOutputs.get(verificationFromStepId),
+          tenantId: ctx.args.tenantId,
+          outPath
+        });
+      } else {
+        generated = await generateOpsReport({
+          input: reportInput,
+          tenantId: ctx.args.tenantId,
+          format: step.report.format,
+          outPath,
+          includeSensitive: step.report.includeSensitive === true
+        });
+      }
       return {
         output: generated,
         artifactPath: outPath

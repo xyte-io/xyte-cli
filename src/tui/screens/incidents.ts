@@ -105,6 +105,28 @@ export function createIncidentsScreen(): TuiScreen {
 
   const selectedIncident = () => filtered[selectedIndex];
 
+  const renderIncidentFallbackRows = (incidentList: Record<string, unknown>[]) => {
+    setListTableData(
+      list,
+      [
+        ['ID', 'Severity', 'State', 'Device'],
+        ...incidentList.map((incident, index) => {
+          const deviceObj =
+            incident.device && typeof incident.device === 'object'
+              ? (incident.device as Record<string, unknown>)
+              : undefined;
+          return [
+            String(incident.id ?? incident._id ?? incident.uuid ?? `row-${index + 1}`),
+            String(incident.severity ?? incident.priority ?? 'unknown'),
+            String(incident.status ?? incident.state ?? 'unknown'),
+            String(incident.device_id ?? deviceObj?.id ?? 'n/a')
+          ];
+        })
+      ],
+      selectionSync
+    );
+  };
+
   const renderRows = (restoreIncidentId?: string) => {
     if (!isMounted) {
       return;
@@ -132,25 +154,7 @@ export function createIncidentsScreen(): TuiScreen {
 
     try {
       if (renderErrors.frozen) {
-        setListTableData(
-          list,
-          [
-            ['ID', 'Severity', 'State', 'Device'],
-            ...filtered.map((incident, index) => {
-              const deviceObj =
-                incident.device && typeof incident.device === 'object'
-                  ? (incident.device as Record<string, unknown>)
-                  : undefined;
-              return [
-                String(incident.id ?? incident._id ?? incident.uuid ?? `row-${index + 1}`),
-                String(incident.severity ?? incident.priority ?? 'unknown'),
-                String(incident.status ?? incident.state ?? 'unknown'),
-                String(incident.device_id ?? deviceObj?.id ?? 'n/a')
-              ];
-            })
-          ],
-          selectionSync
-        );
+        renderIncidentFallbackRows(filtered);
         detailBox?.setContent('Render fallback mode enabled for incident details.');
       } else {
         const panels = sceneFromIncidentsState({
@@ -193,25 +197,7 @@ export function createIncidentsScreen(): TuiScreen {
       context.debugLog?.('screen.render.fallback.applied', {
         screen: 'incidents'
       });
-      setListTableData(
-        list,
-        [
-          ['ID', 'Severity', 'State', 'Device'],
-          ...filtered.map((incident, index) => {
-            const deviceObj =
-              incident.device && typeof incident.device === 'object'
-                ? (incident.device as Record<string, unknown>)
-                : undefined;
-            return [
-              String(incident.id ?? incident._id ?? incident.uuid ?? `row-${index + 1}`),
-              String(incident.severity ?? incident.priority ?? 'unknown'),
-              String(incident.status ?? incident.state ?? 'unknown'),
-              String(incident.device_id ?? deviceObj?.id ?? 'n/a')
-            ];
-          })
-        ],
-        selectionSync
-      );
+      renderIncidentFallbackRows(filtered);
       detailBox?.setContent(`Unable to render incident detail safely.\nReason: ${message}`);
     }
     syncListSelection(list, selectedIndex, selectionSync);

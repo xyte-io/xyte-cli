@@ -9,7 +9,7 @@ import { runDeviceMatch } from '../../workflows/match';
 import { runMoveDevices } from '../../workflows/move-devices';
 import {
   type CliContext,
-  type CliGlobalOptions,
+  getExplicitGlobalOutput,
   printJson,
   resolveStrictJson,
   resolveTextJsonOutput
@@ -187,21 +187,15 @@ async function handleUtilMatch(
     target: string;
     sourceField: string;
     targetField: string;
-    output?: string;
-    globalOutput?: string;
+    out?: string;
     strictJson?: boolean;
   }
 ): Promise<void> {
   const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
-  const outputPath =
-    options.output ??
-    (options.globalOutput && options.globalOutput !== 'auto' && options.globalOutput !== 'json' && options.globalOutput !== 'text'
-      ? options.globalOutput
-      : undefined);
-  if (!outputPath) {
+  if (!options.out) {
     throw new CliUserError({
       summary: 'Missing output path for util match.',
-      suggestedCommands: ['Use --output <path>']
+      suggestedCommands: ['Use --out <path>']
     });
   }
   const result = runDeviceMatch({
@@ -209,7 +203,7 @@ async function handleUtilMatch(
     targetPath: options.target,
     sourceField: options.sourceField,
     targetField: options.targetField,
-    outputPath,
+    outputPath: options.out,
     tenantId: options.tenant ?? settings.values.defaults.tenant
   });
   printJson(ctx.stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
@@ -226,7 +220,7 @@ export function registerUtilCommands(parent: Command, ctx: CliContext): void {
       '  xyte-cli util prepare --action organization.devices.claimDevice --tenant <tenant-id> --input ./claims.csv',
       '  xyte-cli util import-tree --tenant <tenant-id> --input ./space-import.csv',
       '  xyte-cli util move-devices --tenant <tenant-id> --input ./device-moves.csv',
-      '  xyte-cli util match --source ./source-devices.json --target ./target-spaces.json --source-field name --target-field name --output ./device-moves.csv'
+      '  xyte-cli util match --source ./source-devices.json --target ./target-spaces.json --source-field name --target-field name --out ./device-moves.csv'
     ].join('\n')
   );
   util
@@ -269,7 +263,7 @@ export function registerUtilCommands(parent: Command, ctx: CliContext): void {
     }) {
       await handleUtilListActions(ctx, {
         ...options,
-        output: (this.optsWithGlobals() as CliGlobalOptions).output
+        output: getExplicitGlobalOutput(this)
       });
     });
 
@@ -334,21 +328,18 @@ export function registerUtilCommands(parent: Command, ctx: CliContext): void {
     .requiredOption('--target <path>', 'Target space JSON path')
     .requiredOption('--source-field <name>', 'Source field containing the device name')
     .requiredOption('--target-field <name>', 'Target field containing the target space name')
-    .option('--output <path>', 'Output CSV path')
+    .requiredOption('--out <path>', 'Output CSV path')
     .option('--tenant <tenantId>', 'Tenant id override for summary metadata')
     .option('--strict-json', 'Fail on non-serializable output')
-    .action(async function (options: {
+    .action(async (options: {
       tenant?: string;
       source: string;
       target: string;
       sourceField: string;
       targetField: string;
-      output?: string;
+      out: string;
       strictJson?: boolean;
-    }) {
-      await handleUtilMatch(ctx, {
-        ...options,
-        globalOutput: (this.optsWithGlobals() as CliGlobalOptions).output
-      });
+    }) => {
+      await handleUtilMatch(ctx, options);
     });
 }

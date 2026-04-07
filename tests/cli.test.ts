@@ -498,7 +498,7 @@ describe('cli integration', () => {
       'name',
       '--target-field',
       'name',
-      '--output',
+      '--out',
       outputPath
     ]);
 

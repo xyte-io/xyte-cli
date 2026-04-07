@@ -76,16 +76,6 @@ async function makeClientWithProviders(providers: Array<'xyte-org' | 'xyte-partn
   };
 }
 
-function createDeferred<T>() {
-  let resolve!: (value: T | PromiseLike<T>) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
-
 describe('flow runner', () => {
   it('resumes from a pending gate and advances one gate per apply invocation', async () => {
     const { profileStore, secretStore, client } = await makeClient();
@@ -1337,24 +1327,15 @@ describe('flow runner', () => {
     expect(failed.steps.find((item) => item.stepId === 'post_migration_report')?.status).not.toBe('completed');
   });
 
-  it('awaits the migration-specific post report helper before completing the flow', async () => {
+  it('calls the migration-specific post report helper and completes the flow', async () => {
     const { profileStore, secretStore, client } = await makeClient();
     const definition = getBuiltInFlowDefinition('flow.device-migration');
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-migration-await-report`);
     let currentSpaceId = 900;
-    const deferred = createDeferred<{
-      schemaVersion: 'xyte.report.v1';
-      generatedAtUtc: string;
-      tenantId: string;
-      format: 'markdown';
-      outputPath: string;
-      includeSensitive: boolean;
-    }>();
-    let reportStarted = false;
+    let reportCalled = false;
 
-    const reportSpy = vi.spyOn(fleetInsights, 'generateDeviceMigrationReport').mockImplementation(async (args) => {
-      reportStarted = true;
-      await deferred.promise;
+    const reportSpy = vi.spyOn(fleetInsights, 'generateDeviceMigrationReport').mockImplementation((args) => {
+      reportCalled = true;
       writeFileSync(args.outPath, '# Device Migration Post-Execution Report\n', 'utf8');
       return {
         schemaVersion: 'xyte.report.v1',
@@ -1466,8 +1447,7 @@ describe('flow runner', () => {
         client
       });
 
-      let flowCompleted = false;
-      const applyPromise = runDeterministicFlow({
+      const completed = await runDeterministicFlow({
         flowId: definition.id,
         resolvedFlowId: definition.id,
         definition,
@@ -1481,28 +1461,9 @@ describe('flow runner', () => {
         profileStore,
         secretStore,
         client
-      }).then((summary) => {
-        flowCompleted = true;
-        return summary;
       });
 
-      for (let attempt = 0; attempt < 50 && !reportStarted; attempt += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
-
-      expect(reportStarted).toBe(true);
-      expect(flowCompleted).toBe(false);
-
-      deferred.resolve({
-        schemaVersion: 'xyte.report.v1',
-        generatedAtUtc: new Date().toISOString(),
-        tenantId: 'acme',
-        format: 'markdown',
-        outputPath: join(outDir, 'ignored.md'),
-        includeSensitive: false
-      });
-
-      const completed = await applyPromise;
+      expect(reportCalled).toBe(true);
       expect(completed.outcome).toBe('completed');
       expect(completed.steps.find((item) => item.stepId === 'post_migration_report')?.status).toBe('completed');
     } finally {
