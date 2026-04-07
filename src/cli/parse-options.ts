@@ -22,7 +22,7 @@ export function parseQueryJson(
 }
 
 export function parseQueryString(values: string[] | undefined): Record<string, string> {
-  const out: Record<string, string> = {};
+  const out = Object.create(null) as Record<string, string>;
 
   for (const entry of values ?? []) {
     const segments = String(entry)

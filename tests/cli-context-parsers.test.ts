@@ -40,6 +40,13 @@ describe('parseQueryString', () => {
     expect(() => parseQueryString(['space_id=1&space_id=2'])).toThrow('Duplicate query parameter');
   });
 
+  it('uses a null-prototype object for parsed query output', () => {
+    const parsed = parseQueryString(['__proto__=polluted']);
+
+    expect(Object.getPrototypeOf(parsed)).toBeNull();
+    expect(parsed.__proto__).toBe('polluted');
+  });
+
   it('throws on invalid segments', () => {
     expect(() => parseQueryString(['space_id'])).toThrow('Use key=value');
   });
