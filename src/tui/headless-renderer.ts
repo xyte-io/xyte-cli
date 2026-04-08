@@ -2,6 +2,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { randomUUID } from 'node:crypto';
 
 import type { ConnectionState } from '../contracts/status';
+import type { RetryState } from '../config/retry-policy';
 import { evaluateReadiness, type ReadinessCheck } from '../config/readiness';
 import type { SecretStore } from '../secure/secret-store';
 import type { ProfileStore } from '../secure/profile-store';
@@ -242,7 +243,7 @@ interface ScreenLoadResult {
   panels: ScenePanel[];
   connectionState: ConnectionState;
   error?: { message: string };
-  retry: unknown;
+  retry: RetryState | Record<string, RetryState | undefined> | undefined;
   extraMeta?: Record<string, unknown>;
 }
 
@@ -394,7 +395,7 @@ async function buildOperationalFrame(options: {
       let devicesInSpace: unknown[] = [];
       let paneStatus = selected ? 'Loading selected space...' : 'No spaces found for tenant.';
       let drilldownError: string | undefined;
-      let drilldownRetry: unknown;
+      let drilldownRetry: RetryState | undefined;
 
       if (selected && selectedSpaceId) {
         const drilldown = await loadSpaceDrilldownData(options.client, options.tenantId, selectedSpaceId, [], {

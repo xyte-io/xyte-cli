@@ -10,9 +10,10 @@ describe('getLogger', () => {
     expect(typeof logger.debug).toBe('function');
   });
 
-  it('returns the same singleton on subsequent calls', () => {
+  it('returns a fresh logger instance each call (reads env on each invocation)', () => {
     const a = getLogger();
     const b = getLogger();
-    expect(a).toBe(b);
+    // Each call creates a new instance so level changes take effect immediately
+    expect(a).not.toBe(b);
   });
 });

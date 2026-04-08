@@ -531,15 +531,15 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
         primaryFormat: step.utilityPrepare.primaryFormat,
         force: true
       });
+      const CONTEXT_KEY_MAP: Record<string, string> = {
+        'space.import-tree': 'space_import_tree_csv',
+        'organization.devices.claimDevice': 'claim_prepare_csv',
+        'device.move': 'device_move_csv'
+      };
       const contextUpdates: Record<string, string> = {};
-      if (step.utilityPrepare.actionKey === 'space.import-tree') {
-        contextUpdates.space_import_tree_csv = result.artifacts.primary;
-      }
-      if (step.utilityPrepare.actionKey === 'organization.devices.claimDevice') {
-        contextUpdates.claim_prepare_csv = result.artifacts.primary;
-      }
-      if (step.utilityPrepare.actionKey === 'device.move') {
-        contextUpdates.device_move_csv = result.artifacts.primary;
+      const contextKey = CONTEXT_KEY_MAP[step.utilityPrepare.actionKey];
+      if (contextKey) {
+        contextUpdates[contextKey] = result.artifacts.primary;
       }
       return {
         output: result,

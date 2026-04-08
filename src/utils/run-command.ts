@@ -1,14 +1,14 @@
 import crossSpawn from 'cross-spawn';
 import type { ChildProcess } from 'node:child_process';
 
-export interface ProcessRunOptions {
+interface ProcessRunOptions {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   input?: string;
   stdinMode?: 'pipe' | 'ignore';
 }
 
-export interface ProcessRunResult {
+interface ProcessRunResult {
   code: number;
   stdout: string;
   stderr: string;

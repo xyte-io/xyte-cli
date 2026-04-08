@@ -108,33 +108,7 @@ const DeepDiveResultSchema = z.object({
   })
 });
 
-const DeviceMatchRowSchema = z.object({
-  deviceId: z.string(),
-  deviceName: z.string(),
-  targetSpaceId: z.string().optional(),
-  targetSpaceName: z.string().optional(),
-  confidence: z.number(),
-  status: z.enum(['exact', 'fuzzy', 'unmatched'])
-});
-
-const DeviceMatchResultSchema = z.object({
-  schemaVersion: z.literal(DEVICE_MATCH_SCHEMA_VERSION),
-  generatedAtUtc: z.string(),
-  tenantId: z.string().optional(),
-  sourcePath: z.string(),
-  targetPath: z.string(),
-  sourceField: z.string(),
-  targetField: z.string(),
-  outputPath: z.string(),
-  summaryPath: z.string(),
-  totals: z.object({
-    rows: z.number(),
-    exact: z.number(),
-    fuzzy: z.number(),
-    unmatched: z.number()
-  }),
-  matches: z.array(DeviceMatchRowSchema)
-});
+import { DeviceMatchResultSchema } from './match';
 
 const DeviceMoveBatchReportSchema = z.object({
   schemaVersion: z.literal(UTILITY_BATCH_SCHEMA_VERSION),

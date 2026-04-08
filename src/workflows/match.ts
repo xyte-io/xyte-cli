@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import Fuse from 'fuse.js';
+import { z } from 'zod';
 
 import { DEVICE_MATCH_SCHEMA_VERSION } from '../contracts/versions';
 import { isRecord } from '../utils/json';
@@ -36,6 +37,34 @@ export interface DeviceMatchResult {
   };
   matches: DeviceMatchRow[];
 }
+
+const DeviceMatchRowSchema = z.object({
+  deviceId: z.string(),
+  deviceName: z.string(),
+  targetSpaceId: z.string().optional(),
+  targetSpaceName: z.string().optional(),
+  confidence: z.number(),
+  status: z.enum(['exact', 'fuzzy', 'unmatched'])
+});
+
+export const DeviceMatchResultSchema = z.object({
+  schemaVersion: z.literal(DEVICE_MATCH_SCHEMA_VERSION),
+  generatedAtUtc: z.string(),
+  tenantId: z.string().optional(),
+  sourcePath: z.string(),
+  targetPath: z.string(),
+  sourceField: z.string(),
+  targetField: z.string(),
+  outputPath: z.string(),
+  summaryPath: z.string(),
+  totals: z.object({
+    rows: z.number(),
+    exact: z.number(),
+    fuzzy: z.number(),
+    unmatched: z.number()
+  }),
+  matches: z.array(DeviceMatchRowSchema)
+});
 
 interface MatchTarget {
   id: string;
