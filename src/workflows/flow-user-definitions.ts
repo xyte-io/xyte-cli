@@ -118,8 +118,11 @@ export async function listFlowDefinitions(): Promise<Array<FlowDefinitionV1 & { 
         ...parsed,
         path: filePath
       });
-    } catch {
-      // Keep listing resilient to invalid files; they can be fixed manually.
+    } catch (error) {
+      // Keep listing resilient to invalid files (bad JSON or schema); I/O errors propagate.
+      if ((error as NodeJS.ErrnoException).code) {
+        throw error;
+      }
     }
   }
 

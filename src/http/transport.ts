@@ -112,7 +112,7 @@ export class HttpTransport {
   private readonly timeoutMs: number;
   private readonly retryAttempts: number;
   private readonly retryBackoffMs: number;
-  private readonly logger = getLogger();
+  private get logger() { return getLogger(); }
 
   constructor(options: TransportOptions = {}) {
     this.timeoutMs = options.timeoutMs ?? 15_000;

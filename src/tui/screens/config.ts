@@ -1,6 +1,6 @@
 import blessed from 'blessed';
 
-import { runSlotConnectivityTest } from '../../cli/provider-resolution';
+import { runSlotConnectivityTest } from '../../client/probe';
 import {
   clampIndex,
   movePaneWithBoundary,

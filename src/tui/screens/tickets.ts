@@ -46,7 +46,7 @@ interface ResolveTicketWithGuardArgs {
   context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;
 }
 
-export async function resolveTicketWithGuard(args: ResolveTicketWithGuardArgs): Promise<boolean> {
+export async function markTicketResolvedWithGuard(args: ResolveTicketWithGuardArgs): Promise<boolean> {
   const { ticket, mode, context } = args;
   if (mode !== 'organization') {
     context.setStatus('Ticket write actions are disabled in partner mode (organization-only policy).');
@@ -529,7 +529,7 @@ export function createTicketsScreen(): TuiScreen {
           context.setStatus('No ticket selected.');
           return true;
         }
-        const resolved = await resolveTicketWithGuard({ ticket, mode, context });
+        const resolved = await markTicketResolvedWithGuard({ ticket, mode, context });
         if (!isMounted) {
           return true;
         }

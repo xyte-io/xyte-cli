@@ -16,7 +16,7 @@ describe('CliUserError', () => {
 
   it('stores cause detail', () => {
     const err = new CliUserError({ summary: 'fail', cause: 'bad input' });
-    expect(err.causeDetail).toBe('bad input');
+    expect(err.cause).toBe('bad input');
   });
 
   it('stores suggested commands', () => {

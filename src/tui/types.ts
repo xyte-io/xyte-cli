@@ -3,7 +3,7 @@ import type blessed from 'blessed';
 import type { XyteClient } from '../types/client';
 import type { ProfileStore } from '../secure/profile-store';
 import type { SecretStore } from '../secure/secret-store';
-import type { ReadinessCheck } from '../config/readiness';
+import type { ReadinessCheck } from '../contracts/status';
 
 export { TUI_SCREEN_IDS, type TuiScreenId } from '../types/tui-screens';
 import type { TuiScreenId } from '../types/tui-screens';

@@ -134,7 +134,12 @@ function loadMatchRows(inputPath: string): Array<Record<string, unknown>> {
   }
 
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-    const parsed = JSON.parse(trimmed) as unknown;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch (error) {
+      throw new Error(`Input file ${resolved}: ${(error as Error).message}`, { cause: error });
+    }
     const extracted = extractRowsFromJson(parsed);
     if (extracted) {
       return extracted;

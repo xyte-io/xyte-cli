@@ -5,6 +5,7 @@ import type { SecretProvider } from '../types/profile';
 import { isSecretProvider } from '../types/profile';
 import { getXyteConfigDir } from '../utils/config-dir';
 import { errorMessage } from '../utils/error-format';
+import { getLogger } from '../observability/logger';
 import { DEFAULT_SLOT_ID } from './key-slots';
 
 const SECRET_STORE_VERSION = 1;
@@ -178,7 +179,7 @@ export class FileSecretStore implements SecretStore {
         // Best-effort migration: continue returning normalized data even if we cannot write.
         // This avoids breaking reads when the secrets file is readable but not writable (e.g. read-only filesystem).
          
-        console.warn(`Failed to persist normalized secret data to ${this.filePath}:`, writeError);
+        getLogger().warn({ file: this.filePath, error: writeError }, 'Failed to persist normalized secret data');
       }
     }
     return normalized;

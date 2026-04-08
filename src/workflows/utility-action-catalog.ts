@@ -1,4 +1,4 @@
-import rawEndpoints from '../spec/public-endpoints.json';
+import { listEndpoints } from '../client/catalog';
 import type { PublicEndpointSpec } from '../types/endpoints';
 import {
   buildFriendlyClaimDeviceProfile,
@@ -11,7 +11,7 @@ import {
 const WRITE_METHODS = new Set<PublicEndpointSpec['method']>(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 function loadWriteEndpoints(): PublicEndpointSpec[] {
-  return (rawEndpoints as PublicEndpointSpec[]).filter((endpoint) => WRITE_METHODS.has(endpoint.method));
+  return listEndpoints().filter((endpoint) => WRITE_METHODS.has(endpoint.method));
 }
 
 function endpointKeyComparator(left: PublicEndpointSpec, right: PublicEndpointSpec): number {
@@ -38,7 +38,13 @@ function buildProfiles(): UtilityActionProfile[] {
   return Array.from(profiles.values()).sort((left, right) => left.actionKey.localeCompare(right.actionKey));
 }
 
-const ACTION_PROFILES = buildProfiles();
+let _actionProfiles: UtilityActionProfile[] | undefined;
+function getActionProfiles(): UtilityActionProfile[] {
+  if (!_actionProfiles) {
+    _actionProfiles = buildProfiles();
+  }
+  return _actionProfiles;
+}
 
 interface ListUtilityActionOptions {
   entity?: string;
@@ -48,7 +54,7 @@ interface ListUtilityActionOptions {
 export function listUtilityActionProfiles(options: ListUtilityActionOptions = {}): UtilityActionProfile[] {
   const includeGeneric = options.includeGeneric !== false;
   const requestedEntity = options.entity?.trim().toLowerCase();
-  return ACTION_PROFILES.filter((profile) => {
+  return getActionProfiles().filter((profile) => {
     if (!includeGeneric && profile.mode === 'generic') {
       return false;
     }
@@ -61,7 +67,7 @@ export function listUtilityActionProfiles(options: ListUtilityActionOptions = {}
 
 export function getUtilityActionProfile(actionKey: string): UtilityActionProfile {
   const normalized = actionKey.trim();
-  const found = ACTION_PROFILES.find((profile) => profile.actionKey === normalized);
+  const found = getActionProfiles().find((profile) => profile.actionKey === normalized);
   if (!found) {
     throw new Error(`Unknown utility action: ${actionKey}`);
   }

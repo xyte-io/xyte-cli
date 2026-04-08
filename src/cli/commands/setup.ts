@@ -298,6 +298,38 @@ async function handleSetupStatus(
   printJson(ctx.stdout, readiness, { strictJson: resolveStrictJson({ settings }) });
 }
 
+async function resolveProviderAndTenantName(
+  ctx: CliContext,
+  args: {
+    tenantId: string;
+    candidateTenantName: string;
+    keyValue: string;
+    provider: SecretProvider | undefined;
+    connectivityMode: SetupConnectivityMode;
+    explicitTenantName: boolean;
+  }
+): Promise<{ provider: SecretProvider; tenantName: string }> {
+  const resolvedProvider = await resolveProviderForKey({
+    profileStore: ctx.profileStore,
+    tenantId: args.tenantId,
+    keyValue: args.keyValue,
+    provider: args.provider,
+    allowProbe: args.connectivityMode !== 'never'
+  });
+  const resolvedTenantName =
+    args.connectivityMode !== 'never' && !args.explicitTenantName && args.candidateTenantName === args.tenantId
+      ? await resolveTenantNameFromKey(ctx, {
+          tenantId: args.tenantId,
+          provider: resolvedProvider,
+          keyValue: args.keyValue
+        })
+      : undefined;
+  return {
+    provider: resolvedProvider,
+    tenantName: resolvedTenantName ?? args.candidateTenantName
+  };
+}
+
 async function handleSetupRunSimple(
   ctx: CliContext,
   options: {
@@ -357,25 +389,17 @@ async function handleSetupRunSimple(
   }
 
   const tenantId = normalizeTenantId(options.tenant?.trim() || tenantLabel);
-  const tenantName = tenantLabel.trim() || tenantId;
-  const provider = await resolveProviderForKey({
-    profileStore: ctx.profileStore,
+  const { provider, tenantName } = await resolveProviderAndTenantName(ctx, {
     tenantId,
+    candidateTenantName: tenantLabel.trim() || tenantId,
     keyValue,
     provider: options.provider ? parseProvider(options.provider) : undefined,
-    allowProbe: connectivityMode !== 'never'
+    connectivityMode,
+    explicitTenantName
   });
-  const resolvedTenantName =
-    connectivityMode !== 'never' && !explicitTenantName && tenantName === tenantId
-      ? await resolveTenantNameFromKey(ctx, {
-          tenantId,
-          provider,
-          keyValue
-        })
-      : undefined;
   const setupResult = await runSimpleSetup(ctx, {
     tenantId,
-    tenantName: resolvedTenantName ?? tenantName,
+    tenantName,
     keyValue,
     provider,
     setActive: options.setActive !== false,
@@ -462,24 +486,16 @@ async function handleSetupRunAdvanced(
     });
   }
 
-  provider = await resolveProviderForKey({
-    profileStore: ctx.profileStore,
+  const { provider: resolvedProvider, tenantName: resolvedTenantName } = await resolveProviderAndTenantName(ctx, {
     tenantId,
+    candidateTenantName: (tenantName?.trim() || tenantId).trim() || tenantId,
     keyValue,
     provider,
-    allowProbe: connectivityMode !== 'never'
+    connectivityMode,
+    explicitTenantName
   });
-
-  const candidateTenantName = (tenantName?.trim() || tenantId).trim() || tenantId;
-  const resolvedTenantName =
-    connectivityMode !== 'never' && !explicitTenantName && candidateTenantName === tenantId
-      ? await resolveTenantNameFromKey(ctx, {
-          tenantId,
-          provider,
-          keyValue
-        })
-      : undefined;
-  tenantName = resolvedTenantName ?? candidateTenantName;
+  provider = resolvedProvider;
+  tenantName = resolvedTenantName;
 
   const result = await runSetupCore(ctx, {
     tenantId,

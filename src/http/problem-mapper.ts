@@ -20,7 +20,7 @@ export function toProblemDetails(error: unknown, instance?: string): ProblemDeta
       instance,
       xyteCode: error.xyteCode,
       retriable: false,
-      cause: error.causeDetail ? redactSensitiveText(error.causeDetail) : undefined,
+      cause: error.cause ? redactSensitiveText(error.cause) : undefined,
       suggestedCommands: error.suggestedCommands.map((item) => redactSensitiveText(item))
     };
   }
