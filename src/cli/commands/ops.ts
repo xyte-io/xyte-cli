@@ -59,15 +59,15 @@ function appendRenderedOutput(stream: OutputStream, text: string, outPath?: stri
   }
 }
 
-function resolveRenderMode(options: { render?: string; format?: string }, allowed: string[], fallback: string): string {
+function resolveRenderMode<T extends string>(options: { render?: string; format?: string }, allowed: readonly T[], fallback: T): T {
   const render = (options.render ?? options.format ?? fallback).trim().toLowerCase();
-  if (!allowed.includes(render)) {
+  if (!allowed.includes(render as T)) {
     throw new CliUserError({
       summary: `Invalid render mode: "${render}".`,
       suggestedCommands: allowed.map((mode) => `Use --render ${mode}`)
     });
   }
-  return render;
+  return render as T;
 }
 
 function parseWatchProfile(value: string | undefined): WatchProfile {
@@ -499,7 +499,7 @@ async function handleOpsConsole(
     secretStore,
     initialScreen: screen,
     headless: Boolean(options.headless),
-    format: (options.headless ? 'json' : requestedOutput === 'text' ? 'text' : 'json') as OutputFormat,
+    format: (requestedOutput === 'text' ? 'text' : 'json') as OutputFormat,
     motionEnabled,
     follow,
     intervalMs,
