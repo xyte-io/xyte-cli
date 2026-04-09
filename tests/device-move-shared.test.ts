@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  parseDeviceRecord,
   parseOptionalInteger,
   parseOptionalLabel,
   parseRequiredInteger,
@@ -71,6 +72,28 @@ describe('parseOptionalLabel', () => {
   it('returns undefined for non-string/number', () => {
     expect(parseOptionalLabel(null)).toBeUndefined();
     expect(parseOptionalLabel({})).toBeUndefined();
+  });
+});
+
+describe('parseDeviceRecord', () => {
+  it('returns id, name, and currentSpaceId from a flat record', () => {
+    const result = parseDeviceRecord({ name: 'My Device', space_id: 5 }, 'dev-1');
+    expect(result).toEqual({ id: 'dev-1', name: 'My Device', currentSpaceId: 5 });
+  });
+
+  it('extracts space id from nested space object', () => {
+    const result = parseDeviceRecord({ space: { id: 10 } }, 'dev-2');
+    expect(result.currentSpaceId).toBe(10);
+  });
+
+  it('returns undefined name and currentSpaceId when absent', () => {
+    const result = parseDeviceRecord({}, 'dev-3');
+    expect(result).toEqual({ id: 'dev-3', name: undefined, currentSpaceId: undefined });
+  });
+
+  it('throws when data is not a record', () => {
+    expect(() => parseDeviceRecord(null, 'dev-4')).toThrow('Device dev-4 returned an unexpected response payload.');
+    expect(() => parseDeviceRecord('bad', 'dev-5')).toThrow('Device dev-5 returned an unexpected response payload.');
   });
 });
 
