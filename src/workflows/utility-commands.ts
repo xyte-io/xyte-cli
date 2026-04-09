@@ -102,7 +102,7 @@ async function listSpacesByParent(
   return results;
 }
 
-async function resolveRootSpaceId(client: XyteClient, tenantId: string): Promise<number> {
+async function fetchRootSpaceId(client: XyteClient, tenantId: string): Promise<number> {
   const response = await client.callWithMeta('organization.spaces.getSpaces', {
     tenantId,
     query: {
@@ -256,7 +256,7 @@ export function runSpaceImportTree(args: {
       execute: async (_client, tenantId) => {
         const preparedRow = prepare();
         if (resolvedRootSpaceId === undefined) {
-          resolvedRootSpaceId = await resolveRootSpaceId(args.client, tenantId);
+          resolvedRootSpaceId = await fetchRootSpaceId(args.client, tenantId);
         }
         let parentId = resolvedRootSpaceId;
         for (let segmentIndex = 0; segmentIndex < preparedRow.segments.length; segmentIndex += 1) {

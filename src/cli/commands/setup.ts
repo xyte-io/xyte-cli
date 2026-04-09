@@ -9,7 +9,7 @@ import { isRecord } from '../../utils/json';
 import { firstText } from '../../utils/json';
 import { CliUserError } from '../../contracts/user-error';
 import { formatReadinessText } from '../format-readiness';
-import { resolveProviderForKey } from '../provider-resolution';
+import { fetchProviderForKey } from '../provider-resolution';
 import { resolveKeyValue } from '../resolve-key';
 import {
   type CliContext,
@@ -125,7 +125,7 @@ function extractTenantNameFromOrganizationInfo(payload: unknown): string | undef
 
 export { SIMPLE_SETUP_DEFAULT_TENANT, normalizeTenantId, runSimpleSetup };
 
-async function resolveTenantNameFromKey(
+async function fetchTenantNameFromKey(
   ctx: CliContext,
   args: {
     tenantId: string;
@@ -239,7 +239,7 @@ async function runSimpleSetup(
   const connectivityMode = args.connectivityMode ?? 'auto';
   const provider =
     args.provider ??
-    (await resolveProviderForKey({
+    (await fetchProviderForKey({
       profileStore: ctx.profileStore,
       tenantId: args.tenantId,
       keyValue: args.keyValue,
@@ -298,7 +298,7 @@ async function handleSetupStatus(
   printJson(ctx.stdout, readiness, { strictJson: resolveStrictJson({ settings }) });
 }
 
-async function resolveProviderAndTenantName(
+async function fetchProviderAndTenantName(
   ctx: CliContext,
   args: {
     tenantId: string;
@@ -309,7 +309,7 @@ async function resolveProviderAndTenantName(
     explicitTenantName: boolean;
   }
 ): Promise<{ provider: SecretProvider; tenantName: string }> {
-  const resolvedProvider = await resolveProviderForKey({
+  const resolvedProvider = await fetchProviderForKey({
     profileStore: ctx.profileStore,
     tenantId: args.tenantId,
     keyValue: args.keyValue,
@@ -318,7 +318,7 @@ async function resolveProviderAndTenantName(
   });
   const resolvedTenantName =
     args.connectivityMode !== 'never' && !args.explicitTenantName && args.candidateTenantName === args.tenantId
-      ? await resolveTenantNameFromKey(ctx, {
+      ? await fetchTenantNameFromKey(ctx, {
           tenantId: args.tenantId,
           provider: resolvedProvider,
           keyValue: args.keyValue
@@ -389,7 +389,7 @@ async function handleSetupRunSimple(
   }
 
   const tenantId = normalizeTenantId(options.tenant?.trim() || tenantLabel);
-  const { provider, tenantName } = await resolveProviderAndTenantName(ctx, {
+  const { provider, tenantName } = await fetchProviderAndTenantName(ctx, {
     tenantId,
     candidateTenantName: tenantLabel.trim() || tenantId,
     keyValue,
@@ -491,7 +491,7 @@ async function handleSetupRunAdvanced(
     });
   }
 
-  const { provider: resolvedProvider, tenantName } = await resolveProviderAndTenantName(ctx, {
+  const { provider: resolvedProvider, tenantName } = await fetchProviderAndTenantName(ctx, {
     tenantId,
     candidateTenantName: (promptedTenantName?.trim() || tenantId).trim() || tenantId,
     keyValue,

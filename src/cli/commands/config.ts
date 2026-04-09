@@ -18,7 +18,7 @@ import type { SecretStore } from '../../secure/secret-store';
 import { SUPPORTED_SECRET_PROVIDERS, parseProvider, type SecretProvider } from '../../types/profile';
 import { formatReadinessText } from '../format-readiness';
 import { parsePositiveIntegerOption } from '../parse-options';
-import { resolveProviderForKey, runSlotConnectivityTest } from '../provider-resolution';
+import { fetchProviderForKey, runSlotConnectivityTest } from '../provider-resolution';
 import { resolveKeyValue } from '../resolve-key';
 import {
   type CliContext,
@@ -421,7 +421,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
             suggestedCommands: ['Use xyte-cli config key add --tenant <tenant-id> --provider xyte-org --name primary']
           });
         }
-        const provider = await resolveProviderForKey({
+        const provider = await fetchProviderForKey({
           profileStore: ctx.profileStore,
           tenantId: options.tenant,
           keyValue: value,

@@ -5,7 +5,7 @@ import { PROVIDER_ORG, PROVIDER_PARTNER, type SecretProvider } from '../types/pr
 import { runSlotConnectivityTest } from '../client/probe';
 export { runSlotConnectivityTest };
 
-export async function resolveProviderForKey(args: {
+export async function fetchProviderForKey(args: {
   profileStore: ProfileStore;
   tenantId: string;
   keyValue: string;
