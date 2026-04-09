@@ -101,3 +101,30 @@ export function generateDeviceMigrationReport(args: {
     includeSensitive: false
   };
 }
+
+export function formatDeviceMoveBatchReportMarkdown(result: z.infer<typeof DeviceMoveBatchReportSchema>): string {
+  const succeededLabel = result.mode === 'dry-run' ? 'Ready to apply' : 'Succeeded';
+  const lines = [
+    '# Device Migration Execution Report',
+    '',
+    `Generated: ${result.generatedAtUtc}`,
+    `Tenant: ${result.tenantId}`,
+    '',
+    '## Execution',
+    `- Mode: ${result.mode}`,
+    `- Rows: ${result.totals.rows}`,
+    `- ${succeededLabel}: ${result.totals.succeeded}`,
+    `- Failed: ${result.totals.failed}`,
+    `- Skipped: ${result.totals.skipped}`,
+    `- Stopped early: ${result.stoppedEarly ? 'yes' : 'no'}`
+  ];
+
+  if (result.reportPath) {
+    lines.push(`- NDJSON report: ${result.reportPath}`);
+  }
+  if (result.firstError) {
+    lines.push('', '## First Error', `- Row ${result.firstError.rowIndex}: ${result.firstError.message}`);
+  }
+
+  return `${lines.join('\n')}\n`;
+}

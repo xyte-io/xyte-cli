@@ -11,8 +11,8 @@ import {
 } from '../contracts/versions';
 import { parseTimestamp } from './report/time-format';
 import { formatDeepDiveMarkdown } from './fleet-insights-format';
-import { DeviceMatchResultSchema } from './device-match';
-import { DeviceMoveBatchReportSchema } from './device-migration-report';
+import { DeviceMatchResultSchema, formatDeviceMatchReportMarkdown } from './device-match';
+import { DeviceMoveBatchReportSchema, formatDeviceMoveBatchReportMarkdown } from './device-migration-report';
 import type { StatusCounts, FleetSnapshot, FleetInspectResult } from '../types/fleet-inspect';
 import type { DeepDiveResult } from '../types/deep-dive';
 
@@ -453,68 +453,6 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
 function ensureDir(filePath: string): void {
   mkdirSync(dirname(resolve(filePath)), { recursive: true });
 }
-
-function formatDeviceMatchReportMarkdown(result: z.infer<typeof DeviceMatchResultSchema>, tenantId: string): string {
-  const sampleRows = result.matches.slice(0, 12);
-  const lines = [
-    '# Device Migration Matching Report',
-    '',
-    `Generated: ${result.generatedAtUtc}`,
-    `Tenant: ${tenantId}`,
-    '',
-    '## Inputs',
-    `- Source file: ${result.sourcePath}`,
-    `- Target file: ${result.targetPath}`,
-    `- Source field: ${result.sourceField}`,
-    `- Target field: ${result.targetField}`,
-    `- Output CSV: ${result.outputPath}`,
-    '',
-    '## Totals',
-    `- Rows: ${result.totals.rows}`,
-    `- Exact matches: ${result.totals.exact}`,
-    `- Fuzzy matches: ${result.totals.fuzzy}`,
-    `- Unmatched: ${result.totals.unmatched}`
-  ];
-
-  if (sampleRows.length > 0) {
-    lines.push('', '## Sample Matches', '', '| Device | Target Space | Confidence | Status |', '| --- | --- | ---: | --- |');
-    sampleRows.forEach((row) => {
-      lines.push(
-        `| ${row.deviceName} (${row.deviceId}) | ${row.targetSpaceName ?? 'Unmatched'} | ${row.confidence.toFixed(3)} | ${row.status} |`
-      );
-    });
-  }
-
-  return `${lines.join('\n')}\n`;
-}
-
-function formatDeviceMoveBatchReportMarkdown(result: z.infer<typeof DeviceMoveBatchReportSchema>): string {
-  const succeededLabel = result.mode === 'dry-run' ? 'Ready to apply' : 'Succeeded';
-  const lines = [
-    '# Device Migration Execution Report',
-    '',
-    `Generated: ${result.generatedAtUtc}`,
-    `Tenant: ${result.tenantId}`,
-    '',
-    '## Execution',
-    `- Mode: ${result.mode}`,
-    `- Rows: ${result.totals.rows}`,
-    `- ${succeededLabel}: ${result.totals.succeeded}`,
-    `- Failed: ${result.totals.failed}`,
-    `- Skipped: ${result.totals.skipped}`,
-    `- Stopped early: ${result.stoppedEarly ? 'yes' : 'no'}`
-  ];
-
-  if (result.reportPath) {
-    lines.push(`- NDJSON report: ${result.reportPath}`);
-  }
-  if (result.firstError) {
-    lines.push('', '## First Error', `- Row ${result.firstError.rowIndex}: ${result.firstError.message}`);
-  }
-
-  return `${lines.join('\n')}\n`;
-}
-
 
 export function parseDeepDiveForReport(raw: unknown, expectedTenantId?: string): DeepDiveResult {
   const parsed = DeepDiveResultSchema.safeParse(raw);

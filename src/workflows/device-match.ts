@@ -281,3 +281,37 @@ export async function runDeviceMatch(args: {
   await writeFile(summaryPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
   return result;
 }
+
+export function formatDeviceMatchReportMarkdown(result: z.infer<typeof DeviceMatchResultSchema>, tenantId: string): string {
+  const sampleRows = result.matches.slice(0, 12);
+  const lines = [
+    '# Device Migration Matching Report',
+    '',
+    `Generated: ${result.generatedAtUtc}`,
+    `Tenant: ${tenantId}`,
+    '',
+    '## Inputs',
+    `- Source file: ${result.sourcePath}`,
+    `- Target file: ${result.targetPath}`,
+    `- Source field: ${result.sourceField}`,
+    `- Target field: ${result.targetField}`,
+    `- Output CSV: ${result.outputPath}`,
+    '',
+    '## Totals',
+    `- Rows: ${result.totals.rows}`,
+    `- Exact matches: ${result.totals.exact}`,
+    `- Fuzzy matches: ${result.totals.fuzzy}`,
+    `- Unmatched: ${result.totals.unmatched}`
+  ];
+
+  if (sampleRows.length > 0) {
+    lines.push('', '## Sample Matches', '', '| Device | Target Space | Confidence | Status |', '| --- | --- | ---: | --- |');
+    sampleRows.forEach((row) => {
+      lines.push(
+        `| ${row.deviceName} (${row.deviceId}) | ${row.targetSpaceName ?? 'Unmatched'} | ${row.confidence.toFixed(3)} | ${row.status} |`
+      );
+    });
+  }
+
+  return `${lines.join('\n')}\n`;
+}
