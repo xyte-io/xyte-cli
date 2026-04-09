@@ -4,9 +4,7 @@ import { tmpdir } from 'node:os';
 import { describe, expect, it, afterEach } from 'vitest';
 
 import { generateDeviceMigrationReport, extractFleetTotals } from '../src/workflows/device-migration-report';
-import { UTILITY_BATCH_SCHEMA_VERSION } from '../src/contracts/versions';
-import { DEVICE_MOVE_VERIFICATION_SCHEMA_VERSION } from '../src/workflows/verify-device-moves';
-import { REPORT_SCHEMA_VERSION } from '../src/contracts/versions';
+import { UTILITY_BATCH_SCHEMA_VERSION, DEVICE_MOVE_VERIFICATION_SCHEMA_VERSION, REPORT_SCHEMA_VERSION } from '../src/contracts/versions';
 
 const executionFixture = {
   schemaVersion: UTILITY_BATCH_SCHEMA_VERSION as typeof UTILITY_BATCH_SCHEMA_VERSION,

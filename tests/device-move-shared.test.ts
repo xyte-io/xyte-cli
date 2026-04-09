@@ -6,10 +6,8 @@ import {
   parseRequiredInteger,
   requireNonEmptyString
 } from '../src/workflows/device-move-shared';
-import {
-  parseMoveVerificationResult,
-  DEVICE_MOVE_VERIFICATION_SCHEMA_VERSION
-} from '../src/workflows/verify-device-moves';
+import { parseMoveVerificationResult } from '../src/workflows/verify-device-moves';
+import { DEVICE_MOVE_VERIFICATION_SCHEMA_VERSION } from '../src/contracts/versions';
 
 describe('requireNonEmptyString', () => {
   it('throws when value is undefined', () => {

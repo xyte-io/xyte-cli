@@ -389,7 +389,7 @@ function extractGetCommandsContextUpdates(data: unknown): Record<string, string>
   return first && typeof first.command === 'string' ? { command: first.command } : undefined;
 }
 
-async function handleInstallDoctor(_step: FlowTaskStep, _ctx: RunContext): Promise<TaskExecutionResult> {
+function handleInstallDoctor(_step: FlowTaskStep, _ctx: RunContext): TaskExecutionResult {
   return { output: buildInstallDoctorReport(path.resolve(__dirname, '../../dist/bin/xyte-cli.js')) };
 }
 
@@ -551,7 +551,7 @@ const UTILITY_PREPARE_CONTEXT_KEY: Record<string, string> = {
   'device.move': 'device_move_csv'
 };
 
-async function handleUtilityPrepare(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+function handleUtilityPrepare(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): TaskExecutionResult {
   if (!step.utilityPrepare) {
     throw new Error(`Flow step ${step.id} is missing utility prepare configuration.`);
   }
@@ -875,9 +875,15 @@ async function loadResumeState(resumeBundle: string): Promise<ResumeState> {
   const manifestPath = path.join(resumeBundle, 'manifest.json');
   let existingSummary: FlowRunSummary;
   try {
-    existingSummary = JSON.parse(await readFile(manifestPath, 'utf8')) as FlowRunSummary;
-  } catch {
-    throw new Error(`Resume bundle manifest is invalid JSON: ${manifestPath}`);
+    const raw = await readFile(manifestPath, 'utf8');
+    try {
+      existingSummary = JSON.parse(raw) as FlowRunSummary;
+    } catch {
+      throw new Error(`Resume bundle manifest is invalid JSON: ${manifestPath}`);
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('invalid JSON')) throw err;
+    throw new Error(`Resume bundle manifest could not be read: ${manifestPath}`);
   }
   const storedInputs = await readStoredInputs(resumeBundle);
   return {
