@@ -9,7 +9,7 @@ import { DEVICE_MOVE_VERIFICATION_SCHEMA_VERSION } from '../src/workflows/verify
 import { REPORT_SCHEMA_VERSION } from '../src/contracts/versions';
 
 const executionFixture = {
-  schemaVersion: UTILITY_BATCH_SCHEMA_VERSION,
+  schemaVersion: UTILITY_BATCH_SCHEMA_VERSION as typeof UTILITY_BATCH_SCHEMA_VERSION,
   generatedAtUtc: '2026-01-01T00:00:00.000Z',
   tenantId: 'tenant-1',
   command: 'device.move' as const,

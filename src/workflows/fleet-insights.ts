@@ -10,16 +10,17 @@ import {
   REPORT_SCHEMA_VERSION
 } from '../contracts/versions';
 import { parseTimestamp } from './report/time-format';
+import { formatDeepDiveMarkdown } from './fleet-insights-format';
+import { DeviceMatchResultSchema } from './device-match';
+import { DeviceMoveBatchReportSchema } from './device-migration-report';
+import type { StatusCounts, FleetSnapshot, FleetInspectResult } from '../types/fleet-inspect';
+import type { DeepDiveResult } from '../types/deep-dive';
 
 export { collectFleetSnapshot, InspectProviderScopeError } from './fleet-insights-loaders';
 export { formatFleetInspectAscii, formatDeepDiveAscii, formatDeepDiveMarkdown } from './fleet-insights-format';
-import { formatDeepDiveMarkdown } from './fleet-insights-format';
-
+export { generateDeviceMigrationReport } from './device-migration-report';
 export type { FleetSnapshot, FleetInspectResult } from '../types/fleet-inspect';
-import type { StatusCounts, FleetSnapshot, FleetInspectResult } from '../types/fleet-inspect';
-
 export type { DeepDiveResult } from '../types/deep-dive';
-import type { DeepDiveResult } from '../types/deep-dive';
 
 const DeepDiveTopOfflineSpaceSchema = z.object({
   space: z.string(),
@@ -105,10 +106,6 @@ const DeepDiveResultSchema = z.object({
     statusMismatches: z.array(DeepDiveStatusMismatchSchema)
   })
 });
-
-import { DeviceMatchResultSchema } from './device-match';
-import { DeviceMoveBatchReportSchema } from './device-migration-report';
-export { generateDeviceMigrationReport } from './device-migration-report';
 
 interface FleetReportResult {
   schemaVersion: typeof REPORT_SCHEMA_VERSION;
