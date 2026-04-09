@@ -448,10 +448,9 @@ function matchesSpace(device: unknown, spaceId: string): boolean {
 export async function loadSpaceDrilldownData(
   client: XyteClient,
   tenantId: string | undefined,
-  spaceId: string,
-  allDevicesCache: unknown[],
-  options: { profileStore: ProfileStore }
+  options: { spaceId: string; allDevicesCache?: unknown[]; profileStore: ProfileStore }
 ): Promise<LoadOutcome<SpaceDrilldownResult>> {
+  const { spaceId, allDevicesCache = [] } = options;
   const [detailOutcome, queriedDevicesOutcome] = await Promise.all([
     loadWithOutcome(() => client.organization.getSpace({ tenantId, path: { space_id: spaceId } }), undefined),
     loadWithOutcome(async () => {
@@ -527,6 +526,11 @@ export interface ConfigData {
   slotRows: ConfigSlotRow[];
 }
 
+/**
+ * Infrastructure-tier loader: takes store primitives directly rather than a XyteClient.
+ * Intentionally differs from fleet-tier loaders (loadDevicesData, loadSpaceDrilldownData, etc.)
+ * which follow the (client, tenantId, options) convention.
+ */
 export async function loadConfigData(
   profileStore: ProfileStore,
   secretStore: SecretStore,

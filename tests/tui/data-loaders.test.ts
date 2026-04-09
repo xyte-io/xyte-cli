@@ -39,7 +39,7 @@ describe('tui data loaders', () => {
       }
     };
 
-    const result = await loadSpaceDrilldownData(client, 'acme', 's1', [], { profileStore });
+    const result = await loadSpaceDrilldownData(client, 'acme', { spaceId: 's1', profileStore });
     expect(result.data.spaceDetail).toEqual({ id: 's1', name: 'HQ' });
     expect(result.data.devicesInSpace.length).toBe(1);
     expect(result.data.paneStatus).toContain('Loaded');
@@ -55,16 +55,14 @@ describe('tui data loaders', () => {
       }
     };
 
-    const result = await loadSpaceDrilldownData(
-      client,
-      'acme',
-      's1',
-      [
+    const result = await loadSpaceDrilldownData(client, 'acme', {
+      spaceId: 's1',
+      allDevicesCache: [
         { id: 'd1', space_id: 's1' },
         { id: 'd2', space_id: 's2' }
       ],
-      { profileStore }
-    );
+      profileStore
+    });
 
     expect(result.data.devicesInSpace.map((item: any) => item.id)).toEqual(['d1']);
     expect(result.data.paneStatus).toContain('fallback');

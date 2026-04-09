@@ -398,7 +398,8 @@ async function buildOperationalFrame(options: {
       let drilldownRetry: RetryState | undefined;
 
       if (selected && selectedSpaceId) {
-        const drilldown = await loadSpaceDrilldownData(options.client, options.tenantId, selectedSpaceId, [], {
+        const drilldown = await loadSpaceDrilldownData(options.client, options.tenantId, {
+          spaceId: selectedSpaceId,
           profileStore: options.profileStore
         });
         detail = drilldown.data.spaceDetail;
