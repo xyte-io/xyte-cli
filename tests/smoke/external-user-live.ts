@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, rm, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path, { delimiter } from 'node:path';
 
-import { getEnvPathValue, setEnvPathValue } from '../utils/env-path';
+import { getEnvPathValue, setEnvPathValue } from '../../src/utils/env-path';
 import {
   NODE_COMMAND,
   NPM_COMMAND,
@@ -17,7 +17,7 @@ import {
   type LoggerLike,
   type RunCommandOptions
 } from './shared';
-import { errorMessage } from '../utils/error-format';
+import { errorMessage } from '../../src/utils/error-format';
 
 const SKILL_MANIFEST_VALIDATION_SCRIPT = [
   'const fs = require("node:fs");',

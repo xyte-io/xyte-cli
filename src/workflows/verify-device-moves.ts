@@ -5,14 +5,14 @@ import { z } from 'zod';
 
 import type { XyteClient } from '../types/client';
 import { loadInputRows, type UtilityInputFormat } from '../utils/input-parser';
+import { DEVICE_MOVE_VERIFICATION_SCHEMA_VERSION } from '../contracts/versions';
+export { DEVICE_MOVE_VERIFICATION_SCHEMA_VERSION };
 import {
   parseDeviceRecord,
   parseOptionalLabel,
   parseRequiredInteger,
   requireNonEmptyString
 } from './device-move-shared';
-
-export const DEVICE_MOVE_VERIFICATION_SCHEMA_VERSION = 'xyte.device.move-verification.v1' as const;
 
 const DeviceMoveVerificationRowSchema = z.object({
   rowIndex: z.number(),

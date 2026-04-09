@@ -2,17 +2,7 @@ import type { XyteClient } from '../types/client';
 import { loadInputRows, type UtilityInputFormat } from '../utils/input-parser';
 import { errorMessage } from '../utils/error-format';
 import { runUtilityBatch, type UtilityBatchOperation, type UtilityBatchResult } from './utility-batch';
-
-function requireNonEmptyString(value: unknown, fieldName: string, rowIndex: number): string {
-  if (typeof value !== 'string') {
-    throw new Error(`Row ${rowIndex}: field "${fieldName}" must be a string.`);
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    throw new Error(`Row ${rowIndex}: field "${fieldName}" cannot be empty.`);
-  }
-  return trimmed;
-}
+import { requireNonEmptyString } from './device-move-shared';
 
 function maybeString(value: unknown): string | undefined {
   if (typeof value !== 'string') {

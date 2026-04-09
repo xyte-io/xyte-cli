@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildIsolatedEnv } from '../src/smoke/shared';
+import { buildIsolatedEnv } from './smoke/shared';
 import { getEnvPathKey, getEnvPathValue, setEnvPathValue } from '../src/utils/env-path';
 
 describe('env path helpers', () => {

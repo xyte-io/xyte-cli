@@ -11,3 +11,4 @@ export const STATUS_SCHEMA_VERSION = 'xyte.status.v1';
 export const UPGRADE_CHECK_SCHEMA_VERSION = 'xyte.upgrade.check.v1';
 export const UPGRADE_RESULT_SCHEMA_VERSION = 'xyte.upgrade.result.v1';
 export const FLOW_RUN_SCHEMA_VERSION = 'xyte.flow.run.v1';
+export const DEVICE_MOVE_VERIFICATION_SCHEMA_VERSION = 'xyte.device.move-verification.v1' as const;
