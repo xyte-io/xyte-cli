@@ -12,13 +12,13 @@ import {
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
 import { createRenderErrorTracker } from '../render-error-tracker';
-import { createScreenRenderLogger } from '../screen-render-logger';
+import { createScreenRenderLogger, logScreenDataFetch } from '../screen-render-logger';
 import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
 import type { CommandTemplate } from '../data-loaders';
 import { loadCommandTemplates, loadDevicesData } from '../data-loaders';
 import { sceneFromDevicesState } from '../scene';
 import { payloadSummary, safeSearchText } from '../serialize';
-import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, promptChoice } from '../actions';
+import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, promptChoice, runGuardedAction } from '../actions';
 import { errorMessage } from '../../utils/error-format';
 
 function deviceIdOf(device: unknown): string {
@@ -83,20 +83,14 @@ export async function sendCommandWithGuard(args: SendCommandWithGuardArgs): Prom
     body.params = args.params;
   }
 
-  args.context.setStatus('Sending command...');
-  try {
-    const tenantId = await args.context.getActiveTenantId();
+  return runGuardedAction(args.context, 'Sending command...', async (tenantId) => {
     await args.context.client.organization.sendCommand({
       tenantId,
       path: { device_id: deviceId },
       body
     });
     args.context.setStatus(`Command sent to device ${deviceId}.`);
-    return true;
-  } catch (error) {
-    args.context.showError(error);
-    return false;
-  }
+  });
 }
 
 export function createDevicesScreen(): TuiScreen {
@@ -207,11 +201,7 @@ export function createDevicesScreen(): TuiScreen {
     }
 
     const tenantId = await context.getActiveTenantId();
-    context.debugLog?.('screen.data.fetch.start', {
-      screen: 'devices',
-      tenantId,
-      spaceFilter
-    });
+    logScreenDataFetch(context.debugLog, 'devices', 'start', { tenantId, spaceFilter });
     const loaded = await loadDevicesData(context.client, tenantId, {
       profileStore: context.profileStore,
       query: {
@@ -222,8 +212,7 @@ export function createDevicesScreen(): TuiScreen {
       return;
     }
     devices = loaded.data;
-    context.debugLog?.('screen.data.fetch.complete', {
-      screen: 'devices',
+    logScreenDataFetch(context.debugLog, 'devices', 'complete', {
       tenantId,
       count: devices.length,
       connectionState: loaded.connectionState,
@@ -233,11 +222,7 @@ export function createDevicesScreen(): TuiScreen {
     });
     if (loaded.error) {
       context.setStatus(`Devices ${loaded.connectionState}: ${loaded.error.message}`);
-      context.debugLog?.('screen.data.fetch.error', {
-        screen: 'devices',
-        message: loaded.error.message,
-        state: loaded.connectionState
-      });
+      logScreenDataFetch(context.debugLog, 'devices', 'error', { message: loaded.error.message, state: loaded.connectionState });
     }
     applyFilter(restoreDeviceId);
   };

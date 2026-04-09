@@ -3,6 +3,23 @@ import type { TuiContext } from './types';
 type PromptContext = Pick<TuiContext, 'prompt' | 'setStatus'>;
 type GuardContext = Pick<TuiContext, 'confirmWrite' | 'setStatus'>;
 type ErrorContext = Pick<TuiContext, 'showError'>;
+type ActionContext = Pick<TuiContext, 'setStatus' | 'showError' | 'getActiveTenantId'>;
+
+export async function runGuardedAction(
+  context: ActionContext,
+  pendingStatus: string,
+  action: (tenantId: string | undefined) => Promise<void>
+): Promise<boolean> {
+  context.setStatus(pendingStatus);
+  try {
+    const tenantId = await context.getActiveTenantId();
+    await action(tenantId);
+    return true;
+  } catch (error) {
+    context.showError(error);
+    return false;
+  }
+}
 
 interface PaletteAction {
   label: string;

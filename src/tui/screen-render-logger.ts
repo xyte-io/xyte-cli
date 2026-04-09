@@ -2,6 +2,15 @@ import type { RenderErrorTracker } from './render-error-tracker';
 
 type DebugLogFn = (event: string, data?: Record<string, unknown>) => void;
 
+export function logScreenDataFetch(
+  debugLog: DebugLogFn | undefined,
+  screen: string,
+  phase: 'start' | 'complete' | 'error',
+  data: Record<string, unknown>
+): void {
+  debugLog?.(`screen.data.fetch.${phase}`, { screen, ...data });
+}
+
 interface ScreenRenderLogger {
   onRenderStart(): void;
   onRenderComplete(): void;

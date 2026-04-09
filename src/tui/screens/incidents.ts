@@ -12,12 +12,12 @@ import {
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
 import { createRenderErrorTracker } from '../render-error-tracker';
-import { createScreenRenderLogger } from '../screen-render-logger';
+import { createScreenRenderLogger, logScreenDataFetch } from '../screen-render-logger';
 import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
 import { loadIncidentsData } from '../data-loaders';
 import { sceneFromIncidentsState } from '../scene';
 import { payloadSummary } from '../serialize';
-import { confirmWriteWithToken, openActionPalette } from '../actions';
+import { confirmWriteWithToken, openActionPalette, runGuardedAction } from '../actions';
 import { errorMessage } from '../../utils/error-format';
 
 function incidentIdOf(incident: unknown): string {
@@ -47,19 +47,13 @@ export async function closeIncidentWithGuard(args: CloseIncidentWithGuardArgs): 
     return false;
   }
 
-  args.context.setStatus('Closing incident...');
-  try {
-    const tenantId = await args.context.getActiveTenantId();
+  return runGuardedAction(args.context, 'Closing incident...', async (tenantId) => {
     await args.context.client.organization.closeIncident({
       tenantId,
       path: { incident_id: incidentId }
     });
     args.context.setStatus(`Incident ${incidentId} closed.`);
-    return true;
-  } catch (error) {
-    args.context.showError(error);
-    return false;
-  }
+  });
 }
 
 export function castIncidentRecords(items: unknown): Record<string, unknown>[] {
@@ -198,10 +192,7 @@ export function createIncidentsScreen(): TuiScreen {
       return;
     }
     const tenantId = await context.getActiveTenantId();
-    context.debugLog?.('screen.data.fetch.start', {
-      screen: 'incidents',
-      tenantId
-    });
+    logScreenDataFetch(context.debugLog, 'incidents', 'start', { tenantId });
     const loaded = await loadIncidentsData(context.client, tenantId, {
       paginateAll: false,
       query: {
@@ -220,8 +211,7 @@ export function createIncidentsScreen(): TuiScreen {
       return;
     }
     incidents = castIncidentRecords(loaded.data);
-    context.debugLog?.('screen.data.fetch.complete', {
-      screen: 'incidents',
+    logScreenDataFetch(context.debugLog, 'incidents', 'complete', {
       tenantId,
       count: incidents.length,
       connectionState: loaded.connectionState,
@@ -232,11 +222,7 @@ export function createIncidentsScreen(): TuiScreen {
     });
     if (loaded.error) {
       context.setStatus(`Incidents ${loaded.connectionState}: ${loaded.error.message}`);
-      context.debugLog?.('screen.data.fetch.error', {
-        screen: 'incidents',
-        message: loaded.error.message,
-        state: loaded.connectionState
-      });
+      logScreenDataFetch(context.debugLog, 'incidents', 'error', { message: loaded.error.message, state: loaded.connectionState });
     }
     renderRows(restoreIncidentId);
     context.screen.render();

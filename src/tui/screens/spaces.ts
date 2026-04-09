@@ -15,7 +15,7 @@ import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
 import { getSpaceId, getSpaceName, loadDevicesData, loadSpaceDrilldownData, loadSpacesData } from '../data-loaders';
 import { sceneFromSpacesState } from '../scene';
 import { safeSearchText } from '../serialize';
-import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput } from '../actions';
+import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, runGuardedAction } from '../actions';
 
 const SPINNER_FRAMES = ['|', '/', '-', '\\'];
 
@@ -58,9 +58,7 @@ export async function claimDeviceWithGuard(args: ClaimDeviceWithGuardArgs): Prom
     return false;
   }
 
-  args.context.setStatus('Claiming device...');
-  try {
-    const tenantId = await args.context.getActiveTenantId();
+  return runGuardedAction(args.context, 'Claiming device...', async (tenantId) => {
     await args.context.client.organization.claimDevice({
       tenantId,
       body: {
@@ -72,11 +70,7 @@ export async function claimDeviceWithGuard(args: ClaimDeviceWithGuardArgs): Prom
       }
     });
     args.context.setStatus('Device claimed successfully.');
-    return true;
-  } catch (error) {
-    args.context.showError(error);
-    return false;
-  }
+  });
 }
 
 interface CreateChildSpaceWithGuardArgs {
@@ -111,9 +105,7 @@ export async function createChildSpaceWithGuard(args: CreateChildSpaceWithGuardA
     return false;
   }
 
-  args.context.setStatus('Creating child space...');
-  try {
-    const tenantId = await args.context.getActiveTenantId();
+  return runGuardedAction(args.context, 'Creating child space...', async (tenantId) => {
     await args.context.client.organization.createSpace({
       tenantId,
       body: {
@@ -124,11 +116,7 @@ export async function createChildSpaceWithGuard(args: CreateChildSpaceWithGuardA
       }
     });
     args.context.setStatus('Child space created.');
-    return true;
-  } catch (error) {
-    args.context.showError(error);
-    return false;
-  }
+  });
 }
 
 interface RenameSpaceWithGuardArgs {
@@ -160,20 +148,14 @@ export async function renameSpaceWithGuard(args: RenameSpaceWithGuardArgs): Prom
     return false;
   }
 
-  args.context.setStatus('Renaming space...');
-  try {
-    const tenantId = await args.context.getActiveTenantId();
+  return runGuardedAction(args.context, 'Renaming space...', async (tenantId) => {
     await args.context.client.organization.updateSpace({
       tenantId,
       path: { space_id: spaceId },
       body: { name }
     });
     args.context.setStatus('Space renamed.');
-    return true;
-  } catch (error) {
-    args.context.showError(error);
-    return false;
-  }
+  });
 }
 
 export function createStaleSafeSelectionLoader<TInput, TResult>(args: {

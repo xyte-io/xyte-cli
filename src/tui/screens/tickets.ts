@@ -12,13 +12,13 @@ import {
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
 import { createRenderErrorTracker } from '../render-error-tracker';
-import { createScreenRenderLogger } from '../screen-render-logger';
+import { createScreenRenderLogger, logScreenDataFetch } from '../screen-render-logger';
 import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
 import type { EndpointNamespace } from '../../types/endpoints';
 import { loadTicketsData } from '../data-loaders';
 import { sceneFromTicketsState } from '../scene';
 import { payloadSummary, safePreviewLines, safeSearchText } from '../serialize';
-import { confirmWriteWithToken, openActionPalette } from '../actions';
+import { confirmWriteWithToken, openActionPalette, runGuardedAction } from '../actions';
 import { asRecord } from '../../utils/json';
 import { errorMessage } from '../../utils/error-format';
 
@@ -94,16 +94,10 @@ export async function markTicketResolvedWithGuard(args: ResolveTicketWithGuardAr
     return false;
   }
 
-  context.setStatus('Resolving ticket...');
-  try {
-    const tenantId = await context.getActiveTenantId();
+  return runGuardedAction(context, 'Resolving ticket...', async (tenantId) => {
     await context.client.organization.markResolved({ tenantId, path: { ticket_id: ticketId } });
     context.setStatus(`Ticket ${ticketId} resolved.`);
-    return true;
-  } catch (error) {
-    context.showError(error);
-    return false;
-  }
+  });
 }
 
 interface SendTicketMessageWithGuardArgs {
@@ -142,20 +136,14 @@ export async function sendTicketMessageWithGuard(args: SendTicketMessageWithGuar
     return false;
   }
 
-  context.setStatus('Sending ticket message...');
-  try {
-    const tenantId = await context.getActiveTenantId();
+  return runGuardedAction(context, 'Sending ticket message...', async (tenantId) => {
     await context.client.organization.sendMessage({
       tenantId,
       path: { ticket_id: ticketId },
       query: { message }
     });
     context.setStatus(`Message sent for ticket ${ticketId}.`);
-    return true;
-  } catch (error) {
-    context.showError(error);
-    return false;
-  }
+  });
 }
 
 export function createTicketsScreen(): TuiScreen {
@@ -415,10 +403,7 @@ export function createTicketsScreen(): TuiScreen {
       }
       const tenantId = await context.getActiveTenantId();
       const restoreTicketId = ticketIdOf(selectedTicket());
-      context.debugLog?.('screen.data.fetch.start', {
-        screen: 'tickets',
-        tenantId
-      });
+      logScreenDataFetch(context.debugLog, 'tickets', 'start', { tenantId });
       const loaded = await loadTicketsData(context.client, tenantId);
       if (!isMounted) {
         return;
@@ -429,8 +414,7 @@ export function createTicketsScreen(): TuiScreen {
       detailRequestToken += 1;
       detailCacheByTicket.clear();
       detailText = '';
-      context.debugLog?.('screen.data.fetch.complete', {
-        screen: 'tickets',
+      logScreenDataFetch(context.debugLog, 'tickets', 'complete', {
         tenantId,
         count: tickets.length,
         mode,
@@ -440,11 +424,7 @@ export function createTicketsScreen(): TuiScreen {
       });
       if (loaded.error) {
         context.setStatus(`Tickets ${loaded.connectionState}: ${loaded.error.message}`);
-        context.debugLog?.('screen.data.fetch.error', {
-          screen: 'tickets',
-          message: loaded.error.message,
-          state: loaded.connectionState
-        });
+        logScreenDataFetch(context.debugLog, 'tickets', 'error', { message: loaded.error.message, state: loaded.connectionState });
       }
       renderRows(restoreTicketId);
       if (filtered.length) {
