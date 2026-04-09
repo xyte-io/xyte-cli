@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { DEVICE_MATCH_SCHEMA_VERSION } from '../contracts/versions';
 import { isRecord } from '../utils/json';
 import { loadInputRows } from '../utils/input-parser';
+import { requireNonEmptyString } from './device-move-shared';
 
 type MatchStatus = 'exact' | 'fuzzy' | 'unmatched';
 
@@ -179,17 +180,6 @@ async function loadMatchRows(inputPath: string): Promise<Array<Record<string, un
   return loadInputRows(resolved, 'auto').rows;
 }
 
-function requireStringField(row: Record<string, unknown>, fieldName: string, rowIndex: number): string {
-  const value = row[fieldName];
-  if (typeof value !== 'string' && typeof value !== 'number') {
-    throw new Error(`Row ${rowIndex}: field "${fieldName}" must be a string or number.`);
-  }
-  const normalized = String(value).trim();
-  if (!normalized) {
-    throw new Error(`Row ${rowIndex}: field "${fieldName}" cannot be empty.`);
-  }
-  return normalized;
-}
 
 export async function runDeviceMatch(args: {
   sourcePath: string;
@@ -207,9 +197,9 @@ export async function runDeviceMatch(args: {
   const sourceRows = await loadMatchRows(sourcePath);
   const targetRows = await loadMatchRows(targetPath);
   const targets: MatchTarget[] = targetRows.map((row, index) => {
-    const targetName = requireStringField(row, args.targetField, index + 1);
+    const targetName = requireNonEmptyString(row[args.targetField], args.targetField, index + 1);
     return {
-      id: requireStringField(row, 'id', index + 1),
+      id: requireNonEmptyString(row['id'], 'id', index + 1),
       name: targetName,
       [args.targetField]: targetName
     };
@@ -227,8 +217,8 @@ export async function runDeviceMatch(args: {
 
   const matches: DeviceMatchRow[] = sourceRows.map((row, index) => {
     const rowIndex = index + 1;
-    const deviceId = requireStringField(row, 'id', rowIndex);
-    const deviceName = requireStringField(row, args.sourceField, rowIndex);
+    const deviceId = requireNonEmptyString(row['id'], 'id', rowIndex);
+    const deviceName = requireNonEmptyString(row[args.sourceField], args.sourceField, rowIndex);
     const normalizedDeviceName = normalizeName(deviceName);
     const exactTarget = exactTargets.get(normalizedDeviceName);
     if (exactTarget) {

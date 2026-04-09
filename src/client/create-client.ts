@@ -5,6 +5,7 @@ import { createOrganizationNamespace } from './namespaces/organization';
 import { createPartnerNamespace } from './namespaces/partner';
 import { createSecretStore, type SecretStore } from '../secure/secret-store';
 import { createProfileStore, type ProfileStore } from '../secure/profile-store';
+import { DEFAULT_SLOT_ID } from '../secure/key-slots';
 import type { PublicEndpointSpec } from '../types/endpoints';
 import { PROVIDER_ORG, PROVIDER_PARTNER, type SecretProvider } from '../types/profile';
 import type { XyteCallArgs, XyteCallResult, XyteClient } from '../types/client';
@@ -118,7 +119,7 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
     }
 
     const activeSlot = await profileStore.getActiveKeySlot(tenantId, provider);
-    const slotId = activeSlot?.slotId ?? 'default';
+    const slotId = activeSlot?.slotId ?? DEFAULT_SLOT_ID;
     const secretStore = getSecretStore();
     const value = await secretStore.getSlotSecret(tenantId, provider, slotId);
     if (!value) {
@@ -214,8 +215,8 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
       ]);
 
       const [org, partner] = await Promise.all([
-        secretStore.getSlotSecret(tenantId, PROVIDER_ORG, orgSlot?.slotId ?? 'default'),
-        secretStore.getSlotSecret(tenantId, PROVIDER_PARTNER, partnerSlot?.slotId ?? 'default')
+        secretStore.getSlotSecret(tenantId, PROVIDER_ORG, orgSlot?.slotId ?? DEFAULT_SLOT_ID),
+        secretStore.getSlotSecret(tenantId, PROVIDER_PARTNER, partnerSlot?.slotId ?? DEFAULT_SLOT_ID)
       ]);
 
       return listEndpoints().filter((endpoint) => {
