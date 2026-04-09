@@ -6,7 +6,8 @@ import { getUtilityActionProfile, listUtilityActionProfiles } from './utility-ac
 import type {
   UtilityActionProfile,
   UtilityExecutionSupport,
-  UtilityPreparePrimaryFormat
+  UtilityPreparePrimaryFormat,
+  UtilityPrepareMode
 } from './utility-action-profiles';
 
 type UtilityPrepareInputKind = 'tabular' | 'document' | 'image' | 'unknown';
@@ -16,7 +17,7 @@ interface UtilityPrepareResult {
   generatedAtUtc: string;
   actionKey: string;
   entity: string;
-  mode: 'friendly' | 'generic';
+  mode: UtilityPrepareMode;
   input: {
     path: string;
     kind: UtilityPrepareInputKind;
@@ -255,7 +256,7 @@ interface UtilityActionSummary {
   actionKey: string;
   entity: string;
   title: string;
-  mode: 'friendly' | 'generic';
+  mode: UtilityPrepareMode;
   method: string | null;
   pathTemplate: string | null;
   executionSupport: UtilityExecutionSupport;

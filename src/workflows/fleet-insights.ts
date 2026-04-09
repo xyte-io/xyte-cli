@@ -109,27 +109,10 @@ const DeepDiveResultSchema = z.object({
 });
 
 import { DeviceMatchResultSchema } from './match';
+import { UtilityBatchResultSchema } from './utility-batch';
 
-const DeviceMoveBatchReportSchema = z.object({
-  schemaVersion: z.literal(UTILITY_BATCH_SCHEMA_VERSION),
-  generatedAtUtc: z.string(),
-  tenantId: z.string(),
-  command: z.literal('device.move'),
-  mode: z.enum(['dry-run', 'apply']),
-  totals: z.object({
-    rows: z.number(),
-    succeeded: z.number(),
-    failed: z.number(),
-    skipped: z.number()
-  }),
-  stoppedEarly: z.boolean(),
-  firstError: z
-    .object({
-      rowIndex: z.number(),
-      message: z.string()
-    })
-    .optional(),
-  reportPath: z.string().optional()
+const DeviceMoveBatchReportSchema = UtilityBatchResultSchema.extend({
+  command: z.literal('device.move')
 });
 
 interface FleetReportResult {

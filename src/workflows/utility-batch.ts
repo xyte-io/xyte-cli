@@ -1,6 +1,8 @@
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
+import { z } from 'zod';
+
 import { UTILITY_BATCH_SCHEMA_VERSION } from '../contracts/versions';
 import { errorMessage } from '../utils/error-format';
 import type { XyteClient, XyteCallResult } from '../types/client';
@@ -28,25 +30,29 @@ export interface UtilityBatchOperation {
   execute: (client: XyteClient, tenantId: string) => Promise<XyteCallResult<unknown>>;
 }
 
-export interface UtilityBatchResult {
-  schemaVersion: typeof UTILITY_BATCH_SCHEMA_VERSION;
-  generatedAtUtc: string;
-  tenantId: string;
-  command: UtilityBatchCommand;
-  mode: 'dry-run' | 'apply';
-  totals: {
-    rows: number;
-    succeeded: number;
-    failed: number;
-    skipped: number;
-  };
-  stoppedEarly: boolean;
-  firstError?: {
-    rowIndex: number;
-    message: string;
-  };
-  reportPath?: string;
-}
+export const UtilityBatchResultSchema = z.object({
+  schemaVersion: z.literal(UTILITY_BATCH_SCHEMA_VERSION),
+  generatedAtUtc: z.string(),
+  tenantId: z.string(),
+  command: z.enum(['space.import-tree', 'device.move']),
+  mode: z.enum(['dry-run', 'apply']),
+  totals: z.object({
+    rows: z.number(),
+    succeeded: z.number(),
+    failed: z.number(),
+    skipped: z.number()
+  }),
+  stoppedEarly: z.boolean(),
+  firstError: z
+    .object({
+      rowIndex: z.number(),
+      message: z.string()
+    })
+    .optional(),
+  reportPath: z.string().optional()
+});
+
+export type UtilityBatchResult = z.infer<typeof UtilityBatchResultSchema>;
 
 type UtilityRowStatus = 'dry-run' | 'succeeded' | 'failed' | 'skipped';
 

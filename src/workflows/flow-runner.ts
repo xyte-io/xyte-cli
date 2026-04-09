@@ -45,8 +45,8 @@ import type { BuiltInFlowDefinition, FlowTaskStep } from './flow-catalog';
 export type FlowRunMode = 'plan' | 'apply';
 
 class FlowNeedsInputError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = 'FlowNeedsInputError';
   }
 }
@@ -119,7 +119,7 @@ async function collectSnapshotWithGuard(ctx: RunContext): Promise<ReturnType<typ
     });
   } catch (error) {
     if (isInspectProviderScopeError(error)) {
-      throw new FlowNeedsInputError((error as Error).message);
+      throw new FlowNeedsInputError((error as Error).message, { cause: error });
     }
     throw error;
   }
