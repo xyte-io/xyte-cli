@@ -22,6 +22,7 @@ import type { ProfileStore } from '../secure/profile-store';
 import type { SecretStore } from '../secure/secret-store';
 import type { XyteClient } from '../types/client';
 import { buildInstallDoctorReport } from '../utils/install-doctor';
+import { getLogger } from '../observability/logger';
 import { isMutatingMethod } from '../client/catalog';
 import { isRecord } from '../utils/json';
 import { runWatch } from './watch';
@@ -418,7 +419,7 @@ async function handleReportGenerate(step: FlowTaskStep, ctx: RunContext): Promis
   try {
     reportInput = parseReportInput(input, ctx.args.tenantId);
   } catch (error) {
-    throw new FlowNeedsInputError(buildReportInputNeedsDataMessage(step.id, report.inputFromStepId, error));
+    throw new FlowNeedsInputError(buildReportInputNeedsDataMessage(step.id, report.inputFromStepId, error), { cause: error });
   }
   const outPath = path.join(ctx.outputsDir, report.outFileName);
   const { fleetFromStepId, verificationFromStepId } = report;
@@ -768,7 +769,7 @@ async function readStoredInputs(bundleDir: string): Promise<FlowRunInputsPayload
   try {
     return JSON.parse(await readFile(inputsPath, 'utf8')) as FlowRunInputsPayload;
   } catch (error) {
-    console.warn(`[flow-runner] Malformed resume inputs at ${inputsPath} — falling back to invocation defaults.`, error);
+    getLogger().warn({ inputsPath, error }, 'Malformed resume inputs — falling back to invocation defaults');
     return undefined;
   }
 }

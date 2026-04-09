@@ -110,18 +110,18 @@ export async function listFlowDefinitions(): Promise<Array<FlowDefinitionV1 & { 
       continue;
     }
     const filePath = path.join(root, entry.name);
+    let raw: unknown;
     try {
-      const raw = JSON.parse(await readFile(filePath, 'utf8'));
-      const parsed = validateFlowDefinition(raw);
-      defs.push({
-        ...parsed,
-        path: filePath
-      });
+      raw = JSON.parse(await readFile(filePath, 'utf8'));
     } catch (error) {
-      // Keep listing resilient to invalid files (bad JSON or schema); I/O errors propagate.
-      if ((error as NodeJS.ErrnoException).code) {
-        throw error;
-      }
+      if (error instanceof SyntaxError) continue; // bad JSON, skip file
+      throw error; // I/O error, propagate
+    }
+    try {
+      const parsed = validateFlowDefinition(raw);
+      defs.push({ ...parsed, path: filePath });
+    } catch {
+      // invalid schema, skip file
     }
   }
 
