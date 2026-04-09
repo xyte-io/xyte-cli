@@ -328,322 +328,291 @@ function resolveReadiness(ctx: RunContext, checkConnectivity: boolean) {
   });
 }
 
+function extractCallContextUpdates(endpointKey: string, data: unknown): Record<string, string> | undefined {
+  if (endpointKey === 'organization.commands.getCommands' && isRecord(data)) {
+    const items = Array.isArray(data.items) ? data.items : [];
+    const first = items.find((item) => isRecord(item) && typeof item.command === 'string');
+    if (first && typeof first.command === 'string') {
+      return { command: first.command };
+    }
+  }
+  return undefined;
+}
+
+async function handleInstallDoctor(_step: FlowTaskStep, _ctx: RunContext): Promise<TaskExecutionResult> {
+  return { output: buildInstallDoctorReport(path.resolve(__dirname, '../../dist/bin/xyte-cli.js')) };
+}
+
+async function handleSetupStatus(step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
+  const readiness = await resolveReadiness(ctx, true);
+  if (readiness.state !== 'ready') {
+    throw new FlowNeedsInputError(`Setup status is ${readiness.state}. Run setup before continuing.`);
+  }
+  return { output: readiness };
+}
+
+async function handleConfigDoctor(step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
+  const readiness = await resolveReadiness(ctx, true);
+  if (readiness.connectionState !== 'connected') {
+    throw new FlowNeedsInputError(
+      `Connectivity is ${readiness.connectionState}. Resolve connectivity before continuing.`
+    );
+  }
+  return { output: { retryAttempts: 2, retryBackoffMs: 250, readiness } };
+}
+
+async function handleStatusFast(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
+  const readiness = await resolveReadiness(ctx, false);
+  return { output: buildStatusContract({ mode: 'fast', checkConnectivity: false, readiness }) };
+}
+
+async function handleFleetInspect(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
+  const snapshot = await collectSnapshotWithGuard(ctx);
+  return { output: buildFleetInspect(snapshot) };
+}
+
+async function handleDeepDive(step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
+  const windowHours = resolveFlowWindowHours(step, ctx.resolvedContext);
+  const snapshot = await collectSnapshotWithGuard(ctx);
+  return { output: buildDeepDive(snapshot, windowHours) };
+}
+
+async function handleReportGenerate(step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
+  if (!step.report) {
+    throw new Error(`Flow step ${step.id} is missing report configuration.`);
+  }
+  const report = step.report;
+  const input = ctx.taskOutputs.get(report.inputFromStepId);
+  let reportInput;
+  try {
+    reportInput = parseReportInput(input, ctx.args.tenantId);
+  } catch (error) {
+    throw new FlowNeedsInputError(buildReportInputNeedsDataMessage(step.id, report.inputFromStepId, error));
+  }
+  const outPath = path.join(ctx.outputsDir, report.outFileName);
+  const { fleetFromStepId, verificationFromStepId } = report;
+  let generated;
+  if (fleetFromStepId && verificationFromStepId) {
+    if (reportInput.schemaVersion !== UTILITY_BATCH_SCHEMA_VERSION || reportInput.command !== 'device.move') {
+      throw new FlowNeedsInputError(
+        `Step ${step.id} requires device.move batch output from ${report.inputFromStepId}.`
+      );
+    }
+    generated = generateDeviceMigrationReport({
+      execution: reportInput,
+      fleet: ctx.taskOutputs.get(fleetFromStepId),
+      verification: ctx.taskOutputs.get(verificationFromStepId),
+      tenantId: ctx.args.tenantId,
+      outPath
+    });
+  } else {
+    generated = await generateOpsReport({
+      input: reportInput,
+      tenantId: ctx.args.tenantId,
+      format: report.format,
+      outPath,
+      includeSensitive: report.includeSensitive === true
+    });
+  }
+  return { output: generated, artifactPath: outPath };
+}
+
+async function handleWatch(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  if (!step.watch) {
+    throw new Error(`Flow step ${step.id} is missing watch configuration.`);
+  }
+  const watchConfig = step.watch;
+  const frames: WatchFrameV1[] = [];
+  const once = ctx.args.once || watchConfig.once;
+  await runWatch({
+    client: ctx.args.client,
+    tenantId: ctx.args.tenantId,
+    profile: watchConfig.profile,
+    once,
+    intervalMs: watchConfig.intervalMs,
+    maxPolls: once ? 1 : watchConfig.maxPolls,
+    onFrame: (frame) => {
+      frames.push(frame);
+    }
+  });
+  const watchStepPath = buildStepArtifactPath(ctx, stepIndex, step.id, 'ndjson');
+  await writeFile(
+    watchStepPath,
+    frames.length > 0 ? `${frames.map((item) => JSON.stringify(item)).join('\n')}\n` : '',
+    'utf8'
+  );
+  return {
+    output: {
+      frameCount: frames.length,
+      lastEventType: frames.length > 0 ? frames[frames.length - 1].eventType : undefined
+    },
+    artifactPath: watchStepPath,
+    watchFrames: frames,
+    contextUpdates: extractWatchContextUpdates(frames)
+  };
+}
+
+async function handleCall(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  if (!step.call) {
+    throw new Error(`Flow step ${step.id} is missing call configuration.`);
+  }
+  const endpoint = getEndpoint(step.call.endpointKey);
+  const method = endpoint.method.toUpperCase();
+  const isWrite = isMutatingMethod(method);
+  const requestId = randomUUID();
+  const pathPayload = step.call.path ? resolveTemplateValue(step.call.path, ctx.resolvedContext) : undefined;
+  const queryPayload = step.call.query ? resolveTemplateValue(step.call.query, ctx.resolvedContext) : undefined;
+  const bodyPayload = step.call.body ? resolveTemplateValue(step.call.body, ctx.resolvedContext) : undefined;
+  const result = await ctx.args.client.callWithMeta(step.call.endpointKey, {
+    requestId,
+    tenantId: ctx.args.tenantId,
+    ...(pathPayload ? { path: pathPayload } : {}),
+    ...(queryPayload ? { query: queryPayload } : {}),
+    ...(bodyPayload !== undefined ? { body: bodyPayload } : {})
+  });
+  const envelope = buildCallEnvelope({
+    requestId,
+    tenantId: ctx.args.tenantId,
+    endpointKey: step.call.endpointKey,
+    method,
+    guard: { allowWrite: isWrite },
+    request: { path: pathPayload, query: queryPayload, body: bodyPayload },
+    response: { status: result.status, durationMs: result.durationMs, retryCount: result.retryCount, data: result.data }
+  });
+  return {
+    output: envelope,
+    contextUpdates: extractCallContextUpdates(step.call.endpointKey, result.data)
+  };
+}
+
+const UTILITY_PREPARE_CONTEXT_KEY: Record<string, string> = {
+  'space.import-tree': 'space_import_tree_csv',
+  'organization.devices.claimDevice': 'claim_prepare_csv',
+  'device.move': 'device_move_csv'
+};
+
+async function handleUtilityPrepare(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  if (!step.utilityPrepare) {
+    throw new Error(`Flow step ${step.id} is missing utility prepare configuration.`);
+  }
+  const inputPath = path.resolve(resolveTemplateString(step.utilityPrepare.inputPath, ctx.resolvedContext));
+  const outputDir = path.join(ctx.outputsDir, path.basename(step.utilityPrepare.outputDir));
+  const result = runUtilityPrepare({
+    inputPath,
+    actionKey: step.utilityPrepare.actionKey,
+    outputDir,
+    tenantId: ctx.args.tenantId,
+    primaryFormat: step.utilityPrepare.primaryFormat,
+    force: true
+  });
+  const contextKey = UTILITY_PREPARE_CONTEXT_KEY[step.utilityPrepare.actionKey];
+  const contextUpdates: Record<string, string> = contextKey ? { [contextKey]: result.artifacts.primary } : {};
+  return { output: result, contextUpdates };
+}
+
+async function handleDeviceMatch(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  if (!step.deviceMatch) {
+    throw new Error(`Flow step ${step.id} is missing device match configuration.`);
+  }
+  const sourcePath = path.resolve(resolveTemplateString(step.deviceMatch.sourcePath, ctx.resolvedContext));
+  const targetPath = path.resolve(resolveTemplateString(step.deviceMatch.targetPath, ctx.resolvedContext));
+  const outputPath = path.join(ctx.outputsDir, path.basename(step.deviceMatch.outputPath));
+  const result = await runDeviceMatch({
+    sourcePath,
+    targetPath,
+    sourceField: step.deviceMatch.sourceField,
+    targetField: step.deviceMatch.targetField,
+    outputPath,
+    tenantId: ctx.args.tenantId
+  });
+  return { output: result, contextUpdates: { match_csv: result.outputPath, match_summary_json: result.summaryPath } };
+}
+
+async function handleDeviceMoveBatch(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  if (!step.deviceMoveBatch) {
+    throw new Error(`Flow step ${step.id} is missing device move batch configuration.`);
+  }
+  const inputPath = path.resolve(resolveTemplateString(step.deviceMoveBatch.inputPath, ctx.resolvedContext));
+  const reportPath = path.join(ctx.outputsDir, path.basename(step.deviceMoveBatch.reportPath));
+  const result = await runMoveDevices({
+    client: ctx.args.client,
+    tenantId: ctx.args.tenantId,
+    inputPath,
+    apply: step.deviceMoveBatch.apply,
+    continueOnError: step.deviceMoveBatch.continueOnError === true,
+    reportPath
+  });
+  return {
+    output: result,
+    contextUpdates: step.deviceMoveBatch.apply
+      ? { execute_moves_report_path: reportPath }
+      : { dry_run_moves_report_path: reportPath },
+    failureDetail:
+      result.totals.failed > 0 || result.stoppedEarly
+        ? `Step ${step.id} failed because the move batch reported ${result.totals.failed} failed row(s).`
+        : undefined
+  };
+}
+
+async function handleDeviceVerifyBatch(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  if (!step.deviceVerifyBatch) {
+    throw new Error(`Flow step ${step.id} is missing device verification configuration.`);
+  }
+  const inputPath = path.resolve(resolveTemplateString(step.deviceVerifyBatch.inputPath, ctx.resolvedContext));
+  const artifactPath = buildStepArtifactPath(ctx, stepIndex, step.id, 'json');
+  const result = await runVerifyMovedDevices({
+    client: ctx.args.client,
+    tenantId: ctx.args.tenantId,
+    inputPath,
+    outputPath: artifactPath
+  });
+  return {
+    output: result,
+    artifactPath,
+    failureDetail:
+      result.totals.mismatched > 0 || result.totals.missing > 0
+        ? `Step ${step.id} found ${result.totals.mismatched} mismatched and ${result.totals.missing} missing planned device(s).`
+        : undefined
+  };
+}
+
+async function handleSpaceImportTree(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  if (!step.spaceImportTree) {
+    throw new Error(`Flow step ${step.id} is missing space import configuration.`);
+  }
+  const inputPath = path.resolve(resolveTemplateString(step.spaceImportTree.inputPath, ctx.resolvedContext));
+  const reportPath = path.join(ctx.outputsDir, path.basename(step.spaceImportTree.reportPath));
+  const result = await runSpaceImportTree({
+    client: ctx.args.client,
+    tenantId: ctx.args.tenantId,
+    inputPath,
+    apply: step.spaceImportTree.apply,
+    continueOnError: false,
+    reportPath
+  });
+  return { output: result, artifactPath: reportPath };
+}
+
 async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
   applyDerivedFlowContext(ctx);
   ensureContextKeys(step, ctx.resolvedContext);
 
   switch (step.task) {
-    case 'doctor.install': {
-      return {
-        output: buildInstallDoctorReport(path.resolve(__dirname, '../../dist/bin/xyte-cli.js'))
-      };
-    }
-    case 'setup.status': {
-      const readiness = await resolveReadiness(ctx, true);
-      if (readiness.state !== 'ready') {
-        throw new FlowNeedsInputError(`Setup status is ${readiness.state}. Run setup before continuing.`);
-      }
-      return {
-        output: readiness
-      };
-    }
-    case 'config.doctor': {
-      const readiness = await resolveReadiness(ctx, true);
-      const payload = {
-        retryAttempts: 2,
-        retryBackoffMs: 250,
-        readiness
-      };
-      if (readiness.connectionState !== 'connected') {
-        throw new FlowNeedsInputError(
-          `Connectivity is ${readiness.connectionState}. Resolve connectivity before continuing.`
-        );
-      }
-      return {
-        output: payload
-      };
-    }
-    case 'status.fast': {
-      const readiness = await resolveReadiness(ctx, false);
-      const payload = buildStatusContract({
-        mode: 'fast',
-        checkConnectivity: false,
-        readiness
-      });
-      return {
-        output: payload
-      };
-    }
-    case 'inspect.fleet': {
-      const snapshot = await collectSnapshotWithGuard(ctx);
-      return { output: buildFleetInspect(snapshot) };
-    }
-    case 'inspect.deep-dive': {
-      const windowHours = resolveFlowWindowHours(step, ctx.resolvedContext);
-      const snapshot = await collectSnapshotWithGuard(ctx);
-      return { output: buildDeepDive(snapshot, windowHours) };
-    }
-    case 'report.generate': {
-      if (!step.report) {
-        throw new Error(`Flow step ${step.id} is missing report configuration.`);
-      }
-      const report = step.report;
-      const input = ctx.taskOutputs.get(report.inputFromStepId);
-      let reportInput;
-      try {
-        reportInput = parseReportInput(input, ctx.args.tenantId);
-      } catch (error) {
-        throw new FlowNeedsInputError(buildReportInputNeedsDataMessage(step.id, report.inputFromStepId, error));
-      }
-      const outPath = path.join(ctx.outputsDir, report.outFileName);
-      const fleetFromStepId = report.fleetFromStepId;
-      const verificationFromStepId = report.verificationFromStepId;
-      let generated;
-      if (fleetFromStepId && verificationFromStepId) {
-        if (reportInput.schemaVersion !== UTILITY_BATCH_SCHEMA_VERSION || reportInput.command !== 'device.move') {
-          throw new FlowNeedsInputError(
-            `Step ${step.id} requires device.move batch output from ${report.inputFromStepId}.`
-          );
-        }
-        generated = generateDeviceMigrationReport({
-          execution: reportInput,
-          fleet: ctx.taskOutputs.get(fleetFromStepId),
-          verification: ctx.taskOutputs.get(verificationFromStepId),
-          tenantId: ctx.args.tenantId,
-          outPath
-        });
-      } else {
-        generated = await generateOpsReport({
-          input: reportInput,
-          tenantId: ctx.args.tenantId,
-          format: step.report.format,
-          outPath,
-          includeSensitive: step.report.includeSensitive === true
-        });
-      }
-      return {
-        output: generated,
-        artifactPath: outPath
-      };
-    }
-    case 'watch': {
-      const watchConfig = step.watch;
-      if (!watchConfig) {
-        throw new Error(`Flow step ${step.id} is missing watch configuration.`);
-      }
-      const frames: WatchFrameV1[] = [];
-      const once = ctx.args.once || watchConfig.once;
-      await runWatch({
-        client: ctx.args.client,
-        tenantId: ctx.args.tenantId,
-        profile: watchConfig.profile,
-        once,
-        intervalMs: watchConfig.intervalMs,
-        maxPolls: once ? 1 : watchConfig.maxPolls,
-        onFrame: (frame) => {
-          frames.push(frame);
-        }
-      });
-
-      const watchStepPath = buildStepArtifactPath(ctx, stepIndex, step.id, 'ndjson');
-      if (frames.length > 0) {
-        await writeFile(watchStepPath, `${frames.map((item) => JSON.stringify(item)).join('\n')}\n`, 'utf8');
-      } else {
-        await writeFile(watchStepPath, '', 'utf8');
-      }
-
-      return {
-        output: {
-          frameCount: frames.length,
-          lastEventType: frames.length > 0 ? frames[frames.length - 1].eventType : undefined
-        },
-        artifactPath: watchStepPath,
-        watchFrames: frames,
-        contextUpdates: extractWatchContextUpdates(frames)
-      };
-    }
-    case 'call': {
-      if (!step.call) {
-        throw new Error(`Flow step ${step.id} is missing call configuration.`);
-      }
-
-      const endpoint = getEndpoint(step.call.endpointKey);
-      const method = endpoint.method.toUpperCase();
-      const isWrite = isMutatingMethod(method);
-      const requestId = randomUUID();
-
-      const pathPayload = step.call.path ? resolveTemplateValue(step.call.path, ctx.resolvedContext) : undefined;
-      const queryPayload = step.call.query ? resolveTemplateValue(step.call.query, ctx.resolvedContext) : undefined;
-      const bodyPayload = step.call.body ? resolveTemplateValue(step.call.body, ctx.resolvedContext) : undefined;
-
-      const result = await ctx.args.client.callWithMeta(step.call.endpointKey, {
-        requestId,
-        tenantId: ctx.args.tenantId,
-        ...(pathPayload ? { path: pathPayload } : {}),
-        ...(queryPayload ? { query: queryPayload } : {}),
-        ...(bodyPayload !== undefined ? { body: bodyPayload } : {})
-      });
-
-      const envelope = buildCallEnvelope({
-        requestId,
-        tenantId: ctx.args.tenantId,
-        endpointKey: step.call.endpointKey,
-        method,
-        guard: {
-          allowWrite: isWrite
-        },
-        request: {
-          path: pathPayload,
-          query: queryPayload,
-          body: bodyPayload
-        },
-        response: {
-          status: result.status,
-          durationMs: result.durationMs,
-          retryCount: result.retryCount,
-          data: result.data
-        }
-      });
-
-      const contextUpdates: Record<string, string> = {};
-      if (step.call.endpointKey === 'organization.commands.getCommands' && isRecord(result.data)) {
-        const items = Array.isArray(result.data.items) ? result.data.items : [];
-        const first = items.find((item) => isRecord(item) && typeof item.command === 'string');
-        if (first && typeof first.command === 'string') {
-          contextUpdates.command = first.command;
-        }
-      }
-
-      return {
-        output: envelope,
-        contextUpdates: Object.keys(contextUpdates).length > 0 ? contextUpdates : undefined
-      };
-    }
-    case 'utility.prepare': {
-      if (!step.utilityPrepare) {
-        throw new Error(`Flow step ${step.id} is missing utility prepare configuration.`);
-      }
-      const inputPath = path.resolve(resolveTemplateString(step.utilityPrepare.inputPath, ctx.resolvedContext));
-      const outputDir = path.join(ctx.outputsDir, path.basename(step.utilityPrepare.outputDir));
-      const result = runUtilityPrepare({
-        inputPath,
-        actionKey: step.utilityPrepare.actionKey,
-        outputDir,
-        tenantId: ctx.args.tenantId,
-        primaryFormat: step.utilityPrepare.primaryFormat,
-        force: true
-      });
-      const CONTEXT_KEY_MAP: Record<string, string> = {
-        'space.import-tree': 'space_import_tree_csv',
-        'organization.devices.claimDevice': 'claim_prepare_csv',
-        'device.move': 'device_move_csv'
-      };
-      const contextUpdates: Record<string, string> = {};
-      const contextKey = CONTEXT_KEY_MAP[step.utilityPrepare.actionKey];
-      if (contextKey) {
-        contextUpdates[contextKey] = result.artifacts.primary;
-      }
-      return {
-        output: result,
-        contextUpdates
-      };
-    }
-    case 'device.match': {
-      if (!step.deviceMatch) {
-        throw new Error(`Flow step ${step.id} is missing device match configuration.`);
-      }
-      const sourcePath = path.resolve(resolveTemplateString(step.deviceMatch.sourcePath, ctx.resolvedContext));
-      const targetPath = path.resolve(resolveTemplateString(step.deviceMatch.targetPath, ctx.resolvedContext));
-      const outputPath = path.join(ctx.outputsDir, path.basename(step.deviceMatch.outputPath));
-      const result = await runDeviceMatch({
-        sourcePath,
-        targetPath,
-        sourceField: step.deviceMatch.sourceField,
-        targetField: step.deviceMatch.targetField,
-        outputPath,
-        tenantId: ctx.args.tenantId
-      });
-      return {
-        output: result,
-        contextUpdates: {
-          match_csv: result.outputPath,
-          match_summary_json: result.summaryPath
-        }
-      };
-    }
-    case 'device.move-batch': {
-      if (!step.deviceMoveBatch) {
-        throw new Error(`Flow step ${step.id} is missing device move batch configuration.`);
-      }
-      const inputPath = path.resolve(resolveTemplateString(step.deviceMoveBatch.inputPath, ctx.resolvedContext));
-      const reportPath = path.join(ctx.outputsDir, path.basename(step.deviceMoveBatch.reportPath));
-      const result = await runMoveDevices({
-        client: ctx.args.client,
-        tenantId: ctx.args.tenantId,
-        inputPath,
-        apply: step.deviceMoveBatch.apply,
-        continueOnError: step.deviceMoveBatch.continueOnError === true,
-        reportPath
-      });
-      return {
-        output: result,
-        contextUpdates: {
-          ...(step.deviceMoveBatch.apply
-            ? { execute_moves_report_path: reportPath }
-            : { dry_run_moves_report_path: reportPath })
-        },
-        failureDetail:
-          result.totals.failed > 0 || result.stoppedEarly
-            ? `Step ${step.id} failed because the move batch reported ${result.totals.failed} failed row(s).`
-            : undefined
-      };
-    }
-    case 'device.verify-batch': {
-      if (!step.deviceVerifyBatch) {
-        throw new Error(`Flow step ${step.id} is missing device verification configuration.`);
-      }
-      const inputPath = path.resolve(resolveTemplateString(step.deviceVerifyBatch.inputPath, ctx.resolvedContext));
-      const artifactPath = buildStepArtifactPath(ctx, stepIndex, step.id, 'json');
-      const result = await runVerifyMovedDevices({
-        client: ctx.args.client,
-        tenantId: ctx.args.tenantId,
-        inputPath,
-        outputPath: artifactPath
-      });
-      const mismatchCount = result.totals.mismatched;
-      const missingCount = result.totals.missing;
-      return {
-        output: result,
-        artifactPath,
-        failureDetail:
-          mismatchCount > 0 || missingCount > 0
-            ? `Step ${step.id} found ${mismatchCount} mismatched and ${missingCount} missing planned device(s).`
-            : undefined
-      };
-    }
-    case 'space.import-tree': {
-      if (!step.spaceImportTree) {
-        throw new Error(`Flow step ${step.id} is missing space import configuration.`);
-      }
-
-      const inputPath = path.resolve(resolveTemplateString(step.spaceImportTree.inputPath, ctx.resolvedContext));
-      const reportPath = path.join(ctx.outputsDir, path.basename(step.spaceImportTree.reportPath));
-      const result = await runSpaceImportTree({
-        client: ctx.args.client,
-        tenantId: ctx.args.tenantId,
-        inputPath,
-        apply: step.spaceImportTree.apply,
-        continueOnError: false,
-        reportPath
-      });
-      return {
-        output: result,
-        artifactPath: reportPath
-      };
-    }
-    default: {
-      throw new Error(`Unsupported flow task type: ${(step as { task: string }).task}`);
-    }
+    case 'doctor.install':    return handleInstallDoctor(step, ctx);
+    case 'setup.status':      return handleSetupStatus(step, ctx);
+    case 'config.doctor':     return handleConfigDoctor(step, ctx);
+    case 'status.fast':       return handleStatusFast(step, ctx);
+    case 'inspect.fleet':     return handleFleetInspect(step, ctx);
+    case 'inspect.deep-dive': return handleDeepDive(step, ctx);
+    case 'report.generate':   return handleReportGenerate(step, ctx);
+    case 'watch':             return handleWatch(step, stepIndex, ctx);
+    case 'call':              return handleCall(step, stepIndex, ctx);
+    case 'utility.prepare':   return handleUtilityPrepare(step, stepIndex, ctx);
+    case 'device.match':      return handleDeviceMatch(step, stepIndex, ctx);
+    case 'device.move-batch': return handleDeviceMoveBatch(step, stepIndex, ctx);
+    case 'device.verify-batch': return handleDeviceVerifyBatch(step, stepIndex, ctx);
+    case 'space.import-tree': return handleSpaceImportTree(step, stepIndex, ctx);
+    default: throw new Error(`Unsupported flow task type: ${(step as { task: string }).task}`);
   }
 }
 
