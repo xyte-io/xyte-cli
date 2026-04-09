@@ -553,7 +553,7 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
       const sourcePath = path.resolve(resolveTemplateString(step.deviceMatch.sourcePath, ctx.resolvedContext));
       const targetPath = path.resolve(resolveTemplateString(step.deviceMatch.targetPath, ctx.resolvedContext));
       const outputPath = path.join(ctx.outputsDir, path.basename(step.deviceMatch.outputPath));
-      const result = runDeviceMatch({
+      const result = await runDeviceMatch({
         sourcePath,
         targetPath,
         sourceField: step.deviceMatch.sourceField,

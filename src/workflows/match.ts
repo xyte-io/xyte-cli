@@ -1,4 +1,5 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import Fuse from 'fuse.js';
@@ -97,7 +98,7 @@ function quoteCsvField(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
-function writeCsv(outputPath: string, rows: DeviceMatchRow[]): void {
+async function writeCsv(outputPath: string, rows: DeviceMatchRow[]): Promise<void> {
   const lines = ['device_id,device_name,target_space_id,target_space_name,confidence'];
   for (const row of rows) {
     lines.push(
@@ -112,7 +113,7 @@ function writeCsv(outputPath: string, rows: DeviceMatchRow[]): void {
         .join(',')
     );
   }
-  writeFileSync(outputPath, `${lines.join('\n')}\n`, 'utf8');
+  await writeFile(outputPath, `${lines.join('\n')}\n`, 'utf8');
 }
 
 function toObjectRows(items: unknown[]): Array<Record<string, unknown>> {
@@ -154,9 +155,9 @@ function extractRowsFromJson(value: unknown): Array<Record<string, unknown>> | u
   return undefined;
 }
 
-function loadMatchRows(inputPath: string): Array<Record<string, unknown>> {
+async function loadMatchRows(inputPath: string): Promise<Array<Record<string, unknown>>> {
   const resolved = path.resolve(inputPath);
-  const raw = readFileSync(resolved, 'utf8');
+  const raw = await readFile(resolved, 'utf8');
   const trimmed = raw.trim();
   if (!trimmed) {
     return [];
@@ -190,21 +191,21 @@ function requireStringField(row: Record<string, unknown>, fieldName: string, row
   return normalized;
 }
 
-export function runDeviceMatch(args: {
+export async function runDeviceMatch(args: {
   sourcePath: string;
   targetPath: string;
   sourceField: string;
   targetField: string;
   outputPath: string;
   tenantId?: string;
-}): DeviceMatchResult {
+}): Promise<DeviceMatchResult> {
   const sourcePath = path.resolve(args.sourcePath);
   const targetPath = path.resolve(args.targetPath);
   const outputPath = path.resolve(args.outputPath);
   const summaryPath = `${outputPath}.summary.json`;
 
-  const sourceRows = loadMatchRows(sourcePath);
-  const targetRows = loadMatchRows(targetPath);
+  const sourceRows = await loadMatchRows(sourcePath);
+  const targetRows = await loadMatchRows(targetPath);
   const targets: MatchTarget[] = targetRows.map((row, index) => {
     const targetName = requireStringField(row, args.targetField, index + 1);
     return {
@@ -266,7 +267,7 @@ export function runDeviceMatch(args: {
   });
 
   mkdirSync(path.dirname(outputPath), { recursive: true });
-  writeCsv(outputPath, matches);
+  await writeCsv(outputPath, matches);
 
   const result: DeviceMatchResult = {
     schemaVersion: DEVICE_MATCH_SCHEMA_VERSION,
@@ -287,6 +288,6 @@ export function runDeviceMatch(args: {
     matches
   };
 
-  writeFileSync(summaryPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
+  await writeFile(summaryPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
   return result;
 }

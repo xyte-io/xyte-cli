@@ -11,7 +11,7 @@ function makeRoot(prefix: string): string {
 }
 
 describe('runDeviceMatch', () => {
-  it('emits exact matches with confidence 1 for identical names', () => {
+  it('emits exact matches with confidence 1 for identical names', async () => {
     const root = makeRoot('xyte-match-exact-');
     const sourcePath = join(root, 'source.json');
     const targetPath = join(root, 'target.json');
@@ -20,7 +20,7 @@ describe('runDeviceMatch', () => {
     writeFileSync(sourcePath, '[{"id":"dev-1","name":"South Wing"}]\n', 'utf8');
     writeFileSync(targetPath, '[{"id":"99592","name":"South Wing"}]\n', 'utf8');
 
-    const result = runDeviceMatch({
+    const result = await runDeviceMatch({
       sourcePath,
       targetPath,
       sourceField: 'name',
@@ -45,7 +45,7 @@ describe('runDeviceMatch', () => {
     expect(JSON.parse(readFileSync(`${outputPath}.summary.json`, 'utf8')).schemaVersion).toBe('xyte.device.match.v1');
   });
 
-  it('emits fuzzy matches with confidence between 0 and 1 for close names', () => {
+  it('emits fuzzy matches with confidence between 0 and 1 for close names', async () => {
     const root = makeRoot('xyte-match-fuzzy-');
     const sourcePath = join(root, 'source.json');
     const targetPath = join(root, 'target.json');
@@ -54,7 +54,7 @@ describe('runDeviceMatch', () => {
     writeFileSync(sourcePath, '[{"id":"dev-1","name":"South Wing Display"}]\n', 'utf8');
     writeFileSync(targetPath, '[{"id":"99592","name":"South Wing"}]\n', 'utf8');
 
-    const result = runDeviceMatch({
+    const result = await runDeviceMatch({
       sourcePath,
       targetPath,
       sourceField: 'name',
@@ -70,7 +70,7 @@ describe('runDeviceMatch', () => {
     expect(result.matches[0]?.confidence).toBeLessThan(1);
   });
 
-  it('does not overstate confidence for low-information partial matches', () => {
+  it('does not overstate confidence for low-information partial matches', async () => {
     const root = makeRoot('xyte-match-partial-');
     const sourcePath = join(root, 'source.json');
     const targetPath = join(root, 'target.json');
@@ -79,7 +79,7 @@ describe('runDeviceMatch', () => {
     writeFileSync(sourcePath, '[{"id":"dev-1","name":"Wing"}]\n', 'utf8');
     writeFileSync(targetPath, '[{"id":"99592","name":"South Wing"}]\n', 'utf8');
 
-    const result = runDeviceMatch({
+    const result = await runDeviceMatch({
       sourcePath,
       targetPath,
       sourceField: 'name',
@@ -91,7 +91,7 @@ describe('runDeviceMatch', () => {
     expect(result.matches[0]?.confidence).toBeLessThan(0.6);
   });
 
-  it('rejects one-character partial matches as unmatched', () => {
+  it('rejects one-character partial matches as unmatched', async () => {
     const root = makeRoot('xyte-match-short-');
     const sourcePath = join(root, 'source.json');
     const targetPath = join(root, 'target.json');
@@ -100,7 +100,7 @@ describe('runDeviceMatch', () => {
     writeFileSync(sourcePath, '[{"id":"dev-1","name":"S"}]\n', 'utf8');
     writeFileSync(targetPath, '[{"id":"99592","name":"South Wing"}]\n', 'utf8');
 
-    const result = runDeviceMatch({
+    const result = await runDeviceMatch({
       sourcePath,
       targetPath,
       sourceField: 'name',
@@ -116,7 +116,7 @@ describe('runDeviceMatch', () => {
     });
   });
 
-  it('emits unmatched rows when Fuse returns no target', () => {
+  it('emits unmatched rows when Fuse returns no target', async () => {
     const root = makeRoot('xyte-match-unmatched-');
     const sourcePath = join(root, 'source.json');
     const targetPath = join(root, 'target.json');
@@ -125,7 +125,7 @@ describe('runDeviceMatch', () => {
     writeFileSync(sourcePath, '[{"id":"dev-1","name":"Unrelated Device Name"}]\n', 'utf8');
     writeFileSync(targetPath, '[{"id":"99592","name":"South Wing"}]\n', 'utf8');
 
-    const result = runDeviceMatch({
+    const result = await runDeviceMatch({
       sourcePath,
       targetPath,
       sourceField: 'name',
@@ -143,7 +143,7 @@ describe('runDeviceMatch', () => {
     ]);
   });
 
-  it('counts exact, fuzzy, and unmatched totals correctly', () => {
+  it('counts exact, fuzzy, and unmatched totals correctly', async () => {
     const root = makeRoot('xyte-match-totals-');
     const sourcePath = join(root, 'source.json');
     const targetPath = join(root, 'target.json');
@@ -160,7 +160,7 @@ describe('runDeviceMatch', () => {
     );
     writeFileSync(targetPath, '[{"id":"99592","name":"South Wing"}]\n', 'utf8');
 
-    const result = runDeviceMatch({
+    const result = await runDeviceMatch({
       sourcePath,
       targetPath,
       sourceField: 'name',

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { ScreenRuntime } from '../../src/tui/runtime';
 import { updateErrorStormState } from '../../src/tui/app';
@@ -13,15 +13,6 @@ function deferred<T = void>() {
   return { promise, resolve, reject };
 }
 
-async function waitFor(predicate: () => boolean, timeoutMs = 1_500): Promise<void> {
-  const started = Date.now();
-  while (!predicate()) {
-    if (Date.now() - started > timeoutMs) {
-      throw new Error('Timed out waiting for condition.');
-    }
-    await new Promise((resolve) => setTimeout(resolve, 5));
-  }
-}
 
 describe('tui app navigation runtime', () => {
   it('queues refresh requests while one is in flight without blocking dispatch', async () => {
@@ -49,9 +40,12 @@ describe('tui app navigation runtime', () => {
     expect(pendingStatus.refreshQueued).toBe(true);
 
     first.resolve();
-    await waitFor(() => calls >= 2);
+    await vi.waitFor(() => expect(calls).toBeGreaterThanOrEqual(2));
     second.resolve();
-    await waitFor(() => runtime.getStatus().state === 'idle' && runtime.getStatus().refreshInFlight === false);
+    await vi.waitFor(() => {
+      expect(runtime.getStatus().state).toBe('idle');
+      expect(runtime.getStatus().refreshInFlight).toBe(false);
+    });
 
     expect(calls).toBe(2);
   });
@@ -68,7 +62,7 @@ describe('tui app navigation runtime', () => {
 
     runtime.setMountToken(2);
     done.resolve();
-    await waitFor(() => runtime.getStatus().staleDiscarded > 0);
+    await vi.waitFor(() => expect(runtime.getStatus().staleDiscarded).toBeGreaterThan(0));
 
     expect(runtime.getStatus().staleDiscarded).toBeGreaterThan(0);
   });
