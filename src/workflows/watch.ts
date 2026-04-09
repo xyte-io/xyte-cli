@@ -89,14 +89,14 @@ export function computeDelta(previous: NormalizedIncident[], current: Normalized
     .filter((id) => !previousById.has(id))
     .map((id) => ({
       id,
-      current: currentById.get(id)?.raw
+      after: currentById.get(id)?.raw
     }));
 
   const removed = previousIds
     .filter((id) => !currentById.has(id))
     .map((id) => ({
       id,
-      previous: previousById.get(id)?.raw
+      before: previousById.get(id)?.raw
     }));
 
   const updated = currentIds

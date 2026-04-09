@@ -459,10 +459,8 @@ async function handleReportGenerate(step: FlowTaskStep, ctx: RunContext): Promis
     });
   } else {
     const includeSensitive = report.includeSensitive === true;
-    generated =
-      reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION
-        ? await generateOpsReport({ input: reportInput, tenantId: ctx.args.tenantId, format: report.format, outPath, includeSensitive })
-        : await generateOpsReport({ input: reportInput, tenantId: ctx.args.tenantId, format: 'markdown', outPath, includeSensitive });
+    const format = reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION ? report.format : 'markdown';
+    generated = await generateOpsReport({ input: reportInput, tenantId: ctx.args.tenantId, format, outPath, includeSensitive });
   }
   return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
 }
@@ -1050,9 +1048,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
           ctx.resolvedContext[`${step.id}_output`] = primaryOutputPath;
         }
 
-        if (result.contextUpdates || primaryOutputPath || artifactPath) {
-          await persistFlowRunInputs(ctx, args, effectiveInspectProviderScope);
-        }
+        await persistFlowRunInputs(ctx, args, effectiveInspectProviderScope);
 
         nextStepIndex = index + 1;
         continue;
