@@ -531,7 +531,7 @@ interface ConfigData {
  * Intentionally differs from fleet-tier loaders (loadDevicesData, loadSpaceDrilldownData, etc.)
  * which follow the (client, tenantId, options) convention.
  */
-export async function loadConfigData(
+export async function readConfigData(
   profileStore: ProfileStore,
   secretStore: SecretStore,
   tenantId: string | undefined

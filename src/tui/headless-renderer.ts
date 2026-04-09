@@ -11,7 +11,7 @@ import { startupFrames } from './animation';
 import { XYTE_LOGO_COMPACT } from './assets/logo';
 import {
   getSpaceId,
-  loadConfigData,
+  readConfigData,
   loadDashboardData,
   loadDevicesData,
   loadIncidentsData,
@@ -198,7 +198,7 @@ async function buildConfigFrame(args: {
   motionPhase: number;
   doctorStatus?: string;
 }): Promise<HeadlessFrame> {
-  const { providerRows, selectedProvider, slotRows } = await loadConfigData(
+  const { providerRows, selectedProvider, slotRows } = await readConfigData(
     args.profileStore,
     args.secretStore,
     args.readiness.tenantId
