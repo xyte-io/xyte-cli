@@ -28,6 +28,21 @@ function countValue(counter: StatusCounts, key: string): void {
   counter[key] = (counter[key] ?? 0) + 1;
 }
 
+async function safeCall(
+  outcome: PartnerEndpointOutcome,
+  operation: () => Promise<unknown>
+): Promise<unknown | undefined> {
+  outcome.attempted += 1;
+  try {
+    const value = await withTimeout(operation, PARTNER_ENRICHMENT_TIMEOUT_MS);
+    outcome.succeeded += 1;
+    return value;
+  } catch {
+    outcome.failed += 1;
+    return undefined;
+  }
+}
+
 function emptyEndpointOutcome(): PartnerEndpointOutcome {
   return {
     attempted: 0,
@@ -281,21 +296,6 @@ async function collectPartnerEnrichment(
     const id = deviceId(item);
     if (id && !baseDevicesById.has(id)) {
       baseDevicesById.set(id, asRecord(item));
-    }
-  }
-
-  async function safeCall(
-    outcome: PartnerEndpointOutcome,
-    operation: () => Promise<unknown>
-  ): Promise<unknown | undefined> {
-    outcome.attempted += 1;
-    try {
-      const value = await withTimeout(operation, PARTNER_ENRICHMENT_TIMEOUT_MS);
-      outcome.succeeded += 1;
-      return value;
-    } catch {
-      outcome.failed += 1;
-      return undefined;
     }
   }
 

@@ -3,8 +3,7 @@ import path from 'node:path';
 
 import { getXyteConfigDir } from '../utils/config-dir';
 import { errorMessage } from '../utils/error-format';
-
-const FLOW_DEFINITION_SCHEMA_VERSION = 'xyte.flow.definition.v1';
+import { FLOW_DEFINITION_SCHEMA_VERSION } from '../contracts/versions';
 
 interface FlowDefinitionV1 {
   schemaVersion: typeof FLOW_DEFINITION_SCHEMA_VERSION;

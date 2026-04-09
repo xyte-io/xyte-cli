@@ -26,6 +26,33 @@ function deviceIdOf(device: unknown): string {
   return String(rec?.id ?? rec?._id ?? rec?.device_id ?? '');
 }
 
+function renderDeviceFallbackTable(
+  table: blessed.Widgets.ListTableElement | undefined,
+  filtered: unknown[],
+  selectionSync: SelectionSyncState
+): void {
+  if (!table) return;
+  setListTableData(
+    table,
+    [
+      ['ID', 'Name', 'Status', 'Space'],
+      ...filtered.map((device, index) => {
+        const d =
+          device && typeof device === 'object'
+            ? (device as Record<string, unknown>)
+            : ({} as Record<string, unknown>);
+        return [
+          String(d.id ?? d._id ?? `row-${index + 1}`),
+          String(d.name ?? d.title ?? 'n/a'),
+          String(d.status ?? d.state ?? 'unknown'),
+          String(d.space_name ?? d.space_id ?? 'n/a')
+        ];
+      })
+    ],
+    selectionSync
+  );
+}
+
 interface SendCommandWithGuardArgs {
   device: unknown;
   template: CommandTemplate;
@@ -124,25 +151,7 @@ export function createDevicesScreen(): TuiScreen {
 
     try {
       if (renderErrors.frozen) {
-        setListTableData(
-          table,
-          [
-            ['ID', 'Name', 'Status', 'Space'],
-            ...filtered.map((device, index) => {
-              const d =
-                device && typeof device === 'object'
-                  ? (device as Record<string, unknown>)
-                  : ({} as Record<string, unknown>);
-              return [
-                String(d.id ?? d._id ?? `row-${index + 1}`),
-                String(d.name ?? d.title ?? 'n/a'),
-                String(d.status ?? d.state ?? 'unknown'),
-                String(d.space_name ?? d.space_id ?? 'n/a')
-              ];
-            })
-          ],
-          selectionSync
-        );
+        renderDeviceFallbackTable(table, filtered, selectionSync);
         detail?.setContent(
           [
             'Render fallback mode enabled.',
@@ -178,25 +187,7 @@ export function createDevicesScreen(): TuiScreen {
       renderErrors.recordError(message);
       renderLog.onRenderError(message);
 
-      setListTableData(
-        table,
-        [
-          ['ID', 'Name', 'Status', 'Space'],
-          ...filtered.map((device, index) => {
-            const d =
-              device && typeof device === 'object'
-                ? (device as Record<string, unknown>)
-                : ({} as Record<string, unknown>);
-            return [
-              String(d.id ?? d._id ?? `row-${index + 1}`),
-              String(d.name ?? d.title ?? 'n/a'),
-              String(d.status ?? d.state ?? 'unknown'),
-              String(d.space_name ?? d.space_id ?? 'n/a')
-            ];
-          })
-        ],
-        selectionSync
-      );
+      renderDeviceFallbackTable(table, filtered, selectionSync);
       detail?.setContent(
         [
           'Unable to render device detail safely.',

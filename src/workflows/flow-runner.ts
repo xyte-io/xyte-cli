@@ -295,6 +295,37 @@ async function appendNdjson(targetPath: string, payload: unknown): Promise<void>
   await appendFile(targetPath, `${JSON.stringify(payload)}\n`, 'utf8');
 }
 
+async function recordStepFailure(
+  stepState: FlowRunStep,
+  problem: ReturnType<typeof toProblemDetails>,
+  opts: {
+    stepId: string;
+    startedAt: number;
+    errorsPath: string;
+    errors: FlowRunErrorEntry[];
+    artifactPath?: string;
+  }
+): Promise<FlowRunClassification> {
+  const classification = classifyFailure(problem);
+  stepState.status = 'failed';
+  stepState.endedAtUtc = nowIso();
+  stepState.durationMs = Date.now() - opts.startedAt;
+  if (opts.artifactPath !== undefined) {
+    stepState.artifactPath = opts.artifactPath;
+  }
+  stepState.error = problem;
+  stepState.classification = classification;
+  const errorEntry: FlowRunErrorEntry = {
+    timestamp: nowIso(),
+    stepId: opts.stepId,
+    classification,
+    error: problem
+  };
+  opts.errors.push(errorEntry);
+  await appendNdjson(opts.errorsPath, errorEntry);
+  return classification;
+}
+
 function buildReportInputNeedsDataMessage(stepId: string, inputStepId: string, cause: unknown): string {
   const base = `Step ${stepId} requires report-compatible output from ${inputStepId}.`;
   if (!(cause instanceof Error) || cause.message.trim().length === 0) {
@@ -960,24 +991,13 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
 
         if (result.failureDetail) {
           const problem = toProblemDetails(new Error(result.failureDetail), `/flow/${args.flowId}/${step.id}`);
-          const classification = classifyFailure(problem);
-
-          stepState.status = 'failed';
-          stepState.endedAtUtc = nowIso();
-          stepState.durationMs = Date.now() - stepStartedAt;
-          stepState.artifactPath = artifactPath;
-          stepState.error = problem;
-          stepState.classification = classification;
-
-          const errorEntry: FlowRunErrorEntry = {
-            timestamp: nowIso(),
+          const classification = await recordStepFailure(stepState, problem, {
             stepId: step.id,
-            classification,
-            error: problem
-          };
-          errors.push(errorEntry);
-          await appendNdjson(ctx.errorsPath, errorEntry);
-
+            startedAt: stepStartedAt,
+            errorsPath: ctx.errorsPath,
+            errors,
+            artifactPath
+          });
           outcome = classification === 'needs_data' ? 'needs_input' : 'failed';
           nextStepIndex = index;
           break;
@@ -1019,23 +1039,12 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
           error instanceof FlowNeedsInputError
             ? toNeedsInputProblem(error, `/flow/${args.flowId}/${step.id}`)
             : toProblemDetails(error, `/flow/${args.flowId}/${step.id}`);
-        const classification = classifyFailure(problem);
-
-        stepState.status = 'failed';
-        stepState.endedAtUtc = nowIso();
-        stepState.durationMs = Date.now() - stepStartedAt;
-        stepState.error = problem;
-        stepState.classification = classification;
-
-        const errorEntry: FlowRunErrorEntry = {
-          timestamp: nowIso(),
+        const classification = await recordStepFailure(stepState, problem, {
           stepId: step.id,
-          classification,
-          error: problem
-        };
-        errors.push(errorEntry);
-        await appendNdjson(ctx.errorsPath, errorEntry);
-
+          startedAt: stepStartedAt,
+          errorsPath: ctx.errorsPath,
+          errors
+        });
         outcome = classification === 'needs_data' ? 'needs_input' : 'failed';
         nextStepIndex = index;
         break;
