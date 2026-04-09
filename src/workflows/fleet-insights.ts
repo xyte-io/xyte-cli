@@ -586,6 +586,20 @@ export async function generateFleetReport(args: {
 }
 
 export async function generateOpsReport(args: {
+  input: DeepDiveResult;
+  tenantId: string;
+  format: 'markdown' | 'pdf';
+  outPath: string;
+  includeSensitive: boolean;
+}): Promise<FleetReportResult>;
+export async function generateOpsReport(args: {
+  input: z.infer<typeof DeviceMatchResultSchema> | z.infer<typeof DeviceMoveBatchReportSchema>;
+  tenantId: string;
+  format: 'markdown';
+  outPath: string;
+  includeSensitive: boolean;
+}): Promise<FleetReportResult>;
+export async function generateOpsReport(args: {
   input: OpsReportInput;
   tenantId: string;
   format: 'markdown' | 'pdf';

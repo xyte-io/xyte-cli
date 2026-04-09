@@ -461,13 +461,11 @@ async function handleReportGenerate(step: FlowTaskStep, ctx: RunContext): Promis
       outPath
     });
   } else {
-    generated = await generateOpsReport({
-      input: reportInput,
-      tenantId: ctx.args.tenantId,
-      format: report.format,
-      outPath,
-      includeSensitive: report.includeSensitive === true
-    });
+    const includeSensitive = report.includeSensitive === true;
+    generated =
+      reportInput.schemaVersion === 'xyte.inspect.deep-dive.v1'
+        ? await generateOpsReport({ input: reportInput, tenantId: ctx.args.tenantId, format: report.format, outPath, includeSensitive })
+        : await generateOpsReport({ input: reportInput, tenantId: ctx.args.tenantId, format: 'markdown', outPath, includeSensitive });
   }
   return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
 }

@@ -422,13 +422,17 @@ async function handleOpsReportGenerate(
     reportInput.schemaVersion === 'xyte.inspect.deep-dive.v1' ? 'pdf' : 'markdown'
   );
 
-  const generated = await generateOpsReport({
-    input: reportInput,
-    tenantId,
-    format: render as 'markdown' | 'pdf',
-    outPath: options.out,
-    includeSensitive: options.includeSensitive === true || settings.values.report.includeSensitive
-  });
+  const includeSensitive = options.includeSensitive === true || settings.values.report.includeSensitive;
+  const generated =
+    reportInput.schemaVersion === 'xyte.inspect.deep-dive.v1'
+      ? await generateOpsReport({ input: reportInput, tenantId, format: render, outPath: options.out, includeSensitive })
+      : await generateOpsReport({
+          input: reportInput,
+          tenantId,
+          format: render === 'pdf' ? 'markdown' : render,
+          outPath: options.out,
+          includeSensitive
+        });
   printJson(ctx.stdout, generated, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
 }
 
