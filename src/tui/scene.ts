@@ -5,7 +5,7 @@ import { fitCell, formatBoolTag, sanitizePrintable, shortId } from './table-form
 import { HEADLESS_FRAME_SCHEMA_VERSION } from '../contracts/versions';
 import type { ProviderReadiness } from '../contracts/status';
 
-export interface SetupProviderRow {
+interface SetupProviderRow {
   provider: string;
   slotCount: number;
   activeSlot: string;

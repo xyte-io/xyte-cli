@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 
 import { describe, expect, it } from 'vitest';
 
-import { buildDeepDive, generateFleetReport, type FleetSnapshot } from '../src/workflows/fleet-insights';
+import type { FleetSnapshot } from '../src/types/fleet-inspect';
+import { buildDeepDive, generateFleetReport } from '../src/workflows/fleet-insights';
 
 function buildSnapshotForPdf(): FleetSnapshot {
   const generatedAtUtc = new Date().toISOString();

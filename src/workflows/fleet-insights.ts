@@ -19,8 +19,7 @@ import type { DeepDiveResult } from '../types/deep-dive';
 export { collectFleetSnapshot, InspectProviderScopeError } from './fleet-insights-loaders';
 export { formatFleetInspectAscii, formatDeepDiveAscii, formatDeepDiveMarkdown } from './fleet-insights-format';
 export { generateDeviceMigrationReport } from './device-migration-report';
-export type { FleetSnapshot, FleetInspectResult } from '../types/fleet-inspect';
-export type { DeepDiveResult } from '../types/deep-dive';
+
 
 const DeepDiveTopOfflineSpaceSchema = z.object({
   space: z.string(),

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { logScreenDataFetch, createScreenRenderLogger } from '../../src/tui/screen-render-logger';
 
-const fakeRenderErrors = { frozen: false } as { frozen: boolean };
+const fakeRenderErrors = { frozen: false, recordSuccess: () => {}, recordError: () => false };
 
 describe('logScreenDataFetch', () => {
   it('calls debugLog with the correct event and data', () => {

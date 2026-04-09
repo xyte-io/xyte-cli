@@ -50,7 +50,7 @@ describe('runSlotConnectivityTest', () => {
         getOrganizationInfo: async () => { throw new Error('auth error'); }
       },
       partner: { getDevices: async () => ({}) }
-    }) as ReturnType<typeof createXyteClient>);
+    }) as unknown as ReturnType<typeof createXyteClient>);
 
     await expect(
       runSlotConnectivityTest({
