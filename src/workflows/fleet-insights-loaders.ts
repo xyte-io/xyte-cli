@@ -142,7 +142,7 @@ async function mapWithConcurrency<T>(
   );
 }
 
-async function paginateAll(args: {
+async function fetchAllPages(args: {
   fetch: (query: { page: number; per_page: number }) => Promise<unknown>;
   fetchSingle: () => Promise<unknown>;
   extractionKeys: string[];
@@ -171,7 +171,7 @@ async function paginateAll(args: {
 }
 
 function loadAllOrganizationDevices(client: XyteClient, tenantId: string): Promise<unknown[]> {
-  return paginateAll({
+  return fetchAllPages({
     fetch: (query) => client.organization.getDevices({ tenantId, query }),
     fetchSingle: () => client.organization.getDevices({ tenantId }),
     extractionKeys: ['devices', 'data', 'items']
@@ -179,7 +179,7 @@ function loadAllOrganizationDevices(client: XyteClient, tenantId: string): Promi
 }
 
 function loadAllPartnerDevices(client: XyteClient, tenantId: string): Promise<unknown[]> {
-  return paginateAll({
+  return fetchAllPages({
     fetch: (query) => client.partner.getDevices({ tenantId, query }),
     fetchSingle: () => client.partner.getDevices({ tenantId }),
     extractionKeys: ['devices', 'data', 'items']
@@ -187,7 +187,7 @@ function loadAllPartnerDevices(client: XyteClient, tenantId: string): Promise<un
 }
 
 function loadAllSpaces(client: XyteClient, tenantId: string): Promise<unknown[]> {
-  return paginateAll({
+  return fetchAllPages({
     fetch: (query) => client.organization.getSpaces({ tenantId, query }),
     fetchSingle: () => client.organization.getSpaces({ tenantId }),
     extractionKeys: ['spaces', 'data', 'items']

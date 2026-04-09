@@ -350,7 +350,7 @@ function extractPrimaryOutputPath(value: unknown): string | undefined {
   return undefined;
 }
 
-function resolveReadiness(ctx: RunContext, checkConnectivity: boolean) {
+function evaluateFlowReadiness(ctx: RunContext, checkConnectivity: boolean) {
   return evaluateReadiness({
     profileStore: ctx.args.profileStore,
     secretStore: ctx.args.secretStore,
@@ -375,7 +375,7 @@ async function handleInstallDoctor(_step: FlowTaskStep, _ctx: RunContext): Promi
 }
 
 async function handleSetupStatus(step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
-  const readiness = await resolveReadiness(ctx, true);
+  const readiness = await evaluateFlowReadiness(ctx, true);
   if (readiness.state !== 'ready') {
     throw new FlowNeedsInputError(`Setup status is ${readiness.state}. Run setup before continuing.`);
   }
@@ -383,7 +383,7 @@ async function handleSetupStatus(step: FlowTaskStep, ctx: RunContext): Promise<T
 }
 
 async function handleConfigDoctor(step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
-  const readiness = await resolveReadiness(ctx, true);
+  const readiness = await evaluateFlowReadiness(ctx, true);
   if (readiness.connectionState !== 'connected') {
     throw new FlowNeedsInputError(
       `Connectivity is ${readiness.connectionState}. Resolve connectivity before continuing.`
@@ -393,7 +393,7 @@ async function handleConfigDoctor(step: FlowTaskStep, ctx: RunContext): Promise<
 }
 
 async function handleStatusFast(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
-  const readiness = await resolveReadiness(ctx, false);
+  const readiness = await evaluateFlowReadiness(ctx, false);
   return { output: buildStatusContract({ mode: 'fast', checkConnectivity: false, readiness }) };
 }
 
