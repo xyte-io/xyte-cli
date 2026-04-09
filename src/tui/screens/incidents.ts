@@ -12,6 +12,7 @@ import {
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
 import { createRenderErrorTracker } from '../render-error-tracker';
+import { createScreenRenderLogger } from '../screen-render-logger';
 import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
 import { loadIncidentsData } from '../data-loaders';
 import { sceneFromIncidentsState } from '../scene';
@@ -94,6 +95,7 @@ export function createIncidentsScreen(): TuiScreen {
   let activePane: TuiPaneId = paneConfig.defaultPane;
   let isMounted = false;
   const renderErrors = createRenderErrorTracker();
+  const renderLog = createScreenRenderLogger('incidents', () => context.debugLog, renderErrors);
 
   const focusPane = () => {
     if (activePane === 'incidents-table') {
@@ -131,10 +133,7 @@ export function createIncidentsScreen(): TuiScreen {
     if (!isMounted) {
       return;
     }
-    context.debugLog?.('screen.render.start', {
-      screen: 'incidents',
-      frozen: renderErrors.frozen
-    });
+    renderLog.onRenderStart();
     filtered = severityFilter
       ? incidents.filter((incident) =>
           String(incident?.severity ?? incident?.priority ?? '')
@@ -182,21 +181,11 @@ export function createIncidentsScreen(): TuiScreen {
         detailBox?.setContent((detailPanel?.text?.lines ?? ['No incidents.']).join('\n'));
       }
       renderErrors.recordSuccess();
-      context.debugLog?.('screen.render.complete', {
-        screen: 'incidents',
-        frozen: renderErrors.frozen
-      });
+      renderLog.onRenderComplete();
     } catch (error) {
       const message = errorMessage(error);
       renderErrors.recordError(message);
-      context.debugLog?.('screen.render.error', {
-        screen: 'incidents',
-        message,
-        frozen: renderErrors.frozen
-      });
-      context.debugLog?.('screen.render.fallback.applied', {
-        screen: 'incidents'
-      });
+      renderLog.onRenderError(message);
       renderIncidentFallbackRows(filtered);
       detailBox?.setContent(`Unable to render incident detail safely.\nReason: ${message}`);
     }

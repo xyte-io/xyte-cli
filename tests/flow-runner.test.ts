@@ -1334,7 +1334,7 @@ describe('flow runner', () => {
     let currentSpaceId = 900;
     let reportCalled = false;
 
-    const reportSpy = vi.spyOn(fleetInsights, 'generateDeviceMigrationReport').mockImplementation(async (args) => {
+    const reportSpy = vi.spyOn(fleetInsights, 'generateDeviceMigrationReport').mockImplementation((args) => {
       reportCalled = true;
       writeFileSync(args.outPath, '# Device Migration Post-Execution Report\n', 'utf8');
       return {

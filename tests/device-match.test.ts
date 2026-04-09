@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 
 import { describe, expect, it } from 'vitest';
 
-import { runDeviceMatch } from '../src/workflows/match';
+import { runDeviceMatch } from '../src/workflows/device-match';
 
 function makeRoot(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix));

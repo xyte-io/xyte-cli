@@ -12,6 +12,7 @@ import {
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
 import { createRenderErrorTracker } from '../render-error-tracker';
+import { createScreenRenderLogger } from '../screen-render-logger';
 import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
 import type { EndpointNamespace } from '../../types/endpoints';
 import { loadTicketsData } from '../data-loaders';
@@ -159,6 +160,7 @@ export function createTicketsScreen(): TuiScreen {
   let activePane: TuiPaneId = paneConfig.defaultPane;
   let isMounted = false;
   const renderErrors = createRenderErrorTracker();
+  const renderLog = createScreenRenderLogger('tickets', () => context.debugLog, renderErrors);
   const detailCacheByTicket = new Map<string, string>();
 
   const focusPane = () => {
@@ -213,10 +215,7 @@ export function createTicketsScreen(): TuiScreen {
     if (!isMounted) {
       return;
     }
-    context.debugLog?.('screen.render.start', {
-      screen: 'tickets',
-      frozen: renderErrors.frozen
-    });
+    renderLog.onRenderStart();
     rebuildFiltered(restoreTicketId);
 
     const actionsHint = ticketWritesEnabled()
@@ -271,21 +270,11 @@ export function createTicketsScreen(): TuiScreen {
         detail?.setContent((detailPanel?.text?.lines ?? ['No tickets.']).join('\n'));
       }
       renderErrors.recordSuccess();
-      context.debugLog?.('screen.render.complete', {
-        screen: 'tickets',
-        frozen: renderErrors.frozen
-      });
+      renderLog.onRenderComplete();
     } catch (error) {
       const message = errorMessage(error);
       renderErrors.recordError(message);
-      context.debugLog?.('screen.render.error', {
-        screen: 'tickets',
-        message,
-        frozen: renderErrors.frozen
-      });
-      context.debugLog?.('screen.render.fallback.applied', {
-        screen: 'tickets'
-      });
+      renderLog.onRenderError(message);
       setListTableData(
         list,
         [

@@ -12,6 +12,7 @@ import {
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
 import { createRenderErrorTracker } from '../render-error-tracker';
+import { createScreenRenderLogger } from '../screen-render-logger';
 import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
 import type { CommandTemplate } from '../data-loaders';
 import { loadCommandTemplates, loadDevicesData } from '../data-loaders';
@@ -88,6 +89,7 @@ export function createDevicesScreen(): TuiScreen {
   let activePane: TuiPaneId = paneConfig.defaultPane;
   let isMounted = false;
   const renderErrors = createRenderErrorTracker();
+  const renderLog = createScreenRenderLogger('devices', () => context.debugLog, renderErrors);
   let spaceFilter = '';
 
   const focusPane = () => {
@@ -104,9 +106,7 @@ export function createDevicesScreen(): TuiScreen {
     if (!isMounted) {
       return;
     }
-    context.debugLog?.('screen.render.start', {
-      screen: 'devices'
-    });
+    renderLog.onRenderStart();
     if (!searchText) {
       filtered = devices;
     } else {
@@ -172,22 +172,11 @@ export function createDevicesScreen(): TuiScreen {
         detail?.setContent((detailPanel?.text?.lines ?? ['No matching devices.']).join('\n'));
       }
       renderErrors.recordSuccess();
-      context.debugLog?.('screen.render.complete', {
-        screen: 'devices',
-        frozen: renderErrors.frozen
-      });
+      renderLog.onRenderComplete();
     } catch (error) {
       const message = errorMessage(error);
       renderErrors.recordError(message);
-
-      context.debugLog?.('screen.render.error', {
-        screen: 'devices',
-        message,
-        frozen: renderErrors.frozen
-      });
-      context.debugLog?.('screen.render.fallback.applied', {
-        screen: 'devices'
-      });
+      renderLog.onRenderError(message);
 
       setListTableData(
         table,

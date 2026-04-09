@@ -21,7 +21,7 @@ export async function runProcess(
 ): Promise<ProcessRunResult> {
   const stdinMode = options.stdinMode ?? 'pipe';
 
-  return await new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const child: ChildProcess = spawn(command, args, {
       cwd: options.cwd,
       env: options.env,

@@ -5,7 +5,7 @@ import type { UtilityInputFormat } from '../../utils/input-parser';
 import type { UtilityPreparePrimaryFormat } from '../../workflows/utility-action-profiles';
 import { runUtilityPrepare, listUtilityPrepareActions } from '../../workflows/utility-prepare';
 import { runSpaceImportTree } from '../../workflows/utility-commands';
-import { runDeviceMatch } from '../../workflows/match';
+import { runDeviceMatch } from '../../workflows/device-match';
 import { runMoveDevices } from '../../workflows/move-devices';
 import {
   type CliContext,

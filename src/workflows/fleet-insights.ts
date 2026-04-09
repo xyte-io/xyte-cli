@@ -7,11 +7,9 @@ import {
   DEVICE_MATCH_SCHEMA_VERSION,
   INSPECT_DEEP_DIVE_SCHEMA_VERSION,
   INSPECT_FLEET_SCHEMA_VERSION,
-  REPORT_SCHEMA_VERSION,
-  UTILITY_BATCH_SCHEMA_VERSION
+  REPORT_SCHEMA_VERSION
 } from '../contracts/versions';
 import { parseTimestamp } from './report/time-format';
-import { parseMoveVerificationResult } from './verify-device-moves';
 
 export { collectFleetSnapshot, InspectProviderScopeError } from './fleet-insights-loaders';
 export { formatFleetInspectAscii, formatDeepDiveAscii, formatDeepDiveMarkdown } from './fleet-insights-format';
@@ -108,12 +106,9 @@ const DeepDiveResultSchema = z.object({
   })
 });
 
-import { DeviceMatchResultSchema } from './match';
-import { UtilityBatchResultSchema } from './utility-batch';
-
-const DeviceMoveBatchReportSchema = UtilityBatchResultSchema.extend({
-  command: z.literal('device.move')
-});
+import { DeviceMatchResultSchema } from './device-match';
+import { DeviceMoveBatchReportSchema } from './device-migration-report';
+export { generateDeviceMigrationReport } from './device-migration-report';
 
 interface FleetReportResult {
   schemaVersion: typeof REPORT_SCHEMA_VERSION;
@@ -523,82 +518,6 @@ function formatDeviceMoveBatchReportMarkdown(result: z.infer<typeof DeviceMoveBa
   return `${lines.join('\n')}\n`;
 }
 
-function parseFleetInspectResult(value: unknown): FleetInspectResult['totals'] {
-  const record = asRecord(value);
-  const totals = asRecord(record.totals);
-  return {
-    devices: Number(totals.devices ?? 0),
-    spaces: Number(totals.spaces ?? 0),
-    incidents: Number(totals.incidents ?? 0),
-    tickets: Number(totals.tickets ?? 0)
-  };
-}
-
-export async function generateDeviceMigrationReport(args: {
-  execution: z.infer<typeof DeviceMoveBatchReportSchema>;
-  fleet: unknown;
-  verification: unknown;
-  tenantId: string;
-  outPath: string;
-}): Promise<FleetReportResult> {
-  const fleetTotals = parseFleetInspectResult(args.fleet);
-  const verification = parseMoveVerificationResult(args.verification);
-  const issueRows = verification.rows.filter((row) => row.status !== 'verified');
-  ensureDir(args.outPath);
-
-  const lines = [
-    '# Device Migration Post-Execution Report',
-    '',
-    `Generated: ${new Date().toISOString()}`,
-    `Tenant: ${args.tenantId}`,
-    '',
-    '## Execution',
-    `- Mode: ${args.execution.mode}`,
-    `- Rows: ${args.execution.totals.rows}`,
-    `- Succeeded: ${args.execution.totals.succeeded}`,
-    `- Failed: ${args.execution.totals.failed}`,
-    `- Skipped: ${args.execution.totals.skipped}`,
-    `- Stopped early: ${args.execution.stoppedEarly ? 'yes' : 'no'}`,
-    '',
-    '## Verification',
-    `- Planned rows: ${verification.totals.rows}`,
-    `- Verified: ${verification.totals.verified}`,
-    `- Mismatched: ${verification.totals.mismatched}`,
-    `- Missing: ${verification.totals.missing}`,
-    '',
-    '## Fleet Snapshot',
-    `- Fleet devices: ${fleetTotals.devices}`,
-    `- Fleet spaces: ${fleetTotals.spaces}`,
-    `- Fleet incidents: ${fleetTotals.incidents}`,
-    `- Fleet tickets: ${fleetTotals.tickets}`
-  ];
-
-  if (args.execution.reportPath) {
-    lines.push(`- NDJSON report: ${args.execution.reportPath}`);
-  }
-  if (args.execution.firstError) {
-    lines.push('', '## First Error', `- Row ${args.execution.firstError.rowIndex}: ${args.execution.firstError.message}`);
-  }
-  if (issueRows.length > 0) {
-    lines.push('', '## Verification Issues', '', '| Row | Device | Target Space | Actual Space | Status | Detail |');
-    lines.push('| ---: | --- | ---: | ---: | --- | --- |');
-    issueRows.forEach((row) => {
-      lines.push(
-        `| ${row.rowIndex} | ${row.deviceName ?? row.deviceId} (${row.deviceId}) | ${row.targetSpaceId} | ${row.actualSpaceId ?? 'n/a'} | ${row.status} | ${row.detail} |`
-      );
-    });
-  }
-
-  writeFileSync(args.outPath, `${lines.join('\n')}\n`, 'utf8');
-  return {
-    schemaVersion: REPORT_SCHEMA_VERSION,
-    generatedAtUtc: new Date().toISOString(),
-    tenantId: args.tenantId,
-    format: 'markdown',
-    outputPath: resolve(args.outPath),
-    includeSensitive: false
-  };
-}
 
 export function parseDeepDiveForReport(raw: unknown, expectedTenantId?: string): DeepDiveResult {
   const parsed = DeepDiveResultSchema.safeParse(raw);

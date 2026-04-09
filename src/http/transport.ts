@@ -89,8 +89,8 @@ async function parseResponseBody(response: Response): Promise<unknown> {
   if (contentType.includes('application/json')) {
     try {
       return await response.json();
-    } catch {
-      return undefined;
+    } catch (error) {
+      throw new Error('Failed to parse JSON response body', { cause: error });
     }
   }
 

@@ -243,7 +243,7 @@ async function handleOpsWatchIncidents(
   });
 }
 
-async function resolveInspectContext(
+async function fetchInspectContext(
   ctx: CliContext,
   options: {
     tenant?: string;
@@ -290,7 +290,7 @@ async function handleOpsInspectFleet(
   }
 ): Promise<void> {
   const render = resolveRenderMode(options, ['json', 'ascii'], 'json');
-  const { settings, snapshot } = await resolveInspectContext(ctx, {
+  const { settings, snapshot } = await fetchInspectContext(ctx, {
     tenant: options.tenant,
     providerScope: options.providerScope,
     commandLabel: 'ops inspect fleet'
@@ -328,7 +328,7 @@ async function handleOpsInspectDeepDive(
   }
 ): Promise<void> {
   const render = resolveRenderMode(options, ['json', 'ascii', 'markdown'], 'json');
-  const { settings, snapshot } = await resolveInspectContext(ctx, {
+  const { settings, snapshot } = await fetchInspectContext(ctx, {
     tenant: options.tenant,
     providerScope: options.providerScope,
     commandLabel: 'ops inspect deep-dive'

@@ -27,7 +27,7 @@ import { isRecord } from '../utils/json';
 import { runWatch } from './watch';
 import { runUtilityPrepare } from './utility-prepare';
 import { runSpaceImportTree } from './utility-commands';
-import { runDeviceMatch } from './match';
+import { runDeviceMatch } from './device-match';
 import { runMoveDevices } from './move-devices';
 import { runVerifyMovedDevices } from './verify-device-moves';
 import {
@@ -390,7 +390,7 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
             `Step ${step.id} requires device.move batch output from ${report.inputFromStepId}.`
           );
         }
-        generated = await generateDeviceMigrationReport({
+        generated = generateDeviceMigrationReport({
           execution: reportInput,
           fleet: ctx.taskOutputs.get(fleetFromStepId),
           verification: ctx.taskOutputs.get(verificationFromStepId),
@@ -766,8 +766,8 @@ async function readStoredInputs(bundleDir: string): Promise<FlowRunInputsPayload
 
   try {
     return JSON.parse(await readFile(inputsPath, 'utf8')) as FlowRunInputsPayload;
-  } catch {
-    // Ignore malformed resume inputs and use current invocation defaults.
+  } catch (error) {
+    console.warn(`[flow-runner] Malformed resume inputs at ${inputsPath} — falling back to invocation defaults.`, error);
     return undefined;
   }
 }
