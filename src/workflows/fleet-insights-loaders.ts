@@ -391,7 +391,7 @@ async function collectPartnerEnrichment(
   return snapshot;
 }
 
-async function resolveInspectProviderScope(
+async function fetchInspectProviderScope(
   client: XyteClient,
   tenantId: string,
   providerScope: InspectProviderScope
@@ -440,7 +440,7 @@ export async function collectFleetSnapshot(args: {
 }): Promise<FleetSnapshot> {
   const { client, tenantId, tenantName, providerScope = 'auto' } = args;
   return withSpan('xyte.inspect.collect_snapshot', { 'xyte.tenant.id': tenantId }, async () => {
-    const resolvedScope = await resolveInspectProviderScope(client, tenantId, providerScope);
+    const resolvedScope = await fetchInspectProviderScope(client, tenantId, providerScope);
     let devices: unknown[];
     let spaces: unknown[];
     let incidents: unknown[];
