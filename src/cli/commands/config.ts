@@ -34,7 +34,7 @@ function parseWritableScope(raw: string | undefined): Exclude<CliSettingsScope, 
   if (scope !== 'user' && scope !== 'workspace') {
     throw new CliUserError({
       summary: 'Invalid config scope.',
-      cause: `Received "${raw}".`,
+      detail: `Received "${raw}".`,
       suggestedCommands: ['Use --scope user', 'Use --scope workspace']
     });
   }
@@ -190,7 +190,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
       if (!['user', 'workspace', 'resolved'].includes(scope)) {
         throw new CliUserError({
           summary: 'Invalid config scope.',
-          cause: `Received "${options.scope}".`,
+          detail: `Received "${options.scope}".`,
           suggestedCommands: ['Use --scope resolved', 'Use --scope user', 'Use --scope workspace']
         });
       }
@@ -262,7 +262,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
         if (!SUPPORTED_SETTING_KEYS.includes(key as SettingKey)) {
           throw new CliUserError({
             summary: 'Unknown config key.',
-            cause: `Received "${key}".`,
+            detail: `Received "${key}".`,
             suggestedCommands: [`Supported keys: ${SUPPORTED_SETTING_KEYS.join(', ')}`]
           });
         }
@@ -309,7 +309,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
       if (!SUPPORTED_SETTING_KEYS.includes(key as SettingKey)) {
         throw new CliUserError({
           summary: 'Unknown config key.',
-          cause: `Received "${key}".`,
+          detail: `Received "${key}".`,
           suggestedCommands: [`Supported keys: ${SUPPORTED_SETTING_KEYS.join(', ')}`]
         });
       }
@@ -417,7 +417,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
         if (!value) {
           throw new CliUserError({
             summary: 'Missing key value.',
-            cause: 'Use --key, --key-file, --key-stdin, or XYTE_CLI_KEY.',
+            detail: 'Use --key, --key-file, --key-stdin, or XYTE_CLI_KEY.',
             suggestedCommands: ['Use xyte-cli config key add --tenant <tenant-id> --provider xyte-org --name primary']
           });
         }
@@ -547,7 +547,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
         if (!value) {
           throw new CliUserError({
             summary: 'Missing key value.',
-            cause: 'Use --key, --key-file, --key-stdin, or XYTE_CLI_KEY.',
+            detail: 'Use --key, --key-file, --key-stdin, or XYTE_CLI_KEY.',
             suggestedCommands: [
               'Use xyte-cli config key update --tenant <tenant-id> --provider xyte-org --slot <slot-id>'
             ]
@@ -604,7 +604,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
       if (!secret) {
         throw new CliUserError({
           summary: 'No secret found for selected key slot.',
-          cause: `Slot "${slot.slotId}" has no stored secret.`,
+          detail: `Slot "${slot.slotId}" has no stored secret.`,
           suggestedCommands: [
             `xyte-cli config key update --tenant ${options.tenant} --provider ${provider} --slot ${slot.slotId}`
           ]

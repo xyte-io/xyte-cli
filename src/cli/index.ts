@@ -548,7 +548,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     if (failed.length > 0) {
       throw new CliUserError({
         summary: 'Skill installation failed.',
-        cause: `Failed on ${failed.length} target(s).`,
+        detail: `Failed on ${failed.length} target(s).`,
         suggestedCommands: ['Re-run with xyte-cli init --force', 'Inspect the failed targets reported above.']
       });
     }
@@ -582,7 +582,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       if (options.requireSetup === true) {
         throw new CliUserError({
           summary: 'Missing API key for init setup.',
-          cause: 'Neither XYTE_CLI_KEY nor interactive input supplied a key.',
+          detail: 'Neither XYTE_CLI_KEY nor interactive input supplied a key.',
           suggestedCommands: ['Run xyte-cli setup run --tenant <tenant-id>', 'Re-run xyte-cli init --no-setup']
         });
       }
@@ -606,7 +606,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       if (options.requireSetup === true) {
         throw new CliUserError({
           summary: 'Init setup did not complete.',
-          cause: setupResult.readiness.connectivity.message || 'Connectivity validation failed.',
+          detail: setupResult.readiness.connectivity.message || 'Connectivity validation failed.',
           suggestedCommands: [
             `xyte-cli setup status --tenant ${tenantId}`,
             `xyte-cli config doctor --tenant ${tenantId}`

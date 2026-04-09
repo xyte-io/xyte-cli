@@ -398,7 +398,7 @@ async function handleOpsReportGenerate(
     const detail = isSyntax ? `: ${error.message}` : `: ${errorMessage(error)}`;
     throw new CliUserError({
       summary: isSyntax ? `Input JSON is invalid${detail}` : `Cannot read input file${detail}`,
-      cause: `Failed to ${isSyntax ? 'parse' : 'read'} ${inputPath}.`,
+      detail: `Failed to ${isSyntax ? 'parse' : 'read'} ${inputPath}.`,
       suggestedCommands: [
         'Generate fresh input with xyte-cli ops inspect deep-dive --output json',
         'Generate fresh input with xyte-cli util match',
@@ -480,7 +480,7 @@ async function handleOpsConsole(
   if (!(TUI_SCREEN_IDS as readonly string[]).includes(screenRaw)) {
     throw new CliUserError({
       summary: 'Invalid console screen.',
-      cause: `Received "${screenRaw}".`,
+      detail: `Received "${screenRaw}".`,
       suggestedCommands: [`Use one of: ${TUI_SCREEN_IDS.join(', ')}`]
     });
   }

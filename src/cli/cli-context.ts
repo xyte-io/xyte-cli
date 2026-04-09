@@ -59,7 +59,7 @@ export function parseCliOutputMode(value: string | undefined): CliOutputMode | u
   if (normalized !== 'auto' && normalized !== 'json' && normalized !== 'text') {
     throw new CliUserError({
       summary: 'Invalid output mode.',
-      cause: `Received "${value}".`,
+      detail: `Received "${value}".`,
       suggestedCommands: ['Use --output auto', 'Use --output json', 'Use --output text']
     });
   }
@@ -78,7 +78,7 @@ export function resolveTextJsonOutput(args: {
     if (localFormat !== 'json' && localFormat !== 'text') {
       throw new CliUserError({
         summary: 'Invalid format.',
-        cause: `Received "${args.format}".`,
+        detail: `Received "${args.format}".`,
         suggestedCommands: ['Use --output json', 'Use --output text']
       });
     }

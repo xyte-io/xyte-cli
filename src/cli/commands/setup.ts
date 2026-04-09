@@ -85,7 +85,7 @@ function formatScalarFieldValue(value: unknown, field: string): string {
   if (value === undefined || Array.isArray(value) || isRecord(value)) {
     throw new CliUserError({
       summary: 'Invalid setup status field.',
-      cause: `Field "${field}" is missing or not a scalar value.`,
+      detail: `Field "${field}" is missing or not a scalar value.`,
       suggestedCommands: ['Use --field tenantId', 'Omit --field to print the full status payload']
     });
   }
@@ -383,7 +383,7 @@ async function handleSetupRunSimple(
   if (!keyValue) {
     throw new CliUserError({
       summary: 'Missing API key.',
-      cause: 'Setup needs --key, --key-file, --key-stdin, XYTE_CLI_KEY, or interactive input.',
+      detail: 'Setup needs --key, --key-file, --key-stdin, XYTE_CLI_KEY, or interactive input.',
       suggestedCommands: ['Use xyte-cli setup run --tenant <tenant-id>']
     });
   }
@@ -486,7 +486,7 @@ async function handleSetupRunAdvanced(
   if (!keyValue) {
     throw new CliUserError({
       summary: 'Missing API key.',
-      cause: 'Setup needs --key, --key-file, --key-stdin, XYTE_CLI_KEY, or interactive input.',
+      detail: 'Setup needs --key, --key-file, --key-stdin, XYTE_CLI_KEY, or interactive input.',
       suggestedCommands: ['Use xyte-cli setup run --advanced --tenant <tenant-id> --provider xyte-org']
     });
   }

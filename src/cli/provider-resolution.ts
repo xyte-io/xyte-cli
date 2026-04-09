@@ -19,7 +19,7 @@ export async function fetchProviderForKey(args: {
   if (!args.allowProbe) {
     throw new CliUserError({
       summary: 'Missing provider.',
-      cause: 'Provider auto-detection requires connectivity.',
+      detail: 'Provider auto-detection requires connectivity.',
       suggestedCommands: ['Use --provider xyte-org', 'Use --provider xyte-partner']
     });
   }

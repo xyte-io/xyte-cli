@@ -98,7 +98,7 @@ async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptio
   if (!['raw', 'envelope'].includes(outputMode)) {
     throw new CliUserError({
       summary: 'Invalid API call output mode.',
-      cause: `Received "${outputMode}".`,
+      detail: `Received "${outputMode}".`,
       suggestedCommands: ['Use --output-mode raw', 'Use --output-mode envelope']
     });
   }
@@ -108,7 +108,7 @@ async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptio
   if ((options.query?.length ?? 0) > 0 && options.queryJson) {
     throw new CliUserError({
       summary: 'Conflicting query flags.',
-      cause: 'Use either --query or --query-json, not both.',
+      detail: 'Use either --query or --query-json, not both.',
       suggestedCommands: ['Use --query key=value', 'Use --query-json \'{"key":"value"}\'']
     });
   }

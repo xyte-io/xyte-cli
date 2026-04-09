@@ -56,8 +56,8 @@ const StatusProviderSchema = z.object({
 });
 
 const StatusConnectivitySchema = z.object({
-  state: z.string(),
-  class: z.string().optional(),
+  state: z.enum(['connected', 'auth_required', 'missing_key', 'network_error', 'timeout', 'rate_limited', 'unknown_error', 'not_checked']),
+  class: z.enum(['auth', 'missing_key', 'network', 'timeout', 'rate_limit', 'unknown']).optional(),
   message: z.string(),
   retriable: z.boolean(),
   endpointKey: z.string().optional(),
@@ -65,13 +65,13 @@ const StatusConnectivitySchema = z.object({
 });
 
 const StatusReadinessSchema = z.object({
-  state: z.string(),
+  state: z.enum(['ready', 'needs_setup', 'degraded']),
   tenantId: z.string().optional(),
   activeTenant: z.unknown().optional(),
   missingItems: z.array(z.string()),
   recommendedActions: z.array(z.string()),
   providers: z.array(StatusProviderSchema),
-  connectionState: z.string(),
+  connectionState: z.enum(['connected', 'auth_required', 'missing_key', 'network_error', 'timeout', 'rate_limited', 'unknown_error', 'not_checked']),
   connectivity: StatusConnectivitySchema
 });
 
