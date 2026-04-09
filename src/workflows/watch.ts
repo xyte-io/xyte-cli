@@ -13,7 +13,7 @@ export const WATCH_MIN_INTERVAL_MS = 1000;
 const WATCH_DEFAULT_MAX_POLLS = 600;
 export const WATCH_MAX_POLLS = 3600;
 
-export interface NormalizedIncident {
+interface NormalizedIncident {
   id: string;
   raw: unknown;
   stable: string;
