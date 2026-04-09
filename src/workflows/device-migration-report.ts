@@ -21,7 +21,7 @@ export interface DeviceMigrationReportResult {
   includeSensitive: boolean;
 }
 
-function extractFleetTotals(value: unknown): FleetInspectResult['totals'] {
+export function extractFleetTotals(value: unknown): FleetInspectResult['totals'] {
   const record = asRecord(value);
   const totals = asRecord(record.totals);
   return {
