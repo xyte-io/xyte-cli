@@ -42,6 +42,7 @@ import {
 } from './fleet-insights';
 import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';
 import type { BuiltInFlowDefinition, FlowTaskStep } from './flow-catalog';
+import { hasBuiltInFlowDefinition, getBuiltInFlowDefinition } from './flow-catalog';
 
 export type FlowRunMode = 'plan' | 'apply';
 
@@ -224,10 +225,6 @@ function ensureContextKeys(step: FlowTaskStep, context: Record<string, string>):
   }
 }
 
-function buildGuidedRemediationDeviceName(deviceId: string): string {
-  return `Remediated ${deviceId}`;
-}
-
 function resolveFlowWindowHours(step: FlowTaskStep, context: Record<string, string>): number {
   const rawOverride = context.window_hours?.trim();
   if (!rawOverride) {
@@ -256,8 +253,16 @@ function applyDerivedFlowContext(ctx: RunContext): void {
     }
   }
 
-  if (ctx.args.resolvedFlowId === 'flow.guided-remediation' && !context.updated_device_name && context.device_id) {
-    context.updated_device_name = buildGuidedRemediationDeviceName(context.device_id);
+  if (hasBuiltInFlowDefinition(ctx.args.resolvedFlowId)) {
+    const def = getBuiltInFlowDefinition(ctx.args.resolvedFlowId);
+    for (const [key, template] of Object.entries(def.contextDefaults ?? {})) {
+      if (!context[key]) {
+        const value = template.replace(/\{\{(\w+)\}\}/g, (_, k: string) => context[k] ?? '');
+        if (value && !value.includes('{{')) {
+          context[key] = value;
+        }
+      }
+    }
   }
 }
 

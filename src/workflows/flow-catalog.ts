@@ -104,6 +104,8 @@ export interface BuiltInFlowDefinition {
   writeCapable: boolean;
   recipeCommands: string[];
   steps: FlowStep[];
+  /** Context keys to derive when missing. Values may contain {{key}} placeholders resolved from the current context. */
+  contextDefaults?: Record<string, string>;
 }
 
 const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
@@ -271,6 +273,7 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
     title: 'Guided Remediation',
     intent: 'Run controlled org-scope remediation with explicit human gates.',
     writeCapable: true,
+    contextDefaults: { updated_device_name: 'Remediated {{device_id}}' },
     recipeCommands: [
       'xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json --out ./artifacts/xyte-watch.before.ndjson',
       [
