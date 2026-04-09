@@ -327,6 +327,28 @@ async function recordStepFailure(
   return classification;
 }
 
+async function recordGatePending(
+  stepState: FlowRunStep,
+  opts: {
+    stepId: string;
+    requiresWrite: boolean;
+    detail: string;
+    decisionsPath: string;
+    decisions: FlowRunDecision[];
+  }
+): Promise<void> {
+  stepState.status = 'gate_pending';
+  const decision: FlowRunDecision = {
+    timestamp: nowIso(),
+    stepId: opts.stepId,
+    action: 'pending',
+    detail: opts.detail,
+    requiresWrite: opts.requiresWrite
+  };
+  opts.decisions.push(decision);
+  await appendNdjson(opts.decisionsPath, decision);
+}
+
 function buildReportInputNeedsDataMessage(stepId: string, inputStepId: string, cause: unknown): string {
   const base = `Step ${stepId} requires report-compatible output from ${inputStepId}.`;
   if (!(cause instanceof Error) || cause.message.trim().length === 0) {
@@ -939,32 +961,26 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
 
       if (step.kind === 'gate') {
         if (args.mode === 'plan') {
-          stepState.status = 'gate_pending';
-          const decision: FlowRunDecision = {
-            timestamp: nowIso(),
+          await recordGatePending(stepState, {
             stepId: step.id,
-            action: 'pending',
+            requiresWrite: step.mutating,
             detail: 'Plan mode paused at human decision gate.',
-            requiresWrite: step.mutating
-          };
-          decisions.push(decision);
-          await appendNdjson(ctx.decisionsPath, decision);
+            decisionsPath: ctx.decisionsPath,
+            decisions
+          });
           outcome = 'pending_gate';
           nextStepIndex = index;
           break;
         }
 
         if (gateApprovalsThisRun >= 1) {
-          stepState.status = 'gate_pending';
-          const decision: FlowRunDecision = {
-            timestamp: nowIso(),
+          await recordGatePending(stepState, {
             stepId: step.id,
-            action: 'pending',
+            requiresWrite: step.mutating,
             detail: 'Single-gate apply limit reached for this invocation.',
-            requiresWrite: step.mutating
-          };
-          decisions.push(decision);
-          await appendNdjson(ctx.decisionsPath, decision);
+            decisionsPath: ctx.decisionsPath,
+            decisions
+          });
           outcome = 'pending_gate';
           nextStepIndex = index;
           break;

@@ -22,6 +22,30 @@ import { confirmWriteWithToken, openActionPalette } from '../actions';
 import { asRecord } from '../../utils/json';
 import { errorMessage } from '../../utils/error-format';
 
+function renderTicketFallbackTable(
+  list: blessed.Widgets.ListTableElement | undefined,
+  filtered: unknown[],
+  selectionSync: SelectionSyncState
+): void {
+  if (!list) return;
+  setListTableData(
+    list,
+    [
+      ['ID', 'Status', 'Priority', 'Subject'],
+      ...filtered.map((ticket, index) => {
+        const r = asRecord(ticket);
+        return [
+          String(r.id ?? r._id ?? `row-${index + 1}`),
+          String(r.status ?? r.state ?? 'unknown'),
+          String(r.priority ?? 'n/a'),
+          String(r.subject ?? r.title ?? 'n/a')
+        ];
+      })
+    ],
+    selectionSync
+  );
+}
+
 function ticketIdOf(ticket: unknown): string {
   const r = asRecord(ticket);
   return String(r.id ?? r._id ?? '');
@@ -224,22 +248,7 @@ export function createTicketsScreen(): TuiScreen {
 
     try {
       if (renderErrors.frozen) {
-        setListTableData(
-          list,
-          [
-            ['ID', 'Status', 'Priority', 'Subject'],
-            ...filtered.map((ticket, index) => {
-              const r = asRecord(ticket);
-              return [
-                String(r.id ?? r._id ?? `row-${index + 1}`),
-                String(r.status ?? r.state ?? 'unknown'),
-                String(r.priority ?? 'n/a'),
-                String(r.subject ?? r.title ?? 'n/a')
-              ];
-            })
-          ],
-          selectionSync
-        );
+        renderTicketFallbackTable(list, filtered, selectionSync);
         detail?.setContent('Render fallback mode enabled for ticket details.');
       } else {
         const panels = sceneFromTicketsState({
@@ -275,22 +284,7 @@ export function createTicketsScreen(): TuiScreen {
       const message = errorMessage(error);
       renderErrors.recordError(message);
       renderLog.onRenderError(message);
-      setListTableData(
-        list,
-        [
-          ['ID', 'Status', 'Priority', 'Subject'],
-          ...filtered.map((ticket, index) => {
-            const r = asRecord(ticket);
-            return [
-              String(r.id ?? r._id ?? `row-${index + 1}`),
-              String(r.status ?? r.state ?? 'unknown'),
-              String(r.priority ?? 'n/a'),
-              String(r.subject ?? r.title ?? 'n/a')
-            ];
-          })
-        ],
-        selectionSync
-      );
+      renderTicketFallbackTable(list, filtered, selectionSync);
       detail?.setContent(`Unable to render ticket detail safely.\nReason: ${message}`);
     }
     syncListSelection(list, selectedIndex, selectionSync);
