@@ -387,11 +387,15 @@ function evaluateFlowReadiness(ctx: RunContext, checkConnectivity: boolean) {
   });
 }
 
-function extractGetCommandsContextUpdates(data: unknown): Record<string, string> | undefined {
+function extractCallOutputContext(
+  data: unknown,
+  spec: { contextKey: string; arrayPath: string; valueField: string }
+): Record<string, string> | undefined {
   if (!isRecord(data)) return undefined;
-  const items = Array.isArray(data.items) ? data.items : [];
-  const first = items.find((item) => isRecord(item) && typeof item.command === 'string');
-  return first && typeof first.command === 'string' ? { command: first.command } : undefined;
+  const arr = data[spec.arrayPath];
+  if (!Array.isArray(arr)) return undefined;
+  const first = arr.find((item): item is Record<string, unknown> => isRecord(item) && typeof item[spec.valueField] === 'string');
+  return first ? { [spec.contextKey]: first[spec.valueField] as string } : undefined;
 }
 
 function handleInstallDoctor(_step: FlowTaskStep, _ctx: RunContext): TaskExecutionResult {
@@ -543,10 +547,9 @@ async function handleCall(step: FlowTaskStep, _stepIndex: number, ctx: RunContex
   });
   return {
     output: envelope,
-    contextUpdates:
-      step.call.endpointKey === 'organization.commands.getCommands'
-        ? extractGetCommandsContextUpdates(result.data)
-        : undefined
+    contextUpdates: step.call.outputContext
+      ? extractCallOutputContext(result.data, step.call.outputContext)
+      : undefined
   };
 }
 

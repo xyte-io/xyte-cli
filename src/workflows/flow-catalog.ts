@@ -59,6 +59,8 @@ export interface FlowTaskStep extends FlowStepBase {
     query?: Record<string, string | number | boolean | null | undefined>;
     body?: unknown;
     outputMode?: 'raw' | 'envelope';
+    /** Extract a context key from the response: find the first item in arrayPath that has a string valueField. */
+    outputContext?: { contextKey: string; arrayPath: string; valueField: string };
   };
   utilityPrepare?: {
     actionKey: string;
@@ -340,7 +342,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
             page: 1,
             per_page: 20
           },
-          outputMode: 'envelope'
+          outputMode: 'envelope',
+          outputContext: { contextKey: 'command', arrayPath: 'items', valueField: 'command' }
         },
         requiresContext: ['device_id'],
         mutating: false,
