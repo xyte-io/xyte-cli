@@ -2687,11 +2687,13 @@ describe('cli integration', () => {
 
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ id: 'org-1' }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' }
-        })
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ id: 'org-1' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        )
       )
     );
 
@@ -2729,11 +2731,13 @@ describe('cli integration', () => {
 
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ id: 'org-1' }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' }
-        })
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ id: 'org-1' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        )
       )
     );
 
@@ -3197,11 +3201,13 @@ describe('cli integration', () => {
 
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ id: 'org-1' }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' }
-        })
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ id: 'org-1' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        )
       )
     );
 
@@ -3266,11 +3272,13 @@ describe('cli integration', () => {
 
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ id: 'org-1' }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' }
-        })
+      vi.fn().mockImplementation(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ id: 'org-1' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          })
+        )
       )
     );
 
