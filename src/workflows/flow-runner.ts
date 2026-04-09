@@ -70,6 +70,7 @@ interface RunContext {
 interface TaskExecutionResult {
   output?: unknown;
   artifactPath?: string;
+  primaryOutputPath?: string;
   watchFrames?: WatchFrameV1[];
   contextUpdates?: Record<string, string>;
   failureDetail?: string;
@@ -362,20 +363,8 @@ function buildReportInputNeedsDataMessage(stepId: string, inputStepId: string, c
   return `${base} ${cause.message}`;
 }
 
-function extractPrimaryOutputPath(value: unknown): string | undefined {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-  if (typeof value.outputPath === 'string') {
-    return value.outputPath;
-  }
-  if (isRecord(value.artifacts) && typeof value.artifacts.primary === 'string') {
-    return value.artifacts.primary;
-  }
-  if (typeof value.reportPath === 'string') {
-    return value.reportPath;
-  }
-  return undefined;
+function extractPrimaryOutputPath(result: TaskExecutionResult): string | undefined {
+  return result.primaryOutputPath;
 }
 
 function evaluateFlowReadiness(ctx: RunContext, checkConnectivity: boolean) {
@@ -480,7 +469,7 @@ async function handleReportGenerate(step: FlowTaskStep, ctx: RunContext): Promis
       includeSensitive: report.includeSensitive === true
     });
   }
-  return { output: generated, artifactPath: outPath };
+  return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
 }
 
 async function handleWatch(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
@@ -575,7 +564,7 @@ function handleUtilityPrepare(step: FlowTaskStep, _stepIndex: number, ctx: RunCo
   });
   const contextKey = UTILITY_PREPARE_CONTEXT_KEY[step.utilityPrepare.actionKey];
   const contextUpdates: Record<string, string> = contextKey ? { [contextKey]: result.artifacts.primary } : {};
-  return { output: result, contextUpdates };
+  return { output: result, primaryOutputPath: result.artifacts.primary, contextUpdates };
 }
 
 async function handleDeviceMatch(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
@@ -593,7 +582,7 @@ async function handleDeviceMatch(step: FlowTaskStep, _stepIndex: number, ctx: Ru
     outputPath,
     tenantId: ctx.args.tenantId
   });
-  return { output: result };
+  return { output: result, primaryOutputPath: outputPath };
 }
 
 async function handleDeviceMoveBatch(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
@@ -612,6 +601,7 @@ async function handleDeviceMoveBatch(step: FlowTaskStep, _stepIndex: number, ctx
   });
   return {
     output: result,
+    primaryOutputPath: reportPath,
     contextUpdates: step.deviceMoveBatch.apply
       ? { execute_moves_report_path: reportPath }
       : { dry_run_moves_report_path: reportPath },
@@ -1060,7 +1050,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
           ctx.taskOutputs.set(step.id, result.output);
         }
 
-        const primaryOutputPath = extractPrimaryOutputPath(result.output);
+        const primaryOutputPath = extractPrimaryOutputPath(result);
         if (primaryOutputPath) {
           ctx.resolvedContext[`${step.id}_output`] = primaryOutputPath;
         }
