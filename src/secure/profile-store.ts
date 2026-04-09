@@ -204,8 +204,14 @@ export class FileProfileStore implements ProfileStore {
       }
       return this.normalize(parsed).data;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      const errno = error as NodeJS.ErrnoException;
+      if (errno.code === 'ENOENT') {
         return structuredClone(DEFAULT_DATA);
+      }
+      if (errno.code === 'EACCES' || errno.code === 'EPERM' || errno.code === 'EROFS' || errno.code === 'ENOTDIR') {
+        throw new Error(
+          `Cannot read profile store at ${this.filePath}. Check file permissions or directory access (error=${errno.code}).`
+        );
       }
       throw error;
     }

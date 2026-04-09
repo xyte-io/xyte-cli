@@ -23,6 +23,7 @@ export interface PartnerEndpointOutcome {
   attempted: number;
   succeeded: number;
   failed: number;
+  lastError?: string;
 }
 
 export interface PartnerEnrichmentSnapshot {

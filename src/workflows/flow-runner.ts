@@ -866,17 +866,17 @@ interface ResumeState {
 
 async function loadResumeState(resumeBundle: string): Promise<ResumeState> {
   const manifestPath = path.join(resumeBundle, 'manifest.json');
+  let raw: string;
+  try {
+    raw = await readFile(manifestPath, 'utf8');
+  } catch {
+    throw new Error(`Resume bundle manifest could not be read: ${manifestPath}`);
+  }
   let existingSummary: FlowRunSummary;
   try {
-    const raw = await readFile(manifestPath, 'utf8');
-    try {
-      existingSummary = JSON.parse(raw) as FlowRunSummary;
-    } catch {
-      throw new Error(`Resume bundle manifest is invalid JSON: ${manifestPath}`);
-    }
-  } catch (err) {
-    if (err instanceof Error && err.message.includes('invalid JSON')) throw err;
-    throw new Error(`Resume bundle manifest could not be read: ${manifestPath}`);
+    existingSummary = JSON.parse(raw) as FlowRunSummary;
+  } catch {
+    throw new Error(`Resume bundle manifest is invalid JSON: ${manifestPath}`);
   }
   const storedInputs = await readStoredInputs(resumeBundle);
   return {

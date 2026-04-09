@@ -37,8 +37,9 @@ async function safeCall(
     const value = await withTimeout(operation, PARTNER_ENRICHMENT_TIMEOUT_MS);
     outcome.succeeded += 1;
     return value;
-  } catch {
+  } catch (error) {
     outcome.failed += 1;
+    outcome.lastError = error instanceof Error ? error.message : String(error);
     return undefined;
   }
 }
