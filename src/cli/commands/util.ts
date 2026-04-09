@@ -198,7 +198,7 @@ async function handleUtilMatch(
       suggestedCommands: ['Use --out <path>']
     });
   }
-  const result = runDeviceMatch({
+  const result = await runDeviceMatch({
     sourcePath: options.source,
     targetPath: options.target,
     sourceField: options.sourceField,

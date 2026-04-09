@@ -4,6 +4,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import { buildCallEnvelope } from '../contracts/call-envelope';
+import { UTILITY_BATCH_SCHEMA_VERSION } from '../contracts/versions';
 import {
   buildFlowRunSummary,
   type FlowRunClassification,
@@ -384,12 +385,12 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
       const verificationFromStepId = report.verificationFromStepId;
       let generated;
       if (fleetFromStepId && verificationFromStepId) {
-        if (reportInput.schemaVersion !== 'xyte.utility.batch.v1' || reportInput.command !== 'device.move') {
+        if (reportInput.schemaVersion !== UTILITY_BATCH_SCHEMA_VERSION || reportInput.command !== 'device.move') {
           throw new FlowNeedsInputError(
             `Step ${step.id} requires device.move batch output from ${report.inputFromStepId}.`
           );
         }
-        generated = generateDeviceMigrationReport({
+        generated = await generateDeviceMigrationReport({
           execution: reportInput,
           fleet: ctx.taskOutputs.get(fleetFromStepId),
           verification: ctx.taskOutputs.get(verificationFromStepId),
