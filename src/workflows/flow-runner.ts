@@ -360,15 +360,11 @@ function evaluateFlowReadiness(ctx: RunContext, checkConnectivity: boolean) {
   });
 }
 
-function extractCallContextUpdates(endpointKey: string, data: unknown): Record<string, string> | undefined {
-  if (endpointKey === 'organization.commands.getCommands' && isRecord(data)) {
-    const items = Array.isArray(data.items) ? data.items : [];
-    const first = items.find((item) => isRecord(item) && typeof item.command === 'string');
-    if (first && typeof first.command === 'string') {
-      return { command: first.command };
-    }
-  }
-  return undefined;
+function extractGetCommandsContextUpdates(data: unknown): Record<string, string> | undefined {
+  if (!isRecord(data)) return undefined;
+  const items = Array.isArray(data.items) ? data.items : [];
+  const first = items.find((item) => isRecord(item) && typeof item.command === 'string');
+  return first && typeof first.command === 'string' ? { command: first.command } : undefined;
 }
 
 async function handleInstallDoctor(_step: FlowTaskStep, _ctx: RunContext): Promise<TaskExecutionResult> {
@@ -430,10 +426,17 @@ async function handleReportGenerate(step: FlowTaskStep, ctx: RunContext): Promis
         `Step ${step.id} requires device.move batch output from ${report.inputFromStepId}.`
       );
     }
+    const fleetInput = ctx.taskOutputs.get(fleetFromStepId);
+    const verificationInput = ctx.taskOutputs.get(verificationFromStepId);
+    if (!fleetInput || typeof fleetInput !== 'object') {
+      throw new FlowNeedsInputError(
+        `Step ${step.id}: fleet snapshot from ${fleetFromStepId} is missing or invalid.`
+      );
+    }
     generated = generateDeviceMigrationReport({
       execution: reportInput,
-      fleet: ctx.taskOutputs.get(fleetFromStepId),
-      verification: ctx.taskOutputs.get(verificationFromStepId),
+      fleet: fleetInput,
+      verification: verificationInput,
       tenantId: ctx.args.tenantId,
       outPath
     });
@@ -513,7 +516,10 @@ async function handleCall(step: FlowTaskStep, _stepIndex: number, ctx: RunContex
   });
   return {
     output: envelope,
-    contextUpdates: extractCallContextUpdates(step.call.endpointKey, result.data)
+    contextUpdates:
+      step.call.endpointKey === 'organization.commands.getCommands'
+        ? extractGetCommandsContextUpdates(result.data)
+        : undefined
   };
 }
 
@@ -557,7 +563,7 @@ async function handleDeviceMatch(step: FlowTaskStep, _stepIndex: number, ctx: Ru
     outputPath,
     tenantId: ctx.args.tenantId
   });
-  return { output: result, contextUpdates: { match_csv: result.outputPath, match_summary_json: result.summaryPath } };
+  return { output: result };
 }
 
 async function handleDeviceMoveBatch(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {

@@ -14,7 +14,7 @@ import { SCREEN_PANE_CONFIG } from '../panes';
 import { sceneFromConfigState } from '../scene';
 import { runKeyCreateWizard, runKeyUpdateWizard } from '../key-wizard';
 import type { SecretProvider } from '../../types/profile';
-import { PROVIDER_ORG, PROVIDER_PARTNER, SUPPORTED_SECRET_PROVIDERS } from '../../types/profile';
+import { PROVIDER_ORG, SUPPORTED_SECRET_PROVIDERS } from '../../types/profile';
 import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
 
 const PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];

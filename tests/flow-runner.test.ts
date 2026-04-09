@@ -572,7 +572,7 @@ describe('flow runner', () => {
     const plannedInputs = JSON.parse(readFileSync(plan.inputsPath, 'utf8'));
     expect(plannedInputs.context.inventory_source_artifact).toBeDefined();
     expect(plannedInputs.context.inventory_target_artifact).toBeDefined();
-    expect(plannedInputs.context.match_csv).toContain('device-moves.csv');
+    expect(plannedInputs.context.match_devices_output).toContain('device-moves.csv');
     expect(plan.steps.find((item) => item.stepId === 'inventory_target')?.command).toBe(
       'xyte-cli api call organization.spaces.getSpaces --tenant <tenant-id> --query path_includes=<target-path> --output json > ./artifacts/target-spaces.json'
     );
