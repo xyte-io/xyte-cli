@@ -179,7 +179,7 @@ export class FileSecretStore implements SecretStore {
         // Best-effort migration: continue returning normalized data even if we cannot write.
         // This avoids breaking reads when the secrets file is readable but not writable (e.g. read-only filesystem).
          
-        getLogger().warn({ file: this.filePath, error: writeError }, 'Failed to persist normalized secret data');
+        getLogger().warn({ file: this.filePath, errorMessage: errorMessage(writeError) }, 'Failed to persist normalized secret data');
       }
     }
     return normalized;

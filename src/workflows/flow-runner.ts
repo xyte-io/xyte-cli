@@ -371,7 +371,7 @@ async function handleInstallDoctor(_step: FlowTaskStep, _ctx: RunContext): Promi
   return { output: buildInstallDoctorReport(path.resolve(__dirname, '../../dist/bin/xyte-cli.js')) };
 }
 
-async function handleSetupStatus(step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
+async function handleSetupStatus(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
   const readiness = await evaluateFlowReadiness(ctx, true);
   if (readiness.state !== 'ready') {
     throw new FlowNeedsInputError(`Setup status is ${readiness.state}. Run setup before continuing.`);
@@ -379,7 +379,7 @@ async function handleSetupStatus(step: FlowTaskStep, ctx: RunContext): Promise<T
   return { output: readiness };
 }
 
-async function handleConfigDoctor(step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
+async function handleConfigDoctor(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
   const readiness = await evaluateFlowReadiness(ctx, true);
   if (readiness.connectionState !== 'connected') {
     throw new FlowNeedsInputError(
