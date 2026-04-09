@@ -441,10 +441,9 @@ async function handleSetupRunAdvanced(
     settings
   });
 
-  let tenantId = options.tenant ?? settings.values.defaults.tenant;
-  let tenantName = options.name;
-  let provider = options.provider ? parseProvider(options.provider) : undefined;
-  let slotName = options.slotName ?? 'primary';
+  const rawTenantId = options.tenant ?? settings.values.defaults.tenant;
+  const rawProvider = options.provider ? parseProvider(options.provider) : undefined;
+  const rawSlotName = options.slotName ?? 'primary';
   const keyValue = await resolveKeyValue({
     key: options.key,
     keyFile: options.keyFile,
@@ -456,15 +455,21 @@ async function handleSetupRunAdvanced(
     promptQuestion: 'API key',
     stdout: ctx.stdout
   });
-  if (!options.nonInteractive) {
-    tenantId = tenantId || (await ctx.prompt({ question: 'Tenant id', stdout: ctx.stdout }));
-    tenantName =
-      tenantName || (await ctx.prompt({ question: 'Tenant display name', initial: tenantId, stdout: ctx.stdout }));
-    const providerAnswer =
-      provider || parseProvider(await ctx.prompt({ question: 'Provider', initial: PROVIDER_ORG, stdout: ctx.stdout }));
-    provider = providerAnswer;
-    slotName = await ctx.prompt({ question: 'Slot name', initial: slotName, stdout: ctx.stdout });
-  }
+
+  const tenantId = options.nonInteractive
+    ? rawTenantId
+    : rawTenantId || (await ctx.prompt({ question: 'Tenant id', stdout: ctx.stdout }));
+  const promptedTenantName = options.nonInteractive
+    ? options.name
+    : options.name ||
+      (await ctx.prompt({ question: 'Tenant display name', initial: tenantId, stdout: ctx.stdout }));
+  const provider = options.nonInteractive
+    ? rawProvider
+    : rawProvider ||
+      parseProvider(await ctx.prompt({ question: 'Provider', initial: PROVIDER_ORG, stdout: ctx.stdout }));
+  const slotName = options.nonInteractive
+    ? rawSlotName
+    : await ctx.prompt({ question: 'Slot name', initial: rawSlotName, stdout: ctx.stdout });
 
   if (!tenantId) {
     throw new CliUserError({
@@ -486,21 +491,19 @@ async function handleSetupRunAdvanced(
     });
   }
 
-  const { provider: resolvedProvider, tenantName: resolvedTenantName } = await resolveProviderAndTenantName(ctx, {
+  const { provider: resolvedProvider, tenantName } = await resolveProviderAndTenantName(ctx, {
     tenantId,
-    candidateTenantName: (tenantName?.trim() || tenantId).trim() || tenantId,
+    candidateTenantName: (promptedTenantName?.trim() || tenantId).trim() || tenantId,
     keyValue,
     provider,
     connectivityMode,
     explicitTenantName
   });
-  provider = resolvedProvider;
-  tenantName = resolvedTenantName;
 
   const result = await runSetupCore(ctx, {
     tenantId,
     tenantName,
-    provider,
+    provider: resolvedProvider,
     slotName,
     keyValue,
     setActive: options.setActive !== false,

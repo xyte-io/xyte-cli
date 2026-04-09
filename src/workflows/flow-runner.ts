@@ -152,6 +152,21 @@ function buildRunDirName(runId: string): string {
   return `${stamp}-${runId}`;
 }
 
+function extractWatchContextUpdates(frames: WatchFrameV1[]): Record<string, string> | undefined {
+  if (frames.length === 0 || !Array.isArray(frames[0].items) || frames[0].items.length === 0) {
+    return undefined;
+  }
+  const first = frames[0].items[0];
+  if (!isRecord(first)) {
+    return undefined;
+  }
+  const updates: Record<string, string> = {};
+  if (typeof first.device_id === 'string') updates.watch_device_id = first.device_id;
+  if (typeof first.uuid === 'string') updates.watch_incident_id = first.uuid;
+  if (typeof first.id === 'string') updates.watch_item_id = first.id;
+  return Object.keys(updates).length > 0 ? updates : undefined;
+}
+
 export function parseFlowVarOptions(values: string[] | undefined): Record<string, string> {
   const out: Record<string, string> = {};
   for (const entry of values ?? []) {
@@ -444,21 +459,7 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
         },
         artifactPath: watchStepPath,
         watchFrames: frames,
-        contextUpdates:
-          frames.length > 0 &&
-          Array.isArray(frames[0].items) &&
-          frames[0].items.length > 0 &&
-          isRecord(frames[0].items[0])
-            ? {
-                ...(typeof frames[0].items[0].device_id === 'string'
-                  ? { watch_device_id: String(frames[0].items[0].device_id) }
-                  : {}),
-                ...(typeof frames[0].items[0].uuid === 'string'
-                  ? { watch_incident_id: String(frames[0].items[0].uuid) }
-                  : {}),
-                ...(typeof frames[0].items[0].id === 'string' ? { watch_item_id: String(frames[0].items[0].id) } : {})
-              }
-            : undefined
+        contextUpdates: extractWatchContextUpdates(frames)
       };
     }
     case 'call': {
@@ -829,42 +830,71 @@ async function writeSummaryToManifest(summary: FlowRunSummary, manifestPath: str
   await writeFile(manifestPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
 }
 
+interface ResumeState {
+  runId: string;
+  bundleDir: string;
+  initialStartedAtUtc: string;
+  steps: FlowRunStep[];
+  cursorIndex: number;
+  priorDecisions: FlowRunDecision[];
+  priorErrors: FlowRunErrorEntry[];
+  resumedInspectProviderScope: InspectProviderScope | undefined;
+  resumedContext: Record<string, string>;
+}
+
+async function loadResumeState(resumeBundle: string): Promise<ResumeState> {
+  const manifestPath = path.join(resumeBundle, 'manifest.json');
+  let existingSummary: FlowRunSummary;
+  try {
+    existingSummary = JSON.parse(await readFile(manifestPath, 'utf8')) as FlowRunSummary;
+  } catch {
+    throw new Error(`Resume bundle manifest is invalid JSON: ${manifestPath}`);
+  }
+  const storedInputs = await readStoredInputs(resumeBundle);
+  return {
+    runId: existingSummary.runId,
+    bundleDir: resumeBundle,
+    initialStartedAtUtc: existingSummary.startedAtUtc,
+    steps: existingSummary.steps,
+    cursorIndex: existingSummary.cursor.nextStepIndex,
+    priorDecisions: await readLinesAsJson<FlowRunDecision>(path.join(resumeBundle, 'decisions.ndjson')),
+    priorErrors: await readLinesAsJson<FlowRunErrorEntry>(path.join(resumeBundle, 'errors.ndjson')),
+    resumedInspectProviderScope: await readStoredInspectProviderScope(resumeBundle),
+    resumedContext: toStringRecord(storedInputs?.context)
+  };
+}
+
+async function ensureRunPaths(ctx: RunContext): Promise<void> {
+  mkdirSync(ctx.stepsDir, { recursive: true });
+  mkdirSync(ctx.outputsDir, { recursive: true });
+  if (!existsSync(ctx.decisionsPath)) {
+    await writeFile(ctx.decisionsPath, '', 'utf8');
+  }
+  if (!existsSync(ctx.errorsPath)) {
+    await writeFile(ctx.errorsPath, '', 'utf8');
+  }
+  if (!existsSync(ctx.watchFramesPath)) {
+    await writeFile(ctx.watchFramesPath, '', 'utf8');
+  }
+}
+
 export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Promise<FlowRunSummary> {
   const outRoot = path.resolve(args.outDir);
   const resumeBundle = args.resume ? await findRunBundle(outRoot, args.resume) : undefined;
 
-  let runId: string = randomUUID();
-  let bundleDir = path.join(outRoot, sanitizeFlowId(args.flowId), buildRunDirName(runId));
-  let initialStartedAtUtc = nowIso();
-  let steps = createInitialSteps(args.definition);
-  let cursorIndex = 0;
-  let priorDecisions: FlowRunDecision[] = [];
-  let priorErrors: FlowRunErrorEntry[] = [];
-  let resumedInspectProviderScope: InspectProviderScope | undefined;
-  let resumedContext: Record<string, string> = {};
+  const freshRunId = randomUUID();
+  const resume = resumeBundle ? await loadResumeState(resumeBundle) : undefined;
+  const runId = resume?.runId ?? freshRunId;
+  const bundleDir =
+    resume?.bundleDir ?? path.join(outRoot, sanitizeFlowId(args.flowId), buildRunDirName(freshRunId));
+  const initialStartedAtUtc = resume?.initialStartedAtUtc ?? nowIso();
+  const steps = resume?.steps ?? createInitialSteps(args.definition);
+  const cursorIndex = resume?.cursorIndex ?? 0;
+  const priorDecisions = resume?.priorDecisions ?? [];
+  const priorErrors = resume?.priorErrors ?? [];
 
-  if (resumeBundle) {
-    const manifestPath = path.join(resumeBundle, 'manifest.json');
-    let existingSummary: FlowRunSummary;
-    try {
-      existingSummary = JSON.parse(await readFile(manifestPath, 'utf8')) as FlowRunSummary;
-    } catch {
-      throw new Error(`Resume bundle manifest is invalid JSON: ${manifestPath}`);
-    }
-    runId = existingSummary.runId;
-    bundleDir = resumeBundle;
-    initialStartedAtUtc = existingSummary.startedAtUtc;
-    steps = existingSummary.steps;
-    cursorIndex = existingSummary.cursor.nextStepIndex;
-    priorDecisions = await readLinesAsJson<FlowRunDecision>(path.join(resumeBundle, 'decisions.ndjson'));
-    priorErrors = await readLinesAsJson<FlowRunErrorEntry>(path.join(resumeBundle, 'errors.ndjson'));
-    const storedInputs = await readStoredInputs(resumeBundle);
-    resumedInspectProviderScope = await readStoredInspectProviderScope(resumeBundle);
-    resumedContext = toStringRecord(storedInputs?.context);
-  }
-
-  const effectiveInspectProviderScope = args.inspectProviderScope ?? resumedInspectProviderScope ?? 'auto';
-  const restoredTaskOutputs = resumeBundle ? await restoreTaskOutputsFromSteps(steps) : new Map<string, unknown>();
+  const effectiveInspectProviderScope = args.inspectProviderScope ?? resume?.resumedInspectProviderScope ?? 'auto';
+  const restoredTaskOutputs = resume ? await restoreTaskOutputsFromSteps(steps) : new Map<string, unknown>();
   const ctx: RunContext = {
     args: {
       ...args,
@@ -879,24 +909,13 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
     errorsPath: path.join(bundleDir, 'errors.ndjson'),
     watchFramesPath: path.join(bundleDir, 'watch-frames.ndjson'),
     resolvedContext: {
-      ...resumedContext,
+      ...(resume?.resumedContext ?? {}),
       ...args.context
     },
     taskOutputs: restoredTaskOutputs
   };
 
-  mkdirSync(ctx.stepsDir, { recursive: true });
-  mkdirSync(ctx.outputsDir, { recursive: true });
-  if (!existsSync(ctx.decisionsPath)) {
-    await writeFile(ctx.decisionsPath, '', 'utf8');
-  }
-  if (!existsSync(ctx.errorsPath)) {
-    await writeFile(ctx.errorsPath, '', 'utf8');
-  }
-  if (!existsSync(ctx.watchFramesPath)) {
-    await writeFile(ctx.watchFramesPath, '', 'utf8');
-  }
-
+  await ensureRunPaths(ctx);
   await persistFlowRunInputs(ctx, args, effectiveInspectProviderScope);
 
   const runStartedAt = Date.now();
