@@ -21,25 +21,6 @@ interface DeviceMatchRow {
   status: MatchStatus;
 }
 
-export interface DeviceMatchResult {
-  schemaVersion: typeof DEVICE_MATCH_SCHEMA_VERSION;
-  generatedAtUtc: string;
-  tenantId?: string;
-  sourcePath: string;
-  targetPath: string;
-  sourceField: string;
-  targetField: string;
-  outputPath: string;
-  summaryPath: string;
-  totals: {
-    rows: number;
-    exact: number;
-    fuzzy: number;
-    unmatched: number;
-  };
-  matches: DeviceMatchRow[];
-}
-
 const DeviceMatchRowSchema = z.object({
   deviceId: z.string(),
   deviceName: z.string(),
@@ -67,6 +48,8 @@ export const DeviceMatchResultSchema = z.object({
   }),
   matches: z.array(DeviceMatchRowSchema)
 });
+
+export type DeviceMatchResult = z.infer<typeof DeviceMatchResultSchema>;
 
 interface MatchTarget {
   id: string;

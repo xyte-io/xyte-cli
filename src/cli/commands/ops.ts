@@ -5,6 +5,7 @@ import type { Command } from 'commander';
 
 import { DEFAULT_WATCH_PROFILE, type WatchFrameV1, type WatchProfile } from '../../contracts/watch-frame';
 import { CliUserError } from '../../contracts/user-error';
+import { INSPECT_DEEP_DIVE_SCHEMA_VERSION } from '../../contracts/versions';
 import { errorMessage } from '../../utils/error-format';
 import { isRecord } from '../../utils/json';
 import { stringifyJsonOutput } from '../../utils/json-output';
@@ -407,7 +408,7 @@ async function handleOpsReportGenerate(
   }
 
   let reportInput = parseReportInput(raw, tenantId);
-  if (reportInput.schemaVersion === 'xyte.inspect.deep-dive.v1' && !reportInput.tenantName) {
+  if (reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION && !reportInput.tenantName) {
     const tenantProfile = await ctx.profileStore.getTenant(tenantId);
     if (tenantProfile?.name) {
       reportInput = {
@@ -419,12 +420,12 @@ async function handleOpsReportGenerate(
   const render = resolveRenderMode(
     options,
     ['markdown', 'pdf'],
-    reportInput.schemaVersion === 'xyte.inspect.deep-dive.v1' ? 'pdf' : 'markdown'
+    reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION ? 'pdf' : 'markdown'
   );
 
   const includeSensitive = options.includeSensitive === true || settings.values.report.includeSensitive;
   const generated =
-    reportInput.schemaVersion === 'xyte.inspect.deep-dive.v1'
+    reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION
       ? await generateOpsReport({ input: reportInput, tenantId, format: render, outPath: options.out, includeSensitive })
       : await generateOpsReport({
           input: reportInput,

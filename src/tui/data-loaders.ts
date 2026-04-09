@@ -238,7 +238,7 @@ function normalizeIncidentItem(incident: unknown): Record<string, unknown> {
 
 export async function loadIncidentsData(
   client: XyteClient,
-  tenantId?: string,
+  tenantId: string | undefined,
   options: IncidentsLoadOptions = {}
 ): Promise<LoadOutcome<unknown[]>> {
   return loadWithOutcome(async () => {
@@ -311,7 +311,7 @@ interface TicketsLoadResult {
   tickets: unknown[];
 }
 
-export async function loadTicketsData(client: XyteClient, tenantId?: string): Promise<LoadOutcome<TicketsLoadResult>> {
+export async function loadTicketsData(client: XyteClient, tenantId: string | undefined): Promise<LoadOutcome<TicketsLoadResult>> {
   const orgOutcome = await loadWithOutcome(async () => {
     const org = await client.organization.getTickets({ tenantId });
     return extractArray(org, ['tickets', 'data', 'items']);
@@ -362,7 +362,7 @@ interface SpacesLoadOptions {
 
 export async function loadSpacesData(
   client: XyteClient,
-  tenantId?: string,
+  tenantId: string | undefined,
   options: SpacesLoadOptions = {}
 ): Promise<LoadOutcome<unknown[]>> {
   return loadWithOutcome(async () => {

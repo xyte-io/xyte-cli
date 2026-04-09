@@ -4,7 +4,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import { buildCallEnvelope } from '../contracts/call-envelope';
-import { UTILITY_BATCH_SCHEMA_VERSION } from '../contracts/versions';
+import { INSPECT_DEEP_DIVE_SCHEMA_VERSION, UTILITY_BATCH_SCHEMA_VERSION } from '../contracts/versions';
 import {
   buildFlowRunSummary,
   type FlowRunClassification,
@@ -363,9 +363,6 @@ function buildReportInputNeedsDataMessage(stepId: string, inputStepId: string, c
   return `${base} ${cause.message}`;
 }
 
-function extractPrimaryOutputPath(result: TaskExecutionResult): string | undefined {
-  return result.primaryOutputPath;
-}
 
 function evaluateFlowReadiness(ctx: RunContext, checkConnectivity: boolean) {
   return evaluateReadiness({
@@ -463,7 +460,7 @@ async function handleReportGenerate(step: FlowTaskStep, ctx: RunContext): Promis
   } else {
     const includeSensitive = report.includeSensitive === true;
     generated =
-      reportInput.schemaVersion === 'xyte.inspect.deep-dive.v1'
+      reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION
         ? await generateOpsReport({ input: reportInput, tenantId: ctx.args.tenantId, format: report.format, outPath, includeSensitive })
         : await generateOpsReport({ input: reportInput, tenantId: ctx.args.tenantId, format: 'markdown', outPath, includeSensitive });
   }
@@ -1048,7 +1045,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
           ctx.taskOutputs.set(step.id, result.output);
         }
 
-        const primaryOutputPath = extractPrimaryOutputPath(result);
+        const primaryOutputPath = result.primaryOutputPath;
         if (primaryOutputPath) {
           ctx.resolvedContext[`${step.id}_output`] = primaryOutputPath;
         }
