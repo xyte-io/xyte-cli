@@ -503,7 +503,7 @@ export function getSpaceName(space: unknown): string {
 
 const CONFIG_PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
 
-export interface ConfigProviderRow {
+interface ConfigProviderRow {
   provider: SecretProvider;
   slotCount: number;
   activeSlot: string;
@@ -511,7 +511,7 @@ export interface ConfigProviderRow {
   lastValidatedAt?: string;
 }
 
-export interface ConfigSlotRow {
+interface ConfigSlotRow {
   provider: SecretProvider;
   slotId: string;
   name: string;
@@ -520,7 +520,7 @@ export interface ConfigSlotRow {
   fingerprint: string;
 }
 
-export interface ConfigData {
+interface ConfigData {
   providerRows: ConfigProviderRow[];
   selectedProvider: SecretProvider;
   slotRows: ConfigSlotRow[];

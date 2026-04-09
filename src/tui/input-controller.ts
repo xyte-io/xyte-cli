@@ -32,7 +32,7 @@ function defaultIsCritical(event: InputEvent): boolean {
   return event.ch === 'q' || event.key.name === 'q' || event.key.full === 'C-c';
 }
 
-export interface InputController {
+interface InputController {
   dispatch: (event: InputEvent) => InputDispatchResult;
   getState: () => InputControllerState;
   clear: () => void;
