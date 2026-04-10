@@ -50,7 +50,7 @@ const SIMPLE_SETUP_DEFAULT_TENANT = 'default';
 function parseSetupConnectivityMode(value: string | undefined): SetupConnectivityMode {
   const normalized = (value ?? 'auto').trim().toLowerCase();
   if (normalized !== 'auto' && normalized !== 'always' && normalized !== 'never') {
-    throw new Error(`Invalid connectivity mode: ${value}. Use auto|always|never.`);
+    throw new CliUserError({ summary: `Invalid connectivity mode: "${value}". Use auto|always|never.` });
   }
   return normalized as SetupConnectivityMode;
 }

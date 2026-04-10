@@ -75,7 +75,7 @@ function resolveRenderMode<T extends string>(options: { render?: string; format?
 function parseWatchProfile(value: string | undefined): WatchProfile {
   const normalized = (value ?? DEFAULT_WATCH_PROFILE).trim().toLowerCase();
   if (normalized !== DEFAULT_WATCH_PROFILE) {
-    throw new Error(`Invalid watch profile: ${value}. Use ${DEFAULT_WATCH_PROFILE}.`);
+    throw new CliUserError({ summary: `Invalid watch profile: "${value}". Use ${DEFAULT_WATCH_PROFILE}.` });
   }
   return normalized as WatchProfile;
 }
@@ -83,10 +83,10 @@ function parseWatchProfile(value: string | undefined): WatchProfile {
 function parseWatchIntervalMs(value: string | undefined): number {
   const parsed = Number.parseInt(value ?? '2000', 10);
   if (!Number.isFinite(parsed)) {
-    throw new Error(`Invalid interval: ${value}.`);
+    throw new CliUserError({ summary: `Invalid interval: "${value}".`, suggestedCommands: ['Use --interval <ms> with a positive integer'] });
   }
   if (parsed < WATCH_MIN_INTERVAL_MS) {
-    throw new Error(`Invalid interval: ${parsed}. Minimum is ${WATCH_MIN_INTERVAL_MS}ms.`);
+    throw new CliUserError({ summary: `Invalid interval: ${parsed}ms. Minimum is ${WATCH_MIN_INTERVAL_MS}ms.` });
   }
   return parsed;
 }
@@ -97,10 +97,10 @@ function parseWatchMaxPolls(value: string | undefined): number | undefined {
   }
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`Invalid max-polls: ${value}. Use a positive integer.`);
+    throw new CliUserError({ summary: `Invalid max-polls: "${value}". Use a positive integer.` });
   }
   if (parsed > WATCH_MAX_POLLS) {
-    throw new Error(`Invalid max-polls: ${value}. Maximum is ${WATCH_MAX_POLLS}.`);
+    throw new CliUserError({ summary: `Invalid max-polls: ${value}. Maximum is ${WATCH_MAX_POLLS}.` });
   }
   return parsed;
 }

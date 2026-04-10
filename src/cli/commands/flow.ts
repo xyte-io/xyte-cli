@@ -18,10 +18,11 @@ import {
 } from '../../workflows/flow-user-definitions';
 import { parseInspectProviderScope } from '../../types/settings-enums';
 import { type CliContext, printJson } from '../cli-context';
+import { CliUserError } from '../../contracts/user-error';
 
 function parseFlowMode(options: { plan?: boolean; apply?: boolean }): FlowRunMode {
   if (options.apply === true && options.plan === true) {
-    throw new Error('Cannot specify both --plan and --apply.');
+    throw new CliUserError({ summary: 'Cannot specify both --plan and --apply.' });
   }
   if (options.apply === true) {
     return 'apply';
@@ -39,10 +40,10 @@ function parseFlowContextJson(value: string | undefined): Record<string, string>
     parsed = JSON.parse(raw);
   } catch (error) {
     const detail = error instanceof SyntaxError ? `: ${error.message}` : '';
-    throw new Error(`Failed to parse context JSON at "${value}"${detail}`);
+    throw new CliUserError({ summary: `Failed to parse context JSON at "${value}"${detail}` });
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new Error(`Context JSON at "${value}" must be a plain object.`);
+    throw new CliUserError({ summary: `Context JSON at "${value}" must be a plain object.` });
   }
   const result: Record<string, string> = {};
   for (const [key, val] of Object.entries(parsed as Record<string, unknown>)) {
@@ -113,7 +114,7 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
         }
       ) => {
         if (!hasBuiltInFlowDefinition(options.basedOn)) {
-          throw new Error(`Custom flows must be based on a built-in flow id. Unknown: ${options.basedOn}`);
+          throw new CliUserError({ summary: `Custom flows must be based on a built-in flow id. Unknown: ${options.basedOn}` });
         }
         const defaults = {
           ...parseFlowContextJson(options.contextJson),
@@ -159,7 +160,7 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
         }
       ) => {
         if (options.basedOn && !hasBuiltInFlowDefinition(options.basedOn)) {
-          throw new Error(`Custom flows must be based on a built-in flow id. Unknown: ${options.basedOn}`);
+          throw new CliUserError({ summary: `Custom flows must be based on a built-in flow id. Unknown: ${options.basedOn}` });
         }
         const mergedDefaults = {
           ...parseFlowContextJson(options.contextJson),
@@ -195,7 +196,7 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
     .action(async (options: { file: string; force?: boolean }) => {
       const imported = await importFlowDefinition({ filePath: options.file, force: options.force === true });
       if (!hasBuiltInFlowDefinition(imported.basedOn)) {
-        throw new Error(`Imported flow ${imported.id} references unknown built-in base flow: ${imported.basedOn}`);
+        throw new CliUserError({ summary: `Imported flow ${imported.id} references unknown built-in base flow: ${imported.basedOn}` });
       }
       printJson(ctx.stdout, imported);
     });
@@ -249,10 +250,10 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
         if (!hasBuiltInFlowDefinition(flowId)) {
           const custom = await getFlowDefinition(flowId);
           if (!custom) {
-            throw new Error(`Unknown flow id: ${flowId}`);
+            throw new CliUserError({ summary: `Unknown flow id: ${flowId}` });
           }
           if (!hasBuiltInFlowDefinition(custom.basedOn)) {
-            throw new Error(`Custom flow ${flowId} references unknown built-in base flow: ${custom.basedOn}`);
+            throw new CliUserError({ summary: `Custom flow ${flowId} references unknown built-in base flow: ${custom.basedOn}` });
           }
           resolvedFlowId = custom.basedOn;
           defaults = custom.defaults;
