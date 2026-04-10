@@ -71,6 +71,18 @@ function resolveRenderMode<T extends string>(options: { render?: string; format?
   return render as T;
 }
 
+function requireTenantId(tenantId: string | undefined, commandLabel: string): asserts tenantId is string {
+  if (!tenantId) {
+    throw new CliUserError({
+      summary: `Missing tenant for ${commandLabel}.`,
+      suggestedCommands: [
+        'Use --tenant <tenant-id>',
+        'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>'
+      ]
+    });
+  }
+}
+
 function parseWatchProfile(value: string | undefined): WatchProfile {
   const normalized = (value ?? DEFAULT_WATCH_PROFILE).trim().toLowerCase();
   if (normalized !== DEFAULT_WATCH_PROFILE) {
@@ -261,15 +273,7 @@ async function fetchInspectContext(
   }
   const settings = await ctx.resolveSettings(overrides);
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
-  if (!tenantId) {
-    throw new CliUserError({
-      summary: `Missing tenant for ${options.commandLabel}.`,
-      suggestedCommands: [
-        'Use --tenant <tenant-id>',
-        'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>'
-      ]
-    });
-  }
+  requireTenantId(tenantId, options.commandLabel);
   const providerScope =
     (overrides['ops.providerScope'] as InspectProviderScope | undefined) ?? settings.values.ops.providerScope;
   const client = await ctx.withClient({ tenantId, flagOverrides: overrides });
@@ -380,15 +384,7 @@ async function handleOpsReportGenerate(
   }
   const settings = await ctx.resolveSettings(overrides);
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
-  if (!tenantId) {
-    throw new CliUserError({
-      summary: 'Missing tenant for ops report generate.',
-      suggestedCommands: [
-        'Use --tenant <tenant-id>',
-        'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>'
-      ]
-    });
-  }
+  requireTenantId(tenantId, 'ops report generate');
   const inputPath = path.resolve(options.input);
   let raw: unknown;
   try {

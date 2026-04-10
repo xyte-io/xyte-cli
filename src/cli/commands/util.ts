@@ -26,6 +26,18 @@ function parseUtilityPreparePrimaryFormat(value: string | undefined): UtilityPre
   return normalized as UtilityPreparePrimaryFormat;
 }
 
+function requireTenantId(tenantId: string | undefined, commandLabel: string): asserts tenantId is string {
+  if (!tenantId) {
+    throw new CliUserError({
+      summary: `Missing tenant for ${commandLabel}.`,
+      suggestedCommands: [
+        'Use --tenant <tenant-id>',
+        'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>'
+      ]
+    });
+  }
+}
+
 function parseUtilityInputFormat(value: string | undefined): UtilityInputFormat {
   const normalized = (value ?? 'auto').trim().toLowerCase();
   const allowed: UtilityInputFormat[] = ['auto', 'csv', 'json', 'jsonl'];
@@ -112,15 +124,7 @@ async function handleUtilImportTree(
 ): Promise<void> {
   const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
-  if (!tenantId) {
-    throw new CliUserError({
-      summary: 'Missing tenant for util import-tree.',
-      suggestedCommands: [
-        'Use --tenant <tenant-id>',
-        'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>'
-      ]
-    });
-  }
+  requireTenantId(tenantId, 'util import-tree');
   const client = await ctx.withClient({ tenantId });
   const result = await runSpaceImportTree({
     client,
@@ -154,15 +158,7 @@ async function handleUtilMoveDevices(
 ): Promise<void> {
   const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
-  if (!tenantId) {
-    throw new CliUserError({
-      summary: 'Missing tenant for util move-devices.',
-      suggestedCommands: [
-        'Use --tenant <tenant-id>',
-        'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>'
-      ]
-    });
-  }
+  requireTenantId(tenantId, 'util move-devices');
   const client = await ctx.withClient({ tenantId });
   const result = await runMoveDevices({
     client,

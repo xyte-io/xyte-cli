@@ -52,7 +52,7 @@ interface SlotView {
   lastValidatedAt?: string;
 }
 
-async function resolveSlotByRef(
+async function fetchSlotByRef(
   profileStore: ProfileStore,
   tenantId: string,
   provider: SecretProvider,
@@ -533,7 +533,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
         keyStdin?: boolean;
       }) => {
         const provider = parseProvider(options.provider);
-        const slot = await resolveSlotByRef(ctx.profileStore, options.tenant, provider, options.slot);
+        const slot = await fetchSlotByRef(ctx.profileStore, options.tenant, provider, options.slot);
         const value = await resolveKeyValue({
           key: options.key,
           keyFile: options.keyFile,
@@ -580,7 +580,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
         });
       }
       const provider = parseProvider(options.provider);
-      const slot = await resolveSlotByRef(ctx.profileStore, options.tenant, provider, options.slot);
+      const slot = await fetchSlotByRef(ctx.profileStore, options.tenant, provider, options.slot);
       const secretStore = ctx.getSecretStore();
       await secretStore.clearSlotSecret(options.tenant, provider, slot.slotId);
       await ctx.profileStore.removeKeySlot(options.tenant, provider, slot.slotId);
@@ -598,7 +598,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
     .requiredOption('--slot <slotRef>', 'Slot id or name')
     .action(async (options: { tenant: string; provider: string; slot: string }) => {
       const provider = parseProvider(options.provider);
-      const slot = await resolveSlotByRef(ctx.profileStore, options.tenant, provider, options.slot);
+      const slot = await fetchSlotByRef(ctx.profileStore, options.tenant, provider, options.slot);
       const secretStore = ctx.getSecretStore();
       const secret = await secretStore.getSlotSecret(options.tenant, provider, slot.slotId);
       if (!secret) {
