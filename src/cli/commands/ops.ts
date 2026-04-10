@@ -32,6 +32,7 @@ import {
   getExplicitGlobalOutput,
   parseCliOutputMode,
   printJson,
+  requireTenantId,
   resolveStrictJson,
   resolveTextJsonOutput
 } from '../cli-context';
@@ -69,18 +70,6 @@ function resolveRenderMode<T extends string>(options: { render?: string; format?
     });
   }
   return render as T;
-}
-
-function requireTenantId(tenantId: string | undefined, commandLabel: string): asserts tenantId is string {
-  if (!tenantId) {
-    throw new CliUserError({
-      summary: `Missing tenant for ${commandLabel}.`,
-      suggestedCommands: [
-        'Use --tenant <tenant-id>',
-        'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>'
-      ]
-    });
-  }
 }
 
 function parseWatchProfile(value: string | undefined): WatchProfile {

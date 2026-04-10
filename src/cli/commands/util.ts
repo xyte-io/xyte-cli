@@ -11,6 +11,7 @@ import {
   type CliContext,
   getExplicitGlobalOutput,
   printJson,
+  requireTenantId,
   resolveStrictJson,
   resolveTextJsonOutput
 } from '../cli-context';
@@ -24,18 +25,6 @@ function parseUtilityPreparePrimaryFormat(value: string | undefined): UtilityPre
     throw new Error(`Invalid primary format: ${value}. Use csv|jsonl.`);
   }
   return normalized as UtilityPreparePrimaryFormat;
-}
-
-function requireTenantId(tenantId: string | undefined, commandLabel: string): asserts tenantId is string {
-  if (!tenantId) {
-    throw new CliUserError({
-      summary: `Missing tenant for ${commandLabel}.`,
-      suggestedCommands: [
-        'Use --tenant <tenant-id>',
-        'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>'
-      ]
-    });
-  }
 }
 
 function parseUtilityInputFormat(value: string | undefined): UtilityInputFormat {

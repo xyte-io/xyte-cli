@@ -12,14 +12,16 @@ export const DeviceMoveBatchReportSchema = UtilityBatchResultSchema.extend({
   command: z.literal('device.move')
 });
 
-export interface DeviceMigrationReportResult {
-  schemaVersion: typeof REPORT_SCHEMA_VERSION;
-  generatedAtUtc: string;
-  tenantId: string;
-  format: 'markdown';
-  outputPath: string;
-  includeSensitive: boolean;
-}
+export const DeviceMigrationReportResultSchema = z.object({
+  schemaVersion: z.literal(REPORT_SCHEMA_VERSION),
+  generatedAtUtc: z.string(),
+  tenantId: z.string(),
+  format: z.literal('markdown'),
+  outputPath: z.string(),
+  includeSensitive: z.boolean()
+});
+
+export type DeviceMigrationReportResult = z.infer<typeof DeviceMigrationReportResultSchema>;
 
 export function extractFleetTotals(value: unknown): FleetInspectResult['totals'] {
   const record = asRecord(value);

@@ -107,3 +107,15 @@ export function printJson(
   const json = stringifyJsonOutput(value, options);
   stream.write(`${json ?? 'null'}\n`);
 }
+
+export function requireTenantId(tenantId: string | undefined, commandLabel: string): asserts tenantId is string {
+  if (!tenantId) {
+    throw new CliUserError({
+      summary: `Missing tenant for ${commandLabel}.`,
+      suggestedCommands: [
+        'Use --tenant <tenant-id>',
+        'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>'
+      ]
+    });
+  }
+}

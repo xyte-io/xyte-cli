@@ -227,7 +227,7 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
           plan?: boolean;
           apply?: boolean;
           resume?: string;
-          outDir?: string;
+          outDir: string;
           inspectProviderScope?: string;
           contextJson?: string;
           var?: string[];
@@ -265,7 +265,7 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
           definition,
           tenantId: options.tenant,
           mode,
-          outDir: options.outDir ?? './tmp/flow-runs',
+          outDir: options.outDir,
           inspectProviderScope,
           resume: options.resume,
           context: {

@@ -332,7 +332,7 @@ describe('schema contracts', () => {
         changed: true
       },
       delta: {
-        added: [{ id: 'inc-1', current: { id: 'inc-1', status: 'active' } }],
+        added: [{ id: 'inc-1', after: { id: 'inc-1', status: 'active' } }],
         removed: [],
         updated: []
       }

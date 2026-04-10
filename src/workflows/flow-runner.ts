@@ -364,15 +364,6 @@ function buildReportInputNeedsDataMessage(stepId: string, inputStepId: string, c
 }
 
 
-function evaluateFlowReadiness(ctx: RunContext, checkConnectivity: boolean) {
-  return evaluateReadiness({
-    profileStore: ctx.args.profileStore,
-    secretStore: ctx.args.secretStore,
-    tenantId: ctx.args.tenantId,
-    ...(checkConnectivity ? { client: ctx.args.client, checkConnectivity: true } : { checkConnectivity: false })
-  });
-}
-
 function extractCallOutputContext(
   data: unknown,
   spec: { contextKey: string; arrayPath: string; valueField: string }
@@ -389,7 +380,7 @@ function handleInstallDoctor(_step: FlowTaskStep, _ctx: RunContext): TaskExecuti
 }
 
 async function handleSetupStatus(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
-  const readiness = await evaluateFlowReadiness(ctx, true);
+  const readiness = await evaluateReadiness({ profileStore: ctx.args.profileStore, secretStore: ctx.args.secretStore, tenantId: ctx.args.tenantId, client: ctx.args.client, checkConnectivity: true });
   if (readiness.state !== 'ready') {
     throw new FlowNeedsInputError(`Setup status is ${readiness.state}. Run setup before continuing.`);
   }
@@ -397,7 +388,7 @@ async function handleSetupStatus(_step: FlowTaskStep, ctx: RunContext): Promise<
 }
 
 async function handleConfigDoctor(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
-  const readiness = await evaluateFlowReadiness(ctx, true);
+  const readiness = await evaluateReadiness({ profileStore: ctx.args.profileStore, secretStore: ctx.args.secretStore, tenantId: ctx.args.tenantId, client: ctx.args.client, checkConnectivity: true });
   if (readiness.connectionState !== 'connected') {
     throw new FlowNeedsInputError(
       `Connectivity is ${readiness.connectionState}. Resolve connectivity before continuing.`
@@ -407,7 +398,7 @@ async function handleConfigDoctor(_step: FlowTaskStep, ctx: RunContext): Promise
 }
 
 async function handleStatusFast(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
-  const readiness = await evaluateFlowReadiness(ctx, false);
+  const readiness = await evaluateReadiness({ profileStore: ctx.args.profileStore, secretStore: ctx.args.secretStore, tenantId: ctx.args.tenantId, checkConnectivity: false });
   return { output: buildStatusContract({ mode: 'fast', checkConnectivity: false, readiness }) };
 }
 

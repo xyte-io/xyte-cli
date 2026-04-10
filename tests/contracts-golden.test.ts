@@ -298,7 +298,7 @@ describe('golden contracts', () => {
         changed: true
       },
       delta: {
-        added: [{ id: 'inc-2', current: { id: 'inc-2', status: 'active' } }],
+        added: [{ id: 'inc-2', after: { id: 'inc-2', status: 'active' } }],
         removed: [],
         updated: [
           { id: 'inc-1', before: { id: 'inc-1', status: 'active' }, after: { id: 'inc-1', status: 'resolved' } }
