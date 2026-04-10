@@ -170,13 +170,13 @@ function formatWatchFrameText(frame: WatchFrameV1): string {
     const previewEntries = [
       ...(frame.delta?.added ?? [])
         .slice(0, 3)
-        .map((entry) => `+ ${formatWatchIncidentText(entry.current ?? entry.after ?? entry.previous)}`),
+        .map((entry) => `+ ${formatWatchIncidentText(entry.after)}`),
       ...(frame.delta?.updated ?? [])
         .slice(0, 3)
-        .map((entry) => `~ ${formatWatchIncidentText(entry.after ?? entry.current ?? entry.before)}`),
+        .map((entry) => `~ ${formatWatchIncidentText(entry.after)}`),
       ...(frame.delta?.removed ?? [])
         .slice(0, 3)
-        .map((entry) => `- ${formatWatchIncidentText(entry.previous ?? entry.before ?? entry.current ?? entry.id)}`)
+        .map((entry) => `- ${formatWatchIncidentText(entry.before ?? entry.id)}`)
     ];
     if (previewEntries.length === 0) {
       lines.push('No incident detail changes captured.');
@@ -420,16 +420,15 @@ async function handleOpsReportGenerate(
   );
 
   const includeSensitive = options.includeSensitive === true || settings.values.report.includeSensitive;
-  const generated =
-    reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION
-      ? await generateOpsReport({ input: reportInput, tenantId, format: render, outPath: options.out, includeSensitive })
-      : await generateOpsReport({
-          input: reportInput,
-          tenantId,
-          format: render === 'pdf' ? 'markdown' : render,
-          outPath: options.out,
-          includeSensitive
-        });
+  const effectiveFormat =
+    reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION ? render : render === 'pdf' ? 'markdown' : render;
+  const generated = await generateOpsReport({
+    input: reportInput,
+    tenantId,
+    format: effectiveFormat,
+    outPath: options.out,
+    includeSensitive
+  });
   printJson(ctx.stdout, generated, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
 }
 
