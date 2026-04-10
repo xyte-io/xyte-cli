@@ -7,6 +7,7 @@ import { buildCallEnvelope } from '../contracts/call-envelope';
 import { INSPECT_DEEP_DIVE_SCHEMA_VERSION, UTILITY_BATCH_SCHEMA_VERSION } from '../contracts/versions';
 import {
   buildFlowRunSummary,
+  FlowRunSummarySchema,
   type FlowRunClassification,
   type FlowRunDecision,
   type FlowRunErrorEntry,
@@ -863,9 +864,9 @@ async function loadResumeState(resumeBundle: string): Promise<ResumeState> {
   }
   let existingSummary: FlowRunSummary;
   try {
-    existingSummary = JSON.parse(raw) as FlowRunSummary;
+    existingSummary = FlowRunSummarySchema.parse(JSON.parse(raw));
   } catch {
-    throw new Error(`Resume bundle manifest is invalid JSON: ${manifestPath}`);
+    throw new Error(`Resume bundle manifest is invalid JSON or has unexpected shape: ${manifestPath}`);
   }
   const storedInputs = await readStoredInputs(resumeBundle);
   return {

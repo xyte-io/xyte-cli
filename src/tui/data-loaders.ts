@@ -315,7 +315,7 @@ interface TicketsLoadResult {
   tickets: unknown[];
 }
 
-export async function loadTicketsData(client: XyteClient, tenantId: string | undefined, options: TicketsLoadOptions = {}): Promise<LoadOutcome<TicketsLoadResult>> {
+export async function loadTicketsData(client: XyteClient, tenantId: string | undefined, _options: TicketsLoadOptions = {}): Promise<LoadOutcome<TicketsLoadResult>> {
   const orgOutcome = await loadWithOutcome(async () => {
     const org = await client.organization.getTickets({ tenantId });
     return extractArray(org, ['tickets', 'data', 'items']);
