@@ -3,6 +3,11 @@ import type { ProblemDetails } from '../contracts/problem';
 import { isCliUserError } from '../contracts/user-error';
 import { redactSensitiveData, redactSensitiveText } from '../utils/redact';
 
+const PROBLEM_TYPE_CLI_USER_ERROR = 'https://xyte.dev/problems/cli-user-error';
+const PROBLEM_TYPE_HTTP_ERROR = 'https://xyte.dev/problems/http-error';
+const PROBLEM_TYPE_AUTH_ERROR = 'https://xyte.dev/problems/auth-error';
+const PROBLEM_TYPE_VALIDATION_ERROR = 'https://xyte.dev/problems/validation-error';
+
 function toMessage(error: unknown): string {
   if (error instanceof Error) {
     return redactSensitiveText(error.message);
@@ -13,7 +18,7 @@ function toMessage(error: unknown): string {
 export function toProblemDetails(error: unknown, instance?: string): ProblemDetails {
   if (isCliUserError(error)) {
     return {
-      type: 'https://xyte.dev/problems/cli-user-error',
+      type: PROBLEM_TYPE_CLI_USER_ERROR,
       title: error.summary,
       status: 400,
       detail: redactSensitiveText(error.message),
@@ -27,7 +32,7 @@ export function toProblemDetails(error: unknown, instance?: string): ProblemDeta
 
   if (error instanceof XyteHttpError) {
     return {
-      type: 'https://xyte.dev/problems/http-error',
+      type: PROBLEM_TYPE_HTTP_ERROR,
       title: 'HTTP request failed',
       status: error.status,
       detail: redactSensitiveText(error.message),
@@ -40,7 +45,7 @@ export function toProblemDetails(error: unknown, instance?: string): ProblemDeta
 
   if (error instanceof XyteAuthError) {
     return {
-      type: 'https://xyte.dev/problems/auth-error',
+      type: PROBLEM_TYPE_AUTH_ERROR,
       title: 'Authentication required',
       status: 401,
       detail: redactSensitiveText(error.message),
@@ -52,7 +57,7 @@ export function toProblemDetails(error: unknown, instance?: string): ProblemDeta
 
   if (error instanceof XyteValidationError) {
     return {
-      type: 'https://xyte.dev/problems/validation-error',
+      type: PROBLEM_TYPE_VALIDATION_ERROR,
       title: 'Invalid request',
       status: 400,
       detail: redactSensitiveText(error.message),
