@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import path from 'node:path';
 
+import { CliUserError } from '../contracts/user-error';
 import { getXyteConfigDir } from '../utils/config-dir';
 import { isRecord } from '../utils/json';
 import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';
@@ -264,7 +265,7 @@ function parseBoolean(value: unknown, label: string): boolean {
       return false;
     }
   }
-  throw new Error(`Invalid ${label}: ${String(value)}. Use true|false.`);
+  throw new CliUserError({ summary: `Invalid ${label}: ${String(value)}. Use true|false.` });
 }
 
 function parsePositiveInteger(value: unknown, label: string): number {
@@ -277,7 +278,7 @@ function parsePositiveInteger(value: unknown, label: string): number {
       return parsed;
     }
   }
-  throw new Error(`Invalid ${label}: ${String(value)}. Use a positive integer.`);
+  throw new CliUserError({ summary: `Invalid ${label}: ${String(value)}. Use a positive integer.` });
 }
 
 function parseOptionalPositiveInteger(value: unknown, label: string): number | undefined {
@@ -300,7 +301,7 @@ function parseEnum<T extends string>(value: unknown, label: string, allowed: rea
   if (normalized && allowed.includes(normalized as T)) {
     return normalized as T;
   }
-  throw new Error(`Invalid ${label}: ${String(value)}. Use ${allowed.join('|')}.`);
+  throw new CliUserError({ summary: `Invalid ${label}: ${String(value)}. Use ${allowed.join('|')}.` });
 }
 
 function validateSettingValue(keyPath: SettingPath, value: unknown): unknown {

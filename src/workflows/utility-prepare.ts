@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 
+import { CliUserError } from '../contracts/user-error';
 import { UTILITY_PREPARE_SCHEMA_VERSION } from '../contracts/versions';
 import { getUtilityActionProfile, listUtilityActionProfiles } from './utility-action-catalog';
 import type {
@@ -68,7 +69,7 @@ function detectInputKind(extension: string): UtilityPrepareInputKind {
 
 function writeScaffoldFile(filePath: string, content: string, force: boolean): void {
   if (existsSync(filePath) && !force) {
-    throw new Error(`Scaffold file already exists: ${filePath}. Re-run with --force to overwrite.`);
+    throw new CliUserError({ summary: `Scaffold file already exists: ${filePath}. Re-run with --force to overwrite.` });
   }
   writeFileSync(filePath, content, 'utf8');
 }
@@ -196,11 +197,11 @@ export function runUtilityPrepare(args: {
 }): UtilityPrepareResult {
   const inputPath = path.resolve(args.inputPath);
   if (!existsSync(inputPath)) {
-    throw new Error(`Input file does not exist: ${inputPath}`);
+    throw new CliUserError({ summary: `Input file does not exist: ${inputPath}` });
   }
   const inputStats = statSync(inputPath);
   if (!inputStats.isFile()) {
-    throw new Error(`Input path must be a file: ${inputPath}`);
+    throw new CliUserError({ summary: `Input path must be a file: ${inputPath}` });
   }
 
   const profile = getUtilityActionProfile(args.actionKey);

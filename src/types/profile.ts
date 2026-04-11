@@ -1,3 +1,5 @@
+import { CliUserError } from '../contracts/user-error';
+
 export const SUPPORTED_SECRET_PROVIDERS = ['xyte-org', 'xyte-partner'] as const;
 
 export type SecretProvider = (typeof SUPPORTED_SECRET_PROVIDERS)[number];
@@ -12,7 +14,7 @@ export function isSecretProvider(value: string): value is SecretProvider {
 export function parseProvider(value: string): SecretProvider {
   const normalized = value.trim();
   if (!isSecretProvider(normalized)) {
-    throw new Error(`Invalid provider: ${value}`);
+    throw new CliUserError({ summary: `Invalid provider: ${value}` });
   }
   return normalized;
 }

@@ -9,6 +9,7 @@ import type {
   TenantProfile
 } from '../types/profile';
 import { SUPPORTED_SECRET_PROVIDERS, isSecretProvider } from '../types/profile';
+import { CliUserError } from '../contracts/user-error';
 import { getXyteConfigDir } from '../utils/config-dir';
 import { errorMessage } from '../utils/error-format';
 import { buildSlotId, ensureSlotName, matchesSlotRef } from './key-slots';
@@ -307,7 +308,7 @@ export class FileProfileStore implements ProfileStore {
     const data = await this.getData();
     const tenant = data.tenants.find((item) => item.id === tenantId);
     if (!tenant) {
-      throw new Error(`Unknown tenant: ${tenantId}`);
+      throw new CliUserError({ summary: `Unknown tenant: ${tenantId}` });
     }
     data.activeTenantId = tenantId;
     await this.writeData(data);
@@ -339,13 +340,13 @@ export class FileProfileStore implements ProfileStore {
     const providerSlots = registry.slots.filter((slot) => slot.provider === input.provider);
 
     if (providerSlots.some((slot) => slot.name.toLowerCase() === slotName.toLowerCase())) {
-      throw new Error(`A key slot named "${slotName}" already exists for provider ${input.provider}.`);
+      throw new CliUserError({ summary: `A key slot named "${slotName}" already exists for provider ${input.provider}.` });
     }
 
     const existingIds = new Set(providerSlots.map((slot) => slot.slotId));
     const slotId = input.slotId?.trim() || buildSlotId(slotName, existingIds);
     if (existingIds.has(slotId)) {
-      throw new Error(`A key slot with id "${slotId}" already exists for provider ${input.provider}.`);
+      throw new CliUserError({ summary: `A key slot with id "${slotId}" already exists for provider ${input.provider}.` });
     }
 
     const slot: ApiKeySlotMeta = {
@@ -394,7 +395,7 @@ export class FileProfileStore implements ProfileStore {
           idx !== slotIndex && item.provider === provider && item.name.toLowerCase() === nextName.toLowerCase()
       );
       if (duplicate) {
-        throw new Error(`A key slot named "${nextName}" already exists for provider ${provider}.`);
+        throw new CliUserError({ summary: `A key slot named "${nextName}" already exists for provider ${provider}.` });
       }
     }
 
@@ -536,7 +537,7 @@ export class FileProfileStore implements ProfileStore {
   private async getRequiredTenant(tenantId: string): Promise<TenantProfile> {
     const tenant = await this.getTenant(tenantId);
     if (!tenant) {
-      throw new Error(`Unknown tenant: ${tenantId}`);
+      throw new CliUserError({ summary: `Unknown tenant: ${tenantId}` });
     }
     return tenant;
   }
@@ -547,7 +548,7 @@ export class FileProfileStore implements ProfileStore {
   ): { tenant: TenantProfile; index: number } {
     const index = data.tenants.findIndex((tenant) => tenant.id === tenantId);
     if (index === -1) {
-      throw new Error(`Unknown tenant: ${tenantId}`);
+      throw new CliUserError({ summary: `Unknown tenant: ${tenantId}` });
     }
     return {
       tenant: data.tenants[index],

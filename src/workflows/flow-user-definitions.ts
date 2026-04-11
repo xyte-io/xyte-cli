@@ -221,7 +221,7 @@ export async function exportFlowDefinition(args: {
   const { flowId, outPath } = args;
   const existing = await getFlowDefinition(flowId);
   if (!existing) {
-    throw new Error(`Unknown flow definition: ${flowId}.`);
+    throw new CliUserError({ summary: `Unknown flow definition: ${flowId}.` });
   }
 
   const resolvedOut = path.resolve(outPath);
@@ -254,7 +254,7 @@ export async function importFlowDefinition(args: {
   } catch (error) {
     const isSyntax = error instanceof SyntaxError;
     const detail = isSyntax ? `: ${error.message}` : `: ${errorMessage(error)}`;
-    throw new Error(`Failed to ${isSyntax ? 'parse' : 'read'} flow definition at "${resolved}"${detail}`);
+    throw new CliUserError({ summary: `Failed to ${isSyntax ? 'parse' : 'read'} flow definition at "${resolved}"${detail}` });
   }
   const parsed = validateFlowDefinition(raw);
 
