@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { ScreenRuntime } from '../../src/tui/runtime';
-import { updateErrorStormState } from '../../src/tui/app';
+import { CHAR_SCREEN_MAP, updateErrorStormState } from '../../src/tui/app';
 
 function deferred<T = void>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
@@ -13,6 +13,27 @@ function deferred<T = void>() {
   return { promise, resolve, reject };
 }
 
+
+describe('CHAR_SCREEN_MAP', () => {
+  it('maps every expected key to the correct screen id', () => {
+    expect(CHAR_SCREEN_MAP['u']).toBe('setup');
+    expect(CHAR_SCREEN_MAP['g']).toBe('config');
+    expect(CHAR_SCREEN_MAP['d']).toBe('dashboard');
+    expect(CHAR_SCREEN_MAP['s']).toBe('spaces');
+    expect(CHAR_SCREEN_MAP['v']).toBe('devices');
+    expect(CHAR_SCREEN_MAP['i']).toBe('incidents');
+    expect(CHAR_SCREEN_MAP['t']).toBe('tickets');
+  });
+
+  it('has exactly 7 entries', () => {
+    expect(Object.keys(CHAR_SCREEN_MAP)).toHaveLength(7);
+  });
+
+  it('returns undefined for unmapped keys', () => {
+    expect(CHAR_SCREEN_MAP['r']).toBeUndefined();
+    expect(CHAR_SCREEN_MAP['x']).toBeUndefined();
+  });
+});
 
 describe('tui app navigation runtime', () => {
   it('queues refresh requests while one is in flight without blocking dispatch', async () => {

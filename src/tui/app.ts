@@ -96,6 +96,16 @@ export function updateErrorStormState(
   };
 }
 
+export const CHAR_SCREEN_MAP: Record<string, TuiScreenId> = {
+  u: 'setup',
+  g: 'config',
+  d: 'dashboard',
+  s: 'spaces',
+  v: 'devices',
+  i: 'incidents',
+  t: 'tickets'
+};
+
 export async function runTuiApp(options: TuiAppOptions): Promise<void> {
   const profileStore = options.profileStore ?? createProfileStore();
   const secretStore = options.secretStore ?? createSecretStore();
@@ -542,15 +552,6 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
           await mountScreen(target);
           return;
         }
-        const CHAR_SCREEN_MAP: Record<string, TuiScreenId> = {
-          u: 'setup',
-          g: 'config',
-          d: 'dashboard',
-          s: 'spaces',
-          v: 'devices',
-          i: 'incidents',
-          t: 'tickets'
-        };
         if (ch && CHAR_SCREEN_MAP[ch]) {
           await mountScreen(CHAR_SCREEN_MAP[ch]);
           return;

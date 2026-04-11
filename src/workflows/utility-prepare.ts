@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { z } from 'zod';
 
 import { UTILITY_PREPARE_SCHEMA_VERSION } from '../contracts/versions';
 import { getUtilityActionProfile, listUtilityActionProfiles } from './utility-action-catalog';
@@ -10,40 +11,42 @@ import type {
   UtilityPrepareMode
 } from './utility-action-profiles';
 
-type UtilityPrepareInputKind = 'tabular' | 'document' | 'image' | 'unknown';
+type UtilityPrepareInputKind = UtilityPrepareResult['input']['kind'];
 
-interface UtilityPrepareResult {
-  schemaVersion: typeof UTILITY_PREPARE_SCHEMA_VERSION;
-  generatedAtUtc: string;
-  actionKey: string;
-  entity: string;
-  mode: UtilityPrepareMode;
-  input: {
-    path: string;
-    kind: UtilityPrepareInputKind;
-    extension: string;
-    sizeBytes: number;
-  };
-  canonical: {
-    primaryFormat: UtilityPreparePrimaryFormat;
-    headers: string[];
-    jsonShape: Record<string, unknown>;
-  };
-  decodeRules: string[];
-  artifacts: {
-    primary: string;
-    rejected: string;
-    notes: string;
-  };
-  promptTemplatePath: string;
-  skillNodePath: string;
-  suggestedCommands: {
-    next: string;
-    apply: string;
-    verify: string;
-  };
-  executionSupport: UtilityExecutionSupport;
-}
+const UtilityPrepareResultSchema = z.object({
+  schemaVersion: z.literal(UTILITY_PREPARE_SCHEMA_VERSION),
+  generatedAtUtc: z.string(),
+  actionKey: z.string(),
+  entity: z.string(),
+  mode: z.enum(['friendly', 'generic']),
+  input: z.object({
+    path: z.string(),
+    kind: z.enum(['tabular', 'document', 'image', 'unknown']),
+    extension: z.string(),
+    sizeBytes: z.number()
+  }),
+  canonical: z.object({
+    primaryFormat: z.enum(['csv', 'jsonl']),
+    headers: z.array(z.string()),
+    jsonShape: z.record(z.string(), z.unknown())
+  }),
+  decodeRules: z.array(z.string()),
+  artifacts: z.object({
+    primary: z.string(),
+    rejected: z.string(),
+    notes: z.string()
+  }),
+  promptTemplatePath: z.string(),
+  skillNodePath: z.string(),
+  suggestedCommands: z.object({
+    next: z.string(),
+    apply: z.string(),
+    verify: z.string()
+  }),
+  executionSupport: z.enum(['space.import-tree', 'device.move', 'call-loop-only'])
+});
+
+type UtilityPrepareResult = z.infer<typeof UtilityPrepareResultSchema>;
 
 const TABULAR_EXTENSIONS = new Set(['.csv', '.tsv', '.xlsx', '.xls', '.json', '.jsonl', '.ndjson']);
 const DOCUMENT_EXTENSIONS = new Set(['.pdf', '.md', '.txt', '.doc', '.docx', '.rtf']);

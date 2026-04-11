@@ -1,4 +1,6 @@
-import type { INSPECT_FLEET_SCHEMA_VERSION } from '../contracts/versions';
+import { z } from 'zod';
+
+import { INSPECT_FLEET_SCHEMA_VERSION } from '../contracts/versions';
 import type { InspectProviderScope } from './settings-enums';
 
 export interface StatusCounts {
@@ -49,27 +51,31 @@ export interface PartnerEnrichmentSnapshot {
   };
 }
 
-export interface FleetInspectResult {
-  schemaVersion: typeof INSPECT_FLEET_SCHEMA_VERSION;
-  generatedAtUtc: string;
-  tenantId: string;
-  totals: {
-    devices: number;
-    spaces: number;
-    incidents: number;
-    tickets: number;
-  };
-  status: {
-    devices: StatusCounts;
-    incidents: StatusCounts;
-    tickets: StatusCounts;
-    spaces: StatusCounts;
-  };
-  highlights: {
-    offlineDevices: number;
-    offlinePct: number;
-    activeIncidents: number;
-    activeIncidentPct: number;
-    openTickets: number;
-  };
-}
+const StatusCountsSchema = z.record(z.string(), z.number());
+
+export const FleetInspectResultSchema = z.object({
+  schemaVersion: z.literal(INSPECT_FLEET_SCHEMA_VERSION),
+  generatedAtUtc: z.string(),
+  tenantId: z.string(),
+  totals: z.object({
+    devices: z.number(),
+    spaces: z.number(),
+    incidents: z.number(),
+    tickets: z.number()
+  }),
+  status: z.object({
+    devices: StatusCountsSchema,
+    incidents: StatusCountsSchema,
+    tickets: StatusCountsSchema,
+    spaces: StatusCountsSchema
+  }),
+  highlights: z.object({
+    offlineDevices: z.number(),
+    offlinePct: z.number(),
+    activeIncidents: z.number(),
+    activeIncidentPct: z.number(),
+    openTickets: z.number()
+  })
+});
+
+export type FleetInspectResult = z.infer<typeof FleetInspectResultSchema>;
