@@ -103,7 +103,8 @@
               "id": {
                 "type": "string"
               },
-              "current": {}
+              "before": {},
+              "after": {}
             }
           }
         },
@@ -117,7 +118,8 @@
               "id": {
                 "type": "string"
               },
-              "previous": {}
+              "before": {},
+              "after": {}
             }
           }
         },
