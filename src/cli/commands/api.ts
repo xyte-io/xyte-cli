@@ -4,7 +4,7 @@ import type { Command } from 'commander';
 
 import { getEndpoint, listEndpoints } from '../../client/catalog';
 import { buildCallEnvelope } from '../../contracts/call-envelope';
-import { toProblemDetails } from '../../http/problem-mapper';
+import { toProblemDetails } from '../../client/errors';
 import { CliUserError } from '../../contracts/user-error';
 import { isMutatingMethod } from '../../client/catalog';
 import { parseJsonObject } from '../../utils/json';
@@ -25,7 +25,7 @@ function parsePathJson(value: string | undefined): Record<string, string | numbe
       out[key] = item;
       continue;
     }
-    throw new Error(`Path parameter "${key}" must be string or number.`);
+    throw new CliUserError({ summary: `Path parameter "${key}" must be string or number.` });
   }
   return out;
 }
@@ -119,7 +119,7 @@ async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptio
       body = JSON.parse(String(options.bodyJson));
     } catch (error) {
       const detail = error instanceof Error && error.message ? `: ${error.message}` : '';
-      throw new Error(`Invalid --body-json${detail}`);
+      throw new CliUserError({ summary: `Invalid --body-json${detail}` });
     }
   }
   const strictJson = resolveStrictJson({ strictJson: options.strictJson, settings });

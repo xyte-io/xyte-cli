@@ -98,7 +98,6 @@ interface RunDeterministicFlowArgs {
   flowId: string;
   tenantId: string;
   mode: FlowRunMode;
-  allowWrite?: boolean;
   inspectProviderScope?: InspectProviderScope;
   outDir: string;
   resume?: string;
@@ -460,10 +459,14 @@ async function handleReportGenerate(step: FlowTaskStep, ctx: RunContext): Promis
     });
   } else {
     const includeSensitive = report.includeSensitive === true;
-    generated =
-      reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION
-        ? await generateOpsReport({ input: reportInput, tenantId: ctx.args.tenantId, format: report.format, outPath, includeSensitive })
-        : await generateOpsReport({ input: reportInput, tenantId: ctx.args.tenantId, format: 'markdown', outPath, includeSensitive });
+    if (reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION) {
+      generated = await generateOpsReport({ input: reportInput, tenantId: ctx.args.tenantId, format: report.format, outPath, includeSensitive });
+    } else {
+      if (report.format !== 'markdown') {
+        throw new CliUserError({ summary: `Report format '${report.format}' is only supported for deep-dive reports. Use 'markdown'.` });
+      }
+      generated = await generateOpsReport({ input: reportInput, tenantId: ctx.args.tenantId, format: report.format, outPath, includeSensitive });
+    }
   }
   return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
 }
@@ -682,7 +685,7 @@ function computeClassificationCounts(errors: FlowRunErrorEntry[]): { needs_data:
 
 async function findRunBundle(outDir: string, resumeRef: string): Promise<string> {
   if (!resumeRef.trim()) {
-    throw new Error('Invalid --resume value.');
+    throw new CliUserError({ summary: 'Invalid --resume value.' });
   }
 
   const direct = path.resolve(resumeRef);
@@ -725,7 +728,7 @@ async function findRunBundle(outDir: string, resumeRef: string): Promise<string>
     }
   }
 
-  throw new Error(`Unable to resolve resume run: ${resumeRef}`);
+  throw new CliUserError({ summary: `Unable to resolve resume run: ${resumeRef}` });
 }
 
 function createInitialSteps(definition: BuiltInFlowDefinition): FlowRunStep[] {

@@ -1,4 +1,5 @@
 import { parseJsonObject } from '../utils/json';
+import { CliUserError } from '../contracts/user-error';
 
 export function parseQueryJson(
   value: string | undefined
@@ -16,7 +17,7 @@ export function parseQueryJson(
       out[key] = item as string | number | boolean | null | undefined;
       continue;
     }
-    throw new Error(`Query parameter "${key}" must be scalar, null, or undefined.`);
+    throw new CliUserError({ summary: `Query parameter "${key}" must be scalar, null, or undefined.` });
   }
   return out;
 }
@@ -31,21 +32,21 @@ export function parseQueryString(values: string[] | undefined): Record<string, s
 
     for (const segment of segments) {
       if (!segment) {
-        throw new Error('Invalid --query segment: expected key=value.');
+        throw new CliUserError({ summary: 'Invalid --query segment: expected key=value.' });
       }
 
       const separator = segment.indexOf('=');
       if (separator <= 0) {
-        throw new Error(`Invalid --query segment: ${segment}. Use key=value.`);
+        throw new CliUserError({ summary: `Invalid --query segment: ${segment}. Use key=value.` });
       }
 
       const key = segment.slice(0, separator).trim();
       const value = segment.slice(separator + 1);
       if (!key) {
-        throw new Error(`Invalid --query segment: ${segment}. Key cannot be empty.`);
+        throw new CliUserError({ summary: `Invalid --query segment: ${segment}. Key cannot be empty.` });
       }
       if (Object.prototype.hasOwnProperty.call(out, key)) {
-        throw new Error(`Duplicate query parameter: ${key}.`);
+        throw new CliUserError({ summary: `Duplicate query parameter: ${key}.` });
       }
       out[key] = value;
     }
@@ -60,7 +61,7 @@ export function parsePositiveIntegerOption(value: string | undefined, fallback: 
   }
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`Invalid ${label}: ${value}. Use a positive integer.`);
+    throw new CliUserError({ summary: `Invalid ${label}: ${value}. Use a positive integer.` });
   }
   return parsed;
 }
@@ -75,7 +76,7 @@ export function parsePositiveNumberOption(
   }
   const parsed = Number.parseFloat(value);
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`Invalid ${label}: expected a positive number, got "${value}".`);
+    throw new CliUserError({ summary: `Invalid ${label}: expected a positive number, got "${value}".` });
   }
   return parsed;
 }

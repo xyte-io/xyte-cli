@@ -6,7 +6,7 @@ import { Command } from 'commander';
 
 import { createCliActionLogger, sanitizeArgvForLog, type CliActionLogger } from './action-logger';
 import { createXyteClient } from '../client/create-client';
-import { toProblemDetails } from '../http/problem-mapper';
+import { toProblemDetails } from '../client/errors';
 import { buildStatusContract, type StatusMode } from '../contracts/status';
 import { evaluateReadiness, type ReadinessCheck } from '../config/readiness';
 import {
@@ -27,7 +27,6 @@ import {
 } from '../utils/install-skills';
 import { applyUpgrade, checkForUpgrade, type UpgradeDependencies } from '../utils/upgrade';
 import { runTuiApp } from '../tui/app';
-import type { TuiScreenId } from '../types/tui-screens';
 import { CliUserError } from '../contracts/user-error';
 import { errorMessage } from '../utils/error-format';
 import { registerLogsCommands } from './commands/logs';
@@ -159,7 +158,7 @@ function parseSkillInstallScope(value: string | undefined): SkillInstallScope | 
 
   const normalized = value.trim().toLowerCase();
   if (!SKILL_SCOPES.includes(normalized as SkillInstallScope)) {
-    throw new Error(`Invalid scope: ${value}. Expected one of: ${SKILL_SCOPES.join(', ')}.`);
+    throw new CliUserError({ summary: `Invalid scope: ${value}. Expected one of: ${SKILL_SCOPES.join(', ')}.` });
   }
   return normalized as SkillInstallScope;
 }
@@ -175,19 +174,19 @@ function parseSkillAgents(value: string | undefined): SkillAgent[] | undefined {
     .filter(Boolean);
 
   if (!tokens.length) {
-    throw new Error('Invalid agents: empty value.');
+    throw new CliUserError({ summary: 'Invalid agents: empty value.' });
   }
 
   if (tokens.includes('all')) {
     if (tokens.length > 1) {
-      throw new Error('Invalid agents: "all" cannot be combined with specific agents.');
+      throw new CliUserError({ summary: 'Invalid agents: "all" cannot be combined with specific agents.' });
     }
     return [...SKILL_AGENTS];
   }
 
   const unknown = tokens.filter((item) => !SKILL_AGENTS.includes(item as SkillAgent));
   if (unknown.length > 0) {
-    throw new Error(`Invalid agents: ${unknown.join(', ')}. Expected "all" or ${SKILL_AGENTS.join(', ')}.`);
+    throw new CliUserError({ summary: `Invalid agents: ${unknown.join(', ')}. Expected "all" or ${SKILL_AGENTS.join(', ')}.` });
   }
 
   return SKILL_AGENTS.filter((agent) => tokens.includes(agent));
@@ -207,7 +206,7 @@ function formatInstallOutcome(outcome: SkillInstallOutcome): string {
 function parseStatusMode(value: string | undefined): StatusMode {
   const normalized = (value ?? 'fast').trim().toLowerCase();
   if (normalized !== 'fast' && normalized !== 'full') {
-    throw new Error(`Invalid status mode: ${value}. Use fast|full.`);
+    throw new CliUserError({ summary: `Invalid status mode: ${value}. Use fast|full.` });
   }
   return normalized as StatusMode;
 }
@@ -265,7 +264,7 @@ interface RootLauncherPayload {
   settings: {
     tenantId?: string;
     outputMode: CliOutputMode;
-    consoleScreen: TuiScreenId;
+    consoleScreen: string;
   };
   sections: Array<{
     title: string;
@@ -865,7 +864,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
       if (!options.yes) {
         if (!isInteractive) {
-          throw new Error('Upgrade requires confirmation. Re-run with --yes or use --check.');
+          throw new CliUserError({ summary: 'Upgrade requires confirmation. Re-run with --yes or use --check.' });
         }
         const answer = (
           await prompt({

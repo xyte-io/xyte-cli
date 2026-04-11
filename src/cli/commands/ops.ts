@@ -58,8 +58,8 @@ function appendRenderedOutput(stream: OutputStream, text: string, outPath?: stri
   }
 }
 
-function resolveRenderMode<T extends string>(options: { render?: string; format?: string }, allowed: readonly T[], fallback: T): T {
-  const render = (options.render ?? options.format ?? fallback).trim().toLowerCase();
+function resolveRenderMode<T extends string>(options: { render?: string }, allowed: readonly T[], fallback: T): T {
+  const render = (options.render ?? fallback).trim().toLowerCase();
   if (!allowed.includes(render as T)) {
     throw new CliUserError({
       summary: `Invalid render mode: "${render}".`,
@@ -274,7 +274,6 @@ async function handleOpsInspectFleet(
     tenant?: string;
     providerScope?: string;
     render?: string;
-    format?: string;
     output?: string;
     out?: string;
     strictJson?: boolean;
@@ -312,7 +311,6 @@ async function handleOpsInspectDeepDive(
     providerScope?: string;
     window?: string;
     render?: string;
-    format?: string;
     output?: string;
     out?: string;
     strictJson?: boolean;
@@ -417,7 +415,6 @@ async function handleOpsConsole(
   options: {
     headless?: boolean;
     screen?: string;
-    format?: string;
     output?: string;
     once?: boolean;
     follow?: boolean;
@@ -460,7 +457,7 @@ async function handleOpsConsole(
   }
   const screen = screenRaw as TuiScreenId;
   const requestedOutput = parseCliOutputMode(
-    options.output ?? options.format ?? (options.headless ? 'json' : undefined)
+    options.output ?? (options.headless ? 'json' : undefined)
   );
   if (Boolean(options.headless) && requestedOutput && requestedOutput !== 'json') {
     throw new CliUserError({

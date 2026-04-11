@@ -9,6 +9,8 @@ let _logger: Logger | undefined;
 export function getLogger(): Logger {
   if (!_logger) {
     _logger = pino({ name: 'xyte-cli', level: resolveLevel() });
+  } else {
+    _logger.level = resolveLevel();
   }
   return _logger;
 }
