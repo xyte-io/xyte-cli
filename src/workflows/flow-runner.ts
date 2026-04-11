@@ -4,9 +4,12 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import { buildCallEnvelope } from '../contracts/call-envelope';
+import type { ProblemDetails } from '../contracts/problem';
 import { INSPECT_DEEP_DIVE_SCHEMA_VERSION, UTILITY_BATCH_SCHEMA_VERSION } from '../contracts/versions';
 import {
   buildFlowRunSummary,
+  FlowRunDecisionSchema,
+  FlowRunErrorEntrySchema,
   FlowRunSummarySchema,
   type FlowRunClassification,
   type FlowRunDecision,
@@ -290,7 +293,7 @@ function classifyFailure(problem: ReturnType<typeof toProblemDetails>): FlowRunC
 function toNeedsInputProblem(
   error: FlowNeedsInputError,
   instance: string
-): { type: string; title: string; status: number; detail: string; instance: string; xyteCode: string; retriable: boolean } {
+): ProblemDetails {
   return {
     type: 'https://xyte.dev/problems/flow-needs-input',
     title: 'Flow requires additional input',
@@ -741,7 +744,10 @@ function createInitialSteps(definition: BuiltInFlowDefinition): FlowRunStep[] {
   }));
 }
 
-async function readLinesAsJson<T>(filePath: string): Promise<T[]> {
+async function readLinesAsJson<T>(
+  filePath: string,
+  schema: { safeParse: (v: unknown) => { success: true; data: T } | { success: false } }
+): Promise<T[]> {
   if (!existsSync(filePath)) {
     return [];
   }
@@ -753,11 +759,17 @@ async function readLinesAsJson<T>(filePath: string): Promise<T[]> {
     .filter(Boolean);
 
   for (let index = 0; index < lines.length; index += 1) {
+    let parsed: unknown;
     try {
-      items.push(JSON.parse(lines[index]) as T);
+      parsed = JSON.parse(lines[index]);
     } catch {
       throw new Error(`Invalid JSON line ${index + 1} in ${filePath}.`);
     }
+    const result = schema.safeParse(parsed);
+    if (!result.success) {
+      throw new Error(`Unexpected shape on line ${index + 1} in ${filePath}.`);
+    }
+    items.push(result.data);
   }
 
   return items;
@@ -787,7 +799,12 @@ async function readStoredInputs(bundleDir: string): Promise<FlowRunInputsPayload
   }
 
   try {
-    return JSON.parse(await readFile(inputsPath, 'utf8')) as FlowRunInputsPayload;
+    const parsed: unknown = JSON.parse(await readFile(inputsPath, 'utf8'));
+    if (!isRecord(parsed)) {
+      getLogger().warn({ inputsPath }, 'Malformed resume inputs (not an object) — falling back to invocation defaults');
+      return undefined;
+    }
+    return parsed as FlowRunInputsPayload;
   } catch (error) {
     getLogger().warn({ inputsPath, error }, 'Malformed resume inputs — falling back to invocation defaults');
     return undefined;
@@ -869,13 +886,13 @@ async function loadResumeState(resumeBundle: string): Promise<ResumeState> {
   try {
     raw = await readFile(manifestPath, 'utf8');
   } catch {
-    throw new Error(`Resume bundle manifest could not be read: ${manifestPath}`);
+    throw new CliUserError({ summary: `Resume bundle manifest could not be read: ${manifestPath}` });
   }
   let existingSummary: FlowRunSummary;
   try {
     existingSummary = FlowRunSummarySchema.parse(JSON.parse(raw));
   } catch {
-    throw new Error(`Resume bundle manifest is invalid JSON or has unexpected shape: ${manifestPath}`);
+    throw new CliUserError({ summary: `Resume bundle manifest is invalid JSON or has unexpected shape: ${manifestPath}` });
   }
   const storedInputs = await readStoredInputs(resumeBundle);
   return {
@@ -884,8 +901,8 @@ async function loadResumeState(resumeBundle: string): Promise<ResumeState> {
     initialStartedAtUtc: existingSummary.startedAtUtc,
     steps: existingSummary.steps,
     cursorIndex: existingSummary.cursor.nextStepIndex,
-    priorDecisions: await readLinesAsJson<FlowRunDecision>(path.join(resumeBundle, 'decisions.ndjson')),
-    priorErrors: await readLinesAsJson<FlowRunErrorEntry>(path.join(resumeBundle, 'errors.ndjson')),
+    priorDecisions: await readLinesAsJson(path.join(resumeBundle, 'decisions.ndjson'), FlowRunDecisionSchema),
+    priorErrors: await readLinesAsJson(path.join(resumeBundle, 'errors.ndjson'), FlowRunErrorEntrySchema),
     resumedInspectProviderScope: await readStoredInspectProviderScope(resumeBundle),
     resumedContext: toStringRecord(storedInputs?.context)
   };

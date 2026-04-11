@@ -5,7 +5,6 @@ import path from 'node:path';
 import { getXyteConfigDir } from '../utils/config-dir';
 import { isRecord } from '../utils/json';
 import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';
-import { TUI_SCREEN_IDS, type TuiScreenId } from '../types/tui-screens';
 import { DEFAULT_WATCH_PROFILE, type WatchProfile } from '../contracts/watch-frame';
 
 const CLI_OUTPUT_MODES = ['auto', 'json', 'text'] as const;
@@ -34,7 +33,7 @@ interface CliSettingsFile {
     retryBackoffMs?: number;
   };
   console?: {
-    screen?: TuiScreenId;
+    screen?: string;
     motion?: boolean;
     follow?: boolean;
     intervalMs?: number;
@@ -53,7 +52,7 @@ interface CliSettingsFile {
   };
 }
 
-export interface ResolvedCliSettings {
+interface ResolvedCliSettings {
   defaults: {
     tenant?: string;
   };
@@ -74,7 +73,7 @@ export interface ResolvedCliSettings {
     retryBackoffMs: number;
   };
   console: {
-    screen: TuiScreenId;
+    screen: string;
     motion: boolean;
     follow: boolean;
     intervalMs: number;
@@ -334,7 +333,7 @@ function validateSettingValue(keyPath: SettingPath, value: unknown): unknown {
     case 'watch.maxPolls':
       return parseOptionalPositiveInteger(value, keyPath);
     case 'console.screen':
-      return parseEnum(value, keyPath, [...TUI_SCREEN_IDS]);
+      return parseOptionalString(value);
     default: {
       const _exhaustive: never = keyPath;
       throw new Error(`Unhandled setting key: ${_exhaustive}`);

@@ -15,7 +15,8 @@ import type { XyteClient } from '../types/client';
 import type { SecretProvider } from '../types/profile';
 import type { EndpointNamespace } from '../types/endpoints';
 import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
-import { extractArray, extractHasNextPage, extractIncidentsArray } from '../utils/json';
+import { extractArray, extractHasNextPage } from '../utils/json';
+import { extractIncidentsArray } from '../utils/incidents';
 import { PROVIDER_ORG } from '../types/profile';
 
 interface LoadOutcome<T> {
@@ -306,16 +307,12 @@ export async function loadIncidentsData(
   }, []);
 }
 
-interface TicketsLoadOptions {
-  query?: Record<string, unknown>;
-}
-
 interface TicketsLoadResult {
   mode: EndpointNamespace;
   tickets: unknown[];
 }
 
-export async function loadTicketsData(client: XyteClient, tenantId: string | undefined, _options: TicketsLoadOptions = {}): Promise<LoadOutcome<TicketsLoadResult>> {
+export async function loadTicketsData(client: XyteClient, tenantId: string | undefined): Promise<LoadOutcome<TicketsLoadResult>> {
   const orgOutcome = await loadWithOutcome(async () => {
     const org = await client.organization.getTickets({ tenantId });
     return extractArray(org, ['tickets', 'data', 'items']);

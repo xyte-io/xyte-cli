@@ -16,6 +16,7 @@ import { getSpaceId, getSpaceName, loadDevicesData, loadSpaceDrilldownData, load
 import { sceneFromSpacesState } from '../scene';
 import { safeSearchText } from '../serialize';
 import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, runGuardedAction } from '../actions';
+import { createStaleSafeSelectionLoader } from '../runtime';
 
 const SPINNER_FRAMES = ['|', '/', '-', '\\'];
 
@@ -156,23 +157,6 @@ export async function renameSpaceWithGuard(args: RenameSpaceWithGuardArgs): Prom
     });
     args.context.setStatus('Space renamed.');
   });
-}
-
-export function createStaleSafeSelectionLoader<TInput, TResult>(args: {
-  load: (input: TInput) => Promise<TResult>;
-  apply: (result: TResult) => void;
-}): (input: TInput) => Promise<boolean> {
-  let token = 0;
-
-  return async (input: TInput): Promise<boolean> => {
-    const current = ++token;
-    const result = await args.load(input);
-    if (current !== token) {
-      return false;
-    }
-    args.apply(result);
-    return true;
-  };
 }
 
 export function createSpacesScreen(): TuiScreen {

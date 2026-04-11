@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createStaleSafeSelectionLoader } from '../../src/tui/screens/spaces';
+import { createStaleSafeSelectionLoader } from '../../src/tui/runtime';
 
 describe('spaces screen stale-safe loader', () => {
   it('ignores stale async responses', async () => {

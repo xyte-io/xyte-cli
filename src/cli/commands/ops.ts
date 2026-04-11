@@ -209,6 +209,7 @@ async function handleOpsWatchIncidents(
   }
   const settings = await ctx.resolveSettings(overrides);
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
+  requireTenantId(tenantId, 'ops watch incidents');
   const query = parseQueryJson(options.queryJson);
   const output = resolveTextJsonOutput({
     output: options.output,
