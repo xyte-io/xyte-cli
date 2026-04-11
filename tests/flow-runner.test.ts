@@ -100,6 +100,8 @@ describe('flow runner', () => {
   afterEach(() => {
     builtInDefinitionOverride = null;
     flowDefinitionOverride = null;
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('resumes from a pending gate and advances one gate per apply invocation', async () => {
