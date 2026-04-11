@@ -17,6 +17,9 @@ import { sceneFromSpacesState } from '../scene';
 import { safeSearchText } from '../serialize';
 import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, runGuardedAction } from '../actions';
 import { createStaleSafeSelectionLoader } from '../runtime';
+import { createRenderErrorTracker } from '../render-error-tracker';
+import { createScreenRenderLogger } from '../screen-render-logger';
+import { errorMessage } from '../../utils/error-format';
 
 const SPINNER_FRAMES = ['|', '/', '-', '\\'];
 
@@ -189,6 +192,8 @@ export function createSpacesScreen(): TuiScreen {
   const paneConfig = SCREEN_PANE_CONFIG.spaces;
   let activePane = paneConfig.defaultPane;
   let isMounted = false;
+  const renderErrors = createRenderErrorTracker();
+  const renderLog = createScreenRenderLogger('spaces', () => context.debugLog, renderErrors);
   let idFilter = '';
   let nameFilter = '';
   let parentIdFilter = '';
@@ -244,54 +249,74 @@ export function createSpacesScreen(): TuiScreen {
       return;
     }
 
-    const actionsHint = 'actions: a claim/create/rename, f endpoint filters';
-    const endpointFilterSummary = [
-      idFilter ? `id=${idFilter}` : '',
-      nameFilter ? `name=${nameFilter}` : '',
-      parentIdFilter ? `parent=${parentIdFilter}` : '',
-      spaceTypeFilter ? `type=${spaceTypeFilter}` : '',
-      pathIncludesFilter ? `path~${pathIncludesFilter}` : ''
-    ]
-      .filter(Boolean)
-      .join(' ');
+    renderLog.onRenderStart();
+    try {
+      if (renderErrors.frozen) {
+        spaceTable.setContent('Render fallback mode enabled. Refresh (r) to retry.');
+        detailBox.setContent('Previous render errors were repeated. Reduce payload complexity and refresh.');
+      } else {
+        const actionsHint = 'actions: a claim/create/rename, f endpoint filters';
+        const endpointFilterSummary = [
+          idFilter ? `id=${idFilter}` : '',
+          nameFilter ? `name=${nameFilter}` : '',
+          parentIdFilter ? `parent=${parentIdFilter}` : '',
+          spaceTypeFilter ? `type=${spaceTypeFilter}` : '',
+          pathIncludesFilter ? `path~${pathIncludesFilter}` : ''
+        ]
+          .filter(Boolean)
+          .join(' ');
 
-    const panels = sceneFromSpacesState({
-      tenantId: activeTenantId,
-      searchText,
-      selectedIndex,
-      loading,
-      paneStatus,
-      spaces: filtered,
-      spaceDetail: selectedSpaceDetail,
-      devicesInSpace,
-      actionsHint,
-      endpointFilterSummary
-    });
+        const panels = sceneFromSpacesState({
+          tenantId: activeTenantId,
+          searchText,
+          selectedIndex,
+          loading,
+          paneStatus,
+          spaces: filtered,
+          spaceDetail: selectedSpaceDetail,
+          devicesInSpace,
+          actionsHint,
+          endpointFilterSummary
+        });
 
-    const listPanel = panels.find((panel) => panel.id === 'spaces-list');
-    const detailPanel = panels.find((panel) => panel.id === 'spaces-detail');
-    const devicesPanel = panels.find((panel) => panel.id === 'spaces-devices');
+        const listPanel = panels.find((panel) => panel.id === 'spaces-list');
+        const detailPanel = panels.find((panel) => panel.id === 'spaces-detail');
+        const devicesPanel = panels.find((panel) => panel.id === 'spaces-devices');
 
-    setListTableData(
-      spaceTable,
-      [
-        (listPanel?.table?.columns ?? ['ID', 'Name', 'Type', 'Path']) as [string, string, string, string],
-        ...((listPanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
-      ],
-      spaceSelectionSync
-    );
-    syncListSelection(spaceTable, selectedIndex, spaceSelectionSync);
+        setListTableData(
+          spaceTable,
+          [
+            (listPanel?.table?.columns ?? ['ID', 'Name', 'Type', 'Path']) as [string, string, string, string],
+            ...((listPanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
+          ],
+          spaceSelectionSync
+        );
+        syncListSelection(spaceTable, selectedIndex, spaceSelectionSync);
 
-    detailBox.setContent((detailPanel?.text?.lines ?? ['No space selected.']).join('\n'));
+        detailBox.setContent((detailPanel?.text?.lines ?? ['No space selected.']).join('\n'));
 
-    setListTableData(devicesTable, [
-      (devicesPanel?.table?.columns ?? ['ID', 'Name', 'Status']) as [string, string, string],
-      ...((devicesPanel?.table?.rows ?? []) as Array<[string, string, string]>)
-    ]);
-    devicesTable.select(clampIndex(selectedDeviceIndex, devicesInSpace.length) + 1);
+        setListTableData(devicesTable, [
+          (devicesPanel?.table?.columns ?? ['ID', 'Name', 'Status']) as [string, string, string],
+          ...((devicesPanel?.table?.rows ?? []) as Array<[string, string, string]>)
+        ]);
+        devicesTable.select(clampIndex(selectedDeviceIndex, devicesInSpace.length) + 1);
+      }
 
-    const statusPrefix = loading ? `${SPINNER_FRAMES[spinnerPhase % SPINNER_FRAMES.length]} ` : '';
-    statusBox.setContent(` ${statusPrefix}${paneStatus}`);
+      const statusPrefix = loading ? `${SPINNER_FRAMES[spinnerPhase % SPINNER_FRAMES.length]} ` : '';
+      statusBox.setContent(` ${statusPrefix}${paneStatus}`);
+      renderErrors.recordSuccess();
+      renderLog.onRenderComplete();
+    } catch (error) {
+      const message = errorMessage(error);
+      renderErrors.recordError(message);
+      renderLog.onRenderError(message);
+      detailBox.setContent([
+        'Unable to render space detail safely.',
+        `Reason: ${message}`,
+        'Try narrowing search/filter and refresh.'
+      ].join('\n'));
+    }
+
     focusPane();
     context.screen.render();
   };

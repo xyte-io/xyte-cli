@@ -388,7 +388,19 @@ async function handleOpsReportGenerate(
     });
   }
 
-  let reportInput = parseReportInput(raw, tenantId);
+  let reportInput: ReturnType<typeof parseReportInput>;
+  try {
+    reportInput = parseReportInput(raw, tenantId);
+  } catch (err) {
+    throw new CliUserError({
+      summary: err instanceof Error ? err.message : 'Invalid report input format.',
+      suggestedCommands: [
+        'Generate fresh input with xyte-cli ops inspect deep-dive --output json',
+        'Generate fresh input with xyte-cli util match',
+        'Generate fresh input with xyte-cli util move-devices'
+      ]
+    });
+  }
   if (reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION && !reportInput.tenantName) {
     const tenantProfile = await ctx.profileStore.getTenant(tenantId);
     if (tenantProfile?.name) {

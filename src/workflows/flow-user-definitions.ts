@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { z } from 'zod';
 
+import { CliUserError } from '../contracts/user-error';
 import { getXyteConfigDir } from '../utils/config-dir';
 import { errorMessage } from '../utils/error-format';
 import { FLOW_DEFINITION_SCHEMA_VERSION } from '../contracts/versions';
@@ -48,9 +49,10 @@ function isFlowId(value: string): boolean {
 function normalizeFlowId(value: string): string {
   const normalized = value.trim();
   if (!isFlowId(normalized)) {
-    throw new Error(
-      `Invalid flow id: ${value}. Use flow.<name> with lowercase letters, numbers, dots, underscores, or dashes.`
-    );
+    throw new CliUserError({
+      summary: `Invalid flow id: ${value}.`,
+      detail: 'Use flow.<name> with lowercase letters, numbers, dots, underscores, or dashes.'
+    });
   }
   return normalized;
 }
@@ -58,7 +60,7 @@ function normalizeFlowId(value: string): string {
 function validateFlowDefinition(value: unknown): FlowDefinitionV1 {
   const result = FlowDefinitionV1Schema.safeParse(value);
   if (!result.success) {
-    throw new Error(result.error.issues.map((e: z.ZodIssue) => e.message).join('; '));
+    throw new CliUserError({ summary: result.error.issues.map((e: z.ZodIssue) => e.message).join('; ') });
   }
   return result.data;
 }
@@ -133,7 +135,10 @@ export async function saveFlowDefinition(args: {
   const id = normalizeFlowId(args.flowId);
   const existing = await getFlowDefinition(id);
   if (existing && !args.overwrite) {
-    throw new Error(`Flow ${id} already exists. Re-run with --force or use flow edit.`);
+    throw new CliUserError({
+      summary: `Flow ${id} already exists.`,
+      suggestedCommands: ['Re-run with --force to overwrite', 'xyte-cli flow edit to update it']
+    });
   }
 
   const now = new Date().toISOString();
@@ -173,7 +178,10 @@ export async function updateFlowDefinition(args: {
 }): Promise<FlowDefinitionV1 & { path: string }> {
   const existing = await getFlowDefinition(args.flowId);
   if (!existing) {
-    throw new Error(`Unknown flow definition: ${args.flowId}. Use flow create first.`);
+    throw new CliUserError({
+      summary: `Unknown flow definition: ${args.flowId}.`,
+      suggestedCommands: ['xyte-cli flow create to create it first']
+    });
   }
 
   const now = new Date().toISOString();

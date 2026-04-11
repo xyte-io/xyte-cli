@@ -128,7 +128,7 @@ describe('mapWithConcurrency — via partner enrichment', () => {
 
     // All 3 device IDs should have been enriched
     expect(getDeviceInfo).toHaveBeenCalledTimes(deviceIds.length);
-    const calledWith = getDeviceInfo.mock.calls.map((call) => (call[0] as any).path.device_id);
+    const calledWith = getDeviceInfo.mock.calls.map((call) => (call as any)[0].path.device_id);
     expect(calledWith.sort()).toEqual(deviceIds.sort());
   });
 });
