@@ -450,13 +450,13 @@ function getSettingsValueSources(args: {
 }
 
 function buildResolvedSettings(values: Record<SettingPath, SourceValue>): ResolvedCliSettings {
-  const resolved = cloneSettings(DEFAULT_SETTINGS) as unknown as Record<string, unknown>;
+  const resolved = cloneSettings(DEFAULT_SETTINGS);
   for (const [keyPath, sourceValue] of Object.entries(values) as Array<[SettingPath, SourceValue]>) {
     if (sourceValue.value !== undefined) {
-      setPathValue(resolved, keyPath, sourceValue.value);
+      setPathValue(resolved as unknown as Record<string, unknown>, keyPath, sourceValue.value);
     }
   }
-  return resolved as unknown as ResolvedCliSettings;
+  return resolved;
 }
 
 export const SUPPORTED_SETTING_KEYS = SETTING_PATHS;

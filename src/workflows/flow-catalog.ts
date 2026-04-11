@@ -1,4 +1,4 @@
-import type { WatchProfile } from '../contracts/watch-frame';
+import { DEFAULT_WATCH_PROFILE, type WatchProfile } from '../contracts/watch-frame';
 
 export type BuiltInFlowId =
   | 'flow.setup-readiness-10m'
@@ -174,7 +174,7 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         title: 'Watch Once',
         task: 'watch',
         watch: {
-          profile: 'incidents-active',
+          profile: DEFAULT_WATCH_PROFILE,
           once: true
         },
         mutating: false,
@@ -187,7 +187,7 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         title: 'Watch Loop',
         task: 'watch',
         watch: {
-          profile: 'incidents-active',
+          profile: DEFAULT_WATCH_PROFILE,
           once: false,
           intervalMs: 2000,
           maxPolls: 30
@@ -216,7 +216,7 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         title: 'Watch Once Triage',
         task: 'watch',
         watch: {
-          profile: 'incidents-active',
+          profile: DEFAULT_WATCH_PROFILE,
           once: true
         },
         mutating: false,
@@ -321,7 +321,7 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         title: 'Watch Before',
         task: 'watch',
         watch: {
-          profile: 'incidents-active',
+          profile: DEFAULT_WATCH_PROFILE,
           once: true
         },
         mutating: false,
@@ -482,7 +482,7 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         title: 'Watch After',
         task: 'watch',
         watch: {
-          profile: 'incidents-active',
+          profile: DEFAULT_WATCH_PROFILE,
           once: true
         },
         mutating: false,
@@ -721,6 +721,12 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
       }
     ]
   }
+};
+
+export const UTILITY_PREPARE_CONTEXT_KEY: Record<string, string> = {
+  'space.import-tree': 'space_import_tree_csv',
+  'organization.devices.claimDevice': 'claim_prepare_csv',
+  'device.move': 'device_move_csv'
 };
 
 export function listBuiltInFlowDefinitions(): BuiltInFlowDefinition[] {

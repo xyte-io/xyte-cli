@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 
 import { toProblemDetails } from '../client/errors';
-import { buildWatchFrame, type WatchDelta, type WatchFrameV1, type WatchProfile } from '../contracts/watch-frame';
+import { buildWatchFrame, DEFAULT_WATCH_PROFILE, type WatchDelta, type WatchFrameV1, type WatchProfile } from '../contracts/watch-frame';
 import type { XyteClient } from '../types/client';
 import { asRecord } from '../utils/json';
 import { extractIncidentsArray } from '../utils/incidents';
@@ -147,7 +147,7 @@ interface RunWatchOptions {
 }
 
 export async function runWatch(options: RunWatchOptions): Promise<void> {
-  const profile = options.profile ?? 'incidents-active';
+  const profile = options.profile ?? DEFAULT_WATCH_PROFILE;
   const intervalMs = Math.max(WATCH_MIN_INTERVAL_MS, options.intervalMs ?? 2000);
   const requestedMaxPolls = options.once ? 1 : (options.maxPolls ?? WATCH_DEFAULT_MAX_POLLS);
   const maxPolls = Math.max(1, Math.min(WATCH_MAX_POLLS, requestedMaxPolls));
