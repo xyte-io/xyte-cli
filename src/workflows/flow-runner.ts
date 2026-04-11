@@ -43,7 +43,9 @@ import {
   generateDeviceMigrationReport,
   generateOpsReport,
   InspectProviderScopeError,
-  parseReportInput
+  parseReportInput,
+  type FleetReportResult,
+  type OpsReportInput
 } from './fleet-insights';
 import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';
 import type { BuiltInFlowDefinition, FlowTaskStep } from './flow-catalog';
@@ -446,10 +448,59 @@ async function handleDeepDive(step: FlowTaskStep, ctx: RunContext): Promise<Task
   return { output: buildDeepDive(snapshot, windowHours) };
 }
 
+function handleMigrationReport(args: {
+  stepId: string;
+  inputFromStepId: string;
+  fleetFromStepId: string;
+  verificationFromStepId: string;
+  reportInput: OpsReportInput;
+  taskOutputs: Map<string, unknown>;
+  tenantId: string;
+  outPath: string;
+}): TaskExecutionResult {
+  const { stepId, inputFromStepId, fleetFromStepId, verificationFromStepId, reportInput, taskOutputs, tenantId, outPath } = args;
+  if (reportInput.schemaVersion !== UTILITY_BATCH_SCHEMA_VERSION || reportInput.command !== 'device.move') {
+    throw new FlowNeedsInputError(`Step ${stepId} requires device.move batch output from ${inputFromStepId}.`);
+  }
+  const fleetInput = taskOutputs.get(fleetFromStepId);
+  const verificationInput = taskOutputs.get(verificationFromStepId);
+  if (!fleetInput || typeof fleetInput !== 'object') {
+    throw new FlowNeedsInputError(`Step ${stepId}: fleet snapshot from ${fleetFromStepId} is missing or invalid.`);
+  }
+  const generated = generateDeviceMigrationReport({
+    execution: reportInput,
+    fleet: fleetInput,
+    verification: verificationInput,
+    tenantId,
+    outPath
+  });
+  return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
+}
+
+async function handleOpsReport(args: {
+  reportInput: OpsReportInput;
+  format: 'markdown' | 'pdf';
+  includeSensitive: boolean;
+  tenantId: string;
+  outPath: string;
+}): Promise<TaskExecutionResult> {
+  const { reportInput, format, includeSensitive, tenantId, outPath } = args;
+  if (reportInput.schemaVersion !== INSPECT_DEEP_DIVE_SCHEMA_VERSION && format !== 'markdown') {
+    throw new CliUserError({ summary: `Report format '${format}' is only supported for deep-dive reports. Use 'markdown'.` });
+  }
+  let generated: FleetReportResult;
+  if (reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION) {
+    generated = await generateOpsReport({ input: reportInput, tenantId, format, outPath, includeSensitive });
+  } else {
+    generated = await generateOpsReport({ input: reportInput, tenantId, format: 'markdown', outPath, includeSensitive });
+  }
+  return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
+}
+
 async function handleReportGenerate(step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
   const report = requireStepConfig(step.report, step.id, 'report');
   const input = ctx.taskOutputs.get(report.inputFromStepId);
-  let reportInput;
+  let reportInput: OpsReportInput;
   try {
     reportInput = parseReportInput(input, ctx.args.tenantId);
   } catch (error) {
@@ -457,39 +508,25 @@ async function handleReportGenerate(step: FlowTaskStep, ctx: RunContext): Promis
   }
   const outPath = path.join(ctx.outputsDir, report.outFileName);
   const { fleetFromStepId, verificationFromStepId } = report;
-  let generated;
   if (fleetFromStepId && verificationFromStepId) {
-    if (reportInput.schemaVersion !== UTILITY_BATCH_SCHEMA_VERSION || reportInput.command !== 'device.move') {
-      throw new FlowNeedsInputError(
-        `Step ${step.id} requires device.move batch output from ${report.inputFromStepId}.`
-      );
-    }
-    const fleetInput = ctx.taskOutputs.get(fleetFromStepId);
-    const verificationInput = ctx.taskOutputs.get(verificationFromStepId);
-    if (!fleetInput || typeof fleetInput !== 'object') {
-      throw new FlowNeedsInputError(
-        `Step ${step.id}: fleet snapshot from ${fleetFromStepId} is missing or invalid.`
-      );
-    }
-    generated = generateDeviceMigrationReport({
-      execution: reportInput,
-      fleet: fleetInput,
-      verification: verificationInput,
+    return handleMigrationReport({
+      stepId: step.id,
+      inputFromStepId: report.inputFromStepId,
+      fleetFromStepId,
+      verificationFromStepId,
+      reportInput,
+      taskOutputs: ctx.taskOutputs,
       tenantId: ctx.args.tenantId,
       outPath
     });
-  } else {
-    const includeSensitive = report.includeSensitive === true;
-    if (reportInput.schemaVersion !== INSPECT_DEEP_DIVE_SCHEMA_VERSION && report.format !== 'markdown') {
-      throw new CliUserError({ summary: `Report format '${report.format}' is only supported for deep-dive reports. Use 'markdown'.` });
-    }
-    if (reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION) {
-      generated = await generateOpsReport({ input: reportInput, tenantId: ctx.args.tenantId, format: report.format, outPath, includeSensitive });
-    } else {
-      generated = await generateOpsReport({ input: reportInput, tenantId: ctx.args.tenantId, format: 'markdown', outPath, includeSensitive });
-    }
   }
-  return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
+  return handleOpsReport({
+    reportInput,
+    format: report.format,
+    includeSensitive: report.includeSensitive === true,
+    tenantId: ctx.args.tenantId,
+    outPath
+  });
 }
 
 async function handleWatch(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
