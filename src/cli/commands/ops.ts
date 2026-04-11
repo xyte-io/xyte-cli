@@ -11,7 +11,7 @@ import { errorMessage } from '../../utils/error-format';
 import { isRecord } from '../../utils/json';
 import { stringifyJsonOutput } from '../../utils/json-output';
 import { parseInspectProviderScope, type InspectProviderScope } from '../../types/settings-enums';
-import { TUI_SCREEN_IDS, type TuiScreenId } from '../../types/tui-screens';
+import { TUI_SCREEN_IDS, type TuiScreenId } from '../../tui/types';
 import { runTuiApp } from '../../tui/app';
 import {
   buildDeepDive,

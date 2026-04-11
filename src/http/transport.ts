@@ -46,7 +46,7 @@ function toLowerCaseMap(headers: Headers): Record<string, string> {
 function summarizeHttpErrorDetails(details: unknown): string | undefined {
   if (typeof details === 'string') {
     const value = details.trim();
-    return value ? value : undefined;
+    return value || undefined;
   }
 
   if (!details || typeof details !== 'object') {

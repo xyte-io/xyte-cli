@@ -293,7 +293,7 @@ function parseOptionalString(value: unknown): string | undefined {
     return undefined;
   }
   const normalized = String(value).trim();
-  return normalized ? normalized : undefined;
+  return normalized || undefined;
 }
 
 function parseEnum<T extends string>(value: unknown, label: string, allowed: readonly T[]): T {
