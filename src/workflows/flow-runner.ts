@@ -43,7 +43,9 @@ import {
 } from './fleet-insights';
 import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';
 import type { BuiltInFlowDefinition, FlowTaskStep } from './flow-catalog';
-import { hasBuiltInFlowDefinition, getBuiltInFlowDefinition } from './flow-catalog';
+import { hasBuiltInFlowDefinition, getBuiltInFlowDefinition, UTILITY_PREPARE_CONTEXT_KEY } from './flow-catalog';
+import { getFlowDefinition } from './flow-user-definitions';
+import { CliUserError } from '../contracts/user-error';
 
 export type FlowRunMode = 'plan' | 'apply';
 
@@ -56,6 +58,8 @@ class FlowNeedsInputError extends Error {
 
 interface RunContext {
   args: RunDeterministicFlowArgs;
+  resolvedFlowId: string;
+  definition: BuiltInFlowDefinition;
   bundleDir: string;
   stepsDir: string;
   outputsDir: string;
@@ -78,22 +82,20 @@ interface TaskExecutionResult {
 }
 
 interface FlowRunInputsPayload {
-  flowId?: unknown;
-  resolvedFlowId?: unknown;
-  tenantId?: unknown;
-  mode?: unknown;
-  inspectProviderScope?: unknown;
-  context?: unknown;
-  resume?: unknown;
-  strictJson?: unknown;
-  once?: unknown;
-  generatedAtUtc?: unknown;
+  flowId?: string;
+  resolvedFlowId?: string;
+  tenantId?: string;
+  mode?: FlowRunMode;
+  inspectProviderScope?: InspectProviderScope;
+  context?: Record<string, string>;
+  resume?: string;
+  strictJson?: boolean;
+  once?: boolean;
+  generatedAtUtc?: string;
 }
 
 interface RunDeterministicFlowArgs {
   flowId: string;
-  resolvedFlowId: string;
-  definition: BuiltInFlowDefinition;
   tenantId: string;
   mode: FlowRunMode;
   allowWrite?: boolean;
@@ -112,7 +114,7 @@ function isInspectProviderScopeError(error: unknown): boolean {
   return error instanceof InspectProviderScopeError;
 }
 
-async function collectSnapshotWithGuard(ctx: RunContext): Promise<ReturnType<typeof collectFleetSnapshot>> {
+async function collectSnapshotReclassifyingError(ctx: RunContext): Promise<ReturnType<typeof collectFleetSnapshot>> {
   const tenantProfile = await ctx.args.profileStore.getTenant(ctx.args.tenantId);
   try {
     return await collectFleetSnapshot({
@@ -176,12 +178,12 @@ export function parseFlowVarOptions(values: string[] | undefined): Record<string
   for (const entry of values ?? []) {
     const index = entry.indexOf('=');
     if (index <= 0) {
-      throw new Error(`Invalid --var entry: ${entry}. Use key=value.`);
+      throw new CliUserError({ summary: `Invalid --var entry: "${entry}". Use key=value.` });
     }
     const key = entry.slice(0, index).trim();
     const value = entry.slice(index + 1).trim();
     if (!key) {
-      throw new Error(`Invalid --var entry: ${entry}. Key cannot be empty.`);
+      throw new CliUserError({ summary: `Invalid --var entry: "${entry}". Key cannot be empty.` });
     }
     out[key] = value;
   }
@@ -241,7 +243,7 @@ function resolveFlowWindowHours(step: FlowTaskStep, context: Record<string, stri
   return parsed;
 }
 
-function applyDerivedFlowContext(ctx: RunContext): void {
+function promoteWatchOutputKeys(ctx: RunContext): void {
   const context = ctx.resolvedContext;
 
   if (!context.device_id && context.watch_device_id) {
@@ -254,15 +256,19 @@ function applyDerivedFlowContext(ctx: RunContext): void {
       context.incident_id = incidentId;
     }
   }
+}
 
-  if (hasBuiltInFlowDefinition(ctx.args.resolvedFlowId)) {
-    const def = getBuiltInFlowDefinition(ctx.args.resolvedFlowId);
-    for (const [key, template] of Object.entries(def.contextDefaults ?? {})) {
-      if (!context[key]) {
-        const value = template.replace(/\{\{(\w+)\}\}/g, (_, k: string) => context[k] ?? '');
-        if (value && !value.includes('{{')) {
-          context[key] = value;
-        }
+function applyDefinitionContextDefaults(ctx: RunContext): void {
+  if (!hasBuiltInFlowDefinition(ctx.resolvedFlowId)) {
+    return;
+  }
+  const context = ctx.resolvedContext;
+  const def = getBuiltInFlowDefinition(ctx.resolvedFlowId);
+  for (const [key, template] of Object.entries(def.contextDefaults ?? {})) {
+    if (!context[key]) {
+      const value = template.replace(/{{\s*([a-zA-Z0-9._-]+)\s*}}/g, (_, k: string) => context[k.trim()] ?? '');
+      if (value && !value.includes('{{')) {
+        context[key] = value;
       }
     }
   }
@@ -282,7 +288,10 @@ function classifyFailure(problem: ReturnType<typeof toProblemDetails>): FlowRunC
   return 'bug';
 }
 
-function toNeedsInputProblem(error: FlowNeedsInputError, instance: string) {
+function toNeedsInputProblem(
+  error: FlowNeedsInputError,
+  instance: string
+): { type: string; title: string; status: number; detail: string; instance: string; xyteCode: string; retriable: boolean } {
   return {
     type: 'https://xyte.dev/problems/flow-needs-input',
     title: 'Flow requires additional input',
@@ -404,13 +413,13 @@ async function handleStatusFast(_step: FlowTaskStep, ctx: RunContext): Promise<T
 }
 
 async function handleFleetInspect(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
-  const snapshot = await collectSnapshotWithGuard(ctx);
+  const snapshot = await collectSnapshotReclassifyingError(ctx);
   return { output: buildFleetInspect(snapshot) };
 }
 
 async function handleDeepDive(step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
   const windowHours = resolveFlowWindowHours(step, ctx.resolvedContext);
-  const snapshot = await collectSnapshotWithGuard(ctx);
+  const snapshot = await collectSnapshotReclassifyingError(ctx);
   return { output: buildDeepDive(snapshot, windowHours) };
 }
 
@@ -451,8 +460,10 @@ async function handleReportGenerate(step: FlowTaskStep, ctx: RunContext): Promis
     });
   } else {
     const includeSensitive = report.includeSensitive === true;
-    const format = reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION ? report.format : 'markdown';
-    generated = await generateOpsReport({ input: reportInput, tenantId: ctx.args.tenantId, format, outPath, includeSensitive });
+    generated =
+      reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION
+        ? await generateOpsReport({ input: reportInput, tenantId: ctx.args.tenantId, format: report.format, outPath, includeSensitive })
+        : await generateOpsReport({ input: reportInput, tenantId: ctx.args.tenantId, format: 'markdown', outPath, includeSensitive });
   }
   return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
 }
@@ -526,12 +537,6 @@ async function handleCall(step: FlowTaskStep, _stepIndex: number, ctx: RunContex
       : undefined
   };
 }
-
-const UTILITY_PREPARE_CONTEXT_KEY: Record<string, string> = {
-  'space.import-tree': 'space_import_tree_csv',
-  'organization.devices.claimDevice': 'claim_prepare_csv',
-  'device.move': 'device_move_csv'
-};
 
 function handleUtilityPrepare(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): TaskExecutionResult {
   if (!step.utilityPrepare) {
@@ -637,7 +642,8 @@ async function handleSpaceImportTree(step: FlowTaskStep, _stepIndex: number, ctx
 }
 
 async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
-  applyDerivedFlowContext(ctx);
+  promoteWatchOutputKeys(ctx);
+  applyDefinitionContextDefaults(ctx);
   ensureContextKeys(step, ctx.resolvedContext);
 
   switch (step.task) {
@@ -659,7 +665,7 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
   }
 }
 
-function computeDecisionCounts(decisions: FlowRunDecision[]) {
+function computeDecisionCounts(decisions: FlowRunDecision[]): { pending: number; approved: number; blocked: number } {
   return {
     pending: decisions.filter((item) => item.action === 'pending').length,
     approved: decisions.filter((item) => item.action === 'approved').length,
@@ -667,7 +673,7 @@ function computeDecisionCounts(decisions: FlowRunDecision[]) {
   };
 }
 
-function computeClassificationCounts(errors: FlowRunErrorEntry[]) {
+function computeClassificationCounts(errors: FlowRunErrorEntry[]): { needs_data: number; bug: number } {
   return {
     needs_data: errors.filter((item) => item.classification === 'needs_data').length,
     bug: errors.filter((item) => item.classification === 'bug').length
@@ -786,13 +792,13 @@ async function readStoredInputs(bundleDir: string): Promise<FlowRunInputsPayload
 }
 
 function buildFlowRunInputsPayload(
-  ctx: Pick<RunContext, 'resolvedContext'>,
+  ctx: Pick<RunContext, 'resolvedContext' | 'resolvedFlowId'>,
   args: RunDeterministicFlowArgs,
   inspectProviderScope: InspectProviderScope
 ): FlowRunInputsPayload {
   return {
     flowId: args.flowId,
-    resolvedFlowId: args.resolvedFlowId,
+    resolvedFlowId: ctx.resolvedFlowId,
     tenantId: args.tenantId,
     mode: args.mode,
     inspectProviderScope,
@@ -805,7 +811,7 @@ function buildFlowRunInputsPayload(
 }
 
 async function persistFlowRunInputs(
-  ctx: Pick<RunContext, 'inputsPath' | 'resolvedContext'>,
+  ctx: Pick<RunContext, 'inputsPath' | 'resolvedContext' | 'resolvedFlowId'>,
   args: RunDeterministicFlowArgs,
   inspectProviderScope: InspectProviderScope
 ): Promise<void> {
@@ -897,6 +903,23 @@ async function ensureRunPaths(ctx: RunContext): Promise<void> {
 }
 
 export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Promise<FlowRunSummary> {
+  let resolvedFlowId = args.flowId;
+  let flowDefaults: Record<string, string> = {};
+  if (!hasBuiltInFlowDefinition(args.flowId)) {
+    const custom = await getFlowDefinition(args.flowId);
+    if (!custom) {
+      throw new CliUserError({ summary: `Unknown flow id: ${args.flowId}` });
+    }
+    if (!hasBuiltInFlowDefinition(custom.basedOn)) {
+      throw new CliUserError({
+        summary: `Custom flow ${args.flowId} references unknown built-in base flow: ${custom.basedOn}`
+      });
+    }
+    resolvedFlowId = custom.basedOn;
+    flowDefaults = custom.defaults;
+  }
+  const definition = getBuiltInFlowDefinition(resolvedFlowId);
+
   const outRoot = path.resolve(args.outDir);
   const resumeBundle = args.resume ? await findRunBundle(outRoot, args.resume) : undefined;
 
@@ -906,7 +929,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
   const bundleDir =
     resume?.bundleDir ?? path.join(outRoot, sanitizeFlowId(args.flowId), buildRunDirName(freshRunId));
   const initialStartedAtUtc = resume?.initialStartedAtUtc ?? nowIso();
-  const steps = resume?.steps ?? createInitialSteps(args.definition);
+  const steps = resume?.steps ?? createInitialSteps(definition);
   const cursorIndex = resume?.cursorIndex ?? 0;
   const priorDecisions = resume?.priorDecisions ?? [];
   const priorErrors = resume?.priorErrors ?? [];
@@ -918,6 +941,8 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
       ...args,
       inspectProviderScope: effectiveInspectProviderScope
     },
+    resolvedFlowId,
+    definition,
     bundleDir,
     stepsDir: path.join(bundleDir, 'steps'),
     outputsDir: path.join(bundleDir, 'outputs'),
@@ -928,6 +953,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
     watchFramesPath: path.join(bundleDir, 'watch-frames.ndjson'),
     resolvedContext: {
       ...(resume?.resumedContext ?? {}),
+      ...flowDefaults,
       ...args.context
     },
     taskOutputs: restoredTaskOutputs
@@ -943,9 +969,9 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
   const decisions = [...priorDecisions];
   const errors = [...priorErrors];
 
-  if (nextStepIndex < args.definition.steps.length) {
-    for (let index = nextStepIndex; index < args.definition.steps.length; index += 1) {
-      const step = args.definition.steps[index];
+  if (nextStepIndex < definition.steps.length) {
+    for (let index = nextStepIndex; index < definition.steps.length; index += 1) {
+      const step = definition.steps[index];
       const stepState = steps[index];
 
       if (step.kind === 'gate') {
@@ -1068,7 +1094,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
   const summary = buildFlowRunSummary({
     runId,
     flowId: args.flowId,
-    resolvedFlowId: args.resolvedFlowId,
+    resolvedFlowId: ctx.resolvedFlowId,
     mode: args.mode,
     tenantId: args.tenantId,
     bundleDir: ctx.bundleDir,
@@ -1082,10 +1108,10 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
     durationMs: Date.now() - runStartedAt,
     ...(args.resume ? { resumeFrom: args.resume } : {}),
     outcome,
-    ...(nextStepIndex < args.definition.steps.length
-      ? { nextResumeStepId: args.definition.steps[nextStepIndex].id }
+    ...(nextStepIndex < definition.steps.length
+      ? { nextResumeStepId: definition.steps[nextStepIndex].id }
       : {}),
-    ...(nextStepIndex < args.definition.steps.length
+    ...(nextStepIndex < definition.steps.length
       ? {
           resumeCommand: `xyte-cli flow run ${args.flowId} --tenant ${args.tenantId} --${args.mode} --inspect-provider-scope ${effectiveInspectProviderScope} --resume ${runId}`
         }
@@ -1095,7 +1121,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
     classifications: classificationCount,
     cursor: {
       nextStepIndex,
-      ...(nextStepIndex < args.definition.steps.length ? { nextStepId: args.definition.steps[nextStepIndex].id } : {})
+      ...(nextStepIndex < definition.steps.length ? { nextStepId: definition.steps[nextStepIndex].id } : {})
     }
   });
 

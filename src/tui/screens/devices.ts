@@ -20,9 +20,10 @@ import { sceneFromDevicesState } from '../scene';
 import { payloadSummary, safeSearchText } from '../serialize';
 import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, promptChoice, runGuardedAction } from '../actions';
 import { errorMessage } from '../../utils/error-format';
+import { asRecord, asRecordOrUndefined } from '../../utils/json';
 
 function deviceIdOf(device: unknown): string {
-  const rec = device && typeof device === 'object' ? (device as Record<string, unknown>) : undefined;
+  const rec = asRecordOrUndefined(device);
   return String(rec?.id ?? rec?._id ?? rec?.device_id ?? '');
 }
 
@@ -37,10 +38,7 @@ function renderDeviceFallbackTable(
     [
       ['ID', 'Name', 'Status', 'Space'],
       ...filtered.map((device, index) => {
-        const d =
-          device && typeof device === 'object'
-            ? (device as Record<string, unknown>)
-            : ({} as Record<string, unknown>);
+        const d = asRecord(device);
         return [
           String(d.id ?? d._id ?? `row-${index + 1}`),
           String(d.name ?? d.title ?? 'n/a'),

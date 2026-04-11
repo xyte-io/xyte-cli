@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import type { Command } from 'commander';
@@ -6,6 +6,7 @@ import type { Command } from 'commander';
 import { DEFAULT_WATCH_PROFILE, type WatchFrameV1, type WatchProfile } from '../../contracts/watch-frame';
 import { CliUserError } from '../../contracts/user-error';
 import { INSPECT_DEEP_DIVE_SCHEMA_VERSION } from '../../contracts/versions';
+import { ensureParentDir } from '../../utils/fs';
 import { errorMessage } from '../../utils/error-format';
 import { isRecord } from '../../utils/json';
 import { stringifyJsonOutput } from '../../utils/json-output';
@@ -39,10 +40,6 @@ import {
 
 function resolveOutPath(out: string | undefined): string | undefined {
   return out ? path.resolve(out) : undefined;
-}
-
-function ensureParentDir(filePath: string): void {
-  mkdirSync(path.dirname(filePath), { recursive: true });
 }
 
 function writeRenderedOutput(stream: OutputStream, text: string, outPath?: string): void {
@@ -268,7 +265,7 @@ async function fetchInspectContext(
   const client = await ctx.withClient({ tenantId, flagOverrides: overrides });
   const tenantProfile = await ctx.profileStore.getTenant(tenantId);
   const snapshot = await collectFleetSnapshot({ client, tenantId, tenantName: tenantProfile?.name, providerScope });
-  return { settings, overrides, snapshot };
+  return { settings, snapshot };
 }
 
 async function handleOpsInspectFleet(
@@ -409,15 +406,10 @@ async function handleOpsReportGenerate(
   );
 
   const includeSensitive = options.includeSensitive === true || settings.values.report.includeSensitive;
-  const effectiveFormat =
-    reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION ? render : render === 'pdf' ? 'markdown' : render;
-  const generated = await generateOpsReport({
-    input: reportInput,
-    tenantId,
-    format: effectiveFormat,
-    outPath: options.out,
-    includeSensitive
-  });
+  const generated =
+    reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION
+      ? await generateOpsReport({ input: reportInput, tenantId, format: render, outPath: options.out, includeSensitive })
+      : await generateOpsReport({ input: reportInput, tenantId, format: 'markdown', outPath: options.out, includeSensitive });
   printJson(ctx.stdout, generated, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
 }
 

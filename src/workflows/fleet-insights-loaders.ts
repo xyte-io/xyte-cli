@@ -28,7 +28,7 @@ function countValue(counter: StatusCounts, key: string): void {
   counter[key] = (counter[key] ?? 0) + 1;
 }
 
-async function safeCall(
+async function callWithOutcomeTracking(
   outcome: PartnerEndpointOutcome,
   operation: () => Promise<unknown>
 ): Promise<unknown | undefined> {
@@ -167,6 +167,8 @@ async function fetchAllPages(args: {
     return all;
   }
 
+  // Some API endpoints do not support pagination parameters and return all items in a single call.
+  // Fall back to a non-paginated request when pagination yielded nothing.
   const single = await args.fetchSingle();
   return extractArray(single, args.extractionKeys);
 }
@@ -303,7 +305,7 @@ async function collectPartnerEnrichment(
   await mapWithConcurrency(sampledDeviceIds, PARTNER_ENRICHMENT_CONCURRENCY, async (id) => {
     const base = baseDevicesById.get(id);
 
-    const infoRaw = await safeCall(snapshot.endpointAvailability.deviceInfo, () =>
+    const infoRaw = await callWithOutcomeTracking(snapshot.endpointAvailability.deviceInfo, () =>
       client.partner.getDeviceInfo({
         tenantId,
         path: { device_id: id }
@@ -345,7 +347,7 @@ async function collectPartnerEnrichment(
     );
     countValue(snapshot.lastSeenRecency, recencyBucket(lastSeen));
 
-    const commandsRaw = await safeCall(snapshot.endpointAvailability.commands, () =>
+    const commandsRaw = await callWithOutcomeTracking(snapshot.endpointAvailability.commands, () =>
       client.partner.getCommands({
         tenantId,
         path: { device_id: id }
@@ -358,7 +360,7 @@ async function collectPartnerEnrichment(
       countValue(snapshot.commandPosture, status ? status.toLowerCase() : 'unknown');
     }
 
-    const telemetriesRaw = await safeCall(snapshot.endpointAvailability.telemetries, () =>
+    const telemetriesRaw = await callWithOutcomeTracking(snapshot.endpointAvailability.telemetries, () =>
       client.partner.getTelemetries({
         tenantId,
         path: { device_id: id }
@@ -376,7 +378,7 @@ async function collectPartnerEnrichment(
       }
     }
 
-    const historyRaw = await safeCall(snapshot.endpointAvailability.stateHistory, () =>
+    const historyRaw = await callWithOutcomeTracking(snapshot.endpointAvailability.stateHistory, () =>
       client.partner.getStateHistory({
         tenantId,
         path: { device_id: id }

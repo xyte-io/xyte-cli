@@ -66,7 +66,7 @@ describe('fetchProviderForKey', () => {
     expect(mockRunSlot).toHaveBeenCalledTimes(2);
   });
 
-  it('throws when both org and partner probes fail', async () => {
+  it('throws CliUserError when both org and partner probes fail', async () => {
     mockRunSlot.mockRejectedValueOnce(new Error('org failed'));
     mockRunSlot.mockRejectedValueOnce(new Error('partner failed'));
     await expect(
@@ -76,6 +76,6 @@ describe('fetchProviderForKey', () => {
         keyValue: 'key',
         allowProbe: true
       })
-    ).rejects.toThrow('partner failed');
+    ).rejects.toThrow(CliUserError);
   });
 });

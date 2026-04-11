@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createXyteClient } from '../src/client/create-client';
 import { getBuiltInFlowDefinition, type BuiltInFlowDefinition } from '../src/workflows/flow-catalog';
@@ -10,6 +10,26 @@ import * as fleetInsights from '../src/workflows/fleet-insights';
 import { runDeterministicFlow } from '../src/workflows/flow-runner';
 import { MemorySecretStore } from '../src/secure/secret-store';
 import { MemoryProfileStore } from './support/memory-profile-store';
+
+// Per-test overrides captured by the vi.mock factory closures below.
+let builtInDefinitionOverride: BuiltInFlowDefinition | null = null;
+let flowDefinitionOverride: Record<string, unknown> | null = null;
+
+vi.mock('../src/workflows/flow-catalog', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../src/workflows/flow-catalog')>();
+  return {
+    ...original,
+    getBuiltInFlowDefinition: (id: string) => builtInDefinitionOverride ?? original.getBuiltInFlowDefinition(id)
+  };
+});
+
+vi.mock('../src/workflows/flow-user-definitions', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../src/workflows/flow-user-definitions')>();
+  return {
+    ...original,
+    getFlowDefinition: async (id: string) => flowDefinitionOverride ?? original.getFlowDefinition(id)
+  };
+});
 
 async function makeClient() {
   const profileStore = new MemoryProfileStore();
@@ -77,6 +97,11 @@ async function makeClientWithProviders(providers: Array<'xyte-org' | 'xyte-partn
 }
 
 describe('flow runner', () => {
+  afterEach(() => {
+    builtInDefinitionOverride = null;
+    flowDefinitionOverride = null;
+  });
+
   it('resumes from a pending gate and advances one gate per apply invocation', async () => {
     const { profileStore, secretStore, client } = await makeClient();
 
@@ -155,11 +180,20 @@ describe('flow runner', () => {
       ]
     };
 
+    builtInDefinitionOverride = definition;
+    flowDefinitionOverride = {
+      schemaVersion: 'xyte.flow.definition.v1',
+      id: 'flow.custom-remediation',
+      basedOn: definition.id,
+      defaults: {},
+      title: 'Custom Remediation',
+      createdAtUtc: new Date().toISOString(),
+      updatedAtUtc: new Date().toISOString(),
+      path: '/tmp/flow.custom-remediation.json'
+    };
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-resume`);
     const first = await runDeterministicFlow({
       flowId: 'flow.custom-remediation',
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       outDir,
@@ -179,8 +213,6 @@ describe('flow runner', () => {
 
     const second = await runDeterministicFlow({
       flowId: 'flow.custom-remediation',
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -229,12 +261,11 @@ describe('flow runner', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const definition = getBuiltInFlowDefinition('flow.guided-remediation');
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-guided-defaults`);
 
     const first = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       outDir,
@@ -258,8 +289,6 @@ describe('flow runner', () => {
 
     const second = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -278,8 +307,6 @@ describe('flow runner', () => {
 
     const third = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -333,11 +360,10 @@ describe('flow runner', () => {
       ]
     };
 
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-once`);
     const result = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       outDir,
@@ -394,11 +420,10 @@ describe('flow runner', () => {
       ]
     };
 
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-needs-data`);
     const result = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -450,11 +475,10 @@ describe('flow runner', () => {
       ]
     };
 
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-request-id`);
     const result = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       outDir,
@@ -481,6 +505,7 @@ describe('flow runner', () => {
   it('runs flow.device-migration across gates and persists match artifacts for resume', async () => {
     const { profileStore, secretStore, client } = await makeClient();
     const definition = getBuiltInFlowDefinition('flow.device-migration');
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-migration`);
     let currentSpaceId = 900;
 
@@ -551,8 +576,6 @@ describe('flow runner', () => {
 
     const plan = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       outDir,
@@ -579,8 +602,6 @@ describe('flow runner', () => {
 
     const dryRun = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -599,8 +620,6 @@ describe('flow runner', () => {
 
     const applied = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -627,6 +646,7 @@ describe('flow runner', () => {
   it('completes flow.device-migration when unrelated devices remain outside the move plan', async () => {
     const { profileStore, secretStore, client } = await makeClient();
     const definition = getBuiltInFlowDefinition('flow.device-migration');
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-migration-partial`);
     const currentSpaceByDevice = new Map<string, number>([
       ['dev-1', 900],
@@ -700,8 +720,6 @@ describe('flow runner', () => {
 
     const plan = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       outDir,
@@ -718,8 +736,6 @@ describe('flow runner', () => {
 
     await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -734,8 +750,6 @@ describe('flow runner', () => {
 
     const applied = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -762,6 +776,7 @@ describe('flow runner', () => {
   it('fails flow.device-migration when dry_run_moves reports failed move rows', async () => {
     const { profileStore, secretStore, client } = await makeClient();
     const definition = getBuiltInFlowDefinition('flow.device-migration');
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-migration-dry-run-fail`);
 
     const fetchMock = vi.fn(async (url: string) => {
@@ -813,8 +828,6 @@ describe('flow runner', () => {
 
     const plan = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       outDir,
@@ -831,8 +844,6 @@ describe('flow runner', () => {
 
     const failed = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -856,6 +867,7 @@ describe('flow runner', () => {
   it('fails flow.device-migration when execute_moves reports failed move rows', async () => {
     const { profileStore, secretStore, client } = await makeClient();
     const definition = getBuiltInFlowDefinition('flow.device-migration');
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-migration-execute-fail`);
 
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
@@ -910,8 +922,6 @@ describe('flow runner', () => {
 
     const plan = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       outDir,
@@ -928,8 +938,6 @@ describe('flow runner', () => {
 
     await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -944,8 +952,6 @@ describe('flow runner', () => {
 
     const failed = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -969,6 +975,7 @@ describe('flow runner', () => {
   it('fails flow.device-migration when a planned device resolves to the wrong target space', async () => {
     const { profileStore, secretStore, client } = await makeClient();
     const definition = getBuiltInFlowDefinition('flow.device-migration');
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-migration-fail`);
 
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
@@ -1026,8 +1033,6 @@ describe('flow runner', () => {
 
     const plan = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       outDir,
@@ -1044,8 +1049,6 @@ describe('flow runner', () => {
 
     await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -1060,8 +1063,6 @@ describe('flow runner', () => {
 
     const failed = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -1084,6 +1085,7 @@ describe('flow runner', () => {
   it('fails flow.device-migration when a planned device cannot be fetched during verification', async () => {
     const { profileStore, secretStore, client } = await makeClient();
     const definition = getBuiltInFlowDefinition('flow.device-migration');
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-migration-missing-fetch`);
     let failVerificationFetch = false;
 
@@ -1149,8 +1151,6 @@ describe('flow runner', () => {
 
     const plan = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       outDir,
@@ -1167,8 +1167,6 @@ describe('flow runner', () => {
 
     await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -1183,8 +1181,6 @@ describe('flow runner', () => {
 
     const failed = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -1207,6 +1203,7 @@ describe('flow runner', () => {
   it('fails flow.device-migration when a planned device returns an unusable verification payload', async () => {
     const { profileStore, secretStore, client } = await makeClient();
     const definition = getBuiltInFlowDefinition('flow.device-migration');
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-migration-missing-payload`);
     let returnUnusablePayload = false;
 
@@ -1272,8 +1269,6 @@ describe('flow runner', () => {
 
     const plan = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       outDir,
@@ -1290,8 +1285,6 @@ describe('flow runner', () => {
 
     await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -1306,8 +1299,6 @@ describe('flow runner', () => {
 
     const failed = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -1330,6 +1321,7 @@ describe('flow runner', () => {
   it('calls the migration-specific post report helper and completes the flow', async () => {
     const { profileStore, secretStore, client } = await makeClient();
     const definition = getBuiltInFlowDefinition('flow.device-migration');
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-migration-await-report`);
     let currentSpaceId = 900;
     let reportCalled = false;
@@ -1415,8 +1407,6 @@ describe('flow runner', () => {
     try {
       const plan = await runDeterministicFlow({
         flowId: definition.id,
-        resolvedFlowId: definition.id,
-        definition,
         tenantId: 'acme',
         mode: 'plan',
         outDir,
@@ -1433,8 +1423,6 @@ describe('flow runner', () => {
 
       await runDeterministicFlow({
         flowId: definition.id,
-        resolvedFlowId: definition.id,
-        definition,
         tenantId: 'acme',
         mode: 'apply',
         outDir,
@@ -1449,8 +1437,6 @@ describe('flow runner', () => {
 
       const completed = await runDeterministicFlow({
         flowId: definition.id,
-        resolvedFlowId: definition.id,
-        definition,
         tenantId: 'acme',
         mode: 'apply',
         outDir,
@@ -1529,11 +1515,10 @@ describe('flow runner', () => {
       ]
     };
 
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-provider-partner`);
     const result = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       inspectProviderScope: 'auto',
@@ -1604,11 +1589,10 @@ describe('flow runner', () => {
       ]
     };
 
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-resume-inspect-scope`);
     const first = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       inspectProviderScope: 'partner',
@@ -1625,8 +1609,6 @@ describe('flow runner', () => {
 
     const second = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -1712,11 +1694,10 @@ describe('flow runner', () => {
       ]
     };
 
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-resume-report`);
     const first = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       inspectProviderScope: 'auto',
@@ -1733,8 +1714,6 @@ describe('flow runner', () => {
 
     const second = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -1788,11 +1767,10 @@ describe('flow runner', () => {
       ]
     };
 
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-report-parse-context`);
     const result = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       outDir,
@@ -1843,11 +1821,10 @@ describe('flow runner', () => {
       ]
     };
 
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-provider-ambiguous`);
     const result = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       inspectProviderScope: 'auto',
@@ -1894,11 +1871,10 @@ describe('flow runner', () => {
       ]
     };
 
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-provider-ambiguous-fleet`);
     const result = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       inspectProviderScope: 'auto',
@@ -1946,11 +1922,10 @@ describe('flow runner', () => {
       ]
     };
 
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-provider-explicit-unavailable-deep-dive`);
     const result = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       inspectProviderScope: 'organization',
@@ -1996,11 +1971,10 @@ describe('flow runner', () => {
       ]
     };
 
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-provider-explicit-unavailable-fleet`);
     const result = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       inspectProviderScope: 'partner',
@@ -2086,11 +2060,10 @@ describe('flow runner', () => {
       ]
     };
 
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-resume-explicit-scope-precedence`);
     const first = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       inspectProviderScope: 'partner',
@@ -2107,8 +2080,6 @@ describe('flow runner', () => {
 
     const second = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,
@@ -2161,11 +2132,10 @@ describe('flow runner', () => {
       ]
     };
 
+    builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-resume-malformed-scope`);
     const first = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'plan',
       inspectProviderScope: 'partner',
@@ -2183,8 +2153,6 @@ describe('flow runner', () => {
 
     const second = await runDeterministicFlow({
       flowId: definition.id,
-      resolvedFlowId: definition.id,
-      definition,
       tenantId: 'acme',
       mode: 'apply',
       outDir,

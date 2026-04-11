@@ -1,7 +1,8 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { z } from 'zod';
 
+import { ensureParentDir } from '../utils/fs';
 import { asRecord } from '../utils/json';
 import { REPORT_SCHEMA_VERSION } from '../contracts/versions';
 import { UtilityBatchResultSchema } from './utility-batch';
@@ -23,19 +24,20 @@ export const DeviceMigrationReportResultSchema = z.object({
 
 export type DeviceMigrationReportResult = z.infer<typeof DeviceMigrationReportResultSchema>;
 
+function toSafeInt(value: unknown): number {
+  const n = Number(value ?? 0);
+  return Number.isFinite(n) ? Math.trunc(n) : 0;
+}
+
 export function extractFleetTotals(value: unknown): FleetInspectResult['totals'] {
   const record = asRecord(value);
   const totals = asRecord(record.totals);
   return {
-    devices: Number(totals.devices ?? 0),
-    spaces: Number(totals.spaces ?? 0),
-    incidents: Number(totals.incidents ?? 0),
-    tickets: Number(totals.tickets ?? 0)
+    devices: toSafeInt(totals.devices),
+    spaces: toSafeInt(totals.spaces),
+    incidents: toSafeInt(totals.incidents),
+    tickets: toSafeInt(totals.tickets)
   };
-}
-
-function ensureDir(filePath: string): void {
-  mkdirSync(dirname(resolve(filePath)), { recursive: true });
 }
 
 export function generateDeviceMigrationReport(args: {
@@ -48,7 +50,7 @@ export function generateDeviceMigrationReport(args: {
   const fleetTotals = extractFleetTotals(args.fleet);
   const verification = parseMoveVerificationResult(args.verification);
   const issueRows = verification.rows.filter((row) => row.status !== 'verified');
-  ensureDir(args.outPath);
+  ensureParentDir(args.outPath);
 
   const lines = [
     '# Device Migration Post-Execution Report',

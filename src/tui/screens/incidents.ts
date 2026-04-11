@@ -19,9 +19,10 @@ import { sceneFromIncidentsState } from '../scene';
 import { payloadSummary } from '../serialize';
 import { confirmWriteWithToken, openActionPalette, runGuardedAction } from '../actions';
 import { errorMessage } from '../../utils/error-format';
+import { asRecordOrUndefined } from '../../utils/json';
 
 function incidentIdOf(incident: unknown): string {
-  const rec = incident && typeof incident === 'object' ? (incident as Record<string, unknown>) : undefined;
+  const rec = asRecordOrUndefined(incident);
   return String(rec?.id ?? rec?._id ?? rec?.uuid ?? '');
 }
 

@@ -542,32 +542,17 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
           await mountScreen(target);
           return;
         }
-        if (ch === 'u') {
-          await mountScreen('setup');
-          return;
-        }
-        if (ch === 'g') {
-          await mountScreen('config');
-          return;
-        }
-        if (ch === 'd') {
-          await mountScreen('dashboard');
-          return;
-        }
-        if (ch === 's') {
-          await mountScreen('spaces');
-          return;
-        }
-        if (ch === 'v') {
-          await mountScreen('devices');
-          return;
-        }
-        if (ch === 'i') {
-          await mountScreen('incidents');
-          return;
-        }
-        if (ch === 't') {
-          await mountScreen('tickets');
+        const CHAR_SCREEN_MAP: Record<string, TuiScreenId> = {
+          u: 'setup',
+          g: 'config',
+          d: 'dashboard',
+          s: 'spaces',
+          v: 'devices',
+          i: 'incidents',
+          t: 'tickets'
+        };
+        if (ch && CHAR_SCREEN_MAP[ch]) {
+          await mountScreen(CHAR_SCREEN_MAP[ch]);
           return;
         }
         if (ch === 'r') {
