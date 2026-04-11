@@ -325,6 +325,8 @@ export async function loadTicketsData(
     return extractArray(org, ['tickets', 'data', 'items']);
   }, []);
 
+  // If org returned tickets or connected successfully with an empty list, accept that result — an
+  // empty org response is authoritative and should not trigger a partner fallback.
   if (orgOutcome.data.length || orgOutcome.connectionState === 'connected') {
     return {
       data: {

@@ -217,6 +217,9 @@ export class FileProfileStore implements ProfileStore {
     }
   }
 
+  // Runs normalize() over the persisted file and rewrites it if anything changed.
+  // This is a continuous normalization pass (not a versioned migration), so it
+  // remains valid to call across all profile versions and has no removal deadline.
   async migrateIfNeeded(): Promise<void> {
     try {
       const content = await fs.readFile(this.filePath, 'utf8');

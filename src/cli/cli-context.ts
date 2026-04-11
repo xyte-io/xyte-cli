@@ -66,6 +66,8 @@ export function parseCliOutputMode(value: string | undefined): CliOutputMode | u
   return normalized as CliOutputMode;
 }
 
+// `output` should be a pre-validated CliOutputMode or undefined; raw CLI strings are coerced
+// via parseCliOutputMode internally but callers are encouraged to validate at the CLI boundary first.
 export function resolveTextJsonOutput(args: {
   output?: CliOutputMode | string;
   format?: string;

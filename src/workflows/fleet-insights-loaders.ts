@@ -23,6 +23,9 @@ const PARTNER_ENRICHMENT_SAMPLE_SIZE = 25;
 const PARTNER_ENRICHMENT_CONCURRENCY = 5;
 const PARTNER_ENRICHMENT_TIMEOUT_MS = 3_000;
 const PARTNER_FRESH_TELEMETRY_WINDOW_HOURS = 24;
+const RECENCY_1H_MS = 3_600_000;
+const RECENCY_24H_MS = 86_400_000;
+const RECENCY_7D_MS = 604_800_000;
 
 function countValue(counter: StatusCounts, key: string): void {
   counter[key] = (counter[key] ?? 0) + 1;
@@ -94,13 +97,13 @@ function recencyBucket(timestamp: unknown): string {
     return 'unknown';
   }
   const ageMs = Math.max(0, Date.now() - parsed.getTime());
-  if (ageMs <= 3_600_000) {
+  if (ageMs <= RECENCY_1H_MS) {
     return '<=1h';
   }
-  if (ageMs <= 86_400_000) {
+  if (ageMs <= RECENCY_24H_MS) {
     return '1h-24h';
   }
-  if (ageMs <= 604_800_000) {
+  if (ageMs <= RECENCY_7D_MS) {
     return '1d-7d';
   }
   return '>7d';
@@ -181,6 +184,8 @@ function loadAllOrganizationDevices(client: XyteClient, tenantId: string): Promi
   });
 }
 
+// Partner device endpoints may ignore pagination parameters and return all items in one response;
+// fetchAllPages handles this via its non-paginated fetchSingle fallback.
 function loadAllPartnerDevices(client: XyteClient, tenantId: string): Promise<unknown[]> {
   return fetchAllPages({
     fetch: (query) => client.partner.getDevices({ tenantId, query }),
