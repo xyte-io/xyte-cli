@@ -16,6 +16,7 @@ import { runKeyCreateWizard, runKeyUpdateWizard } from '../key-wizard';
 import type { SecretProvider } from '../../types/profile';
 import { PROVIDER_ORG, SUPPORTED_SECRET_PROVIDERS } from '../../types/profile';
 import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
+import { readConfigData } from '../data-loaders';
 
 const PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
 
@@ -92,31 +93,13 @@ export function createConfigScreen(): TuiScreen {
     }
 
     const activeTenantId = await context.getActiveTenantId();
-    const allSlots = activeTenantId ? await context.profileStore.listKeySlots(activeTenantId) : [];
-
-    providerRowsState = [];
-    for (const provider of PROVIDERS) {
-      const providerSlots = allSlots.filter((slot) => slot.provider === provider);
-      const activeSlot = activeTenantId
-        ? await context.profileStore.getActiveKeySlot(activeTenantId, provider)
-        : undefined;
-      const hasActiveSecret =
-        activeTenantId && activeSlot
-          ? Boolean(await context.secretStore.getSlotSecret(activeTenantId, provider, activeSlot.slotId))
-          : false;
-
-      providerRowsState.push({
-        provider,
-        slotCount: providerSlots.length,
-        activeSlot: activeSlot?.slotId ?? 'none',
-        hasSecret: hasActiveSecret ? 'yes' : 'no',
-        lastValidatedAt: activeSlot?.lastValidatedAt
-      });
-    }
+    const { providerRows } = await readConfigData(context.profileStore, context.secretStore, activeTenantId);
+    providerRowsState = providerRows;
 
     selectedProviderIndex = clampIndex(selectedProviderIndex, providerRowsState.length);
     const selectedProvider = providerRowsState[selectedProviderIndex]?.provider ?? PROVIDER_ORG;
 
+    const allSlots = activeTenantId ? await context.profileStore.listKeySlots(activeTenantId) : [];
     const filteredSlots = allSlots.filter((slot) => slot.provider === selectedProvider);
     const activeForProvider =
       activeTenantId && selectedProvider

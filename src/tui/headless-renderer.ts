@@ -51,6 +51,10 @@ interface HeadlessRenderOptions {
 
 type SafeWrite = (text: string) => boolean;
 
+function isRetryState(value: unknown): value is RetryState {
+  return typeof value === 'object' && value !== null && 'retried' in value;
+}
+
 function getRefreshState(args: {
   connectionState: ReadinessCheck['connectionState'];
   retried?: boolean;
@@ -285,7 +289,7 @@ function buildFrameFromLoad(
         retry: load.retry,
         refreshState: getRefreshState({
           connectionState: load.connectionState,
-          retried: (load.retry as { retried?: boolean })?.retried
+          retried: isRetryState(load.retry) ? load.retry.retried : undefined
         }),
         ...load.extraMeta
       })
