@@ -62,6 +62,7 @@ async function loadWithOutcome<T>(
   const retryOptions = { ...DEFAULT_RETRY_POLICY, ...(options.retry ?? {}) };
   let attempts = 0;
   let retried = false;
+  let lastClassified: ReturnType<typeof classifyConnectivityError> | undefined;
 
   for (let attempt = 1; attempt <= retryOptions.maxAttempts; attempt += 1) {
     attempts = attempt;
@@ -74,6 +75,7 @@ async function loadWithOutcome<T>(
       };
     } catch (error) {
       const classified = classifyConnectivityError(error);
+      lastClassified = classified;
       const retryable = isRetryableErrorClass(classified.class) && classified.retriable;
       if (!retryable || attempt >= retryOptions.maxAttempts) {
         return {
@@ -90,15 +92,11 @@ async function loadWithOutcome<T>(
     }
   }
 
+  // maxAttempts === 0: degenerate config, return empty fallback
   return {
     data: fallback,
-    connectionState: 'unknown_error',
-    error: {
-      state: 'unknown_error',
-      class: 'unknown',
-      message: 'Unknown loader failure.',
-      retriable: true
-    },
+    connectionState: lastClassified?.state ?? 'unknown_error',
+    error: lastClassified,
     retry: { attempts, retried }
   };
 }

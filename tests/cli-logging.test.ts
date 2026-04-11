@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createCli } from '../src/cli/index';
-import { createCliActionLogger, listCliActionLogFiles, sanitizeArgvForLog } from '../src/cli/action-logger';
+import { createCliActionLogger, listCliActionLogFiles, pruneCliActionLogFiles, sanitizeArgvForLog } from '../src/cli/action-logger';
 import { readCliActionLog } from '../src/cli/action-log-store';
 import { MemorySecretStore } from '../src/secure/secret-store';
 import { MemoryProfileStore } from './support/memory-profile-store';
@@ -515,6 +515,37 @@ describe('cli action logging', () => {
     const filesAfter = listCliActionLogFiles(logPath);
     expect(filesAfter.length).toBeLessThanOrEqual(2);
 
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('pruneCliActionLogFiles removes rotated files older than maxAgeMs', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-age-prune-'));
+    const logPath = join(dir, 'actions.ndjson');
+
+    // Write enough data to trigger rotation
+    const seedLogger = createCliActionLogger({
+      enabled: true,
+      path: logPath,
+      maxFileBytes: 200,
+      maxFiles: 10
+    });
+    for (let i = 0; i < 30; i += 1) {
+      seedLogger.log('test.age', { commandPath: 'x', msg: 'x'.repeat(50), i });
+    }
+    seedLogger.close();
+
+    const filesBefore = listCliActionLogFiles(logPath);
+    const rotatedBefore = filesBefore.filter((f) => f.kind === 'rotated');
+    expect(rotatedBefore.length).toBeGreaterThan(0);
+
+    // Mock Date.now() to return a far-future timestamp so all files appear old
+    const farFuture = Date.now() + 1_000_000_000;
+    vi.spyOn(Date, 'now').mockReturnValue(farFuture);
+
+    const result = pruneCliActionLogFiles({ path: logPath, maxAgeMs: 1, maxFiles: 100, dryRun: true });
+    expect(result.removed.length).toBeGreaterThan(0);
+
+    vi.restoreAllMocks();
     rmSync(dir, { recursive: true, force: true });
   });
 });
