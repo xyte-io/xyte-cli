@@ -462,14 +462,10 @@ async function handleReportGenerate(step: FlowTaskStep, ctx: RunContext): Promis
     });
   } else {
     const includeSensitive = report.includeSensitive === true;
-    if (reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION) {
-      generated = await generateOpsReport({ input: reportInput, tenantId: ctx.args.tenantId, format: report.format, outPath, includeSensitive });
-    } else {
-      if (report.format !== 'markdown') {
-        throw new CliUserError({ summary: `Report format '${report.format}' is only supported for deep-dive reports. Use 'markdown'.` });
-      }
-      generated = await generateOpsReport({ input: reportInput, tenantId: ctx.args.tenantId, format: report.format, outPath, includeSensitive });
+    if (reportInput.schemaVersion !== INSPECT_DEEP_DIVE_SCHEMA_VERSION && report.format !== 'markdown') {
+      throw new CliUserError({ summary: `Report format '${report.format}' is only supported for deep-dive reports. Use 'markdown'.` });
     }
+    generated = await generateOpsReport({ input: reportInput, tenantId: ctx.args.tenantId, format: report.format, outPath, includeSensitive });
   }
   return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
 }
