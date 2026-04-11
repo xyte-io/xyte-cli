@@ -434,8 +434,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
           apiProvider: existingTenant?.apiProvider ?? provider
         });
         const secretStore = ctx.getSecretStore();
-        const slot = await ctx.profileStore.addKeySlot(options.tenant, {
-          provider,
+        const slot = await ctx.profileStore.addKeySlot(options.tenant, provider, {
           name: options.name,
           slotId: options.slotId,
           fingerprint: makeKeyFingerprint(value)

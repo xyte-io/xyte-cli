@@ -183,8 +183,7 @@ async function runSetupCore(
     ? await ctx.profileStore.updateKeySlot(args.tenantId, args.provider, existing.slotId, {
         fingerprint: makeKeyFingerprint(args.keyValue)
       })
-    : await ctx.profileStore.addKeySlot(args.tenantId, {
-        provider: args.provider,
+    : await ctx.profileStore.addKeySlot(args.tenantId, args.provider, {
         name: args.slotName,
         fingerprint: makeKeyFingerprint(args.keyValue)
       });

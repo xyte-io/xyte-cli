@@ -36,8 +36,8 @@ async function makeClient() {
   const secretStore = new MemorySecretStore();
   await profileStore.upsertTenant({ id: 'acme' });
   await profileStore.setActiveTenant('acme');
-  const slot = await profileStore.addKeySlot('acme', {
-    provider: 'xyte-org',
+  const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+    
     name: 'primary',
     fingerprint: 'sha256:test'
   });
@@ -64,8 +64,8 @@ async function makeClientWithProviders(providers: Array<'xyte-org' | 'xyte-partn
   await profileStore.setActiveTenant('acme');
 
   if (providers.includes('xyte-org')) {
-    const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'org-primary',
       fingerprint: 'sha256:org'
     });
@@ -74,8 +74,8 @@ async function makeClientWithProviders(providers: Array<'xyte-org' | 'xyte-partn
   }
 
   if (providers.includes('xyte-partner')) {
-    const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-partner',
+    const slot = await profileStore.addKeySlot('acme', 'xyte-partner', {
+      
       name: 'partner-primary',
       fingerprint: 'sha256:partner'
     });

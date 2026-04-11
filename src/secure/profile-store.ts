@@ -37,7 +37,8 @@ export interface ProfileStore {
   listKeySlots(tenantId: string, provider?: SecretProvider): Promise<ApiKeySlotMeta[]>;
   addKeySlot(
     tenantId: string,
-    input: { provider: SecretProvider; name: string; slotId?: string; fingerprint: string }
+    provider: SecretProvider,
+    input: { name: string; slotId?: string; fingerprint: string }
   ): Promise<ApiKeySlotMeta>;
   updateKeySlot(
     tenantId: string,
@@ -330,28 +331,29 @@ export class FileProfileStore implements ProfileStore {
 
   async addKeySlot(
     tenantId: string,
-    input: { provider: SecretProvider; name: string; slotId?: string; fingerprint: string }
+    provider: SecretProvider,
+    input: { name: string; slotId?: string; fingerprint: string }
   ): Promise<ApiKeySlotMeta> {
     const data = await this.getData();
     const { tenant, index } = this.getRequiredTenantFromData(data, tenantId);
     const registry = cloneRegistry(tenant.keyRegistry);
     const now = new Date().toISOString();
     const slotName = ensureSlotName(input.name);
-    const providerSlots = registry.slots.filter((slot) => slot.provider === input.provider);
+    const providerSlots = registry.slots.filter((slot) => slot.provider === provider);
 
     if (providerSlots.some((slot) => slot.name.toLowerCase() === slotName.toLowerCase())) {
-      throw new CliUserError({ summary: `A key slot named "${slotName}" already exists for provider ${input.provider}.` });
+      throw new CliUserError({ summary: `A key slot named "${slotName}" already exists for provider ${provider}.` });
     }
 
     const existingIds = new Set(providerSlots.map((slot) => slot.slotId));
     const slotId = input.slotId?.trim() || buildSlotId(slotName, existingIds);
     if (existingIds.has(slotId)) {
-      throw new CliUserError({ summary: `A key slot with id "${slotId}" already exists for provider ${input.provider}.` });
+      throw new CliUserError({ summary: `A key slot with id "${slotId}" already exists for provider ${provider}.` });
     }
 
     const slot: ApiKeySlotMeta = {
       slotId,
-      provider: input.provider,
+      provider,
       name: slotName,
       fingerprint: input.fingerprint,
       createdAt: now,
@@ -359,8 +361,8 @@ export class FileProfileStore implements ProfileStore {
     };
 
     registry.slots.push(slot);
-    if (!registry.activeSlotByProvider[input.provider]) {
-      registry.activeSlotByProvider[input.provider] = slotId;
+    if (!registry.activeSlotByProvider[provider]) {
+      registry.activeSlotByProvider[provider] = slotId;
     }
 
     data.tenants[index] = {

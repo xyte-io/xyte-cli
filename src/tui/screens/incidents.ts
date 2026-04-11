@@ -57,7 +57,7 @@ export async function closeIncidentWithGuard(args: CloseIncidentWithGuardArgs): 
   });
 }
 
-export function castIncidentRecords(items: unknown): Record<string, unknown>[] {
+function castIncidentRecords(items: unknown): Record<string, unknown>[] {
   if (!Array.isArray(items)) {
     return [];
   }

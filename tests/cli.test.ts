@@ -756,8 +756,8 @@ describe('cli integration', () => {
     await profileStore.upsertTenant({ id: 'acme', name: 'Acme' });
     await profileStore.setActiveTenant('acme');
     const secretStore = new MemorySecretStore();
-    const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'primary',
       fingerprint: 'sha256:test'
     });
@@ -1146,8 +1146,8 @@ describe('cli integration', () => {
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
     const secretStore = new MemorySecretStore();
-    const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'primary',
       fingerprint: 'sha256:test'
     });
@@ -1273,13 +1273,13 @@ describe('cli integration', () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme', apiProvider: 'xyte-org' });
     const secretStore = new MemorySecretStore();
-    await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'org-primary',
       fingerprint: 'sha256:org'
     });
-    await profileStore.addKeySlot('acme', {
-      provider: 'xyte-partner',
+    await profileStore.addKeySlot('acme', 'xyte-partner', {
+      
       name: 'partner-primary',
       fingerprint: 'sha256:partner'
     });
@@ -1374,8 +1374,8 @@ describe('cli integration', () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });
     const secretStore = new MemorySecretStore();
-    const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'primary',
       fingerprint: 'sha256:old'
     });
@@ -1414,8 +1414,8 @@ describe('cli integration', () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });
     const secretStore = new MemorySecretStore();
-    const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'primary',
       fingerprint: 'sha256:old'
     });
@@ -1452,8 +1452,8 @@ describe('cli integration', () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });
     const secretStore = new MemorySecretStore();
-    const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'primary',
       fingerprint: 'sha256:old'
     });
@@ -2030,8 +2030,8 @@ describe('cli integration', () => {
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
     const secretStore = new MemorySecretStore();
-    const partnerSlot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-partner',
+    const partnerSlot = await profileStore.addKeySlot('acme', 'xyte-partner', {
+      
       name: 'partner-primary',
       fingerprint: 'sha256:partner'
     });
@@ -2371,13 +2371,13 @@ describe('cli integration', () => {
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
     const secretStore = new MemorySecretStore();
-    const orgSlot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const orgSlot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'org-primary',
       fingerprint: 'sha256:org'
     });
-    const partnerSlot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-partner',
+    const partnerSlot = await profileStore.addKeySlot('acme', 'xyte-partner', {
+      
       name: 'partner-primary',
       fingerprint: 'sha256:partner'
     });
@@ -2397,13 +2397,13 @@ describe('cli integration', () => {
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
     const secretStore = new MemorySecretStore();
-    const orgSlot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const orgSlot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'org-primary',
       fingerprint: 'sha256:org'
     });
-    const partnerSlot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-partner',
+    const partnerSlot = await profileStore.addKeySlot('acme', 'xyte-partner', {
+      
       name: 'partner-primary',
       fingerprint: 'sha256:partner'
     });
@@ -2435,8 +2435,8 @@ describe('cli integration', () => {
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
     const secretStore = new MemorySecretStore();
-    const partnerSlot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-partner',
+    const partnerSlot = await profileStore.addKeySlot('acme', 'xyte-partner', {
+      
       name: 'partner-primary',
       fingerprint: 'sha256:partner'
     });
@@ -2468,8 +2468,8 @@ describe('cli integration', () => {
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
     const secretStore = new MemorySecretStore();
-    const orgSlot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const orgSlot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'org-primary',
       fingerprint: 'sha256:org'
     });
@@ -2501,13 +2501,13 @@ describe('cli integration', () => {
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
     const secretStore = new MemorySecretStore();
-    const orgSlot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const orgSlot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'org-primary',
       fingerprint: 'sha256:org'
     });
-    const partnerSlot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-partner',
+    const partnerSlot = await profileStore.addKeySlot('acme', 'xyte-partner', {
+      
       name: 'partner-primary',
       fingerprint: 'sha256:partner'
     });
@@ -3671,8 +3671,8 @@ describe('cli integration', () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
-    const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'primary',
       fingerprint: 'sha256:test'
     });
@@ -3789,8 +3789,8 @@ describe('cli integration', () => {
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
     const secretStore = new MemorySecretStore();
-    const partnerSlot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-partner',
+    const partnerSlot = await profileStore.addKeySlot('acme', 'xyte-partner', {
+      
       name: 'partner-primary',
       fingerprint: 'sha256:partner'
     });
@@ -3904,13 +3904,13 @@ describe('cli integration', () => {
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
     const secretStore = new MemorySecretStore();
-    const orgSlot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const orgSlot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'org-primary',
       fingerprint: 'sha256:org'
     });
-    const partnerSlot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-partner',
+    const partnerSlot = await profileStore.addKeySlot('acme', 'xyte-partner', {
+      
       name: 'partner-primary',
       fingerprint: 'sha256:partner'
     });
@@ -3962,13 +3962,13 @@ describe('cli integration', () => {
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
     const secretStore = new MemorySecretStore();
-    const orgSlot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const orgSlot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'org-primary',
       fingerprint: 'sha256:org'
     });
-    const partnerSlot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-partner',
+    const partnerSlot = await profileStore.addKeySlot('acme', 'xyte-partner', {
+      
       name: 'partner-primary',
       fingerprint: 'sha256:partner'
     });
@@ -4212,8 +4212,8 @@ describe('cli integration', () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
-    const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'primary',
       fingerprint: 'sha256:test'
     });

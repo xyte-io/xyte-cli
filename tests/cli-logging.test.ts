@@ -383,8 +383,8 @@ describe('cli action logging', () => {
     const stderr = { write: vi.fn() };
 
     await profileStore.upsertTenant({ id: 'acme' });
-    const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'primary',
       fingerprint: 'old-fingerprint'
     });

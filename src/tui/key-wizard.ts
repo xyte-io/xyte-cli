@@ -156,8 +156,7 @@ export async function runKeyCreateWizard(args: RunKeyCreateWizardArgs): Promise<
     return canceledResult();
   }
 
-  const slot = await context.profileStore.addKeySlot(tenantId, {
-    provider,
+  const slot = await context.profileStore.addKeySlot(tenantId, provider, {
     name: slotName,
     fingerprint
   });
