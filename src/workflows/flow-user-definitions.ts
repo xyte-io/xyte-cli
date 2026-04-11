@@ -1,23 +1,48 @@
 import { mkdir, readFile, writeFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
+import { z } from 'zod';
+
 import { getXyteConfigDir } from '../utils/config-dir';
 import { errorMessage } from '../utils/error-format';
 import { FLOW_DEFINITION_SCHEMA_VERSION } from '../contracts/versions';
 
-interface FlowDefinitionV1 {
-  schemaVersion: typeof FLOW_DEFINITION_SCHEMA_VERSION;
-  id: string;
-  title: string;
-  description?: string;
-  basedOn: string;
-  defaults: Record<string, string>;
-  createdAtUtc: string;
-  updatedAtUtc: string;
-}
+const FLOW_ID_RE = /^flow\.[a-z0-9][a-z0-9._-]*$/;
+
+const FlowDefinitionV1Schema = z
+  .object({
+    schemaVersion: z.string().refine((v) => v === FLOW_DEFINITION_SCHEMA_VERSION, { message: `Flow definition schemaVersion must be ${FLOW_DEFINITION_SCHEMA_VERSION}.` }),
+    id: z.string().transform((v, ctx) => {
+      const normalized = v.trim();
+      if (!FLOW_ID_RE.test(normalized)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Invalid flow id: ${v}. Use flow.<name> with lowercase letters, numbers, dots, underscores, or dashes.` });
+        return z.NEVER;
+      }
+      return normalized;
+    }),
+    title: z.string().optional(),
+    description: z.string().trim().optional(),
+    basedOn: z.string().transform((v, ctx) => {
+      const trimmed = v.trim();
+      if (!trimmed) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Flow definition requires basedOn.' });
+        return z.NEVER;
+      }
+      return trimmed;
+    }),
+    defaults: z.record(z.string(), z.string()).default({}),
+    createdAtUtc: z.string().optional().transform((v) => (v?.trim() || new Date().toISOString())),
+    updatedAtUtc: z.string().optional().transform((v) => (v?.trim() || new Date().toISOString()))
+  })
+  .transform((v) => ({
+    ...v,
+    title: v.title?.trim() || v.id
+  }));
+
+type FlowDefinitionV1 = z.infer<typeof FlowDefinitionV1Schema>;
 
 function isFlowId(value: string): boolean {
-  return /^flow\.[a-z0-9][a-z0-9._-]*$/.test(value);
+  return FLOW_ID_RE.test(value);
 }
 
 function normalizeFlowId(value: string): string {
@@ -31,58 +56,11 @@ function normalizeFlowId(value: string): string {
 }
 
 function validateFlowDefinition(value: unknown): FlowDefinitionV1 {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('Flow definition must be an object.');
+  const result = FlowDefinitionV1Schema.safeParse(value);
+  if (!result.success) {
+    throw new Error(result.error.issues.map((e: z.ZodIssue) => e.message).join('; '));
   }
-  const record = value as Record<string, unknown>;
-  if (record.schemaVersion !== FLOW_DEFINITION_SCHEMA_VERSION) {
-    throw new Error(`Flow definition schemaVersion must be ${FLOW_DEFINITION_SCHEMA_VERSION}.`);
-  }
-  const id = typeof record.id === 'string' ? normalizeFlowId(record.id) : '';
-  if (!id) {
-    throw new Error('Flow definition requires id.');
-  }
-  const basedOn = typeof record.basedOn === 'string' ? record.basedOn.trim() : '';
-  if (!basedOn) {
-    throw new Error('Flow definition requires basedOn.');
-  }
-  const title = typeof record.title === 'string' && record.title.trim() ? record.title.trim() : id;
-  const description =
-    typeof record.description === 'string' && record.description.trim() ? record.description.trim() : undefined;
-
-  const defaultsRaw = record.defaults;
-  const defaults: Record<string, string> = {};
-  if (defaultsRaw !== undefined) {
-    if (!defaultsRaw || typeof defaultsRaw !== 'object' || Array.isArray(defaultsRaw)) {
-      throw new Error('Flow definition defaults must be an object of string values.');
-    }
-    for (const [key, item] of Object.entries(defaultsRaw as Record<string, unknown>)) {
-      if (typeof item !== 'string') {
-        throw new Error(`Flow definition default "${key}" must be a string.`);
-      }
-      defaults[key] = item;
-    }
-  }
-
-  const createdAtUtc =
-    typeof record.createdAtUtc === 'string' && record.createdAtUtc.trim()
-      ? record.createdAtUtc
-      : new Date().toISOString();
-  const updatedAtUtc =
-    typeof record.updatedAtUtc === 'string' && record.updatedAtUtc.trim()
-      ? record.updatedAtUtc
-      : new Date().toISOString();
-
-  return {
-    schemaVersion: FLOW_DEFINITION_SCHEMA_VERSION,
-    id,
-    title,
-    ...(description ? { description } : {}),
-    basedOn,
-    defaults,
-    createdAtUtc,
-    updatedAtUtc
-  };
+  return result.data;
 }
 
 function getFlowDefinitionsDir(): string {

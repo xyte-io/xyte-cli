@@ -1,9 +1,4 @@
-function safeString(value: unknown): string {
-  if (value === undefined || value === null) {
-    return 'n/a';
-  }
-  return String(value);
-}
+import { safeString } from '../../utils/json';
 
 function formatTwoDigits(value: number): string {
   return String(value).padStart(2, '0');
