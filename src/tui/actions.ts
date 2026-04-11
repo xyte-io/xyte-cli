@@ -35,7 +35,7 @@ interface PromptChoice {
 
 function parseOneBasedIndex(input: string, total: number): number | undefined {
   const trimmed = input.trim();
-  if (!/^(?:0|[1-9]\d*)$/.test(trimmed)) {
+  if (!/^[1-9]\d*$/.test(trimmed)) {
     return undefined;
   }
   const numeric = Number(trimmed);

@@ -61,7 +61,7 @@ async function fetchSlotByRef(
   const slots = await profileStore.listKeySlots(tenantId, provider);
   const slot = slots.find((item) => matchesSlotRef(item, slotRef));
   if (!slot) {
-    throw new Error(`Unknown slot "${slotRef}" for provider ${provider} in tenant ${tenantId}.`);
+    throw new CliUserError({ summary: `Unknown slot "${slotRef}" for provider ${provider} in tenant ${tenantId}.` });
   }
   return slot;
 }

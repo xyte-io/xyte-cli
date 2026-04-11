@@ -22,7 +22,7 @@ function parseUtilityPreparePrimaryFormat(value: string | undefined): UtilityPre
   }
   const normalized = value.trim().toLowerCase();
   if (normalized !== 'csv' && normalized !== 'jsonl') {
-    throw new Error(`Invalid primary format: ${value}. Use csv|jsonl.`);
+    throw new CliUserError({ summary: `Invalid primary format: ${value}. Use csv|jsonl.` });
   }
   return normalized as UtilityPreparePrimaryFormat;
 }
@@ -31,7 +31,7 @@ function parseUtilityInputFormat(value: string | undefined): UtilityInputFormat 
   const normalized = (value ?? 'auto').trim().toLowerCase();
   const allowed: UtilityInputFormat[] = ['auto', 'csv', 'json', 'jsonl'];
   if (!allowed.includes(normalized as UtilityInputFormat)) {
-    throw new Error(`Invalid input format: ${value}. Use auto|csv|json|jsonl.`);
+    throw new CliUserError({ summary: `Invalid input format: ${value}. Use auto|csv|json|jsonl.` });
   }
   return normalized as UtilityInputFormat;
 }

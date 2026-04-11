@@ -24,6 +24,7 @@ export async function fetchProviderForKey(args: {
     });
   }
 
+  let orgError: unknown;
   try {
     await runSlotConnectivityTest({
       provider: PROVIDER_ORG,
@@ -32,7 +33,11 @@ export async function fetchProviderForKey(args: {
       profileStore: args.profileStore
     });
     return PROVIDER_ORG;
-  } catch {
+  } catch (error) {
+    orgError = error;
+  }
+
+  try {
     await runSlotConnectivityTest({
       provider: PROVIDER_PARTNER,
       tenantId: args.tenantId,
@@ -40,5 +45,12 @@ export async function fetchProviderForKey(args: {
       profileStore: args.profileStore
     });
     return PROVIDER_PARTNER;
+  } catch (partnerError) {
+    const orgMsg = orgError instanceof Error ? orgError.message : String(orgError);
+    const partnerMsg = partnerError instanceof Error ? partnerError.message : String(partnerError);
+    throw new CliUserError({
+      summary: 'Provider auto-detection failed for both org and partner.',
+      detail: `Org: ${orgMsg}; Partner: ${partnerMsg}`
+    });
   }
 }

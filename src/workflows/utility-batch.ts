@@ -1,8 +1,8 @@
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { appendFileSync, writeFileSync } from 'node:fs';
 
 import { z } from 'zod';
 
+import { ensureParentDir } from '../utils/fs';
 import { UTILITY_BATCH_SCHEMA_VERSION } from '../contracts/versions';
 import { errorMessage } from '../utils/error-format';
 import type { XyteClient, XyteCallResult } from '../types/client';
@@ -55,10 +55,6 @@ export const UtilityBatchResultSchema = z.object({
 export type UtilityBatchResult = z.infer<typeof UtilityBatchResultSchema>;
 
 type UtilityRowStatus = 'dry-run' | 'succeeded' | 'failed' | 'skipped';
-
-function ensureParentDir(filePath: string): void {
-  mkdirSync(dirname(resolve(filePath)), { recursive: true });
-}
 
 function writeReportLine(reportPath: string | undefined, payload: Record<string, unknown>): void {
   if (!reportPath) {

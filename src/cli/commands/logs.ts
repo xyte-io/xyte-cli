@@ -11,6 +11,7 @@ import {
 } from '../action-logger';
 import { isRecord } from '../../utils/json';
 import { formatBytes } from '../format-bytes';
+import { CliUserError } from '../../contracts/user-error';
 import { parsePositiveIntegerOption, parsePositiveNumberOption } from '../parse-options';
 import {
   type CliContext,
@@ -227,7 +228,7 @@ export function registerLogsCommands(parent: Command, ctx: CliContext): void {
     .option('--command <text>', 'Filter by command path substring')
     .action(async (options: { path?: string; limit?: string; event?: string; command?: string }) => {
       if (!ctx.isInteractive) {
-        throw new Error('Interactive log viewer requires a TTY. Use `xyte-cli logs list` in non-interactive mode.');
+        throw new CliUserError({ summary: 'Interactive log viewer requires a TTY. Use `xyte-cli logs list` in non-interactive mode.' });
       }
 
       const limit = parsePositiveIntegerOption(options.limit, 250, 'limit');
