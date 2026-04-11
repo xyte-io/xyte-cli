@@ -2,15 +2,10 @@ import { readFileSync } from 'node:fs';
 
 import type { Command } from 'commander';
 
-import {
-  getBuiltInFlowDefinition,
-  hasBuiltInFlowDefinition,
-  listBuiltInFlowDefinitions
-} from '../../workflows/flow-catalog';
+import { hasBuiltInFlowDefinition, listBuiltInFlowDefinitions } from '../../workflows/flow-catalog';
 import { parseFlowVarOptions, runDeterministicFlow, type FlowRunMode } from '../../workflows/flow-runner';
 import {
   exportFlowDefinition,
-  getFlowDefinition,
   importFlowDefinition,
   listFlowDefinitions,
   saveFlowDefinition,
@@ -245,34 +240,14 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
           ...parseFlowVarOptions(options.var)
         };
 
-        let resolvedFlowId = flowId;
-        let defaults: Record<string, string> = {};
-        if (!hasBuiltInFlowDefinition(flowId)) {
-          const custom = await getFlowDefinition(flowId);
-          if (!custom) {
-            throw new CliUserError({ summary: `Unknown flow id: ${flowId}` });
-          }
-          if (!hasBuiltInFlowDefinition(custom.basedOn)) {
-            throw new CliUserError({ summary: `Custom flow ${flowId} references unknown built-in base flow: ${custom.basedOn}` });
-          }
-          resolvedFlowId = custom.basedOn;
-          defaults = custom.defaults;
-        }
-
-        const definition = getBuiltInFlowDefinition(resolvedFlowId);
         const summary = await runDeterministicFlow({
           flowId,
-          resolvedFlowId,
-          definition,
           tenantId: options.tenant,
           mode,
           outDir: options.outDir,
           inspectProviderScope,
           resume: options.resume,
-          context: {
-            ...defaults,
-            ...runtimeContext
-          },
+          context: runtimeContext,
           once: options.once === true,
           strictJson: options.strictJson === true,
           profileStore: ctx.profileStore,

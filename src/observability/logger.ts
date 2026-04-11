@@ -4,9 +4,11 @@ function resolveLevel(): string {
   return process.env.XYTE_LOG_LEVEL?.trim() || 'silent';
 }
 
+let _logger: Logger | undefined;
+
 export function getLogger(): Logger {
-  return pino({
-    name: 'xyte-cli',
-    level: resolveLevel()
-  });
+  if (!_logger) {
+    _logger = pino({ name: 'xyte-cli', level: resolveLevel() });
+  }
+  return _logger;
 }

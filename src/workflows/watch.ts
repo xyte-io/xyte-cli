@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { toProblemDetails } from '../http/problem-mapper';
+import { toProblemDetails } from '../client/errors';
 import { buildWatchFrame, type WatchDelta, type WatchFrameV1, type WatchProfile } from '../contracts/watch-frame';
 import type { XyteClient } from '../types/client';
 import { asRecord, extractIncidentsArray } from '../utils/json';

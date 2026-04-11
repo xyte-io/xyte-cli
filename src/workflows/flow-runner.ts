@@ -14,7 +14,7 @@ import {
   type FlowRunStep,
   type FlowRunSummary
 } from '../contracts/flow-run';
-import { toProblemDetails } from '../http/problem-mapper';
+import { toProblemDetails } from '../client/errors';
 import { buildStatusContract } from '../contracts/status';
 import type { WatchFrameV1 } from '../contracts/watch-frame';
 import { getEndpoint } from '../client/catalog';

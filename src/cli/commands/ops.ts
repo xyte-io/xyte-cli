@@ -242,7 +242,7 @@ async function handleOpsWatchIncidents(
   });
 }
 
-async function fetchInspectContext(
+async function collectInspectSnapshot(
   ctx: CliContext,
   options: {
     tenant?: string;
@@ -281,7 +281,7 @@ async function handleOpsInspectFleet(
   }
 ): Promise<void> {
   const render = resolveRenderMode(options, ['json', 'ascii'], 'json');
-  const { settings, snapshot } = await fetchInspectContext(ctx, {
+  const { settings, snapshot } = await collectInspectSnapshot(ctx, {
     tenant: options.tenant,
     providerScope: options.providerScope,
     commandLabel: 'ops inspect fleet'
@@ -319,7 +319,7 @@ async function handleOpsInspectDeepDive(
   }
 ): Promise<void> {
   const render = resolveRenderMode(options, ['json', 'ascii', 'markdown'], 'json');
-  const { settings, snapshot } = await fetchInspectContext(ctx, {
+  const { settings, snapshot } = await collectInspectSnapshot(ctx, {
     tenant: options.tenant,
     providerScope: options.providerScope,
     commandLabel: 'ops inspect deep-dive'
@@ -399,17 +399,15 @@ async function handleOpsReportGenerate(
       };
     }
   }
-  const render = resolveRenderMode(
-    options,
-    ['markdown', 'pdf'],
-    reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION ? 'pdf' : 'markdown'
-  );
-
   const includeSensitive = options.includeSensitive === true || settings.values.report.includeSensitive;
-  const generated =
-    reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION
-      ? await generateOpsReport({ input: reportInput, tenantId, format: render, outPath: options.out, includeSensitive })
-      : await generateOpsReport({ input: reportInput, tenantId, format: 'markdown', outPath: options.out, includeSensitive });
+  let generated: Awaited<ReturnType<typeof generateOpsReport>>;
+  if (reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION) {
+    const render = resolveRenderMode(options, ['markdown', 'pdf'], 'pdf');
+    generated = await generateOpsReport({ input: reportInput, tenantId, format: render, outPath: options.out, includeSensitive });
+  } else {
+    const render = resolveRenderMode(options, ['markdown'], 'markdown');
+    generated = await generateOpsReport({ input: reportInput, tenantId, format: render, outPath: options.out, includeSensitive });
+  }
   printJson(ctx.stdout, generated, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
 }
 
