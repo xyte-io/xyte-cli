@@ -21,7 +21,7 @@ export { collectFleetSnapshot, InspectProviderScopeError } from './fleet-insight
 export { formatFleetInspectAscii, formatDeepDiveAscii, formatDeepDiveMarkdown } from './fleet-insights-format';
 export { generateDeviceMigrationReport } from './device-migration-report';
 
-interface FleetReportResult {
+export interface FleetReportResult {
   schemaVersion: typeof REPORT_SCHEMA_VERSION;
   generatedAtUtc: string;
   tenantId: string;
@@ -50,13 +50,15 @@ function pct(count: number, total: number): number {
   return Number(((count * 100) / total).toFixed(1));
 }
 
+const MS_PER_HOUR = 3_600_000;
+
 function ageHours(createdAt: unknown): number | undefined {
   const parsed = parseTimestamp(createdAt);
   if (!parsed) {
     return undefined;
   }
   const now = Date.now();
-  return Math.max(0, Math.round((now - parsed.getTime()) / 3_600_000));
+  return Math.max(0, Math.round((now - parsed.getTime()) / MS_PER_HOUR));
 }
 
 function topEntries(counter: Record<string, number>, limit = 10): Array<[string, number]> {

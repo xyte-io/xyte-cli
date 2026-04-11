@@ -26,6 +26,8 @@ const PARTNER_FRESH_TELEMETRY_WINDOW_HOURS = 24;
 const RECENCY_1H_MS = 3_600_000;
 const RECENCY_24H_MS = 86_400_000;
 const RECENCY_7D_MS = 604_800_000;
+const PAGINATION_PER_PAGE = 100;
+const PAGINATION_PAGE_CAP = 50;
 
 function countValue(counter: StatusCounts, key: string): void {
   counter[key] = (counter[key] ?? 0) + 1;
@@ -151,10 +153,10 @@ async function fetchAllPages(args: {
   fetchSingle: () => Promise<unknown>;
   extractionKeys: string[];
 }): Promise<unknown[]> {
-  const perPage = 100;
+  const perPage = PAGINATION_PER_PAGE;
   const all: unknown[] = [];
 
-  for (let page = 1; page <= 50; page += 1) {
+  for (let page = 1; page <= PAGINATION_PAGE_CAP; page += 1) {
     const raw = await args.fetch({ page, per_page: perPage });
     const pageItems = extractArray(raw, args.extractionKeys);
     if (!pageItems.length) {
@@ -203,13 +205,13 @@ function loadAllSpaces(client: XyteClient, tenantId: string): Promise<unknown[]>
 }
 
 async function loadAllOrganizationIncidents(client: XyteClient, tenantId: string): Promise<unknown[]> {
-  const perPage = 100;
+  const perPage = PAGINATION_PER_PAGE;
   const to = Math.floor(Date.now() / 1000);
   const merged = new Map<string, unknown>();
   const statuses = ['active', 'closed'] as const;
 
   for (const status of statuses) {
-    for (let page = 1; page <= 50; page += 1) {
+    for (let page = 1; page <= PAGINATION_PAGE_CAP; page += 1) {
       const raw = await client.organization.getIncidents({
         tenantId,
         query: {

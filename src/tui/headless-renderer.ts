@@ -425,8 +425,8 @@ async function buildOperationalFrame(options: {
         panels,
         connectionState: spaces.connectionState,
         error: spaces.error,
-        retry: { spaces: spaces.retry, drilldown: drilldownRetry },
-        extraMeta: { connection: { state: spaces.connectionState, error: spaces.error?.message, drilldownError } }
+        retry: spaces.retry,
+        extraMeta: { connection: { state: spaces.connectionState, error: spaces.error?.message, drilldownError, drilldownRetry } }
       });
     }
   }

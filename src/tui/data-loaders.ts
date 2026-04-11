@@ -297,6 +297,9 @@ export async function loadIncidentsData(
     }
 
     if (!all.length) {
+      // Some API implementations ignore pagination params and return all items in a single
+      // un-paginated response. When the paginated pass yields nothing, fall back to a bare
+      // request without page/per_page so those endpoints still work.
       const raw = await client.organization.getIncidents({ tenantId });
       return extractIncidentsArray(raw).map(normalizeIncidentItem);
     }
