@@ -3,6 +3,7 @@ import { appendFile, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
+import { z } from 'zod';
 import { buildCallEnvelope } from '../contracts/call-envelope';
 import type { ProblemDetails } from '../contracts/problem';
 import { INSPECT_DEEP_DIVE_SCHEMA_VERSION, UTILITY_BATCH_SCHEMA_VERSION } from '../contracts/versions';
@@ -96,6 +97,19 @@ interface FlowRunInputsPayload {
   once?: boolean;
   generatedAtUtc?: string;
 }
+
+const FlowRunInputsPayloadSchema = z.object({
+  flowId: z.string().optional(),
+  resolvedFlowId: z.string().optional(),
+  tenantId: z.string().optional(),
+  mode: z.enum(['plan', 'apply']).optional(),
+  inspectProviderScope: z.enum(INSPECT_PROVIDER_SCOPES).optional(),
+  context: z.record(z.string(), z.string()).optional(),
+  resume: z.string().optional(),
+  strictJson: z.boolean().optional(),
+  once: z.boolean().optional(),
+  generatedAtUtc: z.string().optional()
+});
 
 interface RunDeterministicFlowArgs {
   flowId: string;
@@ -221,6 +235,13 @@ function resolveTemplateValue<T>(input: T, context: Record<string, string>): T {
     out[key] = resolveTemplateValue(value, context);
   }
   return out as T;
+}
+
+function requireStepConfig<T>(value: T | undefined, stepId: string, label: string): T {
+  if (!value) {
+    throw new Error(`Flow step ${stepId} is missing ${label} configuration.`);
+  }
+  return value;
 }
 
 function ensureContextKeys(step: FlowTaskStep, context: Record<string, string>): void {
@@ -426,10 +447,7 @@ async function handleDeepDive(step: FlowTaskStep, ctx: RunContext): Promise<Task
 }
 
 async function handleReportGenerate(step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
-  if (!step.report) {
-    throw new Error(`Flow step ${step.id} is missing report configuration.`);
-  }
-  const report = step.report;
+  const report = requireStepConfig(step.report, step.id, 'report');
   const input = ctx.taskOutputs.get(report.inputFromStepId);
   let reportInput;
   try {
@@ -471,10 +489,7 @@ async function handleReportGenerate(step: FlowTaskStep, ctx: RunContext): Promis
 }
 
 async function handleWatch(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
-  if (!step.watch) {
-    throw new Error(`Flow step ${step.id} is missing watch configuration.`);
-  }
-  const watchConfig = step.watch;
+  const watchConfig = requireStepConfig(step.watch, step.id, 'watch');
   const frames: WatchFrameV1[] = [];
   const once = ctx.args.once || watchConfig.once;
   await runWatch({
@@ -506,17 +521,15 @@ async function handleWatch(step: FlowTaskStep, stepIndex: number, ctx: RunContex
 }
 
 async function handleCall(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
-  if (!step.call) {
-    throw new Error(`Flow step ${step.id} is missing call configuration.`);
-  }
-  const endpoint = getEndpoint(step.call.endpointKey);
+  const callConfig = requireStepConfig(step.call, step.id, 'call');
+  const endpoint = getEndpoint(callConfig.endpointKey);
   const method = endpoint.method.toUpperCase();
   const isWrite = isMutatingMethod(method);
   const requestId = randomUUID();
-  const pathPayload = step.call.path ? resolveTemplateValue(step.call.path, ctx.resolvedContext) : undefined;
-  const queryPayload = step.call.query ? resolveTemplateValue(step.call.query, ctx.resolvedContext) : undefined;
-  const bodyPayload = step.call.body ? resolveTemplateValue(step.call.body, ctx.resolvedContext) : undefined;
-  const result = await ctx.args.client.callWithMeta(step.call.endpointKey, {
+  const pathPayload = callConfig.path ? resolveTemplateValue(callConfig.path, ctx.resolvedContext) : undefined;
+  const queryPayload = callConfig.query ? resolveTemplateValue(callConfig.query, ctx.resolvedContext) : undefined;
+  const bodyPayload = callConfig.body ? resolveTemplateValue(callConfig.body, ctx.resolvedContext) : undefined;
+  const result = await ctx.args.client.callWithMeta(callConfig.endpointKey, {
     requestId,
     tenantId: ctx.args.tenantId,
     ...(pathPayload ? { path: pathPayload } : {}),
@@ -526,7 +539,7 @@ async function handleCall(step: FlowTaskStep, _stepIndex: number, ctx: RunContex
   const envelope = buildCallEnvelope({
     requestId,
     tenantId: ctx.args.tenantId,
-    endpointKey: step.call.endpointKey,
+    endpointKey: callConfig.endpointKey,
     method,
     guard: { allowWrite: isWrite },
     request: { path: pathPayload, query: queryPayload, body: bodyPayload },
@@ -534,43 +547,39 @@ async function handleCall(step: FlowTaskStep, _stepIndex: number, ctx: RunContex
   });
   return {
     output: envelope,
-    contextUpdates: step.call.outputContext
-      ? extractCallOutputContext(result.data, step.call.outputContext)
+    contextUpdates: callConfig.outputContext
+      ? extractCallOutputContext(result.data, callConfig.outputContext)
       : undefined
   };
 }
 
 function handleUtilityPrepare(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): TaskExecutionResult {
-  if (!step.utilityPrepare) {
-    throw new Error(`Flow step ${step.id} is missing utility prepare configuration.`);
-  }
-  const inputPath = path.resolve(resolveTemplateString(step.utilityPrepare.inputPath, ctx.resolvedContext));
-  const outputDir = path.join(ctx.outputsDir, path.basename(step.utilityPrepare.outputDir));
+  const utilityPrepare = requireStepConfig(step.utilityPrepare, step.id, 'utility prepare');
+  const inputPath = path.resolve(resolveTemplateString(utilityPrepare.inputPath, ctx.resolvedContext));
+  const outputDir = path.join(ctx.outputsDir, path.basename(utilityPrepare.outputDir));
   const result = runUtilityPrepare({
     inputPath,
-    actionKey: step.utilityPrepare.actionKey,
+    actionKey: utilityPrepare.actionKey,
     outputDir,
     tenantId: ctx.args.tenantId,
-    primaryFormat: step.utilityPrepare.primaryFormat,
+    primaryFormat: utilityPrepare.primaryFormat,
     force: true
   });
-  const contextKey = UTILITY_PREPARE_CONTEXT_KEY[step.utilityPrepare.actionKey];
+  const contextKey = UTILITY_PREPARE_CONTEXT_KEY[utilityPrepare.actionKey];
   const contextUpdates: Record<string, string> = contextKey ? { [contextKey]: result.artifacts.primary } : {};
   return { output: result, primaryOutputPath: result.artifacts.primary, contextUpdates };
 }
 
 async function handleDeviceMatch(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
-  if (!step.deviceMatch) {
-    throw new Error(`Flow step ${step.id} is missing device match configuration.`);
-  }
-  const sourcePath = path.resolve(resolveTemplateString(step.deviceMatch.sourcePath, ctx.resolvedContext));
-  const targetPath = path.resolve(resolveTemplateString(step.deviceMatch.targetPath, ctx.resolvedContext));
-  const outputPath = path.join(ctx.outputsDir, path.basename(step.deviceMatch.outputPath));
+  const deviceMatch = requireStepConfig(step.deviceMatch, step.id, 'device match');
+  const sourcePath = path.resolve(resolveTemplateString(deviceMatch.sourcePath, ctx.resolvedContext));
+  const targetPath = path.resolve(resolveTemplateString(deviceMatch.targetPath, ctx.resolvedContext));
+  const outputPath = path.join(ctx.outputsDir, path.basename(deviceMatch.outputPath));
   const result = await runDeviceMatch({
     sourcePath,
     targetPath,
-    sourceField: step.deviceMatch.sourceField,
-    targetField: step.deviceMatch.targetField,
+    sourceField: deviceMatch.sourceField,
+    targetField: deviceMatch.targetField,
     outputPath,
     tenantId: ctx.args.tenantId
   });
@@ -578,23 +587,21 @@ async function handleDeviceMatch(step: FlowTaskStep, _stepIndex: number, ctx: Ru
 }
 
 async function handleDeviceMoveBatch(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
-  if (!step.deviceMoveBatch) {
-    throw new Error(`Flow step ${step.id} is missing device move batch configuration.`);
-  }
-  const inputPath = path.resolve(resolveTemplateString(step.deviceMoveBatch.inputPath, ctx.resolvedContext));
-  const reportPath = path.join(ctx.outputsDir, path.basename(step.deviceMoveBatch.reportPath));
+  const deviceMoveBatch = requireStepConfig(step.deviceMoveBatch, step.id, 'device move batch');
+  const inputPath = path.resolve(resolveTemplateString(deviceMoveBatch.inputPath, ctx.resolvedContext));
+  const reportPath = path.join(ctx.outputsDir, path.basename(deviceMoveBatch.reportPath));
   const result = await runMoveDevices({
     client: ctx.args.client,
     tenantId: ctx.args.tenantId,
     inputPath,
-    apply: step.deviceMoveBatch.apply,
-    continueOnError: step.deviceMoveBatch.continueOnError === true,
+    apply: deviceMoveBatch.apply,
+    continueOnError: deviceMoveBatch.continueOnError === true,
     reportPath
   });
   return {
     output: result,
     primaryOutputPath: reportPath,
-    contextUpdates: step.deviceMoveBatch.apply
+    contextUpdates: deviceMoveBatch.apply
       ? { execute_moves_report_path: reportPath }
       : { dry_run_moves_report_path: reportPath },
     failureDetail:
@@ -605,10 +612,8 @@ async function handleDeviceMoveBatch(step: FlowTaskStep, _stepIndex: number, ctx
 }
 
 async function handleDeviceVerifyBatch(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
-  if (!step.deviceVerifyBatch) {
-    throw new Error(`Flow step ${step.id} is missing device verification configuration.`);
-  }
-  const inputPath = path.resolve(resolveTemplateString(step.deviceVerifyBatch.inputPath, ctx.resolvedContext));
+  const deviceVerifyBatch = requireStepConfig(step.deviceVerifyBatch, step.id, 'device verification');
+  const inputPath = path.resolve(resolveTemplateString(deviceVerifyBatch.inputPath, ctx.resolvedContext));
   const artifactPath = buildStepArtifactPath(ctx, stepIndex, step.id, 'json');
   const result = await runVerifyMovedDevices({
     client: ctx.args.client,
@@ -627,16 +632,14 @@ async function handleDeviceVerifyBatch(step: FlowTaskStep, stepIndex: number, ct
 }
 
 async function handleSpaceImportTree(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
-  if (!step.spaceImportTree) {
-    throw new Error(`Flow step ${step.id} is missing space import configuration.`);
-  }
-  const inputPath = path.resolve(resolveTemplateString(step.spaceImportTree.inputPath, ctx.resolvedContext));
-  const reportPath = path.join(ctx.outputsDir, path.basename(step.spaceImportTree.reportPath));
+  const spaceImportTree = requireStepConfig(step.spaceImportTree, step.id, 'space import');
+  const inputPath = path.resolve(resolveTemplateString(spaceImportTree.inputPath, ctx.resolvedContext));
+  const reportPath = path.join(ctx.outputsDir, path.basename(spaceImportTree.reportPath));
   const result = await runSpaceImportTree({
     client: ctx.args.client,
     tenantId: ctx.args.tenantId,
     inputPath,
-    apply: step.spaceImportTree.apply,
+    apply: spaceImportTree.apply,
     continueOnError: false,
     reportPath
   });
@@ -795,12 +798,12 @@ async function readStoredInputs(bundleDir: string): Promise<FlowRunInputsPayload
   }
 
   try {
-    const parsed: unknown = JSON.parse(await readFile(inputsPath, 'utf8'));
-    if (!isRecord(parsed)) {
-      getLogger().warn({ inputsPath }, 'Malformed resume inputs (not an object) — falling back to invocation defaults');
+    const result = FlowRunInputsPayloadSchema.safeParse(JSON.parse(await readFile(inputsPath, 'utf8')));
+    if (!result.success) {
+      getLogger().warn({ inputsPath, issues: result.error.issues }, 'Malformed resume inputs — falling back to invocation defaults');
       return undefined;
     }
-    return parsed as FlowRunInputsPayload;
+    return result.data;
   } catch (error) {
     getLogger().warn({ inputsPath, error }, 'Malformed resume inputs — falling back to invocation defaults');
     return undefined;
