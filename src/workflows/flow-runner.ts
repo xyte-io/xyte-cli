@@ -962,7 +962,25 @@ async function ensureRunPaths(ctx: RunContext): Promise<void> {
   }
 }
 
-export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Promise<FlowRunSummary> {
+interface RunState {
+  ctx: RunContext;
+  runId: string;
+  initialStartedAtUtc: string;
+  cursorIndex: number;
+  steps: FlowRunStep[];
+  priorDecisions: FlowRunDecision[];
+  priorErrors: FlowRunErrorEntry[];
+}
+
+interface ExecuteStepsResult {
+  outcome: FlowRunSummary['outcome'];
+  nextStepIndex: number;
+  decisions: FlowRunDecision[];
+  errors: FlowRunErrorEntry[];
+  durationMs: number;
+}
+
+async function buildRunState(args: RunDeterministicFlowArgs): Promise<RunState> {
   let resolvedFlowId = args.flowId;
   let flowDefaults: Record<string, string> = {};
   if (!hasBuiltInFlowDefinition(args.flowId)) {
@@ -1020,7 +1038,15 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
   };
 
   await ensureRunPaths(ctx);
-  await persistFlowRunInputs(ctx, args, effectiveInspectProviderScope);
+  await persistFlowRunInputs(ctx, ctx.args, effectiveInspectProviderScope);
+
+  return { ctx, runId, initialStartedAtUtc, cursorIndex, steps, priorDecisions, priorErrors };
+}
+
+async function executeSteps(state: RunState): Promise<ExecuteStepsResult> {
+  const { ctx, cursorIndex, steps, priorDecisions, priorErrors } = state;
+  const { definition } = ctx;
+  const args = ctx.args;
 
   const runStartedAt = Date.now();
   let outcome: FlowRunSummary['outcome'] = 'completed';
@@ -1128,7 +1154,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
           ctx.resolvedContext[`${step.id}_output`] = primaryOutputPath;
         }
 
-        await persistFlowRunInputs(ctx, args, effectiveInspectProviderScope);
+        await persistFlowRunInputs(ctx, args, args.inspectProviderScope ?? 'auto');
 
         nextStepIndex = index + 1;
         continue;
@@ -1150,15 +1176,24 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
     }
   }
 
-  const decisionsCount = computeDecisionCounts(decisions);
-  const classificationCount = computeClassificationCounts(errors);
+  return { outcome, nextStepIndex, decisions, errors, durationMs: Date.now() - runStartedAt };
+}
+
+export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Promise<FlowRunSummary> {
+  const state = await buildRunState(args);
+  const { ctx, runId, initialStartedAtUtc, steps } = state;
+  const { definition } = ctx;
+  const runArgs = ctx.args;
+
+  const execution = await executeSteps(state);
+  const { outcome, nextStepIndex, decisions, errors, durationMs } = execution;
 
   const summary = buildFlowRunSummary({
     runId,
-    flowId: args.flowId,
+    flowId: runArgs.flowId,
     resolvedFlowId: ctx.resolvedFlowId,
-    mode: args.mode,
-    tenantId: args.tenantId,
+    mode: runArgs.mode,
+    tenantId: runArgs.tenantId,
     bundleDir: ctx.bundleDir,
     manifestPath: ctx.manifestPath,
     inputsPath: ctx.inputsPath,
@@ -1167,20 +1202,20 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
     watchFramesPath: ctx.watchFramesPath,
     startedAtUtc: initialStartedAtUtc,
     endedAtUtc: nowIso(),
-    durationMs: Date.now() - runStartedAt,
-    ...(args.resume ? { resumeFrom: args.resume } : {}),
+    durationMs,
+    ...(runArgs.resume ? { resumeFrom: runArgs.resume } : {}),
     outcome,
     ...(nextStepIndex < definition.steps.length
       ? { nextResumeStepId: definition.steps[nextStepIndex].id }
       : {}),
     ...(nextStepIndex < definition.steps.length
       ? {
-          resumeCommand: `xyte-cli flow run ${args.flowId} --tenant ${args.tenantId} --${args.mode} --inspect-provider-scope ${effectiveInspectProviderScope} --resume ${runId}`
+          resumeCommand: `xyte-cli flow run ${runArgs.flowId} --tenant ${runArgs.tenantId} --${runArgs.mode} --inspect-provider-scope ${runArgs.inspectProviderScope} --resume ${runId}`
         }
       : {}),
     steps,
-    decisions: decisionsCount,
-    classifications: classificationCount,
+    decisions: computeDecisionCounts(decisions),
+    classifications: computeClassificationCounts(errors),
     cursor: {
       nextStepIndex,
       ...(nextStepIndex < definition.steps.length ? { nextStepId: definition.steps[nextStepIndex].id } : {})
