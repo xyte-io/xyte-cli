@@ -310,9 +310,18 @@ interface TicketsLoadResult {
   tickets: unknown[];
 }
 
-export async function loadTicketsData(client: XyteClient, tenantId: string | undefined): Promise<LoadOutcome<TicketsLoadResult>> {
+interface TicketsLoadOptions {
+  query?: QueryShape;
+}
+
+export async function loadTicketsData(
+  client: XyteClient,
+  tenantId: string | undefined,
+  options: TicketsLoadOptions = {}
+): Promise<LoadOutcome<TicketsLoadResult>> {
+  const query = compactQuery(options.query);
   const orgOutcome = await loadWithOutcome(async () => {
-    const org = await client.organization.getTickets({ tenantId });
+    const org = await client.organization.getTickets({ tenantId, ...(query ? { query } : {}) });
     return extractArray(org, ['tickets', 'data', 'items']);
   }, []);
 
@@ -329,7 +338,7 @@ export async function loadTicketsData(client: XyteClient, tenantId: string | und
   }
 
   const partnerOutcome = await loadWithOutcome(async () => {
-    const partner = await client.partner.getTickets({ tenantId });
+    const partner = await client.partner.getTickets({ tenantId, ...(query ? { query } : {}) });
     return extractArray(partner, ['tickets', 'data', 'items']);
   }, []);
 

@@ -1065,6 +1065,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
         stepState.endedAtUtc = nowIso();
         stepState.durationMs = Date.now() - stepStartedAt;
         stepState.artifactPath = artifactPath;
+        // Convention: <stepId>_artifact holds the primary artifact path (e.g. CSV written by a utility-prepare step).
         ctx.resolvedContext[`${step.id}_artifact`] = artifactPath;
 
         if (result.watchFrames && result.watchFrames.length > 0) {
@@ -1083,6 +1084,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
 
         const primaryOutputPath = result.primaryOutputPath;
         if (primaryOutputPath) {
+          // Convention: <stepId>_output holds the primary output path (e.g. NDJSON written by a match/move/verify step).
           ctx.resolvedContext[`${step.id}_output`] = primaryOutputPath;
         }
 

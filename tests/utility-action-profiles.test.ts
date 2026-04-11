@@ -11,11 +11,19 @@ import type { PublicEndpointSpec } from '../src/types/endpoints';
 function makeEndpoint(overrides: Partial<PublicEndpointSpec> = {}): PublicEndpointSpec {
   return {
     key: 'organization.devices.claimDevice',
-    title: 'Claim Device',
+    namespace: 'organization',
     group: 'devices',
+    action: 'claimDevice',
+    title: 'Claim Device',
     method: 'POST',
+    base: 'hub',
     pathTemplate: '/core/v1/organization/devices/claim',
     pathParams: [],
+    queryParams: [],
+    authScope: 'organization',
+    bodyType: 'json',
+    hasBody: true,
+    sourceFile: 'test',
     ...overrides
   };
 }
