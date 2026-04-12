@@ -283,8 +283,8 @@ export async function loadIncidentsData(
 
     const all: unknown[] = [];
 
-    const PAGE_CAP = 50;
-    for (let page = initialPage; page <= PAGE_CAP; page += 1) {
+    const PAGINATION_PAGE_CAP = 50;
+    for (let page = initialPage; page <= PAGINATION_PAGE_CAP; page += 1) {
       const query = buildQuery(page);
       const raw = await client.organization.getIncidents({
         tenantId,

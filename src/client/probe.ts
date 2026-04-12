@@ -1,5 +1,5 @@
 import { createXyteClient } from './create-client';
-import type { ProfileStore } from '../secure/profile-store';
+import type { ProfileStore } from '../types/stores';
 import { PROVIDER_ORG, PROVIDER_PARTNER, type SecretProvider } from '../types/profile';
 
 export async function runSlotConnectivityTest(args: {

@@ -33,7 +33,7 @@ function countValue(counter: StatusCounts, key: string): void {
   counter[key] = (counter[key] ?? 0) + 1;
 }
 
-async function callWithOutcomeTracking(
+async function withEndpointTracking(
   outcome: PartnerEndpointOutcome,
   operation: () => Promise<unknown>
 ): Promise<unknown> {
@@ -312,7 +312,7 @@ async function collectPartnerEnrichment(
   await mapWithConcurrency(sampledDeviceIds, PARTNER_ENRICHMENT_CONCURRENCY, async (id) => {
     const base = baseDevicesById.get(id);
 
-    const infoRaw = await callWithOutcomeTracking(snapshot.endpointAvailability.deviceInfo, () =>
+    const infoRaw = await withEndpointTracking(snapshot.endpointAvailability.deviceInfo, () =>
       client.partner.getDeviceInfo({
         tenantId,
         path: { device_id: id }
@@ -354,7 +354,7 @@ async function collectPartnerEnrichment(
     );
     countValue(snapshot.lastSeenRecency, recencyBucket(lastSeen));
 
-    const commandsRaw = await callWithOutcomeTracking(snapshot.endpointAvailability.commands, () =>
+    const commandsRaw = await withEndpointTracking(snapshot.endpointAvailability.commands, () =>
       client.partner.getCommands({
         tenantId,
         path: { device_id: id }
@@ -367,7 +367,7 @@ async function collectPartnerEnrichment(
       countValue(snapshot.commandPosture, status ? status.toLowerCase() : 'unknown');
     }
 
-    const telemetriesRaw = await callWithOutcomeTracking(snapshot.endpointAvailability.telemetries, () =>
+    const telemetriesRaw = await withEndpointTracking(snapshot.endpointAvailability.telemetries, () =>
       client.partner.getTelemetries({
         tenantId,
         path: { device_id: id }
@@ -385,7 +385,7 @@ async function collectPartnerEnrichment(
       }
     }
 
-    const historyRaw = await callWithOutcomeTracking(snapshot.endpointAvailability.stateHistory, () =>
+    const historyRaw = await withEndpointTracking(snapshot.endpointAvailability.stateHistory, () =>
       client.partner.getStateHistory({
         tenantId,
         path: { device_id: id }

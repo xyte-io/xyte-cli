@@ -43,7 +43,6 @@ import {
   generateOpsReport,
   InspectProviderScopeError,
   parseReportInput,
-  type FleetReportResult,
   type OpsReportInput
 } from './fleet-insights';
 import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';

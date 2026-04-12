@@ -166,9 +166,9 @@ export class FileProfileStore implements ProfileStore {
   async getData(): Promise<ProfileStoreData> {
     try {
       const content = await fs.readFile(this.filePath, 'utf8');
-      let parsed: ProfileStoreData;
+      let parsed: unknown;
       try {
-        parsed = JSON.parse(content) as ProfileStoreData;
+        parsed = JSON.parse(content);
       } catch (error) {
         const detail = errorMessage(error);
         throw new CliUserError({
@@ -198,7 +198,7 @@ export class FileProfileStore implements ProfileStore {
   async migrateIfNeeded(): Promise<void> {
     try {
       const content = await fs.readFile(this.filePath, 'utf8');
-      const parsed = JSON.parse(content) as ProfileStoreData;
+      const parsed: unknown = JSON.parse(content);
       const normalized = this.normalize(parsed);
       if (normalized.changed) {
         await this.writeData(normalized.data);
@@ -457,10 +457,11 @@ export class FileProfileStore implements ProfileStore {
     return slot;
   }
 
-  private normalize(input: ProfileStoreData): { data: ProfileStoreData; changed: boolean } {
+  private normalize(input: unknown): { data: ProfileStoreData; changed: boolean } {
     let changed = false;
-    const rawTenants = Array.isArray(input.tenants) ? input.tenants : [];
-    if (!Array.isArray(input.tenants)) {
+    const raw = input as Record<string, unknown>;
+    const rawTenants = Array.isArray(raw.tenants) ? raw.tenants : [];
+    if (!Array.isArray(raw.tenants)) {
       changed = true;
     }
 
@@ -477,8 +478,8 @@ export class FileProfileStore implements ProfileStore {
       }
     }
 
-    const incomingActiveTenantId = typeof input.activeTenantId === 'string' ? input.activeTenantId : undefined;
-    if (input.activeTenantId !== incomingActiveTenantId) {
+    const incomingActiveTenantId = typeof raw.activeTenantId === 'string' ? raw.activeTenantId : undefined;
+    if (raw.activeTenantId !== incomingActiveTenantId) {
       changed = true;
     }
 
@@ -490,7 +491,7 @@ export class FileProfileStore implements ProfileStore {
       changed = true;
     }
 
-    if (input.version !== 2) {
+    if (raw.version !== 2) {
       changed = true;
     }
 
