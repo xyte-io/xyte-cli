@@ -48,7 +48,7 @@ import {
   type OpsReportInput
 } from './fleet-insights';
 import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';
-import type { BuiltInFlowDefinition, FlowTaskStep } from './flow-catalog';
+import type { BuiltInFlowDefinition, FlowGateStep, FlowTaskStep } from './flow-catalog';
 import { hasBuiltInFlowDefinition, getBuiltInFlowDefinition, UTILITY_PREPARE_CONTEXT_KEY } from './flow-catalog';
 import { getFlowDefinition } from './flow-user-definitions';
 import { CliUserError } from '../contracts/user-error';
@@ -128,10 +128,6 @@ interface RunDeterministicFlowArgs {
   client: XyteClient;
 }
 
-function isInspectProviderScopeError(error: unknown): boolean {
-  return error instanceof InspectProviderScopeError;
-}
-
 async function collectSnapshotReclassifyingError(ctx: RunContext): Promise<ReturnType<typeof collectFleetSnapshot>> {
   const tenantProfile = await ctx.args.profileStore.getTenant(ctx.args.tenantId);
   try {
@@ -142,7 +138,7 @@ async function collectSnapshotReclassifyingError(ctx: RunContext): Promise<Retur
       providerScope: ctx.args.inspectProviderScope ?? 'auto'
     });
   } catch (error) {
-    if (isInspectProviderScopeError(error)) {
+    if (error instanceof InspectProviderScopeError) {
       throw new FlowNeedsInputError((error as Error).message, { cause: error });
     }
     throw error;
@@ -414,7 +410,7 @@ function handleInstallDoctor(_step: FlowTaskStep, _ctx: RunContext): TaskExecuti
   return { output: buildInstallDoctorReport(path.resolve(__dirname, '../../dist/bin/xyte-cli.js')) };
 }
 
-async function evaluateReadinessWithConnectivity(ctx: RunContext): Promise<ReturnType<typeof evaluateReadiness>> {
+function evaluateReadinessWithConnectivity(ctx: RunContext): ReturnType<typeof evaluateReadiness> {
   return evaluateReadiness({ profileStore: ctx.args.profileStore, secretStore: ctx.args.secretStore, tenantId: ctx.args.tenantId, client: ctx.args.client, checkConnectivity: true });
 }
 
@@ -984,37 +980,63 @@ interface ExecuteStepsResult {
   durationMs: number;
 }
 
-async function buildRunState(args: RunDeterministicFlowArgs): Promise<RunState> {
-  let resolvedFlowId = args.flowId;
+async function resolveFlowDefinition(flowId: string): Promise<{
+  definition: BuiltInFlowDefinition;
+  resolvedFlowId: string;
+  flowDefaults: Record<string, string>;
+}> {
+  let resolvedFlowId = flowId;
   let flowDefaults: Record<string, string> = {};
-  if (!hasBuiltInFlowDefinition(args.flowId)) {
-    const custom = await getFlowDefinition(args.flowId);
+  if (!hasBuiltInFlowDefinition(flowId)) {
+    const custom = await getFlowDefinition(flowId);
     if (!custom) {
-      throw new CliUserError({ summary: `Unknown flow id: ${args.flowId}` });
+      throw new CliUserError({ summary: `Unknown flow id: ${flowId}` });
     }
     if (!hasBuiltInFlowDefinition(custom.basedOn)) {
       throw new CliUserError({
-        summary: `Custom flow ${args.flowId} references unknown built-in base flow: ${custom.basedOn}`
+        summary: `Custom flow ${flowId} references unknown built-in base flow: ${custom.basedOn}`
       });
     }
     resolvedFlowId = custom.basedOn;
     flowDefaults = custom.defaults;
   }
-  const definition = getBuiltInFlowDefinition(resolvedFlowId);
+  return { definition: getBuiltInFlowDefinition(resolvedFlowId), resolvedFlowId, flowDefaults };
+}
 
-  const outRoot = path.resolve(args.outDir);
-  const resumeBundle = args.resume ? await findRunBundle(outRoot, args.resume) : undefined;
-
-  const freshRunId = randomUUID();
+async function hydrateResume(
+  outRoot: string,
+  resumeRef: string | undefined,
+  freshRunId: string,
+  definition: BuiltInFlowDefinition,
+  flowId: string
+): Promise<{
+  resume: ResumeState | undefined;
+  runId: string;
+  bundleDir: string;
+  initialStartedAtUtc: string;
+  steps: FlowRunStep[];
+  cursorIndex: number;
+  priorDecisions: FlowRunDecision[];
+  priorErrors: FlowRunErrorEntry[];
+}> {
+  const resumeBundle = resumeRef ? await findRunBundle(outRoot, resumeRef) : undefined;
   const resume = resumeBundle ? await loadResumeState(resumeBundle) : undefined;
   const runId = resume?.runId ?? freshRunId;
-  const bundleDir =
-    resume?.bundleDir ?? path.join(outRoot, sanitizeFlowId(args.flowId), buildRunDirName(freshRunId));
+  const bundleDir = resume?.bundleDir ?? path.join(outRoot, sanitizeFlowId(flowId), buildRunDirName(freshRunId));
   const initialStartedAtUtc = resume?.initialStartedAtUtc ?? nowIso();
   const steps = resume?.steps ?? createInitialSteps(definition);
   const cursorIndex = resume?.cursorIndex ?? 0;
   const priorDecisions = resume?.priorDecisions ?? [];
   const priorErrors = resume?.priorErrors ?? [];
+  return { resume, runId, bundleDir, initialStartedAtUtc, steps, cursorIndex, priorDecisions, priorErrors };
+}
+
+async function buildRunState(args: RunDeterministicFlowArgs): Promise<RunState> {
+  const { definition, resolvedFlowId, flowDefaults } = await resolveFlowDefinition(args.flowId);
+  const outRoot = path.resolve(args.outDir);
+  const freshRunId = randomUUID();
+  const { resume, runId, bundleDir, initialStartedAtUtc, steps, cursorIndex, priorDecisions, priorErrors } =
+    await hydrateResume(outRoot, args.resume, freshRunId, definition, args.flowId);
 
   const effectiveInspectProviderScope = args.inspectProviderScope ?? resume?.resumedInspectProviderScope ?? 'auto';
   const restoredTaskOutputs = resume ? await restoreTaskOutputsFromSteps(steps) : new Map<string, unknown>();
@@ -1047,6 +1069,89 @@ async function buildRunState(args: RunDeterministicFlowArgs): Promise<RunState> 
   return { ctx, runId, initialStartedAtUtc, cursorIndex, steps, priorDecisions, priorErrors };
 }
 
+async function handleGateStep(
+  step: FlowGateStep,
+  stepState: FlowRunStep,
+  args: RunDeterministicFlowArgs,
+  ctx: RunContext,
+  decisions: FlowRunDecision[],
+  gateApprovalsThisRun: number,
+  index: number
+): Promise<{ action: 'continue' | 'pause'; nextStepIndex: number; gateApprovalsThisRun: number; outcome?: 'pending_gate' }> {
+  if (args.mode === 'plan') {
+    await recordGatePending(stepState, {
+      stepId: step.id,
+      requiresWrite: step.mutating,
+      detail: 'Plan mode paused at human decision gate.',
+      decisionsPath: ctx.decisionsPath,
+      decisions
+    });
+    return { action: 'pause', nextStepIndex: index, gateApprovalsThisRun, outcome: 'pending_gate' };
+  }
+
+  if (gateApprovalsThisRun >= 1) {
+    await recordGatePending(stepState, {
+      stepId: step.id,
+      requiresWrite: step.mutating,
+      detail: 'Single-gate apply limit reached for this invocation.',
+      decisionsPath: ctx.decisionsPath,
+      decisions
+    });
+    return { action: 'pause', nextStepIndex: index, gateApprovalsThisRun, outcome: 'pending_gate' };
+  }
+
+  stepState.status = 'gate_approved';
+  const decision: FlowRunDecision = {
+    timestamp: nowIso(),
+    stepId: step.id,
+    action: 'approved',
+    detail: 'Gate approved by apply mode execution.',
+    requiresWrite: step.mutating
+  };
+  decisions.push(decision);
+  await appendNdjson(ctx.decisionsPath, decision);
+  return { action: 'continue', nextStepIndex: index + 1, gateApprovalsThisRun: gateApprovalsThisRun + 1 };
+}
+
+async function recordStepSuccess(
+  result: TaskExecutionResult,
+  step: FlowTaskStep,
+  stepState: FlowRunStep,
+  ctx: RunContext,
+  args: RunDeterministicFlowArgs,
+  artifactPath: string,
+  stepStartedAt: number
+): Promise<void> {
+  stepState.status = 'completed';
+  stepState.endedAtUtc = nowIso();
+  stepState.durationMs = Date.now() - stepStartedAt;
+  stepState.artifactPath = artifactPath;
+  // Convention: <stepId>_artifact holds the primary artifact path (e.g. CSV written by a utility-prepare step).
+  ctx.resolvedContext[`${step.id}_artifact`] = artifactPath;
+
+  if (result.watchFrames && result.watchFrames.length > 0) {
+    for (const frame of result.watchFrames) {
+      await appendNdjson(ctx.watchFramesPath, frame);
+    }
+  }
+
+  if (result.contextUpdates) {
+    Object.assign(ctx.resolvedContext, result.contextUpdates);
+  }
+
+  if (result.output !== undefined) {
+    ctx.taskOutputs.set(step.id, result.output);
+  }
+
+  const primaryOutputPath = result.primaryOutputPath;
+  if (primaryOutputPath) {
+    // Convention: <stepId>_output holds the primary output path (e.g. NDJSON written by a match/move/verify step).
+    ctx.resolvedContext[`${step.id}_output`] = primaryOutputPath;
+  }
+
+  await persistFlowRunInputs(ctx, args, args.inspectProviderScope ?? 'auto');
+}
+
 async function executeSteps(state: RunState): Promise<ExecuteStepsResult> {
   const { ctx, cursorIndex, steps, priorDecisions, priorErrors } = state;
   const { definition } = ctx;
@@ -1065,44 +1170,14 @@ async function executeSteps(state: RunState): Promise<ExecuteStepsResult> {
       const stepState = steps[index];
 
       if (step.kind === 'gate') {
-        if (args.mode === 'plan') {
-          await recordGatePending(stepState, {
-            stepId: step.id,
-            requiresWrite: step.mutating,
-            detail: 'Plan mode paused at human decision gate.',
-            decisionsPath: ctx.decisionsPath,
-            decisions
-          });
-          outcome = 'pending_gate';
-          nextStepIndex = index;
+        const gateResult = await handleGateStep(step, stepState, args, ctx, decisions, gateApprovalsThisRun, index);
+        if (gateResult.action === 'pause') {
+          outcome = gateResult.outcome!;
+          nextStepIndex = gateResult.nextStepIndex;
           break;
         }
-
-        if (gateApprovalsThisRun >= 1) {
-          await recordGatePending(stepState, {
-            stepId: step.id,
-            requiresWrite: step.mutating,
-            detail: 'Single-gate apply limit reached for this invocation.',
-            decisionsPath: ctx.decisionsPath,
-            decisions
-          });
-          outcome = 'pending_gate';
-          nextStepIndex = index;
-          break;
-        }
-
-        stepState.status = 'gate_approved';
-        const decision: FlowRunDecision = {
-          timestamp: nowIso(),
-          stepId: step.id,
-          action: 'approved',
-          detail: 'Gate approved by apply mode execution.',
-          requiresWrite: step.mutating
-        };
-        decisions.push(decision);
-        await appendNdjson(ctx.decisionsPath, decision);
-        gateApprovalsThisRun += 1;
-        nextStepIndex = index + 1;
+        gateApprovalsThisRun = gateResult.gateApprovalsThisRun;
+        nextStepIndex = gateResult.nextStepIndex;
         continue;
       }
 
@@ -1131,34 +1206,7 @@ async function executeSteps(state: RunState): Promise<ExecuteStepsResult> {
           break;
         }
 
-        stepState.status = 'completed';
-        stepState.endedAtUtc = nowIso();
-        stepState.durationMs = Date.now() - stepStartedAt;
-        stepState.artifactPath = artifactPath;
-        // Convention: <stepId>_artifact holds the primary artifact path (e.g. CSV written by a utility-prepare step).
-        ctx.resolvedContext[`${step.id}_artifact`] = artifactPath;
-
-        if (result.watchFrames && result.watchFrames.length > 0) {
-          for (const frame of result.watchFrames) {
-            await appendNdjson(ctx.watchFramesPath, frame);
-          }
-        }
-
-        if (result.contextUpdates) {
-          Object.assign(ctx.resolvedContext, result.contextUpdates);
-        }
-
-        if (result.output !== undefined) {
-          ctx.taskOutputs.set(step.id, result.output);
-        }
-
-        const primaryOutputPath = result.primaryOutputPath;
-        if (primaryOutputPath) {
-          // Convention: <stepId>_output holds the primary output path (e.g. NDJSON written by a match/move/verify step).
-          ctx.resolvedContext[`${step.id}_output`] = primaryOutputPath;
-        }
-
-        await persistFlowRunInputs(ctx, args, args.inspectProviderScope ?? 'auto');
+        await recordStepSuccess(result, step, stepState, ctx, args, artifactPath, stepStartedAt);
 
         nextStepIndex = index + 1;
         continue;
