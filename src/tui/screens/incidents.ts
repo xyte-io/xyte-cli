@@ -13,7 +13,7 @@ import {
 import { SCREEN_PANE_CONFIG } from '../panes';
 import { createRenderErrorTracker } from '../render-error-tracker';
 import { createScreenRenderLogger, logScreenDataFetch } from '../screen-render-logger';
-import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
+import type { TuiArrowKey, TuiContext, NavigableScreen, TuiPaneId } from '../types';
 import { loadIncidentsData } from '../data-loaders';
 import { sceneFromIncidentsState } from '../scene';
 import { payloadSummary } from '../serialize';
@@ -66,7 +66,7 @@ function castIncidentRecords(items: unknown): Record<string, unknown>[] {
     .map((incident) => (typeof incident === 'object' ? (incident as Record<string, unknown>) : { value: incident }));
 }
 
-export function createIncidentsScreen(): TuiScreen {
+export function createIncidentsScreen(): NavigableScreen {
   let root: blessed.Widgets.BoxElement | undefined;
   let list: blessed.Widgets.ListTableElement | undefined;
   let detailBox: blessed.Widgets.BoxElement | undefined;

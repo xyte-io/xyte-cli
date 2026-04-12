@@ -16,7 +16,7 @@ import { runKeyCreateWizard, runKeyUpdateWizard } from '../key-wizard';
 import type { SecretProvider } from '../../types/profile';
 import { PROVIDER_ORG, SUPPORTED_SECRET_PROVIDERS } from '../../types/profile';
 import { CliUserError } from '../../contracts/user-error';
-import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
+import type { TuiArrowKey, TuiContext, NavigableScreen } from '../types';
 import { readConfigData } from '../data-loaders';
 
 const PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
@@ -40,7 +40,7 @@ async function runSlotConnectivityProbe(args: {
   return result.strategy;
 }
 
-export function createConfigScreen(): TuiScreen {
+export function createConfigScreen(): NavigableScreen {
   let root: blessed.Widgets.BoxElement | undefined;
   let providerTable: blessed.Widgets.ListTableElement | undefined;
   let slotTable: blessed.Widgets.ListTableElement | undefined;

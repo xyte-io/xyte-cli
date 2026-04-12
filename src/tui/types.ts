@@ -1,8 +1,7 @@
 import type blessed from 'blessed';
 
 import type { XyteClient } from '../types/client';
-import type { ProfileStore } from '../secure/profile-store';
-import type { SecretStore } from '../secure/secret-store';
+import type { ProfileStore, SecretStore } from '../types/stores';
 import type { ReadinessCheck } from '../contracts/status';
 
 export { TUI_SCREEN_IDS, type TuiScreenId } from '../types/tui-screens';
@@ -34,8 +33,11 @@ export interface TuiScreen {
   unmount(): void;
   refresh(): Promise<void>;
   focus?(): void;
-  getActivePane?(): TuiPaneId;
-  getAvailablePanes?(): TuiPaneId[];
-  handleArrow?(key: TuiArrowKey): Promise<TuiArrowHandleResult>;
   handleKey?(ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg): Promise<boolean>;
+}
+
+export interface NavigableScreen extends TuiScreen {
+  getActivePane(): TuiPaneId;
+  getAvailablePanes(): TuiPaneId[];
+  handleArrow(key: TuiArrowKey): Promise<TuiArrowHandleResult>;
 }

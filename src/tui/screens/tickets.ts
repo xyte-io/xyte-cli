@@ -13,7 +13,7 @@ import {
 import { SCREEN_PANE_CONFIG } from '../panes';
 import { createRenderErrorTracker } from '../render-error-tracker';
 import { createScreenRenderLogger, logScreenDataFetch } from '../screen-render-logger';
-import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
+import type { TuiArrowKey, TuiContext, NavigableScreen, TuiPaneId } from '../types';
 import type { EndpointNamespace } from '../../types/endpoints';
 import { loadTicketsData } from '../data-loaders';
 import { sceneFromTicketsState } from '../scene';
@@ -146,7 +146,7 @@ export async function sendTicketMessageWithGuard(args: SendTicketMessageWithGuar
   });
 }
 
-export function createTicketsScreen(): TuiScreen {
+export function createTicketsScreen(): NavigableScreen {
   let root: blessed.Widgets.BoxElement | undefined;
   let list: blessed.Widgets.ListTableElement | undefined;
   let detail: blessed.Widgets.BoxElement | undefined;

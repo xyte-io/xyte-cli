@@ -4,7 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { CliUserError } from '../contracts/user-error';
 import { createLayout } from './layout';
 import { GLOBAL_KEYMAP, SCREEN_ACTION_KEYMAP } from './keymap';
-import type { TuiContext, TuiScreen, TuiScreenId } from './types';
+import type { TuiContext, NavigableScreen, TuiScreenId } from './types';
 import { createSetupScreen } from './screens/setup';
 import { createConfigScreen } from './screens/config';
 import { createDashboardScreen } from './screens/dashboard';
@@ -410,7 +410,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
         }
       };
 
-      const screens: Record<TuiScreenId, TuiScreen> = {
+      const screens: Record<TuiScreenId, NavigableScreen> = {
         setup: createSetupScreen(),
         config: createConfigScreen(),
         dashboard: createDashboardScreen(),
@@ -420,7 +420,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
         tickets: createTicketsScreen()
       };
 
-      let mounted: TuiScreen | undefined;
+      let mounted: NavigableScreen | undefined;
 
       const mountScreen = async (id: TuiScreenId) => {
         const token = ++mountTransitionToken;
@@ -633,10 +633,10 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
             ch: event.ch,
             key: event.key,
             isModalActive: modalActive,
-            handleArrow: activeMounted?.handleArrow
+            handleArrow: activeMounted
               ? async (key) => {
                   try {
-                    return await activeMounted.handleArrow!(key);
+                    return await activeMounted.handleArrow(key);
                   } catch (error) {
                     logger.log('input.arrow.error', {
                       screen: activeMounted?.id,

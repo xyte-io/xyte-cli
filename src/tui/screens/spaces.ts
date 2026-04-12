@@ -11,7 +11,7 @@ import {
   type SelectionSyncState
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
-import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
+import type { TuiArrowKey, TuiContext, NavigableScreen } from '../types';
 import { getSpaceId, getSpaceName, loadDevicesData, loadSpaceDrilldownData, loadSpacesData } from '../data-loaders';
 import { sceneFromSpacesState } from '../scene';
 import { safeSearchText } from '../serialize';
@@ -162,7 +162,7 @@ export async function renameSpaceWithGuard(args: RenameSpaceWithGuardArgs): Prom
   });
 }
 
-export function createSpacesScreen(): TuiScreen {
+export function createSpacesScreen(): NavigableScreen {
   let root: blessed.Widgets.BoxElement | undefined;
   let spaceTable: blessed.Widgets.ListTableElement | undefined;
   let detailBox: blessed.Widgets.BoxElement | undefined;

@@ -8,11 +8,15 @@ type ActionContext = Pick<TuiContext, 'setStatus' | 'showError' | 'getActiveTena
 export async function runGuardedAction(
   context: ActionContext,
   pendingStatus: string,
-  action: (tenantId: string | undefined) => Promise<void>
+  action: (tenantId: string) => Promise<void>
 ): Promise<boolean> {
   context.setStatus(pendingStatus);
   try {
     const tenantId = await context.getActiveTenantId();
+    if (tenantId === undefined) {
+      context.setStatus('No active tenant.');
+      return false;
+    }
     await action(tenantId);
     return true;
   } catch (error) {

@@ -13,7 +13,7 @@ import {
 import { SCREEN_PANE_CONFIG } from '../panes';
 import { createRenderErrorTracker } from '../render-error-tracker';
 import { createScreenRenderLogger, logScreenDataFetch } from '../screen-render-logger';
-import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
+import type { TuiArrowKey, TuiContext, NavigableScreen, TuiPaneId } from '../types';
 import type { CommandTemplate } from '../data-loaders';
 import { loadCommandTemplates, loadDevicesData } from '../data-loaders';
 import { sceneFromDevicesState } from '../scene';
@@ -159,7 +159,7 @@ async function runSendCommandWizard(args: {
   }
 }
 
-export function createDevicesScreen(): TuiScreen {
+export function createDevicesScreen(): NavigableScreen {
   let root: blessed.Widgets.BoxElement | undefined;
   let table: blessed.Widgets.ListTableElement | undefined;
   let detail: blessed.Widgets.BoxElement | undefined;

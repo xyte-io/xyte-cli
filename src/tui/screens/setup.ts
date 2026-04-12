@@ -10,14 +10,14 @@ import {
   type SelectionSyncState
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
-import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
+import type { TuiArrowKey, TuiContext, NavigableScreen } from '../types';
 import type { SecretProvider } from '../../types/profile';
 import { PROVIDER_ORG } from '../../types/profile';
 import { parseProvider } from '../../utils/parse-domain';
 import { sceneFromSetupState, toSetupProviderRows } from '../scene';
 import { runKeyCreateWizard } from '../key-wizard';
 
-export function createSetupScreen(): TuiScreen {
+export function createSetupScreen(): NavigableScreen {
   let root: blessed.Widgets.BoxElement | undefined;
   let statsBox: blessed.Widgets.BoxElement | undefined;
   let providerTable: blessed.Widgets.ListTableElement | undefined;

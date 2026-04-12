@@ -2,7 +2,7 @@ import blessed from 'blessed';
 
 import { movePaneWithBoundary, scrollBox } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
-import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
+import type { TuiArrowKey, TuiContext, NavigableScreen, TuiPaneId } from '../types';
 import { loadDashboardData } from '../data-loaders';
 import { sceneFromDashboardState } from '../scene';
 import { createRenderErrorTracker } from '../render-error-tracker';
@@ -20,7 +20,7 @@ function linesFromTableRows(rows: Array<Array<string | number>> = [], fallback: 
   return rows.map((row, index) => `${index + 1}. ${row[0]} | ${row[1]} | ${row[2]}`).join('\n');
 }
 
-export function createDashboardScreen(): TuiScreen {
+export function createDashboardScreen(): NavigableScreen {
   let root: blessed.Widgets.BoxElement | undefined;
   let kpis: blessed.Widgets.BoxElement | undefined;
   let incidentsBox: blessed.Widgets.BoxElement | undefined;
