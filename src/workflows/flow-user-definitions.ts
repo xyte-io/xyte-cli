@@ -75,16 +75,20 @@ function getFlowDefinitionPath(flowId: string): string {
   return path.join(getFlowDefinitionsDir(), `${id}.json`);
 }
 
-export async function listFlowDefinitions(): Promise<Array<FlowDefinitionV1 & { path: string }>> {
+export async function listFlowDefinitions(): Promise<{
+  defs: Array<FlowDefinitionV1 & { path: string }>;
+  skipped: Array<{ path: string; reason: string }>;
+}> {
   const root = getFlowDefinitionsDir();
   let entries;
   try {
     entries = await readdir(root, { withFileTypes: true });
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { defs: [], skipped: [] };
     throw error;
   }
   const defs: Array<FlowDefinitionV1 & { path: string }> = [];
+  const skipped: Array<{ path: string; reason: string }> = [];
 
   for (const entry of entries) {
     if (!entry.isFile() || !entry.name.endsWith('.json')) {
@@ -95,18 +99,21 @@ export async function listFlowDefinitions(): Promise<Array<FlowDefinitionV1 & { 
     try {
       raw = JSON.parse(await readFile(filePath, 'utf8'));
     } catch (error) {
-      if (error instanceof SyntaxError) continue; // bad JSON, skip file
+      if (error instanceof SyntaxError) {
+        skipped.push({ path: filePath, reason: errorMessage(error) });
+        continue;
+      }
       throw error; // I/O error, propagate
     }
     try {
       const parsed = validateFlowDefinition(raw);
       defs.push({ ...parsed, path: filePath });
     } catch (error) {
-      getLogger().warn({ filePath, error: errorMessage(error) }, 'Skipping invalid flow definition');
+      skipped.push({ path: filePath, reason: errorMessage(error) });
     }
   }
 
-  return defs.sort((left, right) => left.id.localeCompare(right.id));
+  return { defs: defs.sort((left, right) => left.id.localeCompare(right.id)), skipped };
 }
 
 export async function getFlowDefinition(flowId: string): Promise<(FlowDefinitionV1 & { path: string }) | undefined> {

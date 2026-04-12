@@ -67,7 +67,10 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
         intent: item.intent,
         writeCapable: item.writeCapable
       }));
-      const customDefs = await listFlowDefinitions();
+      const { defs: customDefs, skipped } = await listFlowDefinitions();
+      for (const { path: p, reason } of skipped) {
+        ctx.stderr.write(`Warning: skipping invalid flow definition at ${p}: ${reason}\n`);
+      }
       const custom = customDefs.map((item) => ({
         type: 'custom' as const,
         id: item.id,

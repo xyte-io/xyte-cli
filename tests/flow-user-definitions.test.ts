@@ -47,16 +47,17 @@ describe('flow-user-definitions', () => {
 
   describe('listFlowDefinitions', () => {
     it('returns empty array when flows dir does not exist', async () => {
-      const result = await listFlowDefinitions();
-      expect(result).toEqual([]);
+      const { defs, skipped } = await listFlowDefinitions();
+      expect(defs).toEqual([]);
+      expect(skipped).toEqual([]);
     });
 
     it('returns sorted definitions from flows dir', async () => {
       await saveFlowDefinition({ flowId: 'flow.beta', basedOn: 'device.move', overwrite: false });
       await saveFlowDefinition({ flowId: 'flow.alpha', basedOn: 'device.move', overwrite: false });
 
-      const result = await listFlowDefinitions();
-      expect(result.map((d) => d.id)).toEqual(['flow.alpha', 'flow.beta']);
+      const { defs } = await listFlowDefinitions();
+      expect(defs.map((d) => d.id)).toEqual(['flow.alpha', 'flow.beta']);
     });
 
     it('skips non-json files and invalid JSON', async () => {
@@ -65,8 +66,10 @@ describe('flow-user-definitions', () => {
       writeFileSync(join(flowsDir, 'readme.txt'), 'ignored');
       writeFileSync(join(flowsDir, 'bad.json'), 'not valid json');
 
-      const result = await listFlowDefinitions();
-      expect(result.map((d) => d.id)).toEqual(['flow.ok']);
+      const { defs, skipped } = await listFlowDefinitions();
+      expect(defs.map((d) => d.id)).toEqual(['flow.ok']);
+      expect(skipped).toHaveLength(1);
+      expect(skipped[0].path).toContain('bad.json');
     });
 
     it('skips files with wrong schemaVersion', async () => {
@@ -77,8 +80,10 @@ describe('flow-user-definitions', () => {
         JSON.stringify({ ...validPayload(), id: 'flow.old', schemaVersion: 'xyte.flow.v0' })
       );
 
-      const result = await listFlowDefinitions();
-      expect(result.map((d) => d.id)).toEqual(['flow.ok']);
+      const { defs, skipped } = await listFlowDefinitions();
+      expect(defs.map((d) => d.id)).toEqual(['flow.ok']);
+      expect(skipped).toHaveLength(1);
+      expect(skipped[0].path).toContain('flow.old.json');
     });
   });
 

@@ -462,9 +462,11 @@ async function handleOpsConsole(
     overrides['console.debugLogPath'] = options.debugLog;
   }
   const settings = await ctx.resolveSettings(overrides);
+  const tenantId = options.tenant ?? settings.values.defaults.tenant;
+  requireTenantId(tenantId, 'ops console');
   const secretStore = ctx.getSecretStore();
   const client = await ctx.withClient({
-    tenantId: options.tenant ?? settings.values.defaults.tenant,
+    tenantId,
     flagOverrides: overrides
   });
   const screenRaw = options.screen ?? settings.values.console.screen ?? 'dashboard';
@@ -499,7 +501,7 @@ async function handleOpsConsole(
     motionEnabled,
     follow,
     intervalMs,
-    tenantId: options.tenant ?? settings.values.defaults.tenant,
+    tenantId,
     output: ctx.stdout,
     debug: options.debug,
     debugLogPath: options.debugLog ?? settings.values.console.debugLogPath
