@@ -23,8 +23,7 @@ import { buildStatusContract } from '../contracts/status';
 import type { WatchFrameV1 } from '../contracts/watch-frame';
 import { getEndpoint } from '../client/catalog';
 import { evaluateReadiness } from '../config/readiness';
-import type { ProfileStore } from '../secure/profile-store';
-import type { SecretStore } from '../secure/secret-store';
+import type { ProfileStore, SecretStore } from '../types/stores';
 import type { XyteClient } from '../types/client';
 import { buildInstallDoctorReport } from './install-doctor';
 import { getLogger } from '../observability/logger';
@@ -128,7 +127,7 @@ interface RunDeterministicFlowArgs {
   client: XyteClient;
 }
 
-async function collectSnapshotReclassifyingError(ctx: RunContext): Promise<ReturnType<typeof collectFleetSnapshot>> {
+async function collectFlowSnapshot(ctx: RunContext): Promise<ReturnType<typeof collectFleetSnapshot>> {
   const tenantProfile = await ctx.args.profileStore.getTenant(ctx.args.tenantId);
   try {
     return await collectFleetSnapshot({
@@ -436,13 +435,13 @@ async function handleStatusFast(_step: FlowTaskStep, ctx: RunContext): Promise<T
 }
 
 async function handleFleetInspect(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
-  const snapshot = await collectSnapshotReclassifyingError(ctx);
+  const snapshot = await collectFlowSnapshot(ctx);
   return { output: buildFleetInspect(snapshot) };
 }
 
 async function handleDeepDive(step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
   const windowHours = resolveFlowWindowHours(step, ctx.resolvedContext);
-  const snapshot = await collectSnapshotReclassifyingError(ctx);
+  const snapshot = await collectFlowSnapshot(ctx);
   return { output: buildDeepDive(snapshot, windowHours) };
 }
 
@@ -487,11 +486,9 @@ async function handleOpsReport(args: {
     if (format !== 'markdown') {
       throw new CliUserError({ summary: `Report format '${format}' is only supported for deep-dive reports. Use 'markdown'.` });
     }
-    // format proven to be 'markdown' by the check above
-    const generated = await generateOpsReport({ input: reportInput, tenantId, format: 'markdown', outPath, includeSensitive });
+    const generated = await generateOpsReport({ input: reportInput, tenantId, format, outPath, includeSensitive });
     return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
   }
-  // deep-dive: supports any format
   const generated = await generateOpsReport({ input: reportInput, tenantId, format, outPath, includeSensitive });
   return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
 }

@@ -70,8 +70,8 @@ function resolveRenderMode<T extends string>(options: { render?: string }, allow
   return render as T;
 }
 
-function parseWatchProfile(value: string | undefined): WatchProfile {
-  const normalized = (value ?? DEFAULT_WATCH_PROFILE).trim().toLowerCase();
+function parseWatchProfile(value: string): WatchProfile {
+  const normalized = value.trim().toLowerCase();
   if (normalized !== DEFAULT_WATCH_PROFILE) {
     throw new CliUserError({ summary: `Invalid watch profile: "${value}". Use ${DEFAULT_WATCH_PROFILE}.` });
   }
@@ -393,13 +393,17 @@ async function handleOpsReportGenerate(
   try {
     reportInput = parseReportInput(raw, tenantId);
   } catch (err) {
+    const suggestedCommands = [
+      'Generate fresh input with xyte-cli ops inspect deep-dive --output json',
+      'Generate fresh input with xyte-cli util match',
+      'Generate fresh input with xyte-cli util move-devices'
+    ];
+    if (err instanceof CliUserError) {
+      throw new CliUserError({ ...err, suggestedCommands: [...(err.suggestedCommands ?? []), ...suggestedCommands] });
+    }
     throw new CliUserError({
       summary: err instanceof Error ? err.message : 'Invalid report input format.',
-      suggestedCommands: [
-        'Generate fresh input with xyte-cli ops inspect deep-dive --output json',
-        'Generate fresh input with xyte-cli util match',
-        'Generate fresh input with xyte-cli util move-devices'
-      ]
+      suggestedCommands
     });
   }
   if (reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION && !reportInput.tenantName) {
@@ -525,7 +529,16 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
     .option('--once', 'Run one poll and exit')
     .option('--out <path>', 'Write the rendered output to a UTF-8 file')
     .option('--strict-json', 'Fail on non-serializable output')
-    .action(async function (options: Record<string, unknown>) {
+    .action(async function (options: {
+      tenant?: string;
+      profile?: string;
+      queryJson?: string;
+      intervalMs?: string;
+      maxPolls?: string;
+      once?: boolean;
+      out?: string;
+      strictJson?: boolean;
+    }) {
       await handleOpsWatchIncidents(ctx, {
         ...options,
         output: getExplicitGlobalOutput(this)

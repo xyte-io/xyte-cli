@@ -206,6 +206,9 @@ export function createDashboardScreen(): NavigableScreen {
       }
 
       return 'unhandled';
+    },
+    focus() {
+      focusPane();
     }
   };
 }

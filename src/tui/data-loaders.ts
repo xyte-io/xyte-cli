@@ -10,7 +10,7 @@ import {
   type RetryPolicyOptions,
   type RetryState
 } from '../config/retry-policy';
-import type { ProfileStore } from '../secure/profile-store';
+import type { ProfileStore } from '../types/stores';
 
 import type { XyteClient } from '../types/client';
 import type { SecretProvider } from '../types/profile';
@@ -54,7 +54,7 @@ function pickWorstOutcome(outcomes: Array<LoadOutcome<unknown>>): LoadOutcome<un
   );
 }
 
-async function loadWithOutcome<T>(
+async function withOutcome<T>(
   operation: () => Promise<T>,
   fallback: T,
   options: LoadWithOutcomeOptions = {}
@@ -201,7 +201,7 @@ export async function loadDevicesData(
   tenantId: string | undefined,
   options: DevicesLoadOptions
 ): Promise<LoadOutcome<unknown[]>> {
-  const result = await loadWithOutcome(async () => {
+  const result = await withOutcome(async () => {
     const query = compactQuery(options.query as QueryShape | undefined);
     const provider = await resolveTenantProvider(options.profileStore, tenantId);
     const raw =
@@ -244,7 +244,7 @@ export async function loadIncidentsData(
   tenantId: string | undefined,
   options: IncidentsLoadOptions = {}
 ): Promise<LoadOutcome<unknown[]>> {
-  return loadWithOutcome(async () => {
+  return withOutcome(async () => {
     const nowUnix = Math.floor(Date.now() / 1000);
     const merged: IncidentsQuery = {
       status: 'active',
@@ -328,7 +328,7 @@ export async function loadTicketsData(
   options: TicketsLoadOptions = {}
 ): Promise<LoadOutcome<TicketsLoadResult>> {
   const query = compactQuery(options.query);
-  const orgOutcome = await loadWithOutcome(async () => {
+  const orgOutcome = await withOutcome(async () => {
     const org = await client.organization.getTickets({ tenantId, ...(query ? { query } : {}) });
     return extractArray(org, ['tickets', 'data', 'items']);
   }, []);
@@ -347,7 +347,7 @@ export async function loadTicketsData(
     };
   }
 
-  const partnerOutcome = await loadWithOutcome(async () => {
+  const partnerOutcome = await withOutcome(async () => {
     const partner = await client.partner.getTickets({ tenantId, ...(query ? { query } : {}) });
     return extractArray(partner, ['tickets', 'data', 'items']);
   }, []);
@@ -383,7 +383,7 @@ export async function loadSpacesData(
   tenantId: string | undefined,
   options: SpacesLoadOptions = {}
 ): Promise<LoadOutcome<unknown[]>> {
-  return loadWithOutcome(async () => {
+  return withOutcome(async () => {
     const query = compactQuery(options.query as QueryShape | undefined);
     const raw = await client.organization.getSpaces({ tenantId, ...(query ? { query } : {}) });
     return extractArray(raw, ['spaces', 'data', 'items']);
@@ -438,7 +438,7 @@ export async function loadCommandTemplates(
   tenantId: string | undefined,
   options: { deviceId: string }
 ): Promise<LoadOutcome<CommandTemplate[]>> {
-  return loadWithOutcome(async () => {
+  return withOutcome(async () => {
     const raw = await client.organization.getCommands({
       tenantId,
       path: { device_id: options.deviceId }
@@ -469,8 +469,8 @@ export async function loadSpaceDrilldownData(
 ): Promise<LoadOutcome<SpaceDrilldownResult>> {
   const { spaceId, allDevicesCache = [] } = options;
   const [detailOutcome, queriedDevicesOutcome] = await Promise.all([
-    loadWithOutcome(() => client.organization.getSpace({ tenantId, path: { space_id: spaceId } }), undefined),
-    loadWithOutcome(async () => {
+    withOutcome(() => client.organization.getSpace({ tenantId, path: { space_id: spaceId } }), undefined),
+    withOutcome(async () => {
       const queried = await client.organization.getDevices({ tenantId, query: { space_id: spaceId } });
       return extractArray(queried, ['devices', 'data', 'items']);
     }, [])

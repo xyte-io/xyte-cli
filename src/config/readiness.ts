@@ -1,5 +1,4 @@
-import type { SecretStore } from '../secure/secret-store';
-import type { ProfileStore } from '../secure/profile-store';
+import type { ProfileStore, SecretStore } from '../types/stores';
 import type { SecretProvider } from '../types/profile';
 import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
 import type { XyteClient } from '../types/client';

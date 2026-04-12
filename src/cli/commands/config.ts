@@ -13,8 +13,7 @@ import {
 } from '../../config/settings';
 import { CliUserError } from '../../contracts/user-error';
 import { makeKeyFingerprint, matchesSlotRef } from '../../secure/key-slots';
-import type { ProfileStore } from '../../secure/profile-store';
-import type { SecretStore } from '../../secure/secret-store';
+import type { ProfileStore, SecretStore } from '../../types/stores';
 import { SUPPORTED_SECRET_PROVIDERS, type SecretProvider } from '../../types/profile';
 import { parseProvider } from '../../utils/parse-domain';
 import { formatReadinessText } from '../format-readiness';

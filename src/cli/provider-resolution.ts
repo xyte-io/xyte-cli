@@ -1,5 +1,5 @@
 import { CliUserError } from '../contracts/user-error';
-import type { ProfileStore } from '../secure/profile-store';
+import type { ProfileStore } from '../types/stores';
 import { PROVIDER_ORG, PROVIDER_PARTNER, type SecretProvider } from '../types/profile';
 
 import { runSlotConnectivityTest } from '../client/probe';

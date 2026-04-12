@@ -29,7 +29,13 @@ function parseFlowContextJson(value: string | undefined): Record<string, string>
   if (!value) {
     return {};
   }
-  const raw = readFileSync(value, 'utf8');
+  let raw: string;
+  try {
+    raw = readFileSync(value, 'utf8');
+  } catch (error) {
+    const detail = error instanceof Error ? `: ${error.message}` : '';
+    throw new CliUserError({ summary: `Cannot read context JSON file at "${value}"${detail}` });
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);

@@ -1,8 +1,7 @@
 import type { Command } from 'commander';
 
 import type { CliActionLogLevel } from './action-logger';
-import type { ProfileStore } from '../secure/profile-store';
-import type { SecretStore } from '../secure/secret-store';
+import type { ProfileStore, SecretStore } from '../types/stores';
 import type { XyteClient } from '../types/client';
 import type { CliOutputMode, ResolvedCliSettingsState, SettingKey } from '../config/settings';
 import { stringifyJsonOutput } from '../utils/json-output';
