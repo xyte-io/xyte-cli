@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import endpoints from '../src/spec/public-endpoints.json';
+import endpoints from '../src/api-catalog/public-endpoints.json';
 
 describe('public endpoint catalog', () => {
   it('maps every key uniquely', () => {

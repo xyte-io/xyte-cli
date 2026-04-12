@@ -1,4 +1,4 @@
-import rawEndpoints from '../spec/public-endpoints.json';
+import rawEndpoints from '../api-catalog/public-endpoints.json';
 import type { EndpointNamespace, PublicEndpointSpec } from '../types/endpoints';
 import { CliUserError } from '../contracts/user-error';
 
