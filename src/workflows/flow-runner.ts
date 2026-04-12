@@ -667,7 +667,7 @@ async function handleSpaceImportTree(step: FlowTaskStep, _stepIndex: number, ctx
     continueOnError: false,
     reportPath
   });
-  return { ok: true, output: result, artifactPath: reportPath };
+  return { ok: true, output: result, artifactPath: reportPath, primaryOutputPath: reportPath };
 }
 
 async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {

@@ -14,11 +14,13 @@ import { MemoryProfileStore } from './support/memory-profile-store';
 // Per-test overrides captured by the vi.mock factory closures below.
 let builtInDefinitionOverride: BuiltInFlowDefinition | null = null;
 let flowDefinitionOverride: Record<string, unknown> | null = null;
+let runSpaceImportTreeOverride: (() => Promise<unknown>) | null = null;
 
 vi.mock('../src/workflows/flow-catalog', async (importOriginal) => {
   const original = await importOriginal<typeof import('../src/workflows/flow-catalog')>();
   return {
     ...original,
+    hasBuiltInFlowDefinition: (id: string) => builtInDefinitionOverride?.id === id || original.hasBuiltInFlowDefinition(id),
     getBuiltInFlowDefinition: (id: string) => builtInDefinitionOverride ?? original.getBuiltInFlowDefinition(id)
   };
 });
@@ -28,6 +30,15 @@ vi.mock('../src/workflows/flow-user-definitions', async (importOriginal) => {
   return {
     ...original,
     getFlowDefinition: async (id: string) => flowDefinitionOverride ?? original.getFlowDefinition(id)
+  };
+});
+
+vi.mock('../src/workflows/utility-commands', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../src/workflows/utility-commands')>();
+  return {
+    ...original,
+    runSpaceImportTree: async (...args: unknown[]) =>
+      runSpaceImportTreeOverride ? runSpaceImportTreeOverride(...args) : original.runSpaceImportTree(...(args as Parameters<typeof original.runSpaceImportTree>))
   };
 });
 
@@ -100,6 +111,7 @@ describe('flow runner', () => {
   afterEach(() => {
     builtInDefinitionOverride = null;
     flowDefinitionOverride = null;
+    runSpaceImportTreeOverride = null;
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -2175,5 +2187,64 @@ describe('flow runner', () => {
     expect(String(failedStep?.error?.detail ?? '')).toContain(
       'both organization and partner credentials are configured'
     );
+  });
+
+  it('sets <stepId>_output in context after space.import-tree step', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-space-import-tree-ctx`);
+    const csvPath = join(tmpdir(), `space-import-tree-input-${Date.now()}.csv`);
+    writeFileSync(csvPath, 'path\nBuilding A/Floor 1\n');
+
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.test-space-import',
+      title: 'Test Space Import',
+      intent: 'test',
+      writeCapable: true,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'task',
+          id: 'import_tree',
+          title: 'Import Space Tree',
+          command: 'xyte-cli util import-tree',
+          task: 'space.import-tree',
+          mutating: true,
+          spaceImportTree: {
+            inputPath: csvPath,
+            reportPath: 'import-tree-report.json',
+            apply: false
+          }
+        }
+      ]
+    };
+
+    builtInDefinitionOverride = definition;
+    runSpaceImportTreeOverride = async () => ({
+      schemaVersion: 'xyte.utility.batch.v1',
+      generatedAtUtc: new Date().toISOString(),
+      tenantId: 'acme',
+      command: 'space.import-tree',
+      mode: 'dry-run',
+      totals: { rows: 1, succeeded: 1, failed: 0, skipped: 0 },
+      stoppedEarly: false
+    });
+
+    const result = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(result.outcome).toBe('completed');
+    const inputs = JSON.parse(readFileSync(result.inputsPath, 'utf8'));
+    // <stepId>_output must be set so downstream steps can reference {{import_tree_output}}
+    expect(inputs.context.import_tree_output).toBeDefined();
   });
 });
