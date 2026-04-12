@@ -11,7 +11,7 @@ import {
   INSPECT_FLEET_SCHEMA_VERSION,
   REPORT_SCHEMA_VERSION
 } from '../contracts/versions';
-import { parseTimestamp } from './report/time-format';
+import { parseTimestamp } from '../utils/timestamp';
 import { formatDeepDiveMarkdown } from './fleet-insights-format';
 import { DeviceMatchResultSchema, formatDeviceMatchReportMarkdown } from './device-match';
 import { DeviceMoveBatchReportSchema, formatDeviceMoveBatchReportMarkdown } from './device-migration-report';

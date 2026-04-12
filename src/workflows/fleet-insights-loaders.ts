@@ -2,7 +2,7 @@ import type { XyteClient } from '../types/client';
 import type { InspectProviderScope } from '../types/settings-enums';
 import { asRecord, asRecordOrUndefined, extractArray, extractHasNextPage, firstText, safeString } from '../utils/json';
 import { withSpan } from '../observability/tracing';
-import { parseTimestamp } from './report/time-format';
+import { parseTimestamp } from '../utils/timestamp';
 
 import type {
   FleetSnapshot,

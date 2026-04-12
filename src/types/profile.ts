@@ -1,5 +1,3 @@
-import { CliUserError } from '../contracts/user-error';
-
 export const SUPPORTED_SECRET_PROVIDERS = ['xyte-org', 'xyte-partner'] as const;
 
 export type SecretProvider = (typeof SUPPORTED_SECRET_PROVIDERS)[number];
@@ -9,14 +7,6 @@ export const PROVIDER_PARTNER = 'xyte-partner' as const;
 
 export function isSecretProvider(value: string): value is SecretProvider {
   return (SUPPORTED_SECRET_PROVIDERS as readonly string[]).includes(value);
-}
-
-export function parseProvider(value: string): SecretProvider {
-  const normalized = value.trim();
-  if (!isSecretProvider(normalized)) {
-    throw new CliUserError({ summary: `Invalid provider: ${value}` });
-  }
-  return normalized;
 }
 
 export interface ApiKeySlotMeta {

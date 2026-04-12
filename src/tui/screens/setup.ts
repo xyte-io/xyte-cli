@@ -12,7 +12,8 @@ import {
 import { SCREEN_PANE_CONFIG } from '../panes';
 import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
 import type { SecretProvider } from '../../types/profile';
-import { PROVIDER_ORG, parseProvider } from '../../types/profile';
+import { PROVIDER_ORG } from '../../types/profile';
+import { parseProvider } from '../../utils/parse-domain';
 import { sceneFromSetupState, toSetupProviderRows } from '../scene';
 import { runKeyCreateWizard } from '../key-wizard';
 

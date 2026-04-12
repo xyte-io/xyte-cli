@@ -11,7 +11,7 @@ import {
   saveFlowDefinition,
   updateFlowDefinition
 } from '../../workflows/flow-user-definitions';
-import { parseInspectProviderScope } from '../../types/settings-enums';
+import { parseInspectProviderScope } from '../../utils/parse-domain';
 import { type CliContext, printJson } from '../cli-context';
 import { CliUserError } from '../../contracts/user-error';
 
