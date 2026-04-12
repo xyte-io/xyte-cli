@@ -414,7 +414,7 @@ function evaluateReadinessWithConnectivity(ctx: RunContext): ReturnType<typeof e
   return evaluateReadiness({ profileStore: ctx.args.profileStore, secretStore: ctx.args.secretStore, tenantId: ctx.args.tenantId, client: ctx.args.client, checkConnectivity: true });
 }
 
-async function executeSetupStatusStep(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
+async function handleSetupStatusStep(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
   const readiness = await evaluateReadinessWithConnectivity(ctx);
   if (readiness.state !== 'ready') {
     throw new FlowNeedsInputError(`Setup status is ${readiness.state}. Run setup before continuing.`);
@@ -694,7 +694,7 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
 
   switch (step.task) {
     case 'doctor.install':    return handleInstallDoctor(step, ctx);
-    case 'setup.status':      return executeSetupStatusStep(step, ctx);
+    case 'setup.status':      return handleSetupStatusStep(step, ctx);
     case 'config.doctor':     return handleConfigDoctor(step, ctx);
     case 'status.fast':       return handleStatusFast(step, ctx);
     case 'inspect.fleet':     return handleFleetInspect(step, ctx);

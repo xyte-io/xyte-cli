@@ -16,6 +16,8 @@ export type ConnectionState =
   | 'unknown_error'
   | 'not_checked';
 
+const CONNECTION_STATES = ['connected', 'auth_required', 'missing_key', 'network_error', 'timeout', 'rate_limited', 'unknown_error', 'not_checked'] as const;
+
 export interface ConnectivityResult {
   state: ConnectionState;
   class?: ConnectionErrorClass;
@@ -57,7 +59,7 @@ const StatusProviderSchema = z.object({
 });
 
 const StatusConnectivitySchema = z.object({
-  state: z.enum(['connected', 'auth_required', 'missing_key', 'network_error', 'timeout', 'rate_limited', 'unknown_error', 'not_checked']),
+  state: z.enum(CONNECTION_STATES),
   class: z.enum(['auth', 'missing_key', 'network', 'timeout', 'rate_limit', 'unknown']).optional(),
   message: z.string(),
   retriable: z.boolean(),
@@ -92,7 +94,7 @@ const StatusReadinessSchema = z.object({
   missingItems: z.array(z.string()),
   recommendedActions: z.array(z.string()),
   providers: z.array(StatusProviderSchema),
-  connectionState: z.enum(['connected', 'auth_required', 'missing_key', 'network_error', 'timeout', 'rate_limited', 'unknown_error', 'not_checked']),
+  connectionState: z.enum(CONNECTION_STATES),
   connectivity: StatusConnectivitySchema
 });
 
