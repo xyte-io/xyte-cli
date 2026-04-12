@@ -386,7 +386,7 @@ export class FileProfileStore implements ProfileStore {
     const registry = cloneRegistry(tenant.keyRegistry);
     const slotIndex = registry.slots.findIndex((slot) => slot.provider === provider && matchesSlotRef(slot, slotRef));
     if (slotIndex === -1) {
-      throw new Error(`Unknown slot "${slotRef}" for provider ${provider}.`);
+      throw new CliUserError({ summary: `Unknown slot "${slotRef}" for provider ${provider}.` });
     }
 
     const slot = registry.slots[slotIndex];
@@ -425,7 +425,7 @@ export class FileProfileStore implements ProfileStore {
     const registry = cloneRegistry(tenant.keyRegistry);
     const slot = registry.slots.find((item) => item.provider === provider && matchesSlotRef(item, slotRef));
     if (!slot) {
-      throw new Error(`Unknown slot "${slotRef}" for provider ${provider}.`);
+      throw new CliUserError({ summary: `Unknown slot "${slotRef}" for provider ${provider}.` });
     }
 
     registry.slots = registry.slots.filter((item) => !(item.provider === provider && item.slotId === slot.slotId));
@@ -469,7 +469,7 @@ export class FileProfileStore implements ProfileStore {
     const registry = cloneRegistry(tenant.keyRegistry);
     const slot = registry.slots.find((item) => item.provider === provider && matchesSlotRef(item, slotRef));
     if (!slot) {
-      throw new Error(`Unknown slot "${slotRef}" for provider ${provider}.`);
+      throw new CliUserError({ summary: `Unknown slot "${slotRef}" for provider ${provider}.` });
     }
 
     registry.activeSlotByProvider[provider] = slot.slotId;

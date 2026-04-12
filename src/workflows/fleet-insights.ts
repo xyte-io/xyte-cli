@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { ensureParentDir } from '../utils/fs';
 import { asRecord, safeString } from '../utils/json';
+import { CliUserError } from '../contracts/user-error';
 import {
   DEVICE_MATCH_SCHEMA_VERSION,
   INSPECT_DEEP_DIVE_SCHEMA_VERSION,
@@ -369,11 +370,11 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
 export function parseDeepDiveForReport(raw: unknown, expectedTenantId?: string): DeepDiveResult {
   const parsed = DeepDiveResultSchema.safeParse(raw);
   if (!parsed.success) {
-    throw new Error('Input JSON must be produced by `xyte-cli ops inspect deep-dive --output json`.');
+    throw new CliUserError({ summary: 'Input JSON must be produced by `xyte-cli ops inspect deep-dive --output json`.' });
   }
 
   if (expectedTenantId && parsed.data.tenantId !== expectedTenantId) {
-    throw new Error(`Input tenant mismatch. Expected ${expectedTenantId}, got ${parsed.data.tenantId}.`);
+    throw new CliUserError({ summary: `Input tenant mismatch. Expected ${expectedTenantId}, got ${parsed.data.tenantId}.` });
   }
 
   return parsed.data;
@@ -383,7 +384,7 @@ export function parseReportInput(raw: unknown, expectedTenantId?: string): OpsRe
   const deepDive = DeepDiveResultSchema.safeParse(raw);
   if (deepDive.success) {
     if (expectedTenantId && deepDive.data.tenantId !== expectedTenantId) {
-      throw new Error(`Input tenant mismatch. Expected ${expectedTenantId}, got ${deepDive.data.tenantId}.`);
+      throw new CliUserError({ summary: `Input tenant mismatch. Expected ${expectedTenantId}, got ${deepDive.data.tenantId}.` });
     }
     return deepDive.data;
   }
@@ -391,7 +392,7 @@ export function parseReportInput(raw: unknown, expectedTenantId?: string): OpsRe
   const deviceMatch = DeviceMatchResultSchema.safeParse(raw);
   if (deviceMatch.success) {
     if (expectedTenantId && deviceMatch.data.tenantId && deviceMatch.data.tenantId !== expectedTenantId) {
-      throw new Error(`Input tenant mismatch. Expected ${expectedTenantId}, got ${deviceMatch.data.tenantId}.`);
+      throw new CliUserError({ summary: `Input tenant mismatch. Expected ${expectedTenantId}, got ${deviceMatch.data.tenantId}.` });
     }
     return deviceMatch.data;
   }
@@ -399,14 +400,15 @@ export function parseReportInput(raw: unknown, expectedTenantId?: string): OpsRe
   const deviceMoveBatch = DeviceMoveBatchReportSchema.safeParse(raw);
   if (deviceMoveBatch.success) {
     if (expectedTenantId && deviceMoveBatch.data.tenantId !== expectedTenantId) {
-      throw new Error(`Input tenant mismatch. Expected ${expectedTenantId}, got ${deviceMoveBatch.data.tenantId}.`);
+      throw new CliUserError({ summary: `Input tenant mismatch. Expected ${expectedTenantId}, got ${deviceMoveBatch.data.tenantId}.` });
     }
     return deviceMoveBatch.data;
   }
 
-  throw new Error(
-    'Input JSON must be produced by `xyte-cli ops inspect deep-dive --output json`, `xyte-cli util match`, or `xyte-cli util move-devices`.'
-  );
+  throw new CliUserError({
+    summary:
+      'Input JSON must be produced by `xyte-cli ops inspect deep-dive --output json`, `xyte-cli util match`, or `xyte-cli util move-devices`.'
+  });
 }
 
 export async function generateFleetReport(args: {
@@ -466,7 +468,7 @@ export async function generateOpsReport(args: {
   }
 
   if (args.format === 'pdf') {
-    throw new Error('PDF rendering is only supported for deep-dive report input.');
+    throw new CliUserError({ summary: 'PDF rendering is only supported for deep-dive report input.' });
   }
 
   ensureParentDir(args.outPath);

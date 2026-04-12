@@ -211,16 +211,10 @@ export function createTicketsScreen(): TuiScreen {
     const start = (page - 1) * Math.max(1, perPage);
     filtered = filteredAll.slice(start, start + Math.max(1, perPage));
 
-    if (restoreTicketId) {
-      const pageIndex = filtered.findIndex((ticket) => ticketIdOf(ticket) === restoreTicketId);
-      if (pageIndex >= 0) {
-        selectedIndex = pageIndex;
-      } else {
-        selectedIndex = clampIndex(selectedIndex, filtered.length);
-      }
-    } else {
-      selectedIndex = clampIndex(selectedIndex, filtered.length);
-    }
+    const pageIndex = restoreTicketId
+      ? filtered.findIndex((ticket) => ticketIdOf(ticket) === restoreTicketId)
+      : -1;
+    selectedIndex = pageIndex >= 0 ? pageIndex : clampIndex(selectedIndex, filtered.length);
   };
 
   const renderRows = (restoreTicketId?: string) => {

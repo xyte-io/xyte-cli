@@ -1,6 +1,7 @@
 import blessed from 'blessed';
 import { setTimeout as delay } from 'node:timers/promises';
 
+import { CliUserError } from '../contracts/user-error';
 import { createLayout } from './layout';
 import { GLOBAL_KEYMAP, SCREEN_ACTION_KEYMAP } from './keymap';
 import type { TuiContext, TuiScreen, TuiScreenId } from './types';
@@ -126,7 +127,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
   if (options.headless) {
     const requestedFormat = options.format ?? 'json';
     if (requestedFormat !== 'json') {
-      throw new Error('Headless mode only supports JSON output.');
+      throw new CliUserError({ summary: 'Headless mode only supports JSON output.' });
     }
     try {
       await runHeadlessRenderer({

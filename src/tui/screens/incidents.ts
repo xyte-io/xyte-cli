@@ -137,12 +137,10 @@ export function createIncidentsScreen(): TuiScreen {
         )
       : incidents;
 
-    if (restoreIncidentId) {
-      const restoreIndex = filtered.findIndex((incident) => incidentIdOf(incident) === restoreIncidentId);
-      selectedIndex = restoreIndex >= 0 ? restoreIndex : clampIndex(selectedIndex, filtered.length);
-    } else {
-      selectedIndex = clampIndex(selectedIndex, filtered.length);
-    }
+    const restoreIndex = restoreIncidentId
+      ? filtered.findIndex((incident) => incidentIdOf(incident) === restoreIncidentId)
+      : -1;
+    selectedIndex = restoreIndex >= 0 ? restoreIndex : clampIndex(selectedIndex, filtered.length);
 
     const actionsHint = 'actions: a close-incident, f filters, [ ] pages, p per-page';
 

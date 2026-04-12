@@ -132,12 +132,10 @@ export function createDevicesScreen(): TuiScreen {
       const needle = searchText.toLowerCase();
       filtered = devices.filter((device) => safeSearchText(device).includes(needle));
     }
-    if (restoreDeviceId) {
-      const restoreIndex = filtered.findIndex((device) => deviceIdOf(device) === restoreDeviceId);
-      selectedIndex = restoreIndex >= 0 ? restoreIndex : clampIndex(selectedIndex, filtered.length);
-    } else {
-      selectedIndex = clampIndex(selectedIndex, filtered.length);
-    }
+    const restoreIndex = restoreDeviceId
+      ? filtered.findIndex((device) => deviceIdOf(device) === restoreDeviceId)
+      : -1;
+    selectedIndex = restoreIndex >= 0 ? restoreIndex : clampIndex(selectedIndex, filtered.length);
 
     const actionsHint = 'actions: a send-command, f endpoint filter';
 

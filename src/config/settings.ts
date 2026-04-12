@@ -337,7 +337,7 @@ function validateSettingValue(keyPath: SettingPath, value: unknown): unknown {
       return parseOptionalString(value);
     default: {
       const _exhaustive: never = keyPath;
-      throw new Error(`Unhandled setting key: ${_exhaustive}`);
+      throw new CliUserError({ summary: `Unhandled setting key: ${_exhaustive}` });
     }
   }
 }
@@ -528,7 +528,7 @@ export function resolveCliSettingsSync(
 
 export function parseSettingValue(keyPath: string, rawValue: string): unknown {
   if (!SETTING_PATHS.includes(keyPath as SettingPath)) {
-    throw new Error(`Unknown config key: ${keyPath}.`);
+    throw new CliUserError({ summary: `Unknown config key: ${keyPath}.` });
   }
   return validateSettingValue(keyPath as SettingPath, rawValue);
 }

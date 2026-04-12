@@ -12,7 +12,6 @@ export function parseErrorFormatArg(argv: string[]): CliErrorFormat | undefined 
       if (isCliErrorFormat(next)) {
         return next;
       }
-      continue;
     }
 
     if (arg.startsWith('--error-format=')) {
