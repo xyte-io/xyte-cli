@@ -13,43 +13,14 @@ import { CliUserError } from '../contracts/user-error';
 import { getXyteConfigDir } from '../utils/config-dir';
 import { errorMessage } from '../utils/error-format';
 import { buildSlotId, ensureSlotName, matchesSlotRef } from './key-slots';
+import type { ProfileStore } from '../types/stores';
 
 const DEFAULT_DATA: ProfileStoreData = {
   version: 2,
   tenants: []
 };
 
-export interface ProfileStore {
-  getData(): Promise<ProfileStoreData>;
-  migrateIfNeeded(): Promise<void>;
-  listTenants(): Promise<TenantProfile[]>;
-  getTenant(tenantId: string): Promise<TenantProfile | undefined>;
-  upsertTenant(input: {
-    id: string;
-    name?: string;
-    hubBaseUrl?: string;
-    entryBaseUrl?: string;
-    apiProvider?: SecretProvider;
-  }): Promise<TenantProfile>;
-  removeTenant(tenantId: string): Promise<void>;
-  setActiveTenant(tenantId: string): Promise<void>;
-  getActiveTenant(): Promise<TenantProfile | undefined>;
-  listKeySlots(tenantId: string, provider?: SecretProvider): Promise<ApiKeySlotMeta[]>;
-  addKeySlot(
-    tenantId: string,
-    provider: SecretProvider,
-    input: { name: string; slotId?: string; fingerprint: string }
-  ): Promise<ApiKeySlotMeta>;
-  updateKeySlot(
-    tenantId: string,
-    provider: SecretProvider,
-    slotRef: string,
-    update: { name?: string; fingerprint?: string; lastValidatedAt?: string }
-  ): Promise<ApiKeySlotMeta>;
-  removeKeySlot(tenantId: string, provider: SecretProvider, slotRef: string): Promise<void>;
-  getActiveKeySlot(tenantId: string, provider: SecretProvider): Promise<ApiKeySlotMeta | undefined>;
-  setActiveKeySlot(tenantId: string, provider: SecretProvider, slotRef: string): Promise<ApiKeySlotMeta>;
-}
+export type { ProfileStore } from '../types/stores';
 
 function createEmptyRegistry(): TenantKeyRegistry {
   return {

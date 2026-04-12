@@ -1,7 +1,6 @@
 import type { PublicEndpointSpec } from './endpoints';
 import type { HttpTransport } from '../http/transport';
-import type { SecretStore } from '../secure/secret-store';
-import type { ProfileStore } from '../secure/profile-store';
+import type { SecretStore, ProfileStore } from './stores';
 
 export interface XyteClientOptions {
   tenantId?: string;

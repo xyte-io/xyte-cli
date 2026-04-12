@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import type { SecretProvider, TenantProfile } from '../types/profile';
+import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
 import { STATUS_SCHEMA_VERSION } from './versions';
 
 export type ConnectionErrorClass = 'auth' | 'missing_key' | 'network' | 'timeout' | 'rate_limit' | 'unknown';
@@ -67,7 +68,27 @@ const StatusConnectivitySchema = z.object({
 const StatusReadinessSchema = z.object({
   state: z.enum(['ready', 'needs_setup', 'degraded']),
   tenantId: z.string().optional(),
-  activeTenant: z.unknown().optional(),
+  activeTenant: z.object({
+    id: z.string(),
+    name: z.string(),
+    hubBaseUrl: z.string().optional(),
+    entryBaseUrl: z.string().optional(),
+    apiProvider: z.enum(SUPPORTED_SECRET_PROVIDERS as unknown as [string, ...string[]]).optional(),
+    keyRegistry: z.object({
+      slots: z.array(z.object({
+        slotId: z.string(),
+        provider: z.enum(SUPPORTED_SECRET_PROVIDERS as unknown as [string, ...string[]]),
+        name: z.string(),
+        fingerprint: z.string(),
+        createdAt: z.string(),
+        updatedAt: z.string(),
+        lastValidatedAt: z.string().optional()
+      })),
+      activeSlotByProvider: z.record(z.string(), z.string())
+    }),
+    createdAt: z.string(),
+    updatedAt: z.string()
+  }).optional(),
   missingItems: z.array(z.string()),
   recommendedActions: z.array(z.string()),
   providers: z.array(StatusProviderSchema),

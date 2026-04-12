@@ -8,6 +8,7 @@ import { errorMessage } from '../utils/error-format';
 import { getLogger } from '../observability/logger';
 import { DEFAULT_SLOT_ID } from './key-slots';
 import { CliUserError } from '../contracts/user-error';
+import type { SecretStore } from '../types/stores';
 
 const SECRET_STORE_VERSION = 1;
 
@@ -21,11 +22,7 @@ const EMPTY_SECRETS: PersistedSecrets = {
   records: {}
 };
 
-export interface SecretStore {
-  setSlotSecret(tenantId: string, provider: SecretProvider, slotId: string, value: string): Promise<void>;
-  getSlotSecret(tenantId: string, provider: SecretProvider, slotId: string): Promise<string | undefined>;
-  clearSlotSecret(tenantId: string, provider: SecretProvider, slotId: string): Promise<void>;
-}
+export type { SecretStore } from '../types/stores';
 
 function accountKey(tenantId: string, provider: SecretProvider, slotId: string): string {
   return `${tenantId}:${provider}:${slotId}`;
