@@ -399,7 +399,8 @@ export function createDevicesScreen(): TuiScreen {
                   return;
                 }
 
-                const choice = await promptChoice(context, {
+                const choice = await promptChoice({
+                  context,
                   title: `Command templates for ${deviceId}`,
                   choices: templatesOutcome.data.map((template) => ({
                     label: template.label,

@@ -59,7 +59,8 @@ describe('tui actions helpers', () => {
       prompt: vi.fn().mockResolvedValue('2'),
       setStatus: vi.fn()
     };
-    const choice = await promptChoice(context, {
+    const choice = await promptChoice({
+      context,
       title: 'Pick one',
       choices: [
         { label: 'One', value: 'one' },

@@ -103,10 +103,13 @@ export async function confirmWriteWithToken(args: {
   return true;
 }
 
-export async function promptChoice(
-  context: PromptContext,
-  args: { title: string; choices: PromptChoice[]; emptyStatus?: string }
-): Promise<PromptChoice | undefined> {
+export async function promptChoice(args: {
+  context: PromptContext;
+  title: string;
+  choices: PromptChoice[];
+  emptyStatus?: string;
+}): Promise<PromptChoice | undefined> {
+  const { context } = args;
   if (!args.choices.length) {
     context.setStatus(args.emptyStatus ?? 'No options are available.');
     return undefined;

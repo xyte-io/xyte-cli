@@ -13,6 +13,7 @@ import {
   type CliContext,
   getExplicitGlobalOutput,
   printJson,
+  requireTenantId,
   resolveStrictJson,
   resolveTextJsonOutput
 } from '../cli-context';
@@ -95,6 +96,9 @@ async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptio
   const outputMode = options.outputMode ?? 'raw';
   const requestId = randomUUID();
   const tenantId = tenantOverride ?? settings.values.defaults.tenant;
+  if (endpoint.authScope !== 'none') {
+    requireTenantId(tenantId, 'api call');
+  }
   const path = parsePathJson(options.pathJson);
   if ((options.query?.length ?? 0) > 0 && options.queryJson) {
     throw new CliUserError({
