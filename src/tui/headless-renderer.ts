@@ -296,6 +296,58 @@ function buildFrameFromLoad(
   });
 }
 
+async function loadSpacesFrame(options: {
+  sessionId: string;
+  sequence: number;
+  client: XyteClient;
+  profileStore: ProfileStore;
+  tenantId?: string;
+  motionEnabled: boolean;
+  motionPhase: number;
+  readiness: ReadinessCheck;
+}): Promise<HeadlessFrame> {
+  const spaces = await loadSpacesData(options.client, options.tenantId);
+  const selected = spaces.data[0];
+  const selectedSpaceId = selected ? getSpaceId(selected) : '';
+  let detail: unknown;
+  let devicesInSpace: unknown[] = [];
+  let paneStatus = selected ? 'Loading selected space...' : 'No spaces found for tenant.';
+  let drilldownError: string | undefined;
+  let drilldownRetry: RetryState | undefined;
+
+  if (selected && selectedSpaceId) {
+    const drilldown = await loadSpaceDrilldownData(options.client, options.tenantId, {
+      spaceId: selectedSpaceId,
+      profileStore: options.profileStore
+    });
+    detail = drilldown.data.spaceDetail;
+    devicesInSpace = drilldown.data.devicesInSpace;
+    paneStatus = drilldown.error?.message ?? 'Space details loaded.';
+    drilldownError = drilldown.error?.message;
+    drilldownRetry = drilldown.retry;
+  }
+
+  const panels = sceneFromSpacesState({
+    tenantId: options.tenantId,
+    searchText: '',
+    selectedIndex: 0,
+    loading: false,
+    paneStatus,
+    spaces: spaces.data,
+    spaceDetail: detail,
+    devicesInSpace,
+    endpointFilterSummary: '',
+    actionsHint: 'interactive-only: a claim/create/rename, f endpoint filters'
+  });
+  return buildFrameFromLoad(options, 'spaces', 'Spaces', {
+    panels,
+    connectionState: spaces.connectionState,
+    error: spaces.error,
+    retry: spaces.retry,
+    extraMeta: { connection: { state: spaces.connectionState, error: spaces.error?.message, drilldownError, drilldownRetry } }
+  });
+}
+
 async function buildOperationalFrame(options: {
   sessionId: string;
   sequence: number;
@@ -391,46 +443,7 @@ async function buildOperationalFrame(options: {
     }
 
     case 'spaces': {
-      const spaces = await loadSpacesData(options.client, options.tenantId);
-      const selected = spaces.data[0];
-      const selectedSpaceId = selected ? getSpaceId(selected) : '';
-      let detail: unknown;
-      let devicesInSpace: unknown[] = [];
-      let paneStatus = selected ? 'Loading selected space...' : 'No spaces found for tenant.';
-      let drilldownError: string | undefined;
-      let drilldownRetry: RetryState | undefined;
-
-      if (selected && selectedSpaceId) {
-        const drilldown = await loadSpaceDrilldownData(options.client, options.tenantId, {
-          spaceId: selectedSpaceId,
-          profileStore: options.profileStore
-        });
-        detail = drilldown.data.spaceDetail;
-        devicesInSpace = drilldown.data.devicesInSpace;
-        paneStatus = drilldown.error?.message ?? 'Space details loaded.';
-        drilldownError = drilldown.error?.message;
-        drilldownRetry = drilldown.retry;
-      }
-
-      const panels = sceneFromSpacesState({
-        tenantId: options.tenantId,
-        searchText: '',
-        selectedIndex: 0,
-        loading: false,
-        paneStatus,
-        spaces: spaces.data,
-        spaceDetail: detail,
-        devicesInSpace,
-        endpointFilterSummary: '',
-        actionsHint: 'interactive-only: a claim/create/rename, f endpoint filters'
-      });
-      return buildFrameFromLoad(options, 'spaces', 'Spaces', {
-        panels,
-        connectionState: spaces.connectionState,
-        error: spaces.error,
-        retry: spaces.retry,
-        extraMeta: { connection: { state: spaces.connectionState, error: spaces.error?.message, drilldownError, drilldownRetry } }
-      });
+      return loadSpacesFrame(options);
     }
   }
 }
