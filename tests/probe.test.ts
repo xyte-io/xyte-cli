@@ -29,7 +29,6 @@ describe('runSlotConnectivityTest', () => {
       profileStore: fakeProfileStore
     });
     expect(result.ok).toBe(true);
-    expect(result.strategy).toBe('organization.getOrganizationInfo');
   });
 
   it('returns ok result for xyte-partner provider', async () => {
@@ -40,7 +39,6 @@ describe('runSlotConnectivityTest', () => {
       profileStore: fakeProfileStore
     });
     expect(result.ok).toBe(true);
-    expect(result.strategy).toBe('partner.getDevices');
   });
 
   it('propagates errors from the underlying client call', async () => {

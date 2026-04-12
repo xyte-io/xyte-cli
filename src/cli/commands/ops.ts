@@ -193,7 +193,8 @@ async function handleOpsWatchIncidents(
     output?: string;
     out?: string;
     strictJson?: boolean;
-  }
+  },
+  watchDelayFn?: (ms: number) => Promise<void>
 ): Promise<void> {
   const overrides: Partial<Record<SettingKey, unknown>> = {};
   if (options.tenant) {
@@ -229,6 +230,7 @@ async function handleOpsWatchIncidents(
     intervalMs: settings.values.watch.intervalMs,
     once: options.once === true,
     maxPolls: settings.values.watch.maxPolls,
+    delayFn: watchDelayFn,
     onFrame: (frame) => {
       const renderFrame =
         output === 'text'
@@ -504,7 +506,12 @@ async function handleOpsConsole(
   });
 }
 
-export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: typeof runTuiApp = runTuiApp): void {
+export function registerOpsCommands(
+  parent: Command,
+  ctx: CliContext,
+  runTui: typeof runTuiApp = runTuiApp,
+  watchDelayFn?: (ms: number) => Promise<void>
+): void {
   const ops = parent.command('ops').description('Operator-focused console, watch, inspect, and report workflows');
   ops.addHelpText(
     'after',
@@ -542,7 +549,7 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
       await handleOpsWatchIncidents(ctx, {
         ...options,
         output: getExplicitGlobalOutput(this)
-      });
+      }, watchDelayFn);
     });
 
   const opsInspect = ops.command('inspect').description('Deterministic fleet insights');
@@ -551,7 +558,7 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
     .description('Build a fleet summary snapshot')
     .option('--tenant <tenantId>', 'Tenant id override')
     .option('--provider-scope <scope>', 'organization|partner|auto')
-    .option('--render <render>', 'json|ascii', 'json')
+    .option('--render <render>', 'Output format: json|ascii (ops inspect uses --render, not --format)', 'json')
     .option('--out <path>', 'Write the rendered output to a UTF-8 file')
     .option('--strict-json', 'Fail on non-serializable output')
     .action(async function (options: {
@@ -573,7 +580,7 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
     .option('--tenant <tenantId>', 'Tenant id override')
     .option('--provider-scope <scope>', 'organization|partner|auto')
     .option('--window <hours>', 'Window in hours', '24')
-    .option('--render <render>', 'json|ascii|markdown', 'json')
+    .option('--render <render>', 'Output format: json|ascii|markdown (ops inspect uses --render, not --format)', 'json')
     .option('--out <path>', 'Write the rendered output to a UTF-8 file')
     .option('--strict-json', 'Fail on non-serializable output')
     .action(async function (options: {

@@ -1703,7 +1703,7 @@ describe('cli integration', () => {
     await secretStore.setSecret('acme', 'xyte-org', 'org-key');
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const program = createCli({ profileStore, secretStore, stdout, stderr, watchDelayFn: () => Promise.resolve() });
 
     const fetchMock = vi
       .fn()
@@ -1750,7 +1750,7 @@ describe('cli integration', () => {
     await secretStore.setSecret('acme', 'xyte-org', 'org-key');
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const program = createCli({ profileStore, secretStore, stdout, stderr, watchDelayFn: () => Promise.resolve() });
 
     const fetchMock = vi
       .fn()
@@ -1776,19 +1776,26 @@ describe('cli integration', () => {
       );
     vi.stubGlobal('fetch', fetchMock);
 
-    await program.parseAsync([
-      'node',
-      'xyte-cli',
-      'ops',
-      'watch',
-      'incidents',
-      '--tenant',
-      'acme',
-      '--interval-ms',
-      '1000',
-      '--max-polls',
-      '2'
-    ]);
+    vi.useFakeTimers();
+    try {
+      const runPromise = program.parseAsync([
+        'node',
+        'xyte-cli',
+        'ops',
+        'watch',
+        'incidents',
+        '--tenant',
+        'acme',
+        '--interval-ms',
+        '1000',
+        '--max-polls',
+        '2'
+      ]);
+      await vi.advanceTimersByTimeAsync(2000);
+      await runPromise;
+    } finally {
+      vi.useRealTimers();
+    }
 
     const frames = stdout.write.mock.calls.map((call) => JSON.parse(String(call[0])));
     expect(frames).toHaveLength(2);
@@ -1808,7 +1815,7 @@ describe('cli integration', () => {
     await secretStore.setSecret('acme', 'xyte-org', 'org-key');
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const program = createCli({ profileStore, secretStore, stdout, stderr, watchDelayFn: () => Promise.resolve() });
 
     const fetchMock = vi
       .fn()

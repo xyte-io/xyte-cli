@@ -91,6 +91,7 @@ interface CliRuntime {
   isTTY?: boolean;
   stdoutIsTTY?: boolean;
   upgradeDependencies?: UpgradeDependencies;
+  watchDelayFn?: (ms: number) => Promise<void>;
   cwd?: string;
   env?: NodeJS.ProcessEnv;
 }
@@ -914,7 +915,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     });
 
   registerApiCommands(program, cliContext);
-  registerOpsCommands(program, cliContext, runTui);
+  registerOpsCommands(program, cliContext, runTui, runtime.watchDelayFn);
   registerUtilCommands(program, cliContext);
   registerFlowCommands(program, cliContext);
   registerSetupCommands(program, cliContext);
