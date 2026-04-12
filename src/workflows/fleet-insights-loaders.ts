@@ -84,7 +84,7 @@ function extractObject(value: unknown, preferredKeys: string[]): Record<string, 
   return record;
 }
 
-function deviceId(value: unknown): string | undefined {
+function deviceIdOf(value: unknown): string | undefined {
   const r = asRecord(value);
   const raw = r.id ?? r.device_id ?? asRecord(r.device).id;
   if (raw === undefined || raw === null || String(raw).trim() === '') {
@@ -269,7 +269,7 @@ async function collectPartnerEnrichment(
   devices: unknown[]
 ): Promise<PartnerEnrichmentSnapshot> {
   const sampledDeviceIds = Array.from(
-    new Set(devices.map((device) => deviceId(device)).filter((id): id is string => Boolean(id)))
+    new Set(devices.map((device) => deviceIdOf(device)).filter((id): id is string => Boolean(id)))
   )
     .sort((a, b) => a.localeCompare(b))
     .slice(0, PARTNER_ENRICHMENT_SAMPLE_SIZE);
@@ -303,7 +303,7 @@ async function collectPartnerEnrichment(
 
   const baseDevicesById = new Map<string, Record<string, unknown>>();
   for (const item of devices) {
-    const id = deviceId(item);
+    const id = deviceIdOf(item);
     if (id && !baseDevicesById.has(id)) {
       baseDevicesById.set(id, asRecord(item));
     }

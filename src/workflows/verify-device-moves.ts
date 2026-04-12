@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { z } from 'zod';
 
 import type { XyteClient } from '../types/client';
+import { CliUserError } from '../contracts/user-error';
 import { loadInputRows, type UtilityInputFormat } from '../utils/input-parser';
 import { DEVICE_MOVE_VERIFICATION_SCHEMA_VERSION } from '../contracts/versions';
 import {
@@ -44,7 +45,7 @@ export type DeviceMoveVerificationResult = z.infer<typeof DeviceMoveVerification
 export function parseMoveVerificationResult(value: unknown): DeviceMoveVerificationResult {
   const parsed = DeviceMoveVerificationResultSchema.safeParse(value);
   if (!parsed.success) {
-    throw new Error('Verification input must be produced by the device migration verify_moved_devices step.');
+    throw new CliUserError({ summary: 'Verification input must be produced by the device migration verify_moved_devices step.' });
   }
   return parsed.data;
 }
