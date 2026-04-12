@@ -353,7 +353,7 @@ export function createSpacesScreen(): TuiScreen {
         selectedSpaceId: id,
         selectedSpaceDetail: drilldown.data.spaceDetail,
         devicesInSpace: drilldown.data.devicesInSpace,
-        paneStatus: `${drilldown.data.paneStatus}${drilldown.error ? ` | ${drilldown.error.message}` : ''} (${getSpaceName(selected)})`,
+        paneStatus: `${drilldown.error ? `${drilldown.error.message} | ` : ''}(${getSpaceName(selected)})`,
         index: input.index
       };
     },

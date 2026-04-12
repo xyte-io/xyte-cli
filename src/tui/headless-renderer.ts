@@ -408,7 +408,7 @@ async function buildOperationalFrame(options: {
         });
         detail = drilldown.data.spaceDetail;
         devicesInSpace = drilldown.data.devicesInSpace;
-        paneStatus = drilldown.data.paneStatus;
+        paneStatus = drilldown.error?.message ?? 'Space details loaded.';
         drilldownError = drilldown.error?.message;
         drilldownRetry = drilldown.retry;
       }

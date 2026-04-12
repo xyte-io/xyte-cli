@@ -239,7 +239,7 @@ function resolveTemplateValue<T>(input: T, context: Record<string, string>): T {
 
 function requireStepConfig<T>(value: T | undefined, stepId: string, label: string): T {
   if (!value) {
-    throw new Error(`Flow step ${stepId} is missing ${label} configuration.`);
+    throw new CliUserError({ summary: `Flow step ${stepId} is missing ${label} configuration.` });
   }
   return value;
 }
@@ -490,12 +490,12 @@ async function handleOpsReport(args: {
   if (reportInput.schemaVersion !== INSPECT_DEEP_DIVE_SCHEMA_VERSION && format !== 'markdown') {
     throw new CliUserError({ summary: `Report format '${format}' is only supported for deep-dive reports. Use 'markdown'.` });
   }
-  let generated: FleetReportResult;
   if (reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION) {
-    generated = await generateOpsReport({ input: reportInput, tenantId, format, outPath, includeSensitive });
-  } else {
-    generated = await generateOpsReport({ input: reportInput, tenantId, format: 'markdown', outPath, includeSensitive });
+    const generated = await generateOpsReport({ input: reportInput, tenantId, format, outPath, includeSensitive });
+    return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
   }
+  // format === 'markdown' proven by the guard above (non-deep-dive inputs require markdown)
+  const generated = await generateOpsReport({ input: reportInput, tenantId, format: 'markdown', outPath, includeSensitive });
   return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
 }
 
@@ -805,11 +805,11 @@ async function readLinesAsJson<T>(
     try {
       parsed = JSON.parse(lines[index]);
     } catch {
-      throw new Error(`Invalid JSON line ${index + 1} in ${filePath}.`);
+      throw new CliUserError({ summary: `Invalid JSON line ${index + 1} in ${filePath}.` });
     }
     const result = schema.safeParse(parsed);
     if (!result.success) {
-      throw new Error(`Unexpected shape on line ${index + 1} in ${filePath}.`);
+      throw new CliUserError({ summary: `Unexpected shape on line ${index + 1} in ${filePath}.` });
     }
     items.push(result.data);
   }
@@ -1074,13 +1074,15 @@ async function buildRunState(args: RunDeterministicFlowArgs): Promise<RunState> 
 async function handleGateStep(
   step: FlowGateStep,
   stepState: FlowRunStep,
-  args: RunDeterministicFlowArgs,
   ctx: RunContext,
   decisions: FlowRunDecision[],
   gateApprovalsThisRun: number,
   index: number
-): Promise<{ action: 'continue' | 'pause'; nextStepIndex: number; gateApprovalsThisRun: number; outcome?: 'pending_gate' }> {
-  if (args.mode === 'plan') {
+): Promise<
+  | { action: 'pause'; nextStepIndex: number; gateApprovalsThisRun: number; outcome: 'pending_gate' }
+  | { action: 'continue'; nextStepIndex: number; gateApprovalsThisRun: number }
+> {
+  if (ctx.args.mode === 'plan') {
     await recordGatePending(stepState, {
       stepId: step.id,
       requiresWrite: step.mutating,
@@ -1171,9 +1173,9 @@ async function executeSteps(state: RunState): Promise<ExecuteStepsResult> {
       const stepState = steps[index];
 
       if (step.kind === 'gate') {
-        const gateResult = await handleGateStep(step, stepState, args, ctx, decisions, gateApprovalsThisRun, index);
+        const gateResult = await handleGateStep(step, stepState, ctx, decisions, gateApprovalsThisRun, index);
         if (gateResult.action === 'pause') {
-          outcome = gateResult.outcome!;
+          outcome = gateResult.outcome;
           nextStepIndex = gateResult.nextStepIndex;
           break;
         }

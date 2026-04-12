@@ -11,7 +11,7 @@ import {
   type RetryState
 } from '../config/retry-policy';
 import type { ProfileStore } from '../secure/profile-store';
-import type { SecretStore } from '../secure/secret-store';
+
 import type { XyteClient } from '../types/client';
 import type { SecretProvider } from '../types/profile';
 import type { EndpointNamespace } from '../types/endpoints';
@@ -283,7 +283,8 @@ export async function loadIncidentsData(
 
     const all: unknown[] = [];
 
-    for (let page = initialPage; page <= 50; page += 1) {
+    const PAGE_CAP = 50;
+    for (let page = initialPage; page <= PAGE_CAP; page += 1) {
       const query = buildQuery(page);
       const raw = await client.organization.getIncidents({
         tenantId,
@@ -450,7 +451,6 @@ export async function loadCommandTemplates(
 interface SpaceDrilldownResult {
   spaceDetail?: unknown;
   devicesInSpace: unknown[];
-  paneStatus: string;
 }
 
 function matchesSpace(device: unknown, spaceId: string): boolean {
@@ -477,19 +477,16 @@ export async function loadSpaceDrilldownData(
   ]);
 
   let devicesInSpace = queriedDevicesOutcome.data;
-  let paneStatus = 'Loaded space detail and device listing.';
   let fallbackOutcome: LoadOutcome<unknown[]> | undefined;
 
   if (!devicesInSpace.length) {
     if (allDevicesCache.length) {
       devicesInSpace = allDevicesCache.filter((device) => matchesSpace(device, spaceId));
-      paneStatus = 'Filtered devices by cached space_id fallback.';
     } else {
       fallbackOutcome = await loadDevicesData(client, tenantId, {
         profileStore: options.profileStore
       });
       devicesInSpace = fallbackOutcome.data.filter((device) => matchesSpace(device, spaceId));
-      paneStatus = 'Filtered devices by fetched space_id fallback.';
     }
   }
 
@@ -499,8 +496,7 @@ export async function loadSpaceDrilldownData(
   return {
     data: {
       spaceDetail: detailOutcome.data,
-      devicesInSpace,
-      paneStatus
+      devicesInSpace
     },
     connectionState: worst.connectionState,
     error: worst.error,
