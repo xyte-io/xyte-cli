@@ -264,7 +264,7 @@ interface RootLauncherPayload {
   settings: {
     tenantId?: string;
     outputMode: CliOutputMode;
-    consoleScreen: string;
+    consoleScreen: string | undefined;
   };
   sections: Array<{
     title: string;
@@ -312,7 +312,7 @@ function buildRootLauncherPayload(args: {
           title: 'Console / Headless',
           description: 'Interactive console and machine-readable frames.',
           commands: [
-            `xyte-cli ops console --screen ${args.settings.values.console.screen}`,
+            `xyte-cli ops console --screen ${args.settings.values.console.screen ?? 'dashboard'}`,
             `xyte-cli ops console --headless --screen dashboard --tenant ${tenantId} --output json`
           ]
         },

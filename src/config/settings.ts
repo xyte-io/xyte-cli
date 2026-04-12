@@ -7,6 +7,7 @@ import { getXyteConfigDir } from '../utils/config-dir';
 import { isRecord } from '../utils/json';
 import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';
 import { DEFAULT_WATCH_PROFILE, type WatchProfile } from '../contracts/watch-frame';
+import { TUI_SCREEN_IDS, type TuiScreenId } from '../types/tui-screens';
 
 const CLI_OUTPUT_MODES = ['auto', 'json', 'text'] as const;
 export type CliOutputMode = (typeof CLI_OUTPUT_MODES)[number];
@@ -74,7 +75,7 @@ interface ResolvedCliSettings {
     retryBackoffMs: number;
   };
   console: {
-    screen: string;
+    screen: TuiScreenId | undefined;
     motion: boolean;
     follow: boolean;
     intervalMs: number;
@@ -296,6 +297,17 @@ function parseOptionalString(value: unknown): string | undefined {
   return normalized || undefined;
 }
 
+function parseOptionalEnum<T extends string>(value: unknown, label: string, allowed: readonly T[]): T | undefined {
+  const normalized = parseOptionalString(value);
+  if (!normalized) {
+    return undefined;
+  }
+  if (allowed.includes(normalized as T)) {
+    return normalized as T;
+  }
+  throw new CliUserError({ summary: `Invalid ${label}: ${String(value)}. Use ${allowed.join('|')}.` });
+}
+
 function parseEnum<T extends string>(value: unknown, label: string, allowed: readonly T[]): T {
   const normalized = parseOptionalString(value);
   if (normalized && allowed.includes(normalized as T)) {
@@ -334,7 +346,7 @@ function validateSettingValue(keyPath: SettingPath, value: unknown): unknown {
     case 'watch.maxPolls':
       return parseOptionalPositiveInteger(value, keyPath);
     case 'console.screen':
-      return parseOptionalString(value);
+      return parseOptionalEnum(value, keyPath, TUI_SCREEN_IDS);
     default: {
       const _exhaustive: never = keyPath;
       throw new CliUserError({ summary: `Unhandled setting key: ${_exhaustive}` });

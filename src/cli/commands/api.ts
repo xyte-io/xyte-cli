@@ -78,7 +78,7 @@ interface ApiCallOptions {
   queryJson?: string;
   bodyJson?: string;
   note?: string;
-  outputMode?: string;
+  outputMode?: 'raw' | 'envelope';
   output?: string;
   strictJson?: boolean;
 }
@@ -92,16 +92,7 @@ async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptio
   const settings = await ctx.resolveSettings(tenantOverride ? { 'defaults.tenant': tenantOverride } : {});
   const endpoint = getEndpoint(key);
   const method = endpoint.method.toUpperCase();
-  const outputMode = String(options.outputMode ?? 'raw')
-    .trim()
-    .toLowerCase();
-  if (!['raw', 'envelope'].includes(outputMode)) {
-    throw new CliUserError({
-      summary: 'Invalid API call output mode.',
-      detail: `Received "${outputMode}".`,
-      suggestedCommands: ['Use --output-mode raw', 'Use --output-mode envelope']
-    });
-  }
+  const outputMode = options.outputMode ?? 'raw';
   const requestId = randomUUID();
   const tenantId = tenantOverride ?? settings.values.defaults.tenant;
   const path = parsePathJson(options.pathJson);
