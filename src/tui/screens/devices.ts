@@ -91,6 +91,74 @@ export async function sendCommandWithGuard(args: SendCommandWithGuardArgs): Prom
   });
 }
 
+async function runSendCommandWizard(args: {
+  context: TuiContext;
+  getIsMounted: () => boolean;
+  selectedDevice: () => unknown;
+  refreshDevices: (deviceId?: string) => Promise<void>;
+}): Promise<void> {
+  const { context, getIsMounted, selectedDevice, refreshDevices } = args;
+  const device = selectedDevice();
+  if (!device) {
+    context.setStatus('No device selected.');
+    return;
+  }
+  const deviceId = deviceIdOf(device);
+  if (!deviceId) {
+    context.setStatus('Selected device has no id.');
+    return;
+  }
+  const tenantId = await context.getActiveTenantId();
+  const templatesOutcome = await loadCommandTemplates(context.client, tenantId, { deviceId });
+  if (templatesOutcome.error) {
+    context.setStatus(`Command templates unavailable: ${templatesOutcome.error.message}`);
+    return;
+  }
+  if (!templatesOutcome.data.length) {
+    context.setStatus('No command templates available for selected device.');
+    return;
+  }
+
+  const choice = await promptChoice({
+    context,
+    title: `Command templates for ${deviceId}`,
+    choices: templatesOutcome.data.map((template: CommandTemplate) => ({
+      label: template.label,
+      value: `${template.mode}:${template.value}`
+    }))
+  });
+  if (!choice || !getIsMounted()) {
+    return;
+  }
+  const selectedTemplate = templatesOutcome.data.find(
+    (template: CommandTemplate) => `${template.mode}:${template.value}` === choice.value
+  );
+  if (!selectedTemplate) {
+    context.setStatus('Template selection is invalid.');
+    return;
+  }
+
+  const paramsInput = await context.prompt('Optional params JSON object (empty skips):', '');
+  if (paramsInput === undefined || !getIsMounted()) {
+    context.setStatus('Send command canceled.');
+    return;
+  }
+  let params: Record<string, unknown> | undefined;
+  if (paramsInput.trim()) {
+    const parsed = parseJsonObjectInput(paramsInput);
+    if (!parsed.ok) {
+      context.setStatus(`Invalid params JSON: ${parsed.error}`);
+      return;
+    }
+    params = parsed.value;
+  }
+
+  const sent = await sendCommandWithGuard({ device, template: selectedTemplate, params, context });
+  if (sent && getIsMounted()) {
+    await refreshDevices(deviceId);
+  }
+}
+
 export function createDevicesScreen(): TuiScreen {
   let root: blessed.Widgets.BoxElement | undefined;
   let table: blessed.Widgets.ListTableElement | undefined;
@@ -377,72 +445,12 @@ export function createDevicesScreen(): TuiScreen {
           actions: [
             {
               label: 'Send command',
-              run: async () => {
-                const device = selectedDevice();
-                if (!device) {
-                  context.setStatus('No device selected.');
-                  return;
-                }
-                const deviceId = deviceIdOf(device);
-                if (!deviceId) {
-                  context.setStatus('Selected device has no id.');
-                  return;
-                }
-                const tenantId = await context.getActiveTenantId();
-                const templatesOutcome = await loadCommandTemplates(context.client, tenantId, { deviceId });
-                if (templatesOutcome.error) {
-                  context.setStatus(`Command templates unavailable: ${templatesOutcome.error.message}`);
-                  return;
-                }
-                if (!templatesOutcome.data.length) {
-                  context.setStatus('No command templates available for selected device.');
-                  return;
-                }
-
-                const choice = await promptChoice({
-                  context,
-                  title: `Command templates for ${deviceId}`,
-                  choices: templatesOutcome.data.map((template) => ({
-                    label: template.label,
-                    value: `${template.mode}:${template.value}`
-                  }))
-                });
-                if (!choice || !isMounted) {
-                  return;
-                }
-                const selectedTemplate = templatesOutcome.data.find(
-                  (template) => `${template.mode}:${template.value}` === choice.value
-                );
-                if (!selectedTemplate) {
-                  context.setStatus('Template selection is invalid.');
-                  return;
-                }
-
-                const paramsInput = await context.prompt('Optional params JSON object (empty skips):', '');
-                if (paramsInput === undefined || !isMounted) {
-                  context.setStatus('Send command canceled.');
-                  return;
-                }
-                let params: Record<string, unknown> | undefined;
-                if (paramsInput.trim()) {
-                  const parsed = parseJsonObjectInput(paramsInput);
-                  if (!parsed.ok) {
-                    context.setStatus(`Invalid params JSON: ${parsed.error}`);
-                    return;
-                  }
-                  params = parsed.value;
-                }
-
-                const sent = await sendCommandWithGuard({
-                  device,
-                  template: selectedTemplate,
-                  params,
-                  context
-                });
-                if (sent && isMounted) {
-                  await refreshDevices(deviceId);
-                }
-              }
+              run: () => runSendCommandWizard({
+                context,
+                getIsMounted: () => isMounted,
+                selectedDevice,
+                refreshDevices
+              })
             }
           ]
         });
