@@ -13,6 +13,7 @@ import { CliUserError } from '../contracts/user-error';
 import { getXyteConfigDir } from '../utils/config-dir';
 import { errorMessage } from '../utils/error-format';
 import { buildSlotId, ensureSlotName, matchesSlotRef } from './key-slots';
+import { isRecord } from '../utils/json';
 import type { ProfileStore } from '../types/stores';
 
 const DEFAULT_DATA: ProfileStoreData = {
@@ -459,7 +460,7 @@ export class FileProfileStore implements ProfileStore {
 
   private normalize(input: unknown): { data: ProfileStoreData; changed: boolean } {
     let changed = false;
-    const raw = input as Record<string, unknown>;
+    const raw = isRecord(input) ? input : {};
     const rawTenants = Array.isArray(raw.tenants) ? raw.tenants : [];
     if (!Array.isArray(raw.tenants)) {
       changed = true;

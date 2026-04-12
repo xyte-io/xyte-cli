@@ -481,14 +481,12 @@ async function handleOpsReport(args: {
   outPath: string;
 }): Promise<TaskExecutionResult> {
   const { reportInput, format, includeSensitive, tenantId, outPath } = args;
-  if (reportInput.schemaVersion !== INSPECT_DEEP_DIVE_SCHEMA_VERSION) {
-    if (format !== 'markdown') {
-      throw new CliUserError({ summary: `Report format '${format}' is only supported for deep-dive reports. Use 'markdown'.` });
-    }
-    const generated = await generateOpsReport({ input: reportInput, tenantId, format, outPath, includeSensitive });
-    return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
-  }
-  const generated = await generateOpsReport({ input: reportInput, tenantId, format, outPath, includeSensitive });
+  // schemaVersion discriminant narrows OpsReportInput for overload resolution;
+  // generateOpsReport validates format+input compatibility at runtime
+  const generated =
+    reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION
+      ? await generateOpsReport({ input: reportInput, tenantId, format, outPath, includeSensitive })
+      : await generateOpsReport({ input: reportInput, tenantId, format: format as 'markdown', outPath, includeSensitive });
   return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
 }
 
@@ -816,15 +814,9 @@ function isInspectProviderScopeValue(value: unknown): value is InspectProviderSc
 
 async function readStoredInspectProviderScope(bundleDir: string): Promise<InspectProviderScope | undefined> {
   const storedInputs = await readStoredInputs(bundleDir);
-  if (!storedInputs) {
-    return undefined;
-  }
-
-  if (isInspectProviderScopeValue(storedInputs.inspectProviderScope)) {
-    return storedInputs.inspectProviderScope;
-  }
-
-  return undefined;
+  return storedInputs && isInspectProviderScopeValue(storedInputs.inspectProviderScope)
+    ? storedInputs.inspectProviderScope
+    : undefined;
 }
 
 async function readStoredInputs(bundleDir: string): Promise<FlowRunInputsPayload | undefined> {
@@ -1148,7 +1140,7 @@ async function recordStepSuccess(
   await persistFlowRunInputs(ctx, ctx.args, ctx.args.inspectProviderScope ?? 'auto');
 }
 
-async function executeSteps(state: RunState): Promise<ExecuteStepsResult> {
+async function runSteps(state: RunState): Promise<ExecuteStepsResult> {
   const { ctx, cursorIndex, steps, priorDecisions, priorErrors } = state;
   const { definition } = ctx;
   const args = ctx.args;
@@ -1233,7 +1225,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
   const { definition } = ctx;
   const runArgs = ctx.args;
 
-  const execution = await executeSteps(state);
+  const execution = await runSteps(state);
   const { outcome, nextStepIndex, decisions, errors, durationMs } = execution;
 
   const summary = buildFlowRunSummary({

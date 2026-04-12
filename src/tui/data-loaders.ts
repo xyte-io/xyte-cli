@@ -29,6 +29,8 @@ interface LoadOutcome<T> {
 type QueryValue = string | number | boolean | null | undefined;
 type QueryShape = Record<string, QueryValue>;
 
+const PAGINATION_PAGE_CAP = 50;
+
 interface LoadWithOutcomeOptions {
   retry?: RetryPolicyOptions;
 }
@@ -283,7 +285,6 @@ export async function loadIncidentsData(
 
     const all: unknown[] = [];
 
-    const PAGINATION_PAGE_CAP = 50;
     for (let page = initialPage; page <= PAGINATION_PAGE_CAP; page += 1) {
       const query = buildQuery(page);
       const raw = await client.organization.getIncidents({
