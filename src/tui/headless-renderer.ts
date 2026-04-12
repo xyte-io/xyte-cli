@@ -191,7 +191,7 @@ function buildSetupFrame(args: {
   });
 }
 
-async function buildConfigFrame(args: {
+async function loadConfigFrame(args: {
   sessionId: string;
   sequence: number;
   profileStore: ProfileStore;
@@ -348,7 +348,7 @@ async function loadSpacesFrame(options: {
   });
 }
 
-async function buildOperationalFrame(options: {
+async function loadOperationalFrame(options: {
   sessionId: string;
   sequence: number;
   client: XyteClient;
@@ -575,7 +575,7 @@ export async function runHeadlessRenderer(options: HeadlessRenderOptions): Promi
           redirectedFrom: blocked ? requestedScreen : undefined
         });
       } else if (actualScreen === 'config') {
-        frame = await buildConfigFrame({
+        frame = await loadConfigFrame({
           sessionId,
           sequence: nextSequence(),
           profileStore: options.profileStore,
@@ -586,7 +586,7 @@ export async function runHeadlessRenderer(options: HeadlessRenderOptions): Promi
           doctorStatus: `${readiness.connectionState}: ${readiness.connectivity.message}`
         });
       } else {
-        frame = await buildOperationalFrame({
+        frame = await loadOperationalFrame({
           sessionId,
           sequence: nextSequence(),
           client: options.client,

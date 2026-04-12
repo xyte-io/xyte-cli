@@ -1,6 +1,7 @@
 import type { XyteClient } from '../types/client';
 import { loadInputRows, type UtilityInputFormat } from '../utils/input-parser';
 import { errorMessage } from '../utils/error-format';
+import { asRecord } from '../utils/json';
 import { CliUserError } from '../contracts/user-error';
 import { runUtilityBatch, type UtilityBatchOperation, type UtilityBatchResult } from './utility-batch';
 import { requireNonEmptyString } from './device-move-shared';
@@ -67,7 +68,7 @@ function extractItemsFromSpacesResponse(data: unknown): Array<Record<string, unk
   if (!data || typeof data !== 'object') {
     return [];
   }
-  const maybeItems = (data as { items?: unknown }).items;
+  const maybeItems = asRecord(data).items;
   if (!Array.isArray(maybeItems)) {
     return [];
   }
@@ -93,7 +94,7 @@ async function listSpacesByParent(
     const data = response.data as unknown;
     const items = extractItemsFromSpacesResponse(data);
     results.push(...items);
-    const nextPageRaw = data && typeof data === 'object' ? (data as { next_page?: unknown }).next_page : undefined;
+    const nextPageRaw = asRecord(data).next_page;
     const nextPage = parseSpaceId(nextPageRaw);
     if (!nextPage) {
       break;
