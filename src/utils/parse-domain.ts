@@ -1,5 +1,5 @@
 import { CliUserError } from '../contracts/user-error';
-import { SUPPORTED_SECRET_PROVIDERS, isSecretProvider, type SecretProvider } from '../types/profile';
+import { isSecretProvider, type SecretProvider } from '../types/profile';
 import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';
 
 export function parseProvider(value: string): SecretProvider {
