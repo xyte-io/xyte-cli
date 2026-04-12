@@ -6,6 +6,7 @@ import Fuse from 'fuse.js';
 import { z } from 'zod';
 
 import { DEVICE_MATCH_SCHEMA_VERSION } from '../contracts/versions';
+import { CliUserError } from '../contracts/user-error';
 import { isRecord } from '../utils/json';
 import { loadInputRows } from '../utils/input-parser';
 import { requireNonEmptyString } from './device-move-shared';
@@ -103,7 +104,7 @@ async function writeCsv(outputPath: string, rows: DeviceMatchRow[]): Promise<voi
 function toObjectRows(items: unknown[]): Array<Record<string, unknown>> {
   return items.map((item, index) => {
     if (!isRecord(item)) {
-      throw new Error(`JSON row ${index + 1} must be an object.`);
+      throw new CliUserError({ summary: `JSON row ${index + 1} must be an object.` });
     }
     return item;
   });
@@ -152,7 +153,7 @@ async function loadMatchRows(inputPath: string): Promise<Array<Record<string, un
     try {
       parsed = JSON.parse(trimmed);
     } catch (error) {
-      throw new Error(`Input file ${resolved}: ${(error as Error).message}`, { cause: error });
+      throw new CliUserError({ summary: `Input file ${resolved}: ${(error as Error).message}` });
     }
     const extracted = extractRowsFromJson(parsed);
     if (extracted) {

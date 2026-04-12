@@ -1,6 +1,7 @@
 import type { XyteClient } from '../types/client';
 import { loadInputRows, type UtilityInputFormat } from '../utils/input-parser';
 import { isRecord } from '../utils/json';
+import { CliUserError } from '../contracts/user-error';
 import { runUtilityBatch, type UtilityBatchOperation, type UtilityBatchResult } from './utility-batch';
 import {
   parseDeviceRecord,
@@ -11,7 +12,7 @@ import {
 
 function extractSpaceRecord(data: unknown, spaceId: number): { id: number; name?: string } {
   if (!isRecord(data)) {
-    throw new Error(`Space ${spaceId} returned an unexpected response payload.`);
+    throw new CliUserError({ summary: `Space ${spaceId} returned an unexpected response payload.` });
   }
 
   const items = Array.isArray(data.items) ? data.items : [];
@@ -30,7 +31,7 @@ function extractSpaceRecord(data: unknown, spaceId: number): { id: number; name?
     };
   }
 
-  throw new Error(`Target space ${spaceId} was not found.`);
+  throw new CliUserError({ summary: `Target space ${spaceId} was not found.` });
 }
 
 export async function runMoveDevices(args: {
@@ -114,7 +115,7 @@ export async function runMoveDevices(args: {
 
       const deviceId = requireNonEmptyString(row.device_id, 'device_id', rowIndex);
       if (duplicateDeviceIds.has(deviceId)) {
-        throw new Error(`Row ${rowIndex}: device_id "${deviceId}" is duplicated in the input.`);
+        throw new CliUserError({ summary: `Row ${rowIndex}: device_id "${deviceId}" is duplicated in the input.` });
       }
       const targetSpaceId = parseRequiredInteger(row.target_space_id, 'target_space_id', rowIndex);
       const device = await loadDevice(deviceId);

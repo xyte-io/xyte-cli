@@ -1,12 +1,13 @@
 import { isRecord } from '../utils/json';
+import { CliUserError } from '../contracts/user-error';
 
 export function requireNonEmptyString(value: unknown, fieldName: string, rowIndex: number): string {
   if (typeof value !== 'string' && typeof value !== 'number') {
-    throw new Error(`Row ${rowIndex}: field "${fieldName}" must be a string or number.`);
+    throw new CliUserError({ summary: `Row ${rowIndex}: field "${fieldName}" must be a string or number.` });
   }
   const trimmed = String(value).trim();
   if (!trimmed) {
-    throw new Error(`Row ${rowIndex}: field "${fieldName}" cannot be empty.`);
+    throw new CliUserError({ summary: `Row ${rowIndex}: field "${fieldName}" cannot be empty.` });
   }
   return trimmed;
 }
@@ -14,14 +15,14 @@ export function requireNonEmptyString(value: unknown, fieldName: string, rowInde
 export function parseRequiredInteger(value: unknown, fieldName: string, rowIndex: number): number {
   if (typeof value === 'number') {
     if (!Number.isInteger(value) || value <= 0) {
-      throw new Error(`Row ${rowIndex}: field "${fieldName}" must be a positive integer.`);
+      throw new CliUserError({ summary: `Row ${rowIndex}: field "${fieldName}" must be a positive integer.` });
     }
     return value;
   }
 
   const normalized = requireNonEmptyString(value, fieldName, rowIndex);
   if (!/^\d+$/.test(normalized)) {
-    throw new Error(`Row ${rowIndex}: field "${fieldName}" must be a positive integer.`);
+    throw new CliUserError({ summary: `Row ${rowIndex}: field "${fieldName}" must be a positive integer.` });
   }
   return Number(normalized);
 }
@@ -46,7 +47,7 @@ export function parseOptionalLabel(value: unknown): string | undefined {
 
 export function parseDeviceRecord(data: unknown, deviceId: string): { id: string; name?: string; currentSpaceId?: number } {
   if (!isRecord(data)) {
-    throw new Error(`Device ${deviceId} returned an unexpected response payload.`);
+    throw new CliUserError({ summary: `Device ${deviceId} returned an unexpected response payload.` });
   }
 
   const nestedSpace = isRecord(data.space) ? data.space : undefined;
