@@ -18,6 +18,10 @@ export type ConnectionState =
 
 const CONNECTION_STATES = ['connected', 'auth_required', 'missing_key', 'network_error', 'timeout', 'rate_limited', 'unknown_error', 'not_checked'] as const;
 
+export const CONNECTION_ERROR_CLASSES = ['auth', 'missing_key', 'network', 'timeout', 'rate_limit', 'unknown'] as const;
+
+export const READINESS_STATES = ['ready', 'needs_setup', 'degraded'] as const;
+
 export interface ConnectivityResult {
   state: ConnectionState;
   class?: ConnectionErrorClass;
