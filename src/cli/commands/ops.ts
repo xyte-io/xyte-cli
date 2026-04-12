@@ -558,18 +558,21 @@ export function registerOpsCommands(
     .description('Build a fleet summary snapshot')
     .option('--tenant <tenantId>', 'Tenant id override')
     .option('--provider-scope <scope>', 'organization|partner|auto')
-    .option('--render <render>', 'Output format: json|ascii (ops inspect uses --render, not --format)', 'json')
+    .option('--render <render>', 'Output format: json|ascii', 'json')
+    .option('--format <format>', 'Alias for --render')
     .option('--out <path>', 'Write the rendered output to a UTF-8 file')
     .option('--strict-json', 'Fail on non-serializable output')
     .action(async function (options: {
       tenant?: string;
       providerScope?: string;
       render?: string;
+      format?: string;
       out?: string;
       strictJson?: boolean;
     }) {
       await handleOpsInspectFleet(ctx, {
         ...options,
+        render: options.format ?? options.render,
         output: getExplicitGlobalOutput(this)
       });
     });
@@ -580,7 +583,8 @@ export function registerOpsCommands(
     .option('--tenant <tenantId>', 'Tenant id override')
     .option('--provider-scope <scope>', 'organization|partner|auto')
     .option('--window <hours>', 'Window in hours', '24')
-    .option('--render <render>', 'Output format: json|ascii|markdown (ops inspect uses --render, not --format)', 'json')
+    .option('--render <render>', 'Output format: json|ascii|markdown', 'json')
+    .option('--format <format>', 'Alias for --render')
     .option('--out <path>', 'Write the rendered output to a UTF-8 file')
     .option('--strict-json', 'Fail on non-serializable output')
     .action(async function (options: {
@@ -588,11 +592,13 @@ export function registerOpsCommands(
       providerScope?: string;
       window?: string;
       render?: string;
+      format?: string;
       out?: string;
       strictJson?: boolean;
     }) {
       await handleOpsInspectDeepDive(ctx, {
         ...options,
+        render: options.format ?? options.render,
         output: getExplicitGlobalOutput(this)
       });
     });
@@ -605,6 +611,7 @@ export function registerOpsCommands(
     .requiredOption('--out <path>', 'Output path')
     .option('--tenant <tenantId>', 'Tenant id override')
     .option('--render <render>', 'markdown|pdf')
+    .option('--format <format>', 'Alias for --render')
     .option('--include-sensitive', 'Include full ticket/device IDs in report')
     .option('--strict-json', 'Fail on non-serializable output')
     .action(async function (options: {
@@ -612,10 +619,11 @@ export function registerOpsCommands(
       input: string;
       out: string;
       render?: string;
+      format?: string;
       includeSensitive?: boolean;
       strictJson?: boolean;
     }) {
-      await handleOpsReportGenerate(ctx, options);
+      await handleOpsReportGenerate(ctx, { ...options, render: options.format ?? options.render });
     });
 
   ops

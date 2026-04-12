@@ -187,6 +187,7 @@ function buildCsvHeader(headers: string[]): string {
   return `${headers.join(',')}\n`;
 }
 
+/** Intentionally synchronous: all I/O uses synchronous Node.js APIs (existsSync, statSync, mkdirSync, writeFileSync). */
 export function runUtilityPrepare(args: {
   inputPath: string;
   actionKey: string;

@@ -12,7 +12,7 @@ import {
   updateFlowDefinition
 } from '../../workflows/flow-user-definitions';
 import { parseInspectProviderScope } from '../../utils/parse-domain';
-import { type CliContext, printJson } from '../cli-context';
+import { type CliContext, printJson, resolveStrictJson } from '../cli-context';
 import { CliUserError } from '../../contracts/user-error';
 
 function parseFlowMode(options: { plan?: boolean; apply?: boolean }): FlowRunMode {
@@ -246,6 +246,7 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
           ...parseFlowVarOptions(options.var)
         };
 
+        const settings = await ctx.resolveSettings();
         const summary = await runDeterministicFlow({
           flowId,
           tenantId: options.tenant,
@@ -261,7 +262,7 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
           client: await ctx.withClient({ tenantId: options.tenant })
         });
 
-        printJson(ctx.stdout, summary, { strictJson: options.strictJson });
+        printJson(ctx.stdout, summary, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
         if (summary.outcome === 'failed' && summary.classifications.bug > 0) {
           process.exitCode = 1;
         }

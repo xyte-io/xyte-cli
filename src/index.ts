@@ -11,7 +11,8 @@ export {
   formatFleetInspectAscii,
   formatDeepDiveAscii,
   formatDeepDiveMarkdown,
-  generateFleetReport
+  generateFleetReport,
+  generateOpsReport
 } from './workflows/fleet-insights';
 
 export { FileProfileStore, createProfileStore } from './secure/profile-store';
