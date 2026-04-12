@@ -32,7 +32,7 @@ interface UpgradeSettings {
   latestVersionOverride?: string;
 }
 
-import { compareSemver } from '../utils/semver';
+import { compareSemver } from '../contracts/semver';
 
 function defaultRunner(command: string, args: string[]): Promise<CommandResult> {
   return runProcess(command, args, { stdinMode: 'ignore' });
