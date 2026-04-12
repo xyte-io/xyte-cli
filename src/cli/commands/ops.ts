@@ -373,6 +373,11 @@ async function handleOpsReportGenerate(
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
   requireTenantId(tenantId, 'ops report generate');
   const inputPath = path.resolve(options.input);
+  const inputHints = [
+    'Generate fresh input with xyte-cli ops inspect deep-dive --output json',
+    'Generate fresh input with xyte-cli util match',
+    'Generate fresh input with xyte-cli util move-devices'
+  ];
   let raw: unknown;
   try {
     raw = JSON.parse(readFileSync(inputPath, 'utf8')) as unknown;
@@ -382,11 +387,7 @@ async function handleOpsReportGenerate(
     throw new CliUserError({
       summary: isSyntax ? `Input JSON is invalid${detail}` : `Cannot read input file${detail}`,
       detail: `Failed to ${isSyntax ? 'parse' : 'read'} ${inputPath}.`,
-      suggestedCommands: [
-        'Generate fresh input with xyte-cli ops inspect deep-dive --output json',
-        'Generate fresh input with xyte-cli util match',
-        'Generate fresh input with xyte-cli util move-devices'
-      ]
+      suggestedCommands: inputHints
     });
   }
 
@@ -394,17 +395,12 @@ async function handleOpsReportGenerate(
   try {
     reportInput = parseReportInput(raw, tenantId);
   } catch (err) {
-    const suggestedCommands = [
-      'Generate fresh input with xyte-cli ops inspect deep-dive --output json',
-      'Generate fresh input with xyte-cli util match',
-      'Generate fresh input with xyte-cli util move-devices'
-    ];
     if (err instanceof CliUserError) {
-      throw new CliUserError({ ...err, suggestedCommands: [...(err.suggestedCommands ?? []), ...suggestedCommands] });
+      throw new CliUserError({ ...err, suggestedCommands: [...(err.suggestedCommands ?? []), ...inputHints] });
     }
     throw new CliUserError({
       summary: err instanceof Error ? err.message : 'Invalid report input format.',
-      suggestedCommands
+      suggestedCommands: inputHints
     });
   }
   if (reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION && !reportInput.tenantName) {
