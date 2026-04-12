@@ -1815,7 +1815,14 @@ describe('cli integration', () => {
     await secretStore.setSecret('acme', 'xyte-org', 'org-key');
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const program = createCli({ profileStore, secretStore, stdout, stderr, watchDelayFn: () => Promise.resolve() });
+    const program = createCli({
+      profileStore,
+      secretStore,
+      stdout,
+      stderr,
+      watchDelayFn: () => Promise.resolve(),
+      env: { XYTE_CLI_HTTP_RETRY_BACKOFF_MS: '0' }
+    });
 
     const fetchMock = vi
       .fn()
