@@ -13,8 +13,3 @@ export function getLogger(): Logger {
   return _logger;
 }
 
-export function syncLoggerLevel(): void {
-  if (_logger) {
-    _logger.level = resolveLevel();
-  }
-}

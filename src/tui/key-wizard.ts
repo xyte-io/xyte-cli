@@ -81,23 +81,19 @@ async function promptProvider(
 }
 
 async function promptNonEmpty(context: WizardContext, message: string, initial: string): Promise<string | undefined> {
-  while (true) {
-    const input = await context.prompt(message, initial);
-    if (input === undefined || !input.trim()) {
-      return undefined;
-    }
-    return input.trim();
+  const input = await context.prompt(message, initial);
+  if (input === undefined || !input.trim()) {
+    return undefined;
   }
+  return input.trim();
 }
 
 async function promptSecretNonEmpty(context: WizardContext, message: string): Promise<string | undefined> {
-  while (true) {
-    const input = await context.promptSecret(message, '');
-    if (input === undefined || !input.trim()) {
-      return undefined;
-    }
-    return input.trim();
+  const input = await context.promptSecret(message, '');
+  if (input === undefined || !input.trim()) {
+    return undefined;
   }
+  return input.trim();
 }
 
 async function promptYesNo(

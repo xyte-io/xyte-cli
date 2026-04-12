@@ -516,8 +516,6 @@ export function getSpaceName(space: unknown): string {
   return String(rec?.name ?? rec?.title ?? rec?.path ?? 'n/a');
 }
 
-const CONFIG_PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
-
 interface ConfigProviderRow {
   provider: SecretProvider;
   slotCount: number;
@@ -554,7 +552,7 @@ export async function readConfigData(
   const allSlots = tenantId ? await profileStore.listKeySlots(tenantId) : [];
 
   const providerRows: ConfigProviderRow[] = await Promise.all(
-    CONFIG_PROVIDERS.map(async (provider) => {
+    SUPPORTED_SECRET_PROVIDERS.map(async (provider) => {
       const providerSlots = allSlots.filter((slot) => slot.provider === provider);
       const activeSlot = tenantId ? await profileStore.getActiveKeySlot(tenantId, provider) : undefined;
       const hasActiveSecret =

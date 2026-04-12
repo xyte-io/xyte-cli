@@ -414,8 +414,12 @@ function handleInstallDoctor(_step: FlowTaskStep, _ctx: RunContext): TaskExecuti
   return { output: buildInstallDoctorReport(path.resolve(__dirname, '../../dist/bin/xyte-cli.js')) };
 }
 
-async function handleSetupStatus(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
-  const readiness = await evaluateReadiness({ profileStore: ctx.args.profileStore, secretStore: ctx.args.secretStore, tenantId: ctx.args.tenantId, client: ctx.args.client, checkConnectivity: true });
+async function evaluateReadinessWithConnectivity(ctx: RunContext): Promise<ReturnType<typeof evaluateReadiness>> {
+  return evaluateReadiness({ profileStore: ctx.args.profileStore, secretStore: ctx.args.secretStore, tenantId: ctx.args.tenantId, client: ctx.args.client, checkConnectivity: true });
+}
+
+async function executeSetupStatusStep(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
+  const readiness = await evaluateReadinessWithConnectivity(ctx);
   if (readiness.state !== 'ready') {
     throw new FlowNeedsInputError(`Setup status is ${readiness.state}. Run setup before continuing.`);
   }
@@ -423,7 +427,7 @@ async function handleSetupStatus(_step: FlowTaskStep, ctx: RunContext): Promise<
 }
 
 async function handleConfigDoctor(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
-  const readiness = await evaluateReadiness({ profileStore: ctx.args.profileStore, secretStore: ctx.args.secretStore, tenantId: ctx.args.tenantId, client: ctx.args.client, checkConnectivity: true });
+  const readiness = await evaluateReadinessWithConnectivity(ctx);
   if (readiness.connectionState !== 'connected') {
     throw new FlowNeedsInputError(
       `Connectivity is ${readiness.connectionState}. Resolve connectivity before continuing.`
@@ -694,7 +698,7 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
 
   switch (step.task) {
     case 'doctor.install':    return handleInstallDoctor(step, ctx);
-    case 'setup.status':      return handleSetupStatus(step, ctx);
+    case 'setup.status':      return executeSetupStatusStep(step, ctx);
     case 'config.doctor':     return handleConfigDoctor(step, ctx);
     case 'status.fast':       return handleStatusFast(step, ctx);
     case 'inspect.fleet':     return handleFleetInspect(step, ctx);
