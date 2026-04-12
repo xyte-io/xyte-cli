@@ -3,7 +3,6 @@ import type { ProfileStore } from '../secure/profile-store';
 import { PROVIDER_ORG, PROVIDER_PARTNER, type SecretProvider } from '../types/profile';
 
 import { runSlotConnectivityTest } from '../client/probe';
-export { runSlotConnectivityTest };
 
 export async function fetchProviderForKey(args: {
   profileStore: ProfileStore;

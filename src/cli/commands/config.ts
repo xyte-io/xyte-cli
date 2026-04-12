@@ -19,7 +19,8 @@ import { SUPPORTED_SECRET_PROVIDERS, type SecretProvider } from '../../types/pro
 import { parseProvider } from '../../utils/parse-domain';
 import { formatReadinessText } from '../format-readiness';
 import { parsePositiveIntegerOption } from '../parse-options';
-import { fetchProviderForKey, runSlotConnectivityTest } from '../provider-resolution';
+import { runSlotConnectivityTest } from '../../client/probe';
+import { fetchProviderForKey } from '../provider-resolution';
 import { resolveKeyValue } from '../resolve-key';
 import {
   type CliContext,

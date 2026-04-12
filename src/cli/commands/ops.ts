@@ -12,7 +12,7 @@ import { isRecord } from '../../utils/json';
 import { stringifyJsonOutput } from '../../utils/json-output';
 import { type InspectProviderScope } from '../../types/settings-enums';
 import { parseInspectProviderScope } from '../../utils/parse-domain';
-import { TUI_SCREEN_IDS, type TuiScreenId } from '../../tui/types';
+import { TUI_SCREEN_IDS, type TuiScreenId } from '../../types/tui-screens';
 import { runTuiApp } from '../../tui/app';
 import {
   buildDeepDive,
