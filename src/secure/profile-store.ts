@@ -200,9 +200,10 @@ export class FileProfileStore implements ProfileStore {
         parsed = JSON.parse(content) as ProfileStoreData;
       } catch (error) {
         const detail = errorMessage(error);
-        throw new Error(
-          `Profile store is invalid at ${this.filePath}: ${detail}. Delete or fix this file and rerun setup.`
-        );
+        throw new CliUserError({
+          summary: `Profile store is invalid at ${this.filePath}: ${detail}.`,
+          detail: 'Delete or fix this file and rerun setup.'
+        });
       }
       return this.normalize(parsed).data;
     } catch (error) {
@@ -211,9 +212,10 @@ export class FileProfileStore implements ProfileStore {
         return structuredClone(DEFAULT_DATA);
       }
       if (errno.code === 'EACCES' || errno.code === 'EPERM' || errno.code === 'EROFS' || errno.code === 'ENOTDIR') {
-        throw new Error(
-          `Cannot read profile store at ${this.filePath}. Check file permissions or directory access (error=${errno.code}).`
-        );
+        throw new CliUserError({
+          summary: `Cannot read profile store at ${this.filePath}.`,
+          detail: `Check file permissions or directory access (error=${errno.code}).`
+        });
       }
       throw error;
     }

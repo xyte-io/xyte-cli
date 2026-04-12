@@ -1,3 +1,4 @@
+import { CliUserError } from '../contracts/user-error';
 import { makeKeyFingerprint, matchesSlotRef } from '../secure/key-slots';
 import type { ApiKeySlotMeta, SecretProvider } from '../types/profile';
 import { PROVIDER_ORG, SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
@@ -190,7 +191,7 @@ export async function runKeyUpdateWizard(args: RunKeyUpdateWizardArgs): Promise<
   const slots = await context.profileStore.listKeySlots(tenantId, provider);
   const slot = slots.find((item) => matchesSlotRef(item, slotRef));
   if (!slot) {
-    throw new Error(`Unknown slot "${slotRef}" for ${provider}.`);
+    throw new CliUserError({ summary: `Unknown slot "${slotRef}" for ${provider}.` });
   }
 
   const slotName = await promptNonEmpty(context, 'Slot name:', slot.name);

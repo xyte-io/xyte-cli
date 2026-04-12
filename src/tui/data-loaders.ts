@@ -1,5 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
+import { CliUserError } from '../contracts/user-error';
 import { classifyConnectivityError } from '../config/connectivity';
 import type { ConnectivityResult, ConnectionState } from '../contracts/status';
 import {
@@ -176,17 +177,18 @@ async function resolveTenantProvider(
   tenantId: string | undefined
 ): Promise<SecretProvider> {
   if (!tenantId) {
-    throw new Error('Device loading requires a tenant id.');
+    throw new CliUserError({ summary: 'Device loading requires a tenant id.' });
   }
 
   const tenant = await profileStore.getTenant(tenantId);
   if (!tenant) {
-    throw new Error(`Unknown tenant: ${tenantId}`);
+    throw new CliUserError({ summary: `Unknown tenant: ${tenantId}` });
   }
   if (!tenant.apiProvider) {
-    throw new Error(
-      `Tenant ${tenantId} has no API provider configured. Set an active provider-specific key before loading devices.`
-    );
+    throw new CliUserError({
+      summary: `Tenant ${tenantId} has no API provider configured.`,
+      detail: 'Set an active provider-specific key before loading devices.'
+    });
   }
 
   return tenant.apiProvider;
