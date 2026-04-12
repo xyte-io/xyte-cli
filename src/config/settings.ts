@@ -381,6 +381,8 @@ function getEnvValue(env: NodeJS.ProcessEnv, keyPath: SettingPath): unknown {
         return env.XYTE_CLI_CONSOLE_MOTION;
       }
       if (env.XYTE_TUI_REDUCED_MOTION !== undefined) {
+        // Note: XYTE_TUI_REDUCED_MOTION has inverted semantics — '1' means "reduce motion" (disable), not "enable".
+        process.stderr.write('Warning: XYTE_TUI_REDUCED_MOTION is deprecated, use XYTE_CLI_CONSOLE_MOTION instead.\n');
         return env.XYTE_TUI_REDUCED_MOTION === '1' ? 'false' : 'true';
       }
       return undefined;
@@ -389,19 +391,54 @@ function getEnvValue(env: NodeJS.ProcessEnv, keyPath: SettingPath): unknown {
     case 'console.intervalMs':
       return env.XYTE_CLI_CONSOLE_INTERVAL_MS;
     case 'console.debugLogPath':
-      return env.XYTE_CLI_CONSOLE_DEBUG_LOG_PATH ?? env.XYTE_TUI_DEBUG_LOG;
+      if (env.XYTE_CLI_CONSOLE_DEBUG_LOG_PATH !== undefined) return env.XYTE_CLI_CONSOLE_DEBUG_LOG_PATH;
+      if (env.XYTE_TUI_DEBUG_LOG !== undefined) {
+        process.stderr.write('Warning: XYTE_TUI_DEBUG_LOG is deprecated, use XYTE_CLI_CONSOLE_DEBUG_LOG_PATH instead.\n');
+        return env.XYTE_TUI_DEBUG_LOG;
+      }
+      return undefined;
     case 'logs.enabled':
-      return env.XYTE_CLI_LOGS_ENABLED ?? env.XYTE_LOG_ACTIONS;
+      if (env.XYTE_CLI_LOGS_ENABLED !== undefined) return env.XYTE_CLI_LOGS_ENABLED;
+      if (env.XYTE_LOG_ACTIONS !== undefined) {
+        process.stderr.write('Warning: XYTE_LOG_ACTIONS is deprecated, use XYTE_CLI_LOGS_ENABLED instead.\n');
+        return env.XYTE_LOG_ACTIONS;
+      }
+      return undefined;
     case 'logs.path':
-      return env.XYTE_CLI_LOGS_PATH ?? env.XYTE_LOG_ACTIONS_PATH;
+      if (env.XYTE_CLI_LOGS_PATH !== undefined) return env.XYTE_CLI_LOGS_PATH;
+      if (env.XYTE_LOG_ACTIONS_PATH !== undefined) {
+        process.stderr.write('Warning: XYTE_LOG_ACTIONS_PATH is deprecated, use XYTE_CLI_LOGS_PATH instead.\n');
+        return env.XYTE_LOG_ACTIONS_PATH;
+      }
+      return undefined;
     case 'logs.verbose':
-      return env.XYTE_CLI_LOGS_VERBOSE ?? env.XYTE_LOG_ACTIONS_VERBOSE;
+      if (env.XYTE_CLI_LOGS_VERBOSE !== undefined) return env.XYTE_CLI_LOGS_VERBOSE;
+      if (env.XYTE_LOG_ACTIONS_VERBOSE !== undefined) {
+        process.stderr.write('Warning: XYTE_LOG_ACTIONS_VERBOSE is deprecated, use XYTE_CLI_LOGS_VERBOSE instead.\n');
+        return env.XYTE_LOG_ACTIONS_VERBOSE;
+      }
+      return undefined;
     case 'logs.maxFileBytes':
-      return env.XYTE_CLI_LOGS_MAX_FILE_BYTES ?? env.XYTE_LOG_ACTIONS_MAX_FILE_BYTES;
+      if (env.XYTE_CLI_LOGS_MAX_FILE_BYTES !== undefined) return env.XYTE_CLI_LOGS_MAX_FILE_BYTES;
+      if (env.XYTE_LOG_ACTIONS_MAX_FILE_BYTES !== undefined) {
+        process.stderr.write('Warning: XYTE_LOG_ACTIONS_MAX_FILE_BYTES is deprecated, use XYTE_CLI_LOGS_MAX_FILE_BYTES instead.\n');
+        return env.XYTE_LOG_ACTIONS_MAX_FILE_BYTES;
+      }
+      return undefined;
     case 'logs.maxFiles':
-      return env.XYTE_CLI_LOGS_MAX_FILES ?? env.XYTE_LOG_ACTIONS_MAX_FILES;
+      if (env.XYTE_CLI_LOGS_MAX_FILES !== undefined) return env.XYTE_CLI_LOGS_MAX_FILES;
+      if (env.XYTE_LOG_ACTIONS_MAX_FILES !== undefined) {
+        process.stderr.write('Warning: XYTE_LOG_ACTIONS_MAX_FILES is deprecated, use XYTE_CLI_LOGS_MAX_FILES instead.\n');
+        return env.XYTE_LOG_ACTIONS_MAX_FILES;
+      }
+      return undefined;
     case 'logs.mirrorToStderr':
-      return env.XYTE_CLI_LOGS_MIRROR_TO_STDERR ?? env.XYTE_LOG_ACTIONS_STDERR;
+      if (env.XYTE_CLI_LOGS_MIRROR_TO_STDERR !== undefined) return env.XYTE_CLI_LOGS_MIRROR_TO_STDERR;
+      if (env.XYTE_LOG_ACTIONS_STDERR !== undefined) {
+        process.stderr.write('Warning: XYTE_LOG_ACTIONS_STDERR is deprecated, use XYTE_CLI_LOGS_MIRROR_TO_STDERR instead.\n');
+        return env.XYTE_LOG_ACTIONS_STDERR;
+      }
+      return undefined;
     case 'report.includeSensitive':
       return env.XYTE_CLI_REPORT_INCLUDE_SENSITIVE;
     default: {

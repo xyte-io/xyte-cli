@@ -6,6 +6,9 @@ import { errorMessage, resolveCliErrorFormat } from '../utils/error-format';
 import { redactSensitiveText } from '../utils/redact';
 
 runCli().catch((error) => {
+  if (process.env.XYTE_ERROR_FORMAT !== undefined && process.env.XYTE_CLI_ERROR_FORMAT === undefined) {
+    process.stderr.write('Warning: XYTE_ERROR_FORMAT is deprecated, use XYTE_CLI_ERROR_FORMAT instead.\n');
+  }
   const errorFormat = resolveCliErrorFormat(
     process.argv.slice(2),
     process.env.XYTE_CLI_ERROR_FORMAT ?? process.env.XYTE_ERROR_FORMAT

@@ -197,18 +197,20 @@ xyte-cli logs stats --path ./logs/xyte-cli.actions.ndjson
 
 Advanced shell-specific environment flags:
 
-`XYTE_LOG_ACTIONS` enables NDJSON logging.
-`XYTE_LOG_ACTIONS_STDERR` independently controls stderr mirroring.
-Set `XYTE_LOG_ACTIONS_MAX_FILES=1` to keep only the active file (no rotated history).
+`XYTE_CLI_LOGS_ENABLED` enables NDJSON logging.
+`XYTE_CLI_LOGS_MIRROR_TO_STDERR` independently controls stderr mirroring.
+Set `XYTE_CLI_LOGS_MAX_FILES=1` to keep only the active file (no rotated history).
 
 ```bash
-XYTE_LOG_ACTIONS=1
-XYTE_LOG_ACTIONS_PATH=./logs/xyte-cli.actions.ndjson
-XYTE_LOG_ACTIONS_STDERR=1
-XYTE_LOG_ACTIONS_VERBOSE=1
-XYTE_LOG_ACTIONS_MAX_FILE_BYTES=10485760
-XYTE_LOG_ACTIONS_MAX_FILES=5
+XYTE_CLI_LOGS_ENABLED=1
+XYTE_CLI_LOGS_PATH=./logs/xyte-cli.actions.ndjson
+XYTE_CLI_LOGS_MIRROR_TO_STDERR=1
+XYTE_CLI_LOGS_VERBOSE=1
+XYTE_CLI_LOGS_MAX_FILE_BYTES=10485760
+XYTE_CLI_LOGS_MAX_FILES=5
 ```
+
+The legacy `XYTE_LOG_ACTIONS_*` names are deprecated aliases — they still work but emit a deprecation warning. Use the `XYTE_CLI_LOGS_*` names above.
 
 Interactive hotkeys on ops screens:
 
