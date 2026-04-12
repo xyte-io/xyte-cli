@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createXyteClient } from '../src/client/create-client';
-import { getBuiltInFlowDefinition, type BuiltInFlowDefinition } from '../src/workflows/flow-catalog';
+import { getBuiltInFlowDefinition, type BuiltInFlowDefinition, type BuiltInFlowId } from '../src/workflows/flow-catalog';
 import * as fleetInsights from '../src/workflows/fleet-insights';
 import { runDeterministicFlow } from '../src/workflows/flow-runner';
 import { MemorySecretStore } from '../src/secure/secret-store';
@@ -37,8 +37,8 @@ vi.mock('../src/workflows/utility-commands', async (importOriginal) => {
   const original = await importOriginal<typeof import('../src/workflows/utility-commands')>();
   return {
     ...original,
-    runSpaceImportTree: async (...args: unknown[]) =>
-      runSpaceImportTreeOverride ? runSpaceImportTreeOverride(...args) : original.runSpaceImportTree(...(args as Parameters<typeof original.runSpaceImportTree>))
+    runSpaceImportTree: async (args: Parameters<typeof original.runSpaceImportTree>[0]) =>
+      runSpaceImportTreeOverride ? runSpaceImportTreeOverride() : original.runSpaceImportTree(args)
   };
 });
 
@@ -2196,7 +2196,7 @@ describe('flow runner', () => {
     writeFileSync(csvPath, 'path\nBuilding A/Floor 1\n');
 
     const definition: BuiltInFlowDefinition = {
-      id: 'flow.test-space-import',
+      id: 'flow.test-space-import' as BuiltInFlowId,
       title: 'Test Space Import',
       intent: 'test',
       writeCapable: true,
