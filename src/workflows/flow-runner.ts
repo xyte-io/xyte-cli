@@ -204,8 +204,10 @@ export function parseFlowVarOptions(values: string[] | undefined): Record<string
   return out;
 }
 
+const TEMPLATE_VAR_RE = /{{\s*([a-zA-Z0-9._-]+)\s*}}/g;
+
 function resolveTemplateString(input: string, context: Record<string, string>): string {
-  return input.replace(/{{\s*([a-zA-Z0-9._-]+)\s*}}/g, (_all, rawKey: string) => {
+  return input.replace(TEMPLATE_VAR_RE, (_all, rawKey: string) => {
     const key = rawKey.trim();
     const value = context[key];
     if (value === undefined) {
@@ -287,7 +289,7 @@ function applyDefinitionContextDefaults(ctx: RunContext): void {
   const def = getBuiltInFlowDefinition(ctx.resolvedFlowId);
   for (const [key, template] of Object.entries(def.contextDefaults ?? {})) {
     if (!context[key]) {
-      const value = template.replace(/{{\s*([a-zA-Z0-9._-]+)\s*}}/g, (_, k: string) => context[k.trim()] ?? '');
+      const value = template.replace(TEMPLATE_VAR_RE, (_, k: string) => context[k.trim()] ?? '');
       if (value && !value.includes('{{')) {
         context[key] = value;
       }
@@ -1118,7 +1120,6 @@ async function recordStepSuccess(
   step: FlowTaskStep,
   stepState: FlowRunStep,
   ctx: RunContext,
-  args: RunDeterministicFlowArgs,
   artifactPath: string,
   stepStartedAt: number
 ): Promise<void> {
@@ -1149,7 +1150,7 @@ async function recordStepSuccess(
     ctx.resolvedContext[`${step.id}_output`] = primaryOutputPath;
   }
 
-  await persistFlowRunInputs(ctx, args, args.inspectProviderScope ?? 'auto');
+  await persistFlowRunInputs(ctx, ctx.args, ctx.args.inspectProviderScope ?? 'auto');
 }
 
 async function executeSteps(state: RunState): Promise<ExecuteStepsResult> {
@@ -1206,7 +1207,7 @@ async function executeSteps(state: RunState): Promise<ExecuteStepsResult> {
           break;
         }
 
-        await recordStepSuccess(result, step, stepState, ctx, args, artifactPath, stepStartedAt);
+        await recordStepSuccess(result, step, stepState, ctx, artifactPath, stepStartedAt);
 
         nextStepIndex = index + 1;
         continue;

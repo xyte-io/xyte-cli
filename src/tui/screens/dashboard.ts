@@ -26,8 +26,9 @@ export function createDashboardScreen(): TuiScreen {
   let context: TuiContext;
   const paneConfig = SCREEN_PANE_CONFIG.dashboard;
   let activePane: TuiPaneId = paneConfig.defaultPane;
+  let isMounted = false;
 
-  const focusActivePane = () => {
+  const focusPane = () => {
     if (activePane === 'kpi') {
       kpis?.focus();
       return;
@@ -48,6 +49,7 @@ export function createDashboardScreen(): TuiScreen {
     title: 'Dashboard',
     mount(parent, ctx) {
       context = ctx;
+      isMounted = true;
       root = blessed.box({
         parent,
         width: '100%-2',
@@ -115,11 +117,12 @@ export function createDashboardScreen(): TuiScreen {
       });
     },
     unmount() {
+      isMounted = false;
       root?.destroy();
       root = undefined;
     },
     async refresh() {
-      if (!root || !kpis || !incidentsBox || !ticketsBox || !providerBox) {
+      if (!isMounted || !root || !kpis || !incidentsBox || !ticketsBox || !providerBox) {
         return;
       }
 
@@ -152,7 +155,7 @@ export function createDashboardScreen(): TuiScreen {
       }
 
       context.screen.render();
-      focusActivePane();
+      focusPane();
     },
     getActivePane() {
       return activePane;
@@ -167,7 +170,7 @@ export function createDashboardScreen(): TuiScreen {
           return 'boundary';
         }
         activePane = next.pane;
-        focusActivePane();
+        focusPane();
         context.setStatus(`Pane: ${activePane}`);
         return 'handled';
       }
