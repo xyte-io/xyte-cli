@@ -18,6 +18,9 @@ import { PROVIDER_ORG, SUPPORTED_SECRET_PROVIDERS } from '../../types/profile';
 import { CliUserError } from '../../contracts/user-error';
 import type { TuiArrowKey, TuiContext, NavigableScreen } from '../types';
 import { readConfigData } from '../data-loaders';
+import { createRenderErrorTracker } from '../render-error-tracker';
+import { createScreenRenderLogger } from '../screen-render-logger';
+import { errorMessage } from '../../utils/error-format';
 
 const PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
 
@@ -75,6 +78,8 @@ export function createConfigScreen(): NavigableScreen {
   const paneConfig = SCREEN_PANE_CONFIG.config;
   let activePane = paneConfig.defaultPane;
   let isMounted = false;
+  const renderErrors = createRenderErrorTracker();
+  const renderLog = createScreenRenderLogger('config', () => context.debugLog, renderErrors);
 
   const focusPane = () => {
     if (activePane === 'providers-table') {
@@ -122,46 +127,60 @@ export function createConfigScreen(): NavigableScreen {
     );
     selectedSlotIndex = clampIndex(selectedSlotIndex, slotRowsState.length);
 
-    const panels = sceneFromConfigState({
-      tenantId: activeTenantId,
-      providerRows: providerRowsState,
-      selectedProvider,
-      slotRows: slotRowsState,
-      selectedSlot: slotRowsState[selectedSlotIndex],
-      doctorStatus
-    });
+    renderLog.onRenderStart();
+    try {
+      const panels = sceneFromConfigState({
+        tenantId: activeTenantId,
+        providerRows: providerRowsState,
+        selectedProvider,
+        slotRows: slotRowsState,
+        selectedSlot: slotRowsState[selectedSlotIndex],
+        doctorStatus
+      });
 
-    const providerPanel = panels.find((panel) => panel.id === 'config-providers');
-    const slotPanel = panels.find((panel) => panel.id === 'config-slots');
-    const actionPanel = panels.find((panel) => panel.id === 'config-actions');
+      const providerPanel = panels.find((panel) => panel.id === 'config-providers');
+      const slotPanel = panels.find((panel) => panel.id === 'config-slots');
+      const actionPanel = panels.find((panel) => panel.id === 'config-actions');
 
-    setListTableData(
-      providerTable,
-      [
-        (providerPanel?.table?.columns ?? ['Provider', 'Slots', 'Active Slot', 'Has Secret', 'Last Validated']) as [
-          string,
-          string,
-          string,
-          string,
-          string
+      setListTableData(
+        providerTable,
+        [
+          (providerPanel?.table?.columns ?? ['Provider', 'Slots', 'Active Slot', 'Has Secret', 'Last Validated']) as [
+            string,
+            string,
+            string,
+            string,
+            string
+          ],
+          ...((providerPanel?.table?.rows ?? []) as Array<[string, string, string, string, string]>)
         ],
-        ...((providerPanel?.table?.rows ?? []) as Array<[string, string, string, string, string]>)
-      ],
-      providerSelectionSync
-    );
-    syncListSelection(providerTable, selectedProviderIndex, providerSelectionSync);
+        providerSelectionSync
+      );
+      syncListSelection(providerTable, selectedProviderIndex, providerSelectionSync);
 
-    setListTableData(
-      slotTable,
-      [
-        (slotPanel?.table?.columns ?? ['Provider', 'Slot', 'Active', 'Secret']) as [string, string, string, string],
-        ...((slotPanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
-      ],
-      slotSelectionSync
-    );
-    syncListSelection(slotTable, selectedSlotIndex, slotSelectionSync);
+      setListTableData(
+        slotTable,
+        [
+          (slotPanel?.table?.columns ?? ['Provider', 'Slot', 'Active', 'Secret']) as [string, string, string, string],
+          ...((slotPanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
+        ],
+        slotSelectionSync
+      );
+      syncListSelection(slotTable, selectedSlotIndex, slotSelectionSync);
 
-    actionBox?.setContent((actionPanel?.text?.lines ?? []).join('\n'));
+      actionBox?.setContent((actionPanel?.text?.lines ?? []).join('\n'));
+      renderErrors.recordSuccess();
+      renderLog.onRenderComplete();
+    } catch (error) {
+      const message = errorMessage(error);
+      renderErrors.recordError(message);
+      renderLog.onRenderError(message);
+      actionBox?.setContent([
+        'Unable to render config safely.',
+        `Reason: ${message}`,
+        'Try refreshing (r).'
+      ].join('\n'));
+    }
     focusPane();
     context.screen.render();
   };

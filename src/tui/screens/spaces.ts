@@ -241,6 +241,12 @@ export function createSpacesScreen(): NavigableScreen {
     }, 140);
   };
 
+  const promptOrAbort = async (label: string, current: string): Promise<string | undefined> => {
+    const value = await context.prompt(label, current);
+    if (value === undefined || !isMounted) return undefined;
+    return value;
+  };
+
   const renderState = () => {
     if (!isMounted) {
       return;
@@ -652,34 +658,20 @@ export function createSpacesScreen(): NavigableScreen {
       }
 
       if (ch === 'f') {
-        const nextId = await context.prompt('Filter id (empty clears):', idFilter);
-        if (nextId === undefined || !isMounted) {
-          return true;
-        }
-        const nextName = await context.prompt('Filter name (empty clears):', nameFilter);
-        if (nextName === undefined || !isMounted) {
-          return true;
-        }
-        const nextParentId = await context.prompt('Filter parent_id (empty clears):', parentIdFilter);
-        if (nextParentId === undefined || !isMounted) {
-          return true;
-        }
-        const nextType = await context.prompt('Filter space_type (empty clears):', spaceTypeFilter);
-        if (nextType === undefined || !isMounted) {
-          return true;
-        }
-        const nextPath = await context.prompt('Filter path_includes (empty clears):', pathIncludesFilter);
-        if (nextPath === undefined || !isMounted) {
-          return true;
-        }
-        const nextCreatedAfter = await context.prompt('Filter created_after (empty clears):', createdAfterFilter);
-        if (nextCreatedAfter === undefined || !isMounted) {
-          return true;
-        }
-        const nextCreatedBefore = await context.prompt('Filter created_before (empty clears):', createdBeforeFilter);
-        if (nextCreatedBefore === undefined || !isMounted) {
-          return true;
-        }
+        const nextId = await promptOrAbort('Filter id (empty clears):', idFilter);
+        if (nextId === undefined) return true;
+        const nextName = await promptOrAbort('Filter name (empty clears):', nameFilter);
+        if (nextName === undefined) return true;
+        const nextParentId = await promptOrAbort('Filter parent_id (empty clears):', parentIdFilter);
+        if (nextParentId === undefined) return true;
+        const nextType = await promptOrAbort('Filter space_type (empty clears):', spaceTypeFilter);
+        if (nextType === undefined) return true;
+        const nextPath = await promptOrAbort('Filter path_includes (empty clears):', pathIncludesFilter);
+        if (nextPath === undefined) return true;
+        const nextCreatedAfter = await promptOrAbort('Filter created_after (empty clears):', createdAfterFilter);
+        if (nextCreatedAfter === undefined) return true;
+        const nextCreatedBefore = await promptOrAbort('Filter created_before (empty clears):', createdBeforeFilter);
+        if (nextCreatedBefore === undefined) return true;
 
         idFilter = nextId.trim();
         nameFilter = nextName.trim();

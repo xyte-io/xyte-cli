@@ -16,6 +16,9 @@ import { PROVIDER_ORG } from '../../types/profile';
 import { parseProvider } from '../../utils/parse-domain';
 import { sceneFromSetupState, toSetupProviderRows } from '../scene';
 import { runKeyCreateWizard } from '../key-wizard';
+import { createRenderErrorTracker } from '../render-error-tracker';
+import { createScreenRenderLogger } from '../screen-render-logger';
+import { errorMessage } from '../../utils/error-format';
 
 export function createSetupScreen(): NavigableScreen {
   let root: blessed.Widgets.BoxElement | undefined;
@@ -32,6 +35,8 @@ export function createSetupScreen(): NavigableScreen {
   const paneConfig = SCREEN_PANE_CONFIG.setup;
   let activePane = paneConfig.defaultPane;
   let isMounted = false;
+  const renderErrors = createRenderErrorTracker();
+  const renderLog = createScreenRenderLogger('setup', () => context.debugLog, renderErrors);
 
   const focusPane = () => {
     if (activePane === 'providers-table') {
@@ -49,37 +54,52 @@ export function createSetupScreen(): NavigableScreen {
     if (!isMounted) {
       return;
     }
-    const panels = sceneFromSetupState({
-      tenantId: readiness.tenantId,
-      readinessState: readiness.state,
-      connectionState: readiness.connectionState,
-      missingItems: readiness.missingItems,
-      recommendedActions: readiness.recommendedActions,
-      providerRows: toSetupProviderRows(readiness.providers)
-    });
     providerRowsState = readiness.providers.map((provider) => provider.provider);
-
-    const overview = panels.find((panel) => panel.id === 'setup-overview');
-    const providers = panels.find((panel) => panel.id === 'setup-providers');
-    const checklist = panels.find((panel) => panel.id === 'setup-checklist');
-
-    statsBox?.setContent((overview?.stats ?? []).map((stat) => `${stat.label}: ${stat.value}`).join('\n'));
-    setListTableData(
-      providerTable,
-      [
-        (providers?.table?.columns ?? ['Provider', 'Slots', 'Active Slot', 'Has Secret']) as [
-          string,
-          string,
-          string,
-          string
-        ],
-        ...((providers?.table?.rows ?? []) as Array<[string, string, string, string]>)
-      ],
-      providerSelectionSync
-    );
     selectedProviderIndex = clampIndex(selectedProviderIndex, readiness.providers.length);
-    syncListSelection(providerTable, selectedProviderIndex, providerSelectionSync);
-    checklistBox?.setContent((checklist?.text?.lines ?? []).join('\n'));
+
+    renderLog.onRenderStart();
+    try {
+      const panels = sceneFromSetupState({
+        tenantId: readiness.tenantId,
+        readinessState: readiness.state,
+        connectionState: readiness.connectionState,
+        missingItems: readiness.missingItems,
+        recommendedActions: readiness.recommendedActions,
+        providerRows: toSetupProviderRows(readiness.providers)
+      });
+
+      const overview = panels.find((panel) => panel.id === 'setup-overview');
+      const providers = panels.find((panel) => panel.id === 'setup-providers');
+      const checklist = panels.find((panel) => panel.id === 'setup-checklist');
+
+      statsBox?.setContent((overview?.stats ?? []).map((stat) => `${stat.label}: ${stat.value}`).join('\n'));
+      setListTableData(
+        providerTable,
+        [
+          (providers?.table?.columns ?? ['Provider', 'Slots', 'Active Slot', 'Has Secret']) as [
+            string,
+            string,
+            string,
+            string
+          ],
+          ...((providers?.table?.rows ?? []) as Array<[string, string, string, string]>)
+        ],
+        providerSelectionSync
+      );
+      syncListSelection(providerTable, selectedProviderIndex, providerSelectionSync);
+      checklistBox?.setContent((checklist?.text?.lines ?? []).join('\n'));
+      renderErrors.recordSuccess();
+      renderLog.onRenderComplete();
+    } catch (error) {
+      const message = errorMessage(error);
+      renderErrors.recordError(message);
+      renderLog.onRenderError(message);
+      checklistBox?.setContent([
+        'Unable to render setup safely.',
+        `Reason: ${message}`,
+        'Try refreshing (r).'
+      ].join('\n'));
+    }
     focusPane();
     context.screen.render();
   };
