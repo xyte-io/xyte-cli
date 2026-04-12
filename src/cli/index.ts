@@ -24,8 +24,8 @@ import {
   type SkillAgent,
   type SkillInstallOutcome,
   type SkillInstallScope
-} from '../utils/install-skills';
-import { applyUpgrade, checkForUpgrade, type UpgradeDependencies } from '../utils/upgrade';
+} from './install-skills';
+import { applyUpgrade, checkForUpgrade, type UpgradeDependencies } from './upgrade';
 import { runTuiApp } from '../tui/app';
 import { CliUserError } from '../contracts/user-error';
 import { errorMessage } from '../utils/error-format';

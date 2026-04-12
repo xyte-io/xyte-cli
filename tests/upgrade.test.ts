@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { applyUpgrade, checkForUpgrade } from '../src/utils/upgrade';
+import { applyUpgrade, checkForUpgrade } from '../src/cli/upgrade';
 import { compareSemver } from '../src/utils/semver';
 
 describe('upgrade utilities', () => {
