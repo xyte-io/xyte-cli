@@ -20,10 +20,9 @@ import {
   collectFleetSnapshot,
   formatDeepDiveAscii,
   formatDeepDiveMarkdown,
-  formatFleetInspectAscii,
-  generateOpsReport,
-  parseReportInput
+  formatFleetInspectAscii
 } from '../../workflows/fleet-insights';
+import { generateOpsReport, parseReportInput } from '../../workflows/ops-report';
 import { runWatch, WATCH_MIN_INTERVAL_MS, WATCH_MAX_POLLS } from '../../workflows/watch';
 import type { SettingKey } from '../../config/settings';
 import { parsePositiveIntegerOption, parseQueryJson } from '../parse-options';

@@ -41,11 +41,9 @@ import {
   buildFleetInspect,
   collectFleetSnapshot,
   generateDeviceMigrationReport,
-  generateOpsReport,
-  InspectProviderScopeError,
-  parseReportInput,
-  type OpsReportInput
+  InspectProviderScopeError
 } from './fleet-insights';
+import { generateOpsReport, parseReportInput, type OpsReportInput } from './ops-report';
 import type { DeepDiveResult } from '../types/deep-dive';
 import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';
 import type { BuiltInFlowDefinition, FlowGateStep, FlowTaskStep } from './flow-catalog';

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseReportInput, parseDeepDiveForReport } from '../src/workflows/fleet-insights';
+import { parseReportInput, parseDeepDiveForReport } from '../src/workflows/ops-report';
 import { CliUserError } from '../src/contracts/user-error';
 import {
   INSPECT_DEEP_DIVE_SCHEMA_VERSION,
