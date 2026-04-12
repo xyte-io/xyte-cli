@@ -21,9 +21,6 @@ const EMPTY_SECRETS: PersistedSecrets = {
 };
 
 export interface SecretStore {
-  setSecret(tenantId: string, provider: SecretProvider, value: string): Promise<void>;
-  getSecret(tenantId: string, provider: SecretProvider): Promise<string | undefined>;
-  clearSecret(tenantId: string, provider: SecretProvider): Promise<void>;
   setSlotSecret(tenantId: string, provider: SecretProvider, slotId: string, value: string): Promise<void>;
   getSlotSecret(tenantId: string, provider: SecretProvider, slotId: string): Promise<string | undefined>;
   clearSlotSecret(tenantId: string, provider: SecretProvider, slotId: string): Promise<void>;
@@ -107,18 +104,6 @@ export class FileSecretStore implements SecretStore {
     const data = await this.readData();
     delete data.records[accountKey(tenantId, provider, slotId)];
     await this.writeData(data);
-  }
-
-  async setSecret(tenantId: string, provider: SecretProvider, value: string): Promise<void> {
-    await this.setSlotSecret(tenantId, provider, DEFAULT_SLOT_ID, value);
-  }
-
-  async getSecret(tenantId: string, provider: SecretProvider): Promise<string | undefined> {
-    return await this.getSlotSecret(tenantId, provider, DEFAULT_SLOT_ID);
-  }
-
-  async clearSecret(tenantId: string, provider: SecretProvider): Promise<void> {
-    await this.clearSlotSecret(tenantId, provider, DEFAULT_SLOT_ID);
   }
 
   private async readData(): Promise<PersistedSecrets> {
