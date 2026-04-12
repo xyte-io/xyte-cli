@@ -456,6 +456,15 @@ async function handleOpsConsole(
   if (options.debugLog) {
     overrides['console.debugLogPath'] = options.debugLog;
   }
+  const requestedOutput = parseCliOutputMode(
+    options.output ?? (options.headless ? 'json' : undefined)
+  );
+  if (Boolean(options.headless) && requestedOutput && requestedOutput !== 'json') {
+    throw new CliUserError({
+      summary: 'Headless mode is JSON-only.',
+      suggestedCommands: ['Use xyte-cli ops console --headless --output json']
+    });
+  }
   const settings = await ctx.resolveSettings(overrides);
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
   requireTenantId(tenantId, 'ops console');
@@ -473,15 +482,6 @@ async function handleOpsConsole(
     });
   }
   const screen = screenRaw as TuiScreenId;
-  const requestedOutput = parseCliOutputMode(
-    options.output ?? (options.headless ? 'json' : undefined)
-  );
-  if (Boolean(options.headless) && requestedOutput && requestedOutput !== 'json') {
-    throw new CliUserError({
-      summary: 'Headless mode is JSON-only.',
-      suggestedCommands: ['Use xyte-cli ops console --headless --output json']
-    });
-  }
   const follow = options.once ? false : (options.follow ?? settings.values.console.follow);
   const intervalMs = settings.values.console.intervalMs;
   const motionEnabled = options.motion === false ? false : settings.values.console.motion;

@@ -922,6 +922,8 @@ describe('cli integration', () => {
 
   it('does not force motion setting when --no-motion is omitted', async () => {
     const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
     const secretStore = new MemorySecretStore();
     const runTui = vi.fn().mockResolvedValue(undefined);
 
@@ -1821,7 +1823,7 @@ describe('cli integration', () => {
       stdout,
       stderr,
       watchDelayFn: () => Promise.resolve(),
-      env: { XYTE_CLI_HTTP_RETRY_BACKOFF_MS: '0' }
+      env: { XYTE_CLI_HTTP_RETRY_BACKOFF_MS: '1' }
     });
 
     const fetchMock = vi
