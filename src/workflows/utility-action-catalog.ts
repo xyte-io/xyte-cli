@@ -1,5 +1,6 @@
 import { listEndpoints } from '../client/catalog';
 import type { PublicEndpointSpec } from '../types/endpoints';
+import { CliUserError } from '../contracts/user-error';
 import {
   buildFriendlyClaimDeviceProfile,
   buildFriendlyMoveDeviceProfile,
@@ -69,7 +70,7 @@ export function getUtilityActionProfile(actionKey: string): UtilityActionProfile
   const normalized = actionKey.trim();
   const found = getActionProfiles().find((profile) => profile.actionKey === normalized);
   if (!found) {
-    throw new Error(`Unknown utility action: ${actionKey}`);
+    throw new CliUserError({ summary: `Unknown utility action: ${actionKey}` });
   }
   return found;
 }

@@ -15,6 +15,7 @@ import { sceneFromConfigState } from '../scene';
 import { runKeyCreateWizard, runKeyUpdateWizard } from '../key-wizard';
 import type { SecretProvider } from '../../types/profile';
 import { PROVIDER_ORG, SUPPORTED_SECRET_PROVIDERS } from '../../types/profile';
+import { CliUserError } from '../../contracts/user-error';
 import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
 import { readConfigData } from '../data-loaders';
 
@@ -33,7 +34,7 @@ async function runSlotConnectivityProbe(args: {
   const { context, tenantId, provider, slotId } = args;
   const secret = await context.secretStore.getSlotSecret(tenantId, provider, slotId);
   if (!secret) {
-    throw new Error(`No secret found for slot ${slotId} (${provider}).`);
+    throw new CliUserError({ summary: `No secret found for slot ${slotId} (${provider}).` });
   }
   const result = await runSlotConnectivityTest({ provider, tenantId, key: secret, profileStore: context.profileStore });
   return result.strategy;

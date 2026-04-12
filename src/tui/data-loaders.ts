@@ -75,6 +75,9 @@ async function loadWithOutcome<T>(
         retry: { attempts, retried }
       };
     } catch (error) {
+      if (error instanceof CliUserError) {
+        throw error;
+      }
       const classified = classifyConnectivityError(error);
       lastClassified = classified;
       const retryable = isRetryableErrorClass(classified.class) && classified.retriable;

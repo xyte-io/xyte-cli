@@ -7,6 +7,7 @@ import { getXyteConfigDir } from '../utils/config-dir';
 import { errorMessage } from '../utils/error-format';
 import { getLogger } from '../observability/logger';
 import { DEFAULT_SLOT_ID } from './key-slots';
+import { CliUserError } from '../contracts/user-error';
 
 const SECRET_STORE_VERSION = 1;
 
@@ -121,14 +122,14 @@ export class FileSecretStore implements SecretStore {
         maybeErrno.code === 'EROFS' ||
         maybeErrno.code === 'ENOTDIR'
       ) {
-        throw new Error(
-          `Cannot read secret store at ${this.filePath}. Check file permissions or directory access (error=${maybeErrno.code}).`
-        );
+        throw new CliUserError({
+          summary: `Cannot read secret store at ${this.filePath}. Check file permissions or directory access (error=${maybeErrno.code}).`
+        });
       }
       if (maybeErrno instanceof Error) {
-        throw new Error(`Failed to read secret store at ${this.filePath}: ${maybeErrno.message}`);
+        throw new CliUserError({ summary: `Failed to read secret store at ${this.filePath}: ${maybeErrno.message}` });
       }
-      throw new Error(`Failed to read secret store at ${this.filePath}.`);
+      throw new CliUserError({ summary: `Failed to read secret store at ${this.filePath}.` });
     }
 
     let parsed: unknown;
@@ -136,18 +137,18 @@ export class FileSecretStore implements SecretStore {
       parsed = JSON.parse(content) as PersistedSecrets;
     } catch (error) {
       const detail = errorMessage(error);
-      throw new Error(
-        `Secret store is invalid at ${this.filePath}: ${detail}. Delete or fix this file and rerun setup.`
-      );
+      throw new CliUserError({
+        summary: `Secret store is invalid at ${this.filePath}: ${detail}. Delete or fix this file and rerun setup.`
+      });
     }
 
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new Error(`Secret store is invalid at ${this.filePath}. Delete or fix this file and rerun setup.`);
+      throw new CliUserError({ summary: `Secret store is invalid at ${this.filePath}. Delete or fix this file and rerun setup.` });
     }
 
     const asRecord = parsed as PersistedSecrets;
     if (!asRecord.records || typeof asRecord.records !== 'object' || Array.isArray(asRecord.records)) {
-      throw new Error(`Secret store is invalid at ${this.filePath}. Delete or fix this file and rerun setup.`);
+      throw new CliUserError({ summary: `Secret store is invalid at ${this.filePath}. Delete or fix this file and rerun setup.` });
     }
 
     const normalized = cloneData({
