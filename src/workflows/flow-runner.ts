@@ -29,6 +29,7 @@ import { buildInstallDoctorReport } from './install-doctor';
 import { getLogger } from '../observability/logger';
 import { isMutatingMethod } from '../client/catalog';
 import { isRecord } from '../utils/json';
+import { errorMessage } from '../utils/error-format';
 import { runWatch } from './watch';
 import { runUtilityPrepare } from './utility-prepare';
 import { runSpaceImportTree } from './utility-commands';
@@ -61,8 +62,10 @@ class FlowNeedsInputError extends Error {
   }
 }
 
+type RunContextArgs = Omit<RunDeterministicFlowArgs, 'inspectProviderScope'> & { inspectProviderScope: InspectProviderScope };
+
 interface RunContext {
-  args: RunDeterministicFlowArgs;
+  args: RunContextArgs;
   resolvedFlowId: string;
   definition: BuiltInFlowDefinition;
   bundleDir: string;
@@ -77,14 +80,9 @@ interface RunContext {
   taskOutputs: Map<string, unknown>;
 }
 
-interface TaskExecutionResult {
-  output?: unknown;
-  artifactPath?: string;
-  primaryOutputPath?: string;
-  watchFrames?: WatchFrameV1[];
-  contextUpdates?: Record<string, string>;
-  failureDetail?: string;
-}
+type TaskExecutionResult =
+  | { ok: true; output?: unknown; artifactPath?: string; primaryOutputPath?: string; watchFrames?: WatchFrameV1[]; contextUpdates?: Record<string, string> }
+  | { ok: false; failureDetail: string; output?: unknown; artifactPath?: string; primaryOutputPath?: string; contextUpdates?: Record<string, string> };
 
 interface FlowRunInputsPayload {
   flowId?: string;
@@ -416,7 +414,7 @@ async function handleSetupStatusStep(_step: FlowTaskStep, ctx: RunContext): Prom
   if (readiness.state !== 'ready') {
     throw new FlowNeedsInputError(`Setup status is ${readiness.state}. Run setup before continuing.`);
   }
-  return { output: readiness };
+  return { ok: true, output: readiness };
 }
 
 async function handleConfigDoctor(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
@@ -426,23 +424,23 @@ async function handleConfigDoctor(_step: FlowTaskStep, ctx: RunContext): Promise
       `Connectivity is ${readiness.connectionState}. Resolve connectivity before continuing.`
     );
   }
-  return { output: { retryAttempts: 2, retryBackoffMs: 250, readiness } };
+  return { ok: true, output: { retryAttempts: 2, retryBackoffMs: 250, readiness } };
 }
 
 async function handleStatusFast(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
   const readiness = await evaluateReadiness({ profileStore: ctx.args.profileStore, secretStore: ctx.args.secretStore, tenantId: ctx.args.tenantId, checkConnectivity: false });
-  return { output: buildStatusContract({ mode: 'fast', checkConnectivity: false, readiness }) };
+  return { ok: true, output: buildStatusContract({ mode: 'fast', checkConnectivity: false, readiness }) };
 }
 
 async function handleFleetInspect(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
   const snapshot = await collectFlowSnapshot(ctx);
-  return { output: buildFleetInspect(snapshot) };
+  return { ok: true, output: buildFleetInspect(snapshot) };
 }
 
 async function handleDeepDive(step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
   const windowHours = resolveFlowWindowHours(step, ctx.resolvedContext);
   const snapshot = await collectFlowSnapshot(ctx);
-  return { output: buildDeepDive(snapshot, windowHours) };
+  return { ok: true, output: buildDeepDive(snapshot, windowHours) };
 }
 
 function handleMigrationReport(args: {
@@ -471,7 +469,7 @@ function handleMigrationReport(args: {
     tenantId,
     outPath
   });
-  return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
+  return { ok: true, output: generated, artifactPath: outPath, primaryOutputPath: outPath };
 }
 
 async function handleOpsReport(args: {
@@ -487,7 +485,7 @@ async function handleOpsReport(args: {
   }
   // Cast: pdf path guarded above; implementation accepts OpsReportInput but overloads require narrowed input
   const generated = await generateOpsReport({ input: reportInput as DeepDiveResult, tenantId, format, outPath, includeSensitive });
-  return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
+  return { ok: true, output: generated, artifactPath: outPath, primaryOutputPath: outPath };
 }
 
 async function handleReportGenerate(step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
@@ -544,6 +542,7 @@ async function handleWatch(step: FlowTaskStep, stepIndex: number, ctx: RunContex
     'utf8'
   );
   return {
+    ok: true,
     output: {
       frameCount: frames.length,
       lastEventType: frames.length > 0 ? frames[frames.length - 1].eventType : undefined
@@ -580,6 +579,7 @@ async function handleCall(step: FlowTaskStep, _stepIndex: number, ctx: RunContex
     response: { status: result.status, durationMs: result.durationMs, retryCount: result.retryCount, data: result.data }
   });
   return {
+    ok: true,
     output: envelope,
     contextUpdates: callConfig.outputContext
       ? extractCallOutputContext(result.data, callConfig.outputContext)
@@ -601,7 +601,7 @@ function handleUtilityPrepare(step: FlowTaskStep, _stepIndex: number, ctx: RunCo
   });
   const contextKey = UTILITY_PREPARE_CONTEXT_KEY[utilityPrepare.actionKey];
   const contextUpdates: Record<string, string> = contextKey ? { [contextKey]: result.artifacts.primary } : {};
-  return { output: result, primaryOutputPath: result.artifacts.primary, contextUpdates };
+  return { ok: true, output: result, primaryOutputPath: result.artifacts.primary, contextUpdates };
 }
 
 async function handleDeviceMatch(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
@@ -617,7 +617,7 @@ async function handleDeviceMatch(step: FlowTaskStep, _stepIndex: number, ctx: Ru
     outputPath,
     tenantId: ctx.args.tenantId
   });
-  return { output: result, primaryOutputPath: outputPath };
+  return { ok: true, output: result, primaryOutputPath: outputPath };
 }
 
 async function handleDeviceMoveBatch(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
@@ -632,17 +632,13 @@ async function handleDeviceMoveBatch(step: FlowTaskStep, _stepIndex: number, ctx
     continueOnError: deviceMoveBatch.continueOnError === true,
     reportPath
   });
-  return {
-    output: result,
-    primaryOutputPath: reportPath,
-    contextUpdates: deviceMoveBatch.apply
-      ? { execute_moves_report_path: reportPath }
-      : { dry_run_moves_report_path: reportPath },
-    failureDetail:
-      result.totals.failed > 0 || result.stoppedEarly
-        ? `Step ${step.id} failed because the move batch reported ${result.totals.failed} failed row(s).`
-        : undefined
-  };
+  const contextUpdates: Record<string, string> = deviceMoveBatch.apply
+    ? { execute_moves_report_path: reportPath }
+    : { dry_run_moves_report_path: reportPath };
+  if (result.totals.failed > 0 || result.stoppedEarly) {
+    return { ok: false, failureDetail: `Step ${step.id} failed because the move batch reported ${result.totals.failed} failed row(s).`, output: result, primaryOutputPath: reportPath, contextUpdates };
+  }
+  return { ok: true, output: result, primaryOutputPath: reportPath, contextUpdates };
 }
 
 async function handleDeviceVerifyBatch(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
@@ -655,14 +651,10 @@ async function handleDeviceVerifyBatch(step: FlowTaskStep, stepIndex: number, ct
     inputPath,
     outputPath: artifactPath
   });
-  return {
-    output: result,
-    artifactPath,
-    failureDetail:
-      result.totals.mismatched > 0 || result.totals.missing > 0
-        ? `Step ${step.id} found ${result.totals.mismatched} mismatched and ${result.totals.missing} missing planned device(s).`
-        : undefined
-  };
+  if (result.totals.mismatched > 0 || result.totals.missing > 0) {
+    return { ok: false, failureDetail: `Step ${step.id} found ${result.totals.mismatched} mismatched and ${result.totals.missing} missing planned device(s).`, output: result, artifactPath };
+  }
+  return { ok: true, output: result, artifactPath };
 }
 
 async function handleSpaceImportTree(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
@@ -677,7 +669,7 @@ async function handleSpaceImportTree(step: FlowTaskStep, _stepIndex: number, ctx
     continueOnError: false,
     reportPath
   });
-  return { output: result, artifactPath: reportPath };
+  return { ok: true, output: result, artifactPath: reportPath };
 }
 
 async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
@@ -686,7 +678,7 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
   ensureContextKeys(step, ctx.resolvedContext);
 
   switch (step.task) {
-    case 'doctor.install':    return { output: buildInstallDoctorReport(path.resolve(__dirname, '../../dist/bin/xyte-cli.js')) };
+    case 'doctor.install':    return { ok: true, output: buildInstallDoctorReport(path.resolve(__dirname, '../../dist/bin/xyte-cli.js')) };
     case 'setup.status':      return handleSetupStatusStep(step, ctx);
     case 'config.doctor':     return handleConfigDoctor(step, ctx);
     case 'status.fast':       return handleStatusFast(step, ctx);
@@ -884,8 +876,8 @@ async function restoreTaskOutputsFromSteps(steps: FlowRunStep[]): Promise<Map<st
     try {
       const parsed = JSON.parse(await readFile(step.artifactPath, 'utf8')) as unknown;
       taskOutputs.set(step.stepId, parsed);
-    } catch {
-      // Ignore malformed task artifacts during resume hydration.
+    } catch (error) {
+      getLogger().warn({ stepId: step.stepId, error: errorMessage(error) }, 'Failed to restore task artifact from step during resume hydration');
     }
   }
   return taskOutputs;
@@ -1018,7 +1010,7 @@ async function hydrateResume(
   return { resume, runId, bundleDir, initialStartedAtUtc, steps, cursorIndex, priorDecisions, priorErrors };
 }
 
-async function buildRunState(args: RunDeterministicFlowArgs): Promise<RunState> {
+async function initRunState(args: RunDeterministicFlowArgs): Promise<RunState> {
   const { definition, resolvedFlowId, flowDefaults } = await resolveFlowDefinition(args.flowId);
   const outRoot = path.resolve(args.outDir);
   const freshRunId = randomUUID();
@@ -1117,7 +1109,7 @@ async function recordStepSuccess(
   // Convention: <stepId>_artifact holds the primary artifact path (e.g. CSV written by a utility-prepare step).
   ctx.resolvedContext[`${step.id}_artifact`] = artifactPath;
 
-  if (result.watchFrames && result.watchFrames.length > 0) {
+  if (result.ok && result.watchFrames && result.watchFrames.length > 0) {
     for (const frame of result.watchFrames) {
       await appendNdjson(ctx.watchFramesPath, frame);
     }
@@ -1180,7 +1172,7 @@ async function runSteps(state: RunState): Promise<ExecuteStepsResult> {
           await writeFile(artifactPath, `${JSON.stringify(result.output ?? {}, null, 2)}\n`, 'utf8');
         }
 
-        if (result.failureDetail) {
+        if (!result.ok) {
           const problem = toProblemDetails(new Error(result.failureDetail), `/flow/${args.flowId}/${step.id}`);
           const classification = await recordStepFailure(stepState, problem, {
             stepId: step.id,
@@ -1220,7 +1212,7 @@ async function runSteps(state: RunState): Promise<ExecuteStepsResult> {
 }
 
 export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Promise<FlowRunSummary> {
-  const state = await buildRunState(args);
+  const state = await initRunState(args);
   const { ctx, runId, initialStartedAtUtc, steps } = state;
   const { definition } = ctx;
   const runArgs = ctx.args;
