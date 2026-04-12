@@ -130,7 +130,7 @@ async function collectFlowSnapshot(ctx: RunContext): Promise<ReturnType<typeof c
       client: ctx.args.client,
       tenantId: ctx.args.tenantId,
       tenantName: tenantProfile?.name,
-      providerScope: ctx.args.inspectProviderScope ?? 'auto'
+      providerScope: ctx.args.inspectProviderScope
     });
   } catch (error) {
     if (error instanceof InspectProviderScopeError) {
@@ -748,8 +748,8 @@ async function findRunBundle(outDir: string, resumeRef: string): Promise<string>
         if (parsed.runId === resumeRef.trim()) {
           return candidate;
         }
-      } catch {
-        // ignore malformed manifests during search
+      } catch (error) {
+        getLogger().debug({ manifestPath, error: errorMessage(error) }, 'Skipping malformed manifest during resume search');
       }
     }
   }
@@ -1127,7 +1127,7 @@ async function recordStepSuccess(
     ctx.resolvedContext[`${step.id}_output`] = primaryOutputPath;
   }
 
-  await persistFlowRunInputs(ctx, ctx.args, ctx.args.inspectProviderScope ?? 'auto');
+  await persistFlowRunInputs(ctx, ctx.args, ctx.args.inspectProviderScope);
 }
 
 async function runSteps(state: RunState): Promise<ExecuteStepsResult> {

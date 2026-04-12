@@ -92,6 +92,12 @@ export function createIncidentsScreen(): NavigableScreen {
   const renderErrors = createRenderErrorTracker();
   const renderLog = createScreenRenderLogger('incidents', () => context.debugLog, renderErrors);
 
+  const promptOrAbort = async (label: string, current: string): Promise<string | undefined> => {
+    const value = await context.prompt(label, current);
+    if (value === undefined || !isMounted) return undefined;
+    return value;
+  };
+
   const focusPane = () => {
     if (activePane === 'incidents-table') {
       list?.focus();
@@ -364,26 +370,16 @@ export function createIncidentsScreen(): NavigableScreen {
       }
 
       if (ch === 'f') {
-        const nextStatus = await context.prompt('Status filter (empty clears):', statusFilter);
-        if (nextStatus === undefined || !isMounted) {
-          return true;
-        }
-        const nextPriority = await context.prompt('Priority filter (empty clears):', priorityFilter);
-        if (nextPriority === undefined || !isMounted) {
-          return true;
-        }
-        const nextSpaceId = await context.prompt('Space ID filter (empty clears):', spaceIdFilter);
-        if (nextSpaceId === undefined || !isMounted) {
-          return true;
-        }
-        const nextTitle = await context.prompt('Title filter (empty clears):', titleFilter);
-        if (nextTitle === undefined || !isMounted) {
-          return true;
-        }
-        const nextIssue = await context.prompt('Issue filter (empty clears):', issueFilter);
-        if (nextIssue === undefined || !isMounted) {
-          return true;
-        }
+        const nextStatus = await promptOrAbort('Status filter (empty clears):', statusFilter);
+        if (nextStatus === undefined) return true;
+        const nextPriority = await promptOrAbort('Priority filter (empty clears):', priorityFilter);
+        if (nextPriority === undefined) return true;
+        const nextSpaceId = await promptOrAbort('Space ID filter (empty clears):', spaceIdFilter);
+        if (nextSpaceId === undefined) return true;
+        const nextTitle = await promptOrAbort('Title filter (empty clears):', titleFilter);
+        if (nextTitle === undefined) return true;
+        const nextIssue = await promptOrAbort('Issue filter (empty clears):', issueFilter);
+        if (nextIssue === undefined) return true;
 
         statusFilter = nextStatus.trim().toLowerCase();
         priorityFilter = nextPriority.trim().toLowerCase();

@@ -1,7 +1,7 @@
 import pino, { type Logger } from 'pino';
 
 function resolveLevel(): string {
-  return process.env.XYTE_LOG_LEVEL?.trim() || 'silent';
+  return process.env.XYTE_CLI_LOG_LEVEL?.trim() || process.env.XYTE_LOG_LEVEL?.trim() || 'silent';
 }
 
 let _logger: Logger | undefined;

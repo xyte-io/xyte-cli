@@ -29,7 +29,7 @@ src/
   http/           fetch-based transport with retry, timeout, OTel spans
   observability/  Pino logger, OpenTelemetry tracing wrapper
   secure/         Profile store (tenants), secret store (API keys), key-slot helpers
-  spec/           Static endpoint catalog (public-endpoints.json)
+  api-catalog/    Static endpoint catalog (public-endpoints.json)
   tui/            Blessed TUI: screens, headless renderer, scene serializer
   workflows/      Fleet insights, watch, flow runner, utility pipelines
   utils/          Config dir, redaction, JSON output, upgrade checker
@@ -90,7 +90,7 @@ Two backend providers:
 | `xyte-org` | `https://hub.xyte.io` | Organization API keys |
 | `xyte-partner` | `https://entry.xyte.io` | Partner API keys |
 
-**Endpoint catalog:** Static JSON at `src/spec/public-endpoints.json`. Each entry specifies method, base, path template, params, auth scope. Commands use `client.call(endpointKey, args)` or typed namespace methods.
+**Endpoint catalog:** Static JSON at `src/api-catalog/public-endpoints.json`. Each entry specifies method, base, path template, params, auth scope. Commands use `client.call(endpointKey, args)` or typed namespace methods.
 
 **HTTP transport (`src/http/transport.ts`):**
 - Native `fetch` with `AbortController` timeout (default 15s)
