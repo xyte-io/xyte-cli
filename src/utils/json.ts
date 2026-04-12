@@ -1,3 +1,5 @@
+import { CliUserError } from '../contracts/user-error';
+
 export function safeString(value: unknown): string {
   if (value === undefined || value === null) {
     return 'n/a';
@@ -77,11 +79,11 @@ export function parseJsonObject(
   try {
     parsed = JSON.parse(value) as unknown;
   } catch (error) {
-    const detail = error instanceof Error && error.message.trim().length > 0 ? `: ${error.message}` : '.';
-    throw new Error(`Invalid JSON${detail}`);
+    const detail = error instanceof Error && error.message.trim().length > 0 ? error.message : undefined;
+    throw new CliUserError({ summary: 'Invalid JSON.', detail });
   }
   if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
-    throw new Error('Expected a JSON object.');
+    throw new CliUserError({ summary: 'Expected a JSON object.' });
   }
 
   return parsed as Record<string, unknown>;

@@ -36,7 +36,7 @@ function countValue(counter: StatusCounts, key: string): void {
 async function callWithOutcomeTracking(
   outcome: PartnerEndpointOutcome,
   operation: () => Promise<unknown>
-): Promise<unknown | undefined> {
+): Promise<unknown> {
   outcome.attempted += 1;
   try {
     const value = await withTimeout(operation, PARTNER_ENRICHMENT_TIMEOUT_MS);

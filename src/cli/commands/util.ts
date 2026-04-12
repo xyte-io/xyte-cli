@@ -21,7 +21,8 @@ function parseUtilityPreparePrimaryFormat(value: string | undefined): UtilityPre
     return undefined;
   }
   const normalized = value.trim().toLowerCase();
-  if (normalized !== 'csv' && normalized !== 'jsonl') {
+  const ALLOWED_PRIMARY_FORMATS: UtilityPreparePrimaryFormat[] = ['csv', 'jsonl'];
+  if (!ALLOWED_PRIMARY_FORMATS.includes(normalized as UtilityPreparePrimaryFormat)) {
     throw new CliUserError({ summary: `Invalid primary format: ${value}. Use csv|jsonl.` });
   }
   return normalized as UtilityPreparePrimaryFormat;
@@ -172,17 +173,11 @@ async function handleUtilMatch(
     target: string;
     sourceField: string;
     targetField: string;
-    out?: string;
+    out: string;
     strictJson?: boolean;
   }
 ): Promise<void> {
   const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
-  if (!options.out) {
-    throw new CliUserError({
-      summary: 'Missing output path for util match.',
-      suggestedCommands: ['Use --out <path>']
-    });
-  }
   const result = await runDeviceMatch({
     sourcePath: options.source,
     targetPath: options.target,

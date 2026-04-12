@@ -544,13 +544,13 @@ export function setCliSettingSync(args: {
   const env = args.env ?? process.env;
   const filePath = args.scope === 'user' ? getUserSettingsPath(env) : getWorkspaceSettingsPath(cwd);
   const settings = readCliSettingsFile(args.scope, cwd, env);
-  const next = cloneSettings(settings) as Record<string, unknown>;
-  setPathValue(next, args.key, validateSettingValue(args.key, args.value));
+  const next = cloneSettings(settings);
+  setPathValue(next as unknown as Record<string, unknown>, args.key, validateSettingValue(args.key, args.value));
   next.version = 'settings.v1';
-  writeSettingsFile(filePath, next as CliSettingsFile);
+  writeSettingsFile(filePath, next);
   return {
     path: filePath,
-    data: next as CliSettingsFile
+    data: next
   };
 }
 
@@ -564,12 +564,12 @@ export function unsetCliSettingSync(args: {
   const env = args.env ?? process.env;
   const filePath = args.scope === 'user' ? getUserSettingsPath(env) : getWorkspaceSettingsPath(cwd);
   const settings = readCliSettingsFile(args.scope, cwd, env);
-  const next = cloneSettings(settings) as Record<string, unknown>;
-  unsetPathValue(next, args.key);
+  const next = cloneSettings(settings);
+  unsetPathValue(next as unknown as Record<string, unknown>, args.key);
   next.version = 'settings.v1';
-  writeSettingsFile(filePath, next as CliSettingsFile);
+  writeSettingsFile(filePath, next);
   return {
     path: filePath,
-    data: next as CliSettingsFile
+    data: next
   };
 }

@@ -66,15 +66,13 @@ export function parseCliOutputMode(value: string | undefined): CliOutputMode | u
   return normalized as CliOutputMode;
 }
 
-// `output` should be a pre-validated CliOutputMode or undefined; raw CLI strings are coerced
-// via parseCliOutputMode internally but callers are encouraged to validate at the CLI boundary first.
 export function resolveTextJsonOutput(args: {
   output?: string;
   format?: string;
   stdoutIsTTY: boolean;
   settings: ResolvedCliSettingsState;
 }): OutputFormat {
-  const explicitOutput = parseCliOutputMode(args.output as string | undefined);
+  const explicitOutput = parseCliOutputMode(args.output);
   const localFormat = args.format?.trim().toLowerCase();
   if (localFormat) {
     if (localFormat !== 'json' && localFormat !== 'text') {
