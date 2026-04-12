@@ -408,10 +408,6 @@ function extractCallOutputContext(
   return first ? { [spec.contextKey]: first[spec.valueField] as string } : undefined;
 }
 
-function handleInstallDoctor(_step: FlowTaskStep, _ctx: RunContext): TaskExecutionResult {
-  return { output: buildInstallDoctorReport(path.resolve(__dirname, '../../dist/bin/xyte-cli.js')) };
-}
-
 function evaluateReadinessWithConnectivity(ctx: RunContext): ReturnType<typeof evaluateReadiness> {
   return evaluateReadiness({ profileStore: ctx.args.profileStore, secretStore: ctx.args.secretStore, tenantId: ctx.args.tenantId, client: ctx.args.client, checkConnectivity: true });
 }
@@ -487,15 +483,16 @@ async function handleOpsReport(args: {
   outPath: string;
 }): Promise<TaskExecutionResult> {
   const { reportInput, format, includeSensitive, tenantId, outPath } = args;
-  if (reportInput.schemaVersion !== INSPECT_DEEP_DIVE_SCHEMA_VERSION && format !== 'markdown') {
-    throw new CliUserError({ summary: `Report format '${format}' is only supported for deep-dive reports. Use 'markdown'.` });
-  }
-  if (reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION) {
-    const generated = await generateOpsReport({ input: reportInput, tenantId, format, outPath, includeSensitive });
+  if (reportInput.schemaVersion !== INSPECT_DEEP_DIVE_SCHEMA_VERSION) {
+    if (format !== 'markdown') {
+      throw new CliUserError({ summary: `Report format '${format}' is only supported for deep-dive reports. Use 'markdown'.` });
+    }
+    // format proven to be 'markdown' by the check above
+    const generated = await generateOpsReport({ input: reportInput, tenantId, format: 'markdown', outPath, includeSensitive });
     return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
   }
-  // format === 'markdown' proven by the guard above (non-deep-dive inputs require markdown)
-  const generated = await generateOpsReport({ input: reportInput, tenantId, format: 'markdown', outPath, includeSensitive });
+  // deep-dive: supports any format
+  const generated = await generateOpsReport({ input: reportInput, tenantId, format, outPath, includeSensitive });
   return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
 }
 
@@ -695,7 +692,7 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
   ensureContextKeys(step, ctx.resolvedContext);
 
   switch (step.task) {
-    case 'doctor.install':    return handleInstallDoctor(step, ctx);
+    case 'doctor.install':    return { output: buildInstallDoctorReport(path.resolve(__dirname, '../../dist/bin/xyte-cli.js')) };
     case 'setup.status':      return handleSetupStatusStep(step, ctx);
     case 'config.doctor':     return handleConfigDoctor(step, ctx);
     case 'status.fast':       return handleStatusFast(step, ctx);
