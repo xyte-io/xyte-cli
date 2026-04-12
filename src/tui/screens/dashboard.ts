@@ -5,6 +5,9 @@ import { SCREEN_PANE_CONFIG } from '../panes';
 import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
 import { loadDashboardData } from '../data-loaders';
 import { sceneFromDashboardState } from '../scene';
+import { createRenderErrorTracker } from '../render-error-tracker';
+import { createScreenRenderLogger } from '../screen-render-logger';
+import { errorMessage } from '../../utils/error-format';
 
 function linesFromStats(stats: Array<{ label: string; value: string | number }> = []): string {
   return stats.map((item) => `${item.label}: ${item.value}`).join('\n');
@@ -27,6 +30,8 @@ export function createDashboardScreen(): TuiScreen {
   const paneConfig = SCREEN_PANE_CONFIG.dashboard;
   let activePane: TuiPaneId = paneConfig.defaultPane;
   let isMounted = false;
+  const renderErrors = createRenderErrorTracker();
+  const renderLog = createScreenRenderLogger('dashboard', () => context.debugLog, renderErrors);
 
   const focusPane = () => {
     if (activePane === 'kpi') {
@@ -131,27 +136,38 @@ export function createDashboardScreen(): TuiScreen {
         profileStore: context.profileStore
       });
 
-      const panels = sceneFromDashboardState({
-        tenantId,
-        devices: loaded.data.devices,
-        incidents: loaded.data.incidents,
-        tickets: loaded.data.tickets
-      });
+      renderLog.onRenderStart();
+      try {
+        const panels = sceneFromDashboardState({
+          tenantId,
+          devices: loaded.data.devices,
+          incidents: loaded.data.incidents,
+          tickets: loaded.data.tickets
+        });
 
-      const kpiPanel = panels.find((panel) => panel.id === 'dashboard-kpis');
-      const providerPanel = panels.find((panel) => panel.id === 'dashboard-status');
-      const incidentPanel = panels.find((panel) => panel.id === 'dashboard-incidents');
-      const ticketPanel = panels.find((panel) => panel.id === 'dashboard-tickets');
+        const kpiPanel = panels.find((panel) => panel.id === 'dashboard-kpis');
+        const providerPanel = panels.find((panel) => panel.id === 'dashboard-status');
+        const incidentPanel = panels.find((panel) => panel.id === 'dashboard-incidents');
+        const ticketPanel = panels.find((panel) => panel.id === 'dashboard-tickets');
 
-      kpis.setContent(linesFromStats(kpiPanel?.stats));
-      providerBox.setContent((providerPanel?.text?.lines ?? ['No provider state available.']).join('\n'));
-      incidentsBox.setContent(
-        linesFromTableRows(incidentPanel?.table?.rows, 'No incidents available for this tenant.')
-      );
-      ticketsBox.setContent(linesFromTableRows(ticketPanel?.table?.rows, 'No tickets available for this tenant.'));
+        kpis.setContent(linesFromStats(kpiPanel?.stats));
+        providerBox.setContent((providerPanel?.text?.lines ?? ['No provider state available.']).join('\n'));
+        incidentsBox.setContent(
+          linesFromTableRows(incidentPanel?.table?.rows, 'No incidents available for this tenant.')
+        );
+        ticketsBox.setContent(linesFromTableRows(ticketPanel?.table?.rows, 'No tickets available for this tenant.'));
 
-      if (loaded.error) {
-        context.setStatus(`Dashboard ${loaded.connectionState}: ${loaded.error.message}`);
+        if (loaded.error) {
+          context.setStatus(`Dashboard ${loaded.connectionState}: ${loaded.error.message}`);
+        }
+
+        renderErrors.recordSuccess();
+        renderLog.onRenderComplete();
+      } catch (error) {
+        const message = errorMessage(error);
+        renderErrors.recordError(message);
+        renderLog.onRenderError(message);
+        kpis.setContent(`Dashboard render error: ${message}`);
       }
 
       context.screen.render();
