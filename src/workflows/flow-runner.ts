@@ -26,7 +26,7 @@ import { evaluateReadiness } from '../config/readiness';
 import type { ProfileStore } from '../secure/profile-store';
 import type { SecretStore } from '../secure/secret-store';
 import type { XyteClient } from '../types/client';
-import { buildInstallDoctorReport } from '../utils/install-doctor';
+import { buildInstallDoctorReport } from './install-doctor';
 import { getLogger } from '../observability/logger';
 import { isMutatingMethod } from '../client/catalog';
 import { isRecord } from '../utils/json';

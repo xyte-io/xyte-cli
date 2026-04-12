@@ -1,7 +1,7 @@
 import { realpathSync } from 'node:fs';
 import path from 'node:path';
 
-import { resolveCommandFromPath } from './resolve-command-path';
+import { resolveCommandFromPath } from '../utils/resolve-command-path';
 
 export interface InstallDoctorResult {
   status: 'ok' | 'missing' | 'mismatch';

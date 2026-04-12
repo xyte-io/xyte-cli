@@ -17,7 +17,7 @@ import {
 } from '../config/settings';
 import { createSecretStore, type SecretStore } from '../secure/secret-store';
 import { createProfileStore, type ProfileStore } from '../secure/profile-store';
-import { buildInstallDoctorReport, type InstallDoctorResult } from '../utils/install-doctor';
+import { buildInstallDoctorReport, type InstallDoctorResult } from '../workflows/install-doctor';
 import { getCliVersion } from '../utils/version';
 import {
   installSkills,
