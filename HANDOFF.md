@@ -199,8 +199,8 @@ The CLI reads ~20 env vars, all prefixed `XYTE_CLI_*` (with some legacy `XYTE_*`
 | `XYTE_CLI_OUTPUT_MODE` | Default output mode |
 | `XYTE_CLI_ERROR_FORMAT` | Error format (text/json) |
 | `XYTE_CLI_HTTP_RETRY_ATTEMPTS` | Retry count |
-| `XYTE_CLI_HTTP_TIMEOUT_MS` | Request timeout |
-| `XYTE_CLI_LOG_ACTIONS` | Enable action logging |
+| `XYTE_CLI_HTTP_RETRY_BACKOFF_MS` | Retry backoff in ms |
+| `XYTE_CLI_LOGS_ENABLED` | Enable action logging |
 
 Full mapping in `src/config/settings.ts`.
 

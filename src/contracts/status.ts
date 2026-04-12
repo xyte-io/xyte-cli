@@ -79,11 +79,11 @@ const StatusReadinessSchema = z.object({
     name: z.string(),
     hubBaseUrl: z.string().optional(),
     entryBaseUrl: z.string().optional(),
-    apiProvider: z.enum(SUPPORTED_SECRET_PROVIDERS as unknown as [string, ...string[]]).optional(),
+    apiProvider: z.enum([...SUPPORTED_SECRET_PROVIDERS]).optional(),
     keyRegistry: z.object({
       slots: z.array(z.object({
         slotId: z.string(),
-        provider: z.enum(SUPPORTED_SECRET_PROVIDERS as unknown as [string, ...string[]]),
+        provider: z.enum([...SUPPORTED_SECRET_PROVIDERS]),
         name: z.string(),
         fingerprint: z.string(),
         createdAt: z.string(),

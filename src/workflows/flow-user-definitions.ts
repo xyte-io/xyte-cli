@@ -6,7 +6,6 @@ import { z } from 'zod';
 import { CliUserError } from '../contracts/user-error';
 import { getXyteConfigDir } from '../utils/config-dir';
 import { errorMessage } from '../utils/error-format';
-import { getLogger } from '../observability/logger';
 import { FLOW_DEFINITION_SCHEMA_VERSION } from '../contracts/versions';
 
 const FLOW_ID_RE = /^flow\.[a-z0-9][a-z0-9._-]*$/;

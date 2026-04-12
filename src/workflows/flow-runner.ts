@@ -45,6 +45,7 @@ import {
   parseReportInput,
   type OpsReportInput
 } from './fleet-insights';
+import type { DeepDiveResult } from '../types/deep-dive';
 import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';
 import type { BuiltInFlowDefinition, FlowGateStep, FlowTaskStep } from './flow-catalog';
 import { hasBuiltInFlowDefinition, getBuiltInFlowDefinition, UTILITY_PREPARE_CONTEXT_KEY } from './flow-catalog';
@@ -481,12 +482,11 @@ async function handleOpsReport(args: {
   outPath: string;
 }): Promise<TaskExecutionResult> {
   const { reportInput, format, includeSensitive, tenantId, outPath } = args;
-  // schemaVersion discriminant narrows OpsReportInput for overload resolution;
-  // generateOpsReport validates format+input compatibility at runtime
-  const generated =
-    reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION
-      ? await generateOpsReport({ input: reportInput, tenantId, format, outPath, includeSensitive })
-      : await generateOpsReport({ input: reportInput, tenantId, format: format as 'markdown', outPath, includeSensitive });
+  if (format === 'pdf' && reportInput.schemaVersion !== INSPECT_DEEP_DIVE_SCHEMA_VERSION) {
+    throw new CliUserError({ summary: 'PDF format is only supported for fleet deep-dive reports' });
+  }
+  // Cast: pdf path guarded above; implementation accepts OpsReportInput but overloads require narrowed input
+  const generated = await generateOpsReport({ input: reportInput as DeepDiveResult, tenantId, format, outPath, includeSensitive });
   return { output: generated, artifactPath: outPath, primaryOutputPath: outPath };
 }
 
