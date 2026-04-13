@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { INSPECT_DEEP_DIVE_SCHEMA_VERSION } from '../contracts/versions';
+export const INSPECT_DEEP_DIVE_SCHEMA_VERSION = 'xyte.inspect.deep-dive.v1' as const;
 
 const DeepDiveTopOfflineSpaceSchema = z.object({
   space: z.string(),

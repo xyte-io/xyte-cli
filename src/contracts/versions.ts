@@ -1,8 +1,8 @@
 export const CALL_ENVELOPE_SCHEMA_VERSION = 'xyte.call.envelope.v1' as const;
 export const HEADLESS_FRAME_SCHEMA_VERSION = 'xyte.headless.frame.v1' as const;
 export const WATCH_FRAME_SCHEMA_VERSION = 'xyte.watch.frame.v1' as const;
-export const INSPECT_FLEET_SCHEMA_VERSION = 'xyte.inspect.fleet.v1' as const;
-export const INSPECT_DEEP_DIVE_SCHEMA_VERSION = 'xyte.inspect.deep-dive.v1' as const;
+export { INSPECT_FLEET_SCHEMA_VERSION } from '../types/fleet-inspect';
+export { INSPECT_DEEP_DIVE_SCHEMA_VERSION } from '../types/deep-dive';
 export const DEVICE_MATCH_SCHEMA_VERSION = 'xyte.device.match.v1' as const;
 export const REPORT_SCHEMA_VERSION = 'xyte.report.v1' as const;
 export const UTILITY_BATCH_SCHEMA_VERSION = 'xyte.utility.batch.v1' as const;

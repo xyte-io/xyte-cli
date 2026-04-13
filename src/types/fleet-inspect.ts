@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
-import { INSPECT_FLEET_SCHEMA_VERSION } from '../contracts/versions';
 import type { InspectProviderScope } from './settings-enums';
+
+export const INSPECT_FLEET_SCHEMA_VERSION = 'xyte.inspect.fleet.v1' as const;
 
 export interface StatusCounts {
   [key: string]: number;
