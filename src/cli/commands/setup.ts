@@ -286,8 +286,7 @@ async function handleSetupStatus(
 
   if (
     resolveTextJsonOutput({
-      output: options.output,
-      format: options.format,
+      output: options.format ?? options.output,
       stdoutIsTTY: ctx.stdoutIsTTY,
       settings
     }) === 'text'
@@ -350,8 +349,7 @@ async function handleSetupRunSimple(
   const explicitTenantName = typeof options.name === 'string' && options.name.trim().length > 0;
   const connectivityMode = parseSetupConnectivityMode(options.connectivity);
   const output = resolveTextJsonOutput({
-    output: options.output,
-    format: options.format,
+    output: options.format ?? options.output,
     stdoutIsTTY: ctx.stdoutIsTTY,
     settings
   });
@@ -435,8 +433,7 @@ async function handleSetupRunAdvanced(
   const explicitTenantName = typeof options.name === 'string' && options.name.trim().length > 0;
   const connectivityMode = parseSetupConnectivityMode(options.connectivity);
   const output = resolveTextJsonOutput({
-    output: options.output,
-    format: options.format,
+    output: options.format ?? options.output,
     stdoutIsTTY: ctx.stdoutIsTTY,
     settings
   });

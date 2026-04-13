@@ -749,8 +749,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       const settings = await resolveSettings();
       if (
         resolveTextJsonOutput({
-          output: getExplicitGlobalOutput(command),
-          format: options.format,
+          output: options.format ?? getExplicitGlobalOutput(command),
           stdoutIsTTY,
           settings
         }) === 'text'
@@ -813,8 +812,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
       if (
         resolveTextJsonOutput({
-          output: globals.output,
-          format: options.format,
+          output: options.format ?? globals.output,
           stdoutIsTTY,
           settings
         }) === 'text'
@@ -837,8 +835,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .action(async (options: { check?: boolean; yes?: boolean; format?: OutputFormat }, command: Command) => {
       const settings = await resolveSettings();
       const output = resolveTextJsonOutput({
-        output: getExplicitGlobalOutput(command),
-        format: options.format,
+        output: options.format ?? getExplicitGlobalOutput(command),
         stdoutIsTTY,
         settings
       });

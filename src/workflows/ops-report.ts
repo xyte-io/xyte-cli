@@ -21,41 +21,38 @@ export type OpsReportInput =
 
 export { FleetReportResult };
 
+function checkTenantMatch(parsedTenantId: string | undefined, expectedTenantId: string | undefined): void {
+  if (expectedTenantId && parsedTenantId && parsedTenantId !== expectedTenantId) {
+    throw new CliUserError({ summary: `Input tenant mismatch. Expected ${expectedTenantId}, got ${parsedTenantId}.` });
+  }
+}
+
 export function parseDeepDiveForReport(raw: unknown, expectedTenantId?: string): DeepDiveResult {
   const parsed = DeepDiveResultSchema.safeParse(raw);
   if (!parsed.success) {
     throw new CliUserError({ summary: 'Input JSON must be produced by `xyte-cli ops inspect deep-dive --output json`.' });
   }
 
-  if (expectedTenantId && parsed.data.tenantId !== expectedTenantId) {
-    throw new CliUserError({ summary: `Input tenant mismatch. Expected ${expectedTenantId}, got ${parsed.data.tenantId}.` });
-  }
-
+  checkTenantMatch(parsed.data.tenantId, expectedTenantId);
   return parsed.data;
 }
 
 export function parseReportInput(raw: unknown, expectedTenantId?: string): OpsReportInput {
   const deepDive = DeepDiveResultSchema.safeParse(raw);
   if (deepDive.success) {
-    if (expectedTenantId && deepDive.data.tenantId !== expectedTenantId) {
-      throw new CliUserError({ summary: `Input tenant mismatch. Expected ${expectedTenantId}, got ${deepDive.data.tenantId}.` });
-    }
+    checkTenantMatch(deepDive.data.tenantId, expectedTenantId);
     return deepDive.data;
   }
 
   const deviceMatch = DeviceMatchResultSchema.safeParse(raw);
   if (deviceMatch.success) {
-    if (expectedTenantId && deviceMatch.data.tenantId && deviceMatch.data.tenantId !== expectedTenantId) {
-      throw new CliUserError({ summary: `Input tenant mismatch. Expected ${expectedTenantId}, got ${deviceMatch.data.tenantId}.` });
-    }
+    checkTenantMatch(deviceMatch.data.tenantId, expectedTenantId);
     return deviceMatch.data;
   }
 
   const deviceMoveBatch = DeviceMoveBatchReportSchema.safeParse(raw);
   if (deviceMoveBatch.success) {
-    if (expectedTenantId && deviceMoveBatch.data.tenantId !== expectedTenantId) {
-      throw new CliUserError({ summary: `Input tenant mismatch. Expected ${expectedTenantId}, got ${deviceMoveBatch.data.tenantId}.` });
-    }
+    checkTenantMatch(deviceMoveBatch.data.tenantId, expectedTenantId);
     return deviceMoveBatch.data;
   }
 

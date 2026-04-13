@@ -67,23 +67,10 @@ export function parseCliOutputMode(value: string | undefined): CliOutputMode | u
 
 export function resolveTextJsonOutput(args: {
   output?: string;
-  format?: string;
   stdoutIsTTY: boolean;
   settings: ResolvedCliSettingsState;
 }): OutputFormat {
   const explicitOutput = parseCliOutputMode(args.output);
-  const localFormat = args.format?.trim().toLowerCase();
-  if (localFormat) {
-    if (localFormat !== 'json' && localFormat !== 'text') {
-      throw new CliUserError({
-        summary: 'Invalid format.',
-        detail: `Received "${args.format}".`,
-        suggestedCommands: ['Use --output json', 'Use --output text']
-      });
-    }
-    return localFormat;
-  }
-
   const mode = explicitOutput ?? args.settings.values.output.mode;
   if (mode === 'auto') {
     return args.stdoutIsTTY ? 'text' : 'json';

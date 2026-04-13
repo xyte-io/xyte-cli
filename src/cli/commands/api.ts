@@ -39,8 +39,7 @@ async function handleApiEndpointsList(
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
   const payload = tenantId ? await (await ctx.withClient({ tenantId })).listTenantEndpoints(tenantId) : listEndpoints();
   const output = resolveTextJsonOutput({
-    output: options.output,
-    format: options.format,
+    output: options.format ?? options.output,
     stdoutIsTTY: ctx.stdoutIsTTY,
     settings
   });
@@ -60,8 +59,7 @@ async function handleApiEndpointsDescribe(
   const settings = await ctx.resolveSettings();
   const endpoint = getEndpoint(key);
   const output = resolveTextJsonOutput({
-    output: options.output,
-    format: options.format,
+    output: options.format ?? options.output,
     stdoutIsTTY: ctx.stdoutIsTTY,
     settings
   });

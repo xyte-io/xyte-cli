@@ -158,8 +158,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
 
         if (
           resolveTextJsonOutput({
-            output: explicitOutput,
-            format: options.format,
+            output: options.format ?? explicitOutput,
             stdoutIsTTY: ctx.stdoutIsTTY,
             settings
           }) === 'text'
@@ -197,8 +196,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
       }
       const settings = await ctx.resolveSettings();
       const output = resolveTextJsonOutput({
-        output: explicitOutput,
-        format: options.format,
+        output: options.format ?? explicitOutput,
         stdoutIsTTY: ctx.stdoutIsTTY,
         settings
       });
@@ -227,8 +225,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
       const explicitOutput = getExplicitGlobalOutput(command);
       const settings = await ctx.resolveSettings();
       const output = resolveTextJsonOutput({
-        output: explicitOutput,
-        format: options.format,
+        output: options.format ?? explicitOutput,
         stdoutIsTTY: ctx.stdoutIsTTY,
         settings
       });
@@ -278,8 +275,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
         });
         const settings = await ctx.resolveSettings();
         const output = resolveTextJsonOutput({
-          output: explicitOutput,
-          format: options.format,
+          output: options.format ?? explicitOutput,
           stdoutIsTTY: ctx.stdoutIsTTY,
           settings
         });
@@ -323,8 +319,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
       });
       const settings = await ctx.resolveSettings();
       const output = resolveTextJsonOutput({
-        output: explicitOutput,
-        format: options.format,
+        output: options.format ?? explicitOutput,
         stdoutIsTTY: ctx.stdoutIsTTY,
         settings
       });
@@ -470,8 +465,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
       });
       if (
         resolveTextJsonOutput({
-          output: explicitOutput,
-          format: options.format,
+          output: options.format ?? explicitOutput,
           stdoutIsTTY: ctx.stdoutIsTTY,
           settings
         }) === 'text'

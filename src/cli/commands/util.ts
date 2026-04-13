@@ -73,8 +73,7 @@ async function handleUtilListActions(
 ): Promise<void> {
   const settings = await ctx.resolveSettings();
   const output = resolveTextJsonOutput({
-    output: options.output,
-    format: options.format,
+    output: options.format ?? options.output,
     stdoutIsTTY: ctx.stdoutIsTTY,
     settings
   });

@@ -45,8 +45,7 @@ async function handleLogsList(
 
   if (
     resolveTextJsonOutput({
-      output: getExplicitGlobalOutput(command),
-      format: options.format,
+      output: options.format ?? getExplicitGlobalOutput(command),
       stdoutIsTTY: ctx.stdoutIsTTY,
       settings
     }) === 'json'
@@ -90,8 +89,7 @@ async function handleLogsStats(
 
   if (
     resolveTextJsonOutput({
-      output: getExplicitGlobalOutput(command),
-      format: options.format,
+      output: options.format ?? getExplicitGlobalOutput(command),
       stdoutIsTTY: ctx.stdoutIsTTY,
       settings
     }) === 'json'
@@ -150,8 +148,7 @@ async function handleLogsGc(
 
   if (
     resolveTextJsonOutput({
-      output: getExplicitGlobalOutput(command),
-      format: options.format,
+      output: options.format ?? getExplicitGlobalOutput(command),
       stdoutIsTTY: ctx.stdoutIsTTY,
       settings
     }) === 'json'
