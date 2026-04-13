@@ -19,7 +19,7 @@ import { CliUserError } from '../../contracts/user-error';
 import type { TuiArrowKey, TuiContext, NavigableScreen } from '../types';
 import { readConfigData } from '../data-loaders';
 import { createRenderErrorTracker } from '../render-error-tracker';
-import { createScreenRenderLogger } from '../screen-render-logger';
+import { createScreenRenderLogger, logScreenDataFetch } from '../screen-render-logger';
 import { errorMessage } from '../../utils/error-format';
 
 const PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
@@ -99,6 +99,7 @@ export function createConfigScreen(): NavigableScreen {
     }
 
     const activeTenantId = await context.getActiveTenantId();
+    logScreenDataFetch(context.debugLog, 'config', 'start', { tenantId: activeTenantId });
     const { providerRows } = await readConfigData(context.profileStore, context.secretStore, activeTenantId);
     providerRowsState = providerRows;
 
@@ -126,6 +127,7 @@ export function createConfigScreen(): NavigableScreen {
       }))
     );
     selectedSlotIndex = clampIndex(selectedSlotIndex, slotRowsState.length);
+    logScreenDataFetch(context.debugLog, 'config', 'complete', { tenantId: activeTenantId });
 
     renderLog.onRenderStart();
     try {

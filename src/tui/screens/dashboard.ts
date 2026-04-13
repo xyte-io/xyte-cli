@@ -6,7 +6,7 @@ import type { TuiArrowKey, TuiContext, NavigableScreen, TuiPaneId } from '../typ
 import { loadDashboardData } from '../data-loaders';
 import { sceneFromDashboardState } from '../scene';
 import { createRenderErrorTracker } from '../render-error-tracker';
-import { createScreenRenderLogger } from '../screen-render-logger';
+import { createScreenRenderLogger, logScreenDataFetch } from '../screen-render-logger';
 import { errorMessage } from '../../utils/error-format';
 
 function linesFromStats(stats: Array<{ label: string; value: string | number }> = []): string {
@@ -132,9 +132,11 @@ export function createDashboardScreen(): NavigableScreen {
       }
 
       const tenantId = await context.getActiveTenantId();
+      logScreenDataFetch(context.debugLog, 'dashboard', 'start', { tenantId });
       const loaded = await loadDashboardData(context.client, tenantId, {
         profileStore: context.profileStore
       });
+      logScreenDataFetch(context.debugLog, 'dashboard', 'complete', { tenantId, connectionState: loaded.connectionState });
 
       renderLog.onRenderStart();
       try {

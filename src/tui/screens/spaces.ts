@@ -18,7 +18,7 @@ import { safeSearchText } from '../serialize';
 import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, runGuardedAction } from '../actions';
 import { createStaleSafeSelectionLoader } from '../runtime';
 import { createRenderErrorTracker } from '../render-error-tracker';
-import { createScreenRenderLogger } from '../screen-render-logger';
+import { createScreenRenderLogger, logScreenDataFetch } from '../screen-render-logger';
 import { errorMessage } from '../../utils/error-format';
 
 const SPINNER_FRAMES = ['|', '/', '-', '\\'];
@@ -448,6 +448,7 @@ export function createSpacesScreen(): NavigableScreen {
       return;
     }
     activeTenantId = tenantId;
+    logScreenDataFetch(context.debugLog, 'spaces', 'start', { tenantId });
     const [nextSpacesOutcome, devicesCacheOutcome] = await Promise.all([
       loadSpacesData(context.client, tenantId, {
         query: {
@@ -467,6 +468,7 @@ export function createSpacesScreen(): NavigableScreen {
 
     spaces = nextSpacesOutcome.data;
     allDevicesCache = devicesCacheOutcome.data;
+    logScreenDataFetch(context.debugLog, 'spaces', 'complete', { tenantId, spaceCount: spaces.length, deviceCount: allDevicesCache.length });
     if (!isMounted) {
       return;
     }
