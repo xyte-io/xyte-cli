@@ -100,6 +100,30 @@
     ]
   },
   {
+    "key": "organization.devices.moveDevice",
+    "namespace": "organization",
+    "group": "devices",
+    "action": "moveDevice",
+    "title": "Move Device",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/:device_id/move",
+    "pathParams": [
+      "device_id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/move-device",
+    "bodyExample": "{\n  \"space_id\": 99592\n}",
+    "notes": [
+      "Docs page expected at https://docs.xyte.io/reference/move-device.",
+      "Derived from backend route POST /core/v1/organization/devices/:id/move in server/config/routes.rb.",
+      "Backend controller requires JSON body with integer space_id."
+    ]
+  },
+  {
     "key": "organization.devices.updateDevice",
     "namespace": "organization",
     "group": "devices",

@@ -500,7 +500,7 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
       'mkdir -p ./artifacts ./reports',
       'xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id> --output json > ./artifacts/source-devices.json',
       'xyte-cli api call organization.spaces.getSpaces --tenant <tenant-id> --query path_includes=<target-path> --output json > ./artifacts/target-spaces.json',
-      'xyte-cli util match --tenant <tenant-id> --source ./artifacts/source-devices.json --target ./artifacts/target-spaces.json --source-field name --target-field name --output ./artifacts/device-moves.csv',
+      'xyte-cli util match --tenant <tenant-id> --source ./artifacts/source-devices.json --target ./artifacts/target-spaces.json --source-field name --target-field name --out ./artifacts/device-moves.csv',
       'xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/device-moves.csv.summary.json --out ./reports/device-migration-pre.md --render markdown',
       'xyte-cli util move-devices --tenant <tenant-id> --input ./artifacts/device-moves.csv --report ./artifacts/device-migration.dry-run.ndjson',
       'xyte-cli util move-devices --tenant <tenant-id> --input ./artifacts/device-moves.csv --apply --report ./artifacts/device-migration.apply.ndjson > ./artifacts/device-migration.apply.json',
@@ -555,7 +555,7 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         },
         mutating: false,
         command:
-          'xyte-cli util match --tenant <tenant-id> --source ./artifacts/source-devices.json --target ./artifacts/target-spaces.json --source-field name --target-field name --output ./artifacts/device-moves.csv'
+          'xyte-cli util match --tenant <tenant-id> --source ./artifacts/source-devices.json --target ./artifacts/target-spaces.json --source-field name --target-field name --out ./artifacts/device-moves.csv'
       },
       {
         kind: 'task',

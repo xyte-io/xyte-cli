@@ -40,8 +40,11 @@ xyte-cli flow import --file <path> [--force]
 xyte-cli init [--target <path>] [--scope project|user|both] [--agents all|claude|copilot|codex] [--force] [--no-setup] [--require-setup]
 xyte-cli status [--tenant <tenant-id>] [--mode fast|full] [--output json|text]
 xyte-cli setup status [--tenant <tenant-id>] [--output json] [--field tenantId]
-xyte-cli setup run [--non-interactive] [--tenant <tenant-id>] [--name <display-name>] [--provider xyte-org|xyte-partner] [--key <value>|--key-file <path>|--key-stdin] [--connectivity auto|always|never]
+xyte-cli setup run [--non-interactive] [--advanced] [--tenant <tenant-id>] [--name <display-name>] [--provider xyte-org|xyte-partner] [--key <value>|--key-file <path>|--key-stdin] [--connectivity auto|always|never]
 xyte-cli config show [--scope user|workspace|resolved] [--format json|text]
+xyte-cli config path [--format json|text]
+xyte-cli config set <key> <value> [--scope user|workspace]
+xyte-cli config unset <key> [--scope user|workspace]
 xyte-cli config doctor --tenant <tenant-id> --output json
 xyte-cli doctor install [--format json|text]
 xyte-cli upgrade --check --output json
@@ -70,6 +73,7 @@ Setup notes:
 xyte-cli config tenant add <tenant-id> --name "Acme"
 xyte-cli config tenant use <tenant-id>
 xyte-cli config tenant list
+xyte-cli config tenant remove <tenant-id>
 
 xyte-cli config key add --tenant <tenant-id> --name primary --key "<value>" --set-active
 xyte-cli config key add --tenant <tenant-id> --name primary --key-file ~/.config/xyte/acme.key --set-active
@@ -93,7 +97,7 @@ Auth note:
 xyte-cli api endpoints list
 xyte-cli api endpoints describe organization.devices.getDevices
 xyte-cli api call organization.devices.getDevices --tenant <tenant-id>
-xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --output-mode envelope --strict-json
+xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --output-mode envelope --strict-json [--note <text>]
 xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once
 xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 10
 ```

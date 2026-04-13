@@ -269,14 +269,21 @@ cat templates/ai-space-import.prompt.md
 
 Schema/version IDs:
 - call envelope: `xyte.call.envelope.v1`
+- device match: `xyte.device.match.v1`
+- device move verification: `xyte.device.move-verification.v1`
 - flow catalog: `xyte.flow.catalog.v1`
+- flow definition: `xyte.flow.definition.v1`
 - flow run summary: `xyte.flow.run.v1`
 - headless frame: `xyte.headless.frame.v1`
 - inspect fleet: `xyte.inspect.fleet.v1`
 - inspect deep dive: `xyte.inspect.deep-dive.v1`
 - report metadata: `xyte.report.v1`
+- status: `xyte.status.v1`
+- upgrade check: `xyte.upgrade.check.v1`
+- upgrade result: `xyte.upgrade.result.v1`
 - utility batch summary: `xyte.utility.batch.v1`
 - utility prepare: `xyte.utility.prepare.v1`
+- watch frame: `xyte.watch.frame.v1`
 
 Canonical schemas:
 - `schemas/call-envelope.v1.schema.json`

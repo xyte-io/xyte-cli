@@ -54,6 +54,11 @@ Runtime frame selection rule:
 - `contract.tableFormat`: `compact-v1`
 - `contract.navigationMode`: `pane-focus`
 
+Runtime write-safety keys (always present on operational frames):
+- `writePolicy`: `organization-only`
+- `headlessWrite`: `false`
+- `actionsHint`: screen-specific hint string (human-readable, not agent-parseable)
+
 Common optional keys:
 - `readiness`
 - `connection`
