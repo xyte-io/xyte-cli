@@ -82,6 +82,13 @@ export async function generateOpsReport(args: {
   format: 'markdown' | 'pdf';
   outPath: string;
   includeSensitive: boolean;
+}): Promise<FleetReportResult>;
+export async function generateOpsReport(args: {
+  input: OpsReportInput;
+  tenantId: string;
+  format: 'markdown' | 'pdf';
+  outPath: string;
+  includeSensitive: boolean;
 }): Promise<FleetReportResult> {
   if (args.input.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION) {
     return generateFleetReport({
