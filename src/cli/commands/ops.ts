@@ -398,10 +398,14 @@ async function handleOpsReportGenerate(
     if (err instanceof CliUserError) {
       throw new CliUserError({ ...err, suggestedCommands: [...(err.suggestedCommands ?? []), ...inputHints] });
     }
-    throw new CliUserError({
+    const wrapped = new CliUserError({
       summary: err instanceof Error ? err.message : 'Invalid report input format.',
       suggestedCommands: inputHints
     });
+    if (err instanceof Error) {
+      wrapped.cause = err;
+    }
+    throw wrapped;
   }
   if (reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION && !reportInput.tenantName) {
     const tenantProfile = await ctx.profileStore.getTenant(tenantId);

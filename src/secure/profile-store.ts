@@ -59,12 +59,13 @@ function deriveTenantProvider(rawProvider: unknown, registry: TenantKeyRegistry)
   return configuredProviders.length === 1 ? configuredProviders[0] : undefined;
 }
 
-function normalizeTenant(raw: TenantProfile): { tenant: TenantProfile; changed: boolean } {
-  const now = new Date().toISOString();
-  const registry = cloneRegistry(raw.keyRegistry);
+function normalizeSlots(
+  slots: ApiKeySlotMeta[],
+  now: string
+): { slots: ApiKeySlotMeta[]; changed: boolean } {
   let changed = false;
-  const normalizedSlots: ApiKeySlotMeta[] = [];
-  for (const slot of registry.slots) {
+  const result: ApiKeySlotMeta[] = [];
+  for (const slot of slots) {
     if (!slot || typeof slot.provider !== 'string' || typeof slot.slotId !== 'string') {
       changed = true;
       continue;
@@ -73,8 +74,7 @@ function normalizeTenant(raw: TenantProfile): { tenant: TenantProfile; changed: 
       changed = true;
       continue;
     }
-
-    const normalizedSlot: ApiKeySlotMeta = {
+    const normalized: ApiKeySlotMeta = {
       slotId: slot.slotId,
       provider: slot.provider,
       name: slot.name || slot.slotId,
@@ -83,37 +83,37 @@ function normalizeTenant(raw: TenantProfile): { tenant: TenantProfile; changed: 
       updatedAt: slot.updatedAt || now,
       lastValidatedAt: slot.lastValidatedAt
     };
-
     if (
-      normalizedSlot.name !== slot.name ||
-      normalizedSlot.fingerprint !== slot.fingerprint ||
-      normalizedSlot.createdAt !== slot.createdAt ||
-      normalizedSlot.updatedAt !== slot.updatedAt
+      normalized.name !== slot.name ||
+      normalized.fingerprint !== slot.fingerprint ||
+      normalized.createdAt !== slot.createdAt ||
+      normalized.updatedAt !== slot.updatedAt
     ) {
       changed = true;
     }
-
-    normalizedSlots.push(normalizedSlot);
+    result.push(normalized);
   }
+  return { slots: result, changed };
+}
 
+function repairActiveSlots(
+  rawActive: Record<string, unknown> | undefined,
+  validSlots: ApiKeySlotMeta[]
+): { activeSlotByProvider: Partial<Record<SecretProvider, string>>; changed: boolean } {
+  let changed = false;
   const activeSlotByProvider: Partial<Record<SecretProvider, string>> = {};
-  for (const [provider, slotId] of Object.entries(registry.activeSlotByProvider ?? {})) {
-    if (!isSecretProvider(provider)) {
-      changed = true;
-      continue;
-    }
-    if (typeof slotId !== 'string') {
+  for (const [provider, slotId] of Object.entries(rawActive ?? {})) {
+    if (!isSecretProvider(provider) || typeof slotId !== 'string') {
       changed = true;
       continue;
     }
     activeSlotByProvider[provider] = slotId;
   }
-
   for (const provider of SUPPORTED_SECRET_PROVIDERS) {
     const active = activeSlotByProvider[provider];
-    const exists = normalizedSlots.some((slot) => slot.provider === provider && slot.slotId === active);
+    const exists = validSlots.some((slot) => slot.provider === provider && slot.slotId === active);
     if (!exists) {
-      const fallback = normalizedSlots.find((slot) => slot.provider === provider)?.slotId;
+      const fallback = validSlots.find((slot) => slot.provider === provider)?.slotId;
       if (fallback) {
         activeSlotByProvider[provider] = fallback;
       } else {
@@ -124,6 +124,15 @@ function normalizeTenant(raw: TenantProfile): { tenant: TenantProfile; changed: 
       }
     }
   }
+  return { activeSlotByProvider, changed };
+}
+
+function normalizeTenant(raw: TenantProfile): { tenant: TenantProfile; changed: boolean } {
+  const now = new Date().toISOString();
+  const registry = cloneRegistry(raw.keyRegistry);
+
+  const slotsResult = normalizeSlots(registry.slots, now);
+  const activeResult = repairActiveSlots(registry.activeSlotByProvider, slotsResult.slots);
 
   const tenant: TenantProfile = {
     id: raw.id,
@@ -131,29 +140,26 @@ function normalizeTenant(raw: TenantProfile): { tenant: TenantProfile; changed: 
     hubBaseUrl: raw.hubBaseUrl,
     entryBaseUrl: raw.entryBaseUrl,
     apiProvider: deriveTenantProvider((raw as TenantProfile & { apiProvider?: unknown }).apiProvider, {
-      slots: normalizedSlots,
-      activeSlotByProvider
+      slots: slotsResult.slots,
+      activeSlotByProvider: activeResult.activeSlotByProvider
     }),
     keyRegistry: {
-      slots: normalizedSlots,
-      activeSlotByProvider
+      slots: slotsResult.slots,
+      activeSlotByProvider: activeResult.activeSlotByProvider
     },
     createdAt: raw.createdAt ?? now,
     updatedAt: raw.updatedAt ?? now
   };
 
-  if (
+  const fieldsChanged =
     tenant.name !== raw.name ||
     tenant.apiProvider !== (raw as TenantProfile & { apiProvider?: SecretProvider }).apiProvider ||
     tenant.createdAt !== raw.createdAt ||
-    tenant.updatedAt !== raw.updatedAt
-  ) {
-    changed = true;
-  }
+    tenant.updatedAt !== raw.updatedAt;
 
   return {
     tenant,
-    changed
+    changed: slotsResult.changed || activeResult.changed || fieldsChanged
   };
 }
 
@@ -206,8 +212,12 @@ export class FileProfileStore implements ProfileStore {
       }
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
-      if (code === 'ENOENT' || error instanceof SyntaxError) {
-        return; // No file or invalid JSON — nothing to migrate.
+      if (code === 'ENOENT') {
+        return;
+      }
+      if (error instanceof SyntaxError) {
+        process.stderr.write(`Warning: profile ${this.filePath} contains invalid JSON — skipping migration.\n`);
+        return;
       }
       throw error;
     }
