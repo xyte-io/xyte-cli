@@ -37,11 +37,13 @@ xyte-cli flow import --file <path> [--force]
 ## Core
 
 ```bash
-xyte-cli init [--scope project|user|both] [--agents all|claude|copilot|codex] [--force] [--no-setup] [--require-setup]
+xyte-cli init [--target <path>] [--scope project|user|both] [--agents all|claude|copilot|codex] [--force] [--no-setup] [--require-setup]
 xyte-cli status [--tenant <tenant-id>] [--mode fast|full] [--output json|text]
 xyte-cli setup status [--tenant <tenant-id>] [--output json] [--field tenantId]
 xyte-cli setup run [--non-interactive] [--tenant <tenant-id>] [--name <display-name>] [--provider xyte-org|xyte-partner] [--key <value>|--key-file <path>|--key-stdin] [--connectivity auto|always|never]
+xyte-cli config show [--scope user|workspace|resolved] [--format json|text]
 xyte-cli config doctor --tenant <tenant-id> --output json
+xyte-cli doctor install [--format json|text]
 xyte-cli upgrade --check --output json
 xyte-cli upgrade --yes --output json
 xyte-cli --log-actions [--log-actions-verbose] status --tenant <tenant-id>
@@ -143,7 +145,7 @@ xyte-cli api call organization.commands.cancelCommand \
   --path-json '{"device_id":"DEVICE_ID","command_id":"COMMAND_ID"}'
 ```
 
-## Utility Pipelines And Space Import
+## Utility Pipelines, Space Import, And Device Migration
 
 ```bash
 xyte-cli util list-actions --output text
@@ -151,23 +153,32 @@ xyte-cli util list-actions --output text
 xyte-cli util prepare \
   --action organization.devices.claimDevice \
   --input ./raw-claims.xlsx \
-  --output-dir ./prepared
+  --output-dir ./prepared [--primary-format csv|jsonl] [--force]
 
 xyte-cli util prepare \
   --action space.import-tree \
   --input ./raw-hierarchy.pdf \
   --output-dir ./prepared
 
-xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv
-xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv --apply --report ./reports/space-import.apply.ndjson
+xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv \
+  [--input-format auto|csv|json|jsonl] [--path-field <name>] [--space-type-field <name>] [--config-field <name>] \
+  [--apply] [--continue-on-error] [--report <path>]
+
+xyte-cli util match \
+  --source ./source-devices.json --target ./target-spaces.json \
+  --source-field name --target-field name \
+  --out ./device-moves.csv [--tenant <tenant-id>] [--strict-json]
+
+xyte-cli util move-devices --tenant <tenant-id> --input ./device-moves.csv \
+  [--input-format auto|csv|json|jsonl] [--apply] [--continue-on-error] [--report <path>]
 ```
 
 ## Insights And Reports
 
 ```bash
-xyte-cli ops inspect fleet --tenant <tenant-id> --provider-scope auto --output json
-xyte-cli ops inspect deep-dive --tenant <tenant-id> --provider-scope auto --window 24 --output json --out ./artifacts/deep-dive.json
-xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/deep-dive.json --out ./reports/xyte-report.pdf
+xyte-cli ops inspect fleet --tenant <tenant-id> --provider-scope auto --render json|ascii [--out <path>] [--strict-json]
+xyte-cli ops inspect deep-dive --tenant <tenant-id> --provider-scope auto --window 24 --render json|ascii|markdown [--out <path>] [--strict-json]
+xyte-cli ops report generate --tenant <tenant-id> --input <path> --out <path> [--render markdown|pdf] [--include-sensitive] [--strict-json]
 ```
 
 Provider scope behavior:
@@ -183,7 +194,14 @@ Provider scope behavior:
 xyte-cli ops console
 xyte-cli ops console --headless --screen dashboard --output json --once --tenant <tenant-id>
 xyte-cli ops console --headless --screen spaces --output json --follow --interval-ms 2000 --tenant <tenant-id>
+xyte-cli ops console --no-motion --debug --debug-log ./debug.log --tenant <tenant-id>
 ```
+
+Notes:
+- `--once` renders a single frame and exits (default headless behavior). `--once` overrides `--follow`.
+- `--follow` streams continuous frames with configurable `--interval-ms`.
+- `--no-motion` disables TUI animation effects.
+- `--debug` / `--debug-log <path>` enable TUI debug logging.
 
 ## Action Log Environment Flags
 

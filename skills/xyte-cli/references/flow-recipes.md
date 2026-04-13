@@ -90,12 +90,16 @@ xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --o
 mkdir -p ./artifacts ./reports
 xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id> --output json > ./artifacts/source-devices.json
 xyte-cli api call organization.spaces.getSpaces --tenant <tenant-id> --query path_includes=<target-path> --output json > ./artifacts/target-spaces.json
-xyte-cli util match --tenant <tenant-id> --source ./artifacts/source-devices.json --target ./artifacts/target-spaces.json --source-field name --target-field name --output ./artifacts/device-moves.csv
+xyte-cli util match --tenant <tenant-id> --source ./artifacts/source-devices.json --target ./artifacts/target-spaces.json --source-field name --target-field name --out ./artifacts/device-moves.csv
 xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/device-moves.csv.summary.json --out ./reports/device-migration-pre.md --render markdown
 xyte-cli util move-devices --tenant <tenant-id> --input ./artifacts/device-moves.csv --report ./artifacts/device-migration.dry-run.ndjson
 xyte-cli util move-devices --tenant <tenant-id> --input ./artifacts/device-moves.csv --apply --report ./artifacts/device-migration.apply.ndjson > ./artifacts/device-migration.apply.json
 xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/xyte-fleet.device-migration.json
 ```
+
+When run through `xyte-cli flow run flow.device-migration`, the flow runner also executes two additional verification steps not in the manual recipe:
+- **verify_moved_devices** (`device.verify-batch`): re-fetches each moved device and confirms its `space_id` matches the target from the move plan.
+- **post_migration_report** (`report.generate`): composes a post-migration markdown report from the execution, verification, and fleet artifacts.
 
 ## flow.daily-deep-dive-report
 
