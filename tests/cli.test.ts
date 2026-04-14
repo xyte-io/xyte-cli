@@ -1577,6 +1577,31 @@ describe('cli integration', () => {
     expect(parsed.response.status).toBe(200);
   });
 
+  it('rejects invalid output-mode values for api call', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await expect(
+      program.parseAsync([
+        'node',
+        'xyte-cli',
+        'api',
+        'call',
+        'organization.devices.getDevices',
+        '--tenant',
+        'acme',
+        '--output-mode',
+        'ENVELOPE'
+      ])
+    ).rejects.toThrow('Invalid --output-mode: ENVELOPE');
+  });
+
   it('emits one snapshot frame for watch --once', async () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });

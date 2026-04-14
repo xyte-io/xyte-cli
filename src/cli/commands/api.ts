@@ -92,6 +92,12 @@ async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptio
   const endpoint = getEndpoint(key);
   const method = endpoint.method.toUpperCase();
   const outputMode = options.outputMode ?? 'raw';
+  if (outputMode !== 'raw' && outputMode !== 'envelope') {
+    throw new CliUserError({
+      summary: `Invalid --output-mode: ${outputMode}`,
+      detail: 'Use raw or envelope.'
+    });
+  }
   const requestId = randomUUID();
   const tenantId = tenantOverride ?? settings.values.defaults.tenant;
   if (endpoint.authScope !== 'none') {
