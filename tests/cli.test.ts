@@ -167,6 +167,11 @@ describe('cli integration', () => {
 
     const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
     expect(parsed.note).toBe('Moving dev-1 into South Wing');
+    const calledUrl = String(fetchMock.mock.calls[0][0]);
+    const calledInit = fetchMock.mock.calls[0][1] as RequestInit | undefined;
+    expect(calledUrl).toContain('/core/v1/organization/devices/dev-1/move');
+    expect(calledInit?.method).toBe('POST');
+    expect(calledInit?.body).toBe(JSON.stringify({ space_id: 99592 }));
     expect(stderr.write).toHaveBeenCalledWith('Note: Moving dev-1 into South Wing\n');
     const logEntries = readFileSync(logPath, 'utf8')
       .trim()
