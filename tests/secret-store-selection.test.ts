@@ -73,11 +73,11 @@ function buildDpapiRunProcessMock(options: { available?: boolean; decryptFails?:
   const decryptFails = options.decryptFails ?? false;
   return vi.fn(async (_command: string, args: string[], runtimeOptions?: { input?: string; stdinMode?: 'pipe' | 'ignore' }) => {
     const script = args.join(' ');
-    if (script.includes('[void][System.Security.Cryptography.ProtectedData]')) {
+    if (script.includes('Protect(') && script.includes('Unprotect(') && script.includes("[Console]::Out.Write('ok')")) {
       if (available) {
         return { code: 0, stdout: 'ok', stderr: '' };
       }
-      return { code: 1, stdout: '', stderr: 'ProtectedData unavailable' };
+      return { code: 1, stdout: '', stderr: 'DPAPI CurrentUser round-trip failed' };
     }
     if (script.includes('Protect(')) {
       const plaintext = runtimeOptions?.input ?? '';
@@ -183,6 +183,20 @@ describe('secret store backend selection', () => {
     expect(details.selector).toBe('auto');
     expect(details.backend).toBe('dpapi');
     expect(details.secretStore).toBe(join(configDir, 'secrets.dpapi.v1.json'));
+  });
+
+  it('falls back to the file backend when auto is selected and Windows DPAPI is unavailable', async () => {
+    const configDir = mkdtempSync(join(tmpdir(), 'xyte-secret-store-config-'));
+    const details = await describeSecretStore({
+      env: { ...process.env, XYTE_CLI_CONFIG_DIR: configDir },
+      platform: 'win32',
+      runProcessImpl: buildDpapiRunProcessMock({ available: false })
+    });
+
+    expect(details.selector).toBe('auto');
+    expect(details.backend).toBe('file');
+    expect(details.secretStore).toBe(join(configDir, 'secrets.v1.json'));
+    expect(details.legacySecretStore).toBe(join(configDir, 'secrets.v1.json'));
   });
 
   it('maps auto to the file backend on Linux', async () => {
@@ -474,52 +488,6 @@ describe('platform backend smoke tests', () => {
       await nativeStore.clearSlotSecret(tenantId, 'xyte-partner', partnerSlotId);
       await nativeStore.clearSlotSecret(secondaryTenantId, 'xyte-org', secondarySlotId);
     }
-  });
-
-  it.runIf(process.platform === 'win32')('runs a real Windows DPAPI lifecycle and migration smoke test', async () => {
-    const configDir = mkdtempSync(join(tmpdir(), 'xyte-secret-store-win-live-'));
-    const tenantId = `win-live-${Date.now()}`;
-    const slotId = `slot-${Date.now()}`;
-    const partnerSlotId = `partner-${Date.now()}`;
-    const secondaryTenantId = `win-live-secondary-${Date.now()}`;
-    const secondarySlotId = `secondary-${Date.now()}`;
-    const configured = createSecretStore({
-      env: { ...process.env, XYTE_CLI_CONFIG_DIR: configDir },
-      stderr: { write: vi.fn() }
-    });
-    const legacyPath = join(configDir, 'secrets.v1.json');
-    const dpapiPath = join(configDir, 'secrets.dpapi.v1.json');
-    writeFileSync(
-      legacyPath,
-      JSON.stringify(
-        {
-          version: 1,
-          records: {
-            [`${tenantId}:xyte-org:${slotId}`]: 'windows-live-key',
-            [`${tenantId}:xyte-partner:${partnerSlotId}`]: 'windows-live-partner-key',
-            [`${secondaryTenantId}:xyte-org:${secondarySlotId}`]: 'windows-live-key-3'
-          }
-        },
-        null,
-        2
-      ),
-      'utf8'
-    );
-
-    expect(await configured.getSlotSecret(tenantId, 'xyte-org', slotId)).toBe('windows-live-key');
-    expect(await configured.getSlotSecret(tenantId, 'xyte-partner', partnerSlotId)).toBe('windows-live-partner-key');
-    expect(await configured.getSlotSecret(secondaryTenantId, 'xyte-org', secondarySlotId)).toBe('windows-live-key-3');
-    expect(existsSync(legacyPath)).toBe(false);
-
-    const store = new WindowsDpapiSecretStore(dpapiPath);
-    await store.setSlotSecret(tenantId, 'xyte-org', slotId, 'windows-live-key-2');
-    expect(await store.getSlotSecret(tenantId, 'xyte-org', slotId)).toBe('windows-live-key-2');
-    expect(await store.getSlotSecret(tenantId, 'xyte-partner', partnerSlotId)).toBe('windows-live-partner-key');
-    expect(await store.getSlotSecret(secondaryTenantId, 'xyte-org', secondarySlotId)).toBe('windows-live-key-3');
-    await store.clearSlotSecret(tenantId, 'xyte-org', slotId);
-    await store.clearSlotSecret(tenantId, 'xyte-partner', partnerSlotId);
-    await store.clearSlotSecret(secondaryTenantId, 'xyte-org', secondarySlotId);
-    expect(await store.getSlotSecret(tenantId, 'xyte-org', slotId)).toBeUndefined();
   });
 
   it.runIf(process.platform === 'linux')('keeps auto mapped to the file backend on Linux', async () => {

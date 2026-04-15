@@ -436,10 +436,28 @@ export class WindowsDpapiSecretStore implements NativeSecretStore {
   }
 
   async checkAvailability(): Promise<{ available: boolean; reason?: string }> {
+    const probe = `xyte-cli-dpapi-probe-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const result = await this.runPowerShell(
-      "[void][System.Security.Cryptography.ProtectedData]; [Console]::Out.Write('ok')",
-      undefined,
-      'ignore'
+      [
+        '$inputValue = [Console]::In.ReadToEnd();',
+        '$bytes = [System.Text.Encoding]::UTF8.GetBytes($inputValue);',
+        '$protected = [System.Security.Cryptography.ProtectedData]::Protect(',
+        '  $bytes,',
+        '  $null,',
+        '  [System.Security.Cryptography.DataProtectionScope]::CurrentUser',
+        ');',
+        '$roundTripBytes = [System.Security.Cryptography.ProtectedData]::Unprotect(',
+        '  $protected,',
+        '  $null,',
+        '  [System.Security.Cryptography.DataProtectionScope]::CurrentUser',
+        ');',
+        '$roundTrip = [System.Text.Encoding]::UTF8.GetString($roundTripBytes);',
+        'if ($roundTrip -ne $inputValue) {',
+        "  throw 'Windows DPAPI CurrentUser round-trip mismatch.'",
+        '}',
+        "[Console]::Out.Write('ok');"
+      ].join(' '),
+      probe
     );
     if (result.code === 0 && result.stdout.trim() === 'ok') {
       return { available: true };
