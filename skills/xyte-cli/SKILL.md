@@ -5,7 +5,7 @@ description: "Use for @xyteai/cli operations: first-run setup, config/tenant/key
 
 # XYTE Skill Router (One-Stop, Agent-Native)
 
-Last updated: 2026-04-13
+Last updated: 2026-04-15
 
 This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
 
@@ -27,7 +27,10 @@ This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
 - for automation: use `--key-file <path>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`
 - If `--provider` is omitted, setup probes `xyte-org` first and then `xyte-partner`.
 - If `--connectivity never` is used, require `--provider`.
-  - `xyte-cli setup status --tenant <tenant-id> --field tenantId`
+- persisted credentials default to secure OS-native storage: macOS Keychain, Windows DPAPI, Linux Secret Service
+- if native storage is unavailable under `auth.secretStoreBackend=auto`, `xyte-cli` warns on `stderr` and falls back to file storage; do not treat that warning alone as command failure
+- `xyte-cli config path --format json` reports `secretStoreBackend`, `secretStore`, and `legacySecretStore`; `secretStore` may be a backend identifier such as `xyte-cli`, not only a file path
+- `xyte-cli setup status --tenant <tenant-id> --field tenantId`
 
 ## Purpose And Trigger Conditions
 

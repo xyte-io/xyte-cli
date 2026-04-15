@@ -6,6 +6,14 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+### Added
+- Native persisted secret storage on Linux via Secret Service, alongside macOS Keychain and Windows DPAPI.
+- Secure-storage downgrade warnings that explain when `auth.secretStoreBackend=auto` falls back to file storage and how to require `native` or opt into `file`.
+- Dedicated `windows-native-secret-store-cert` and `linux-native-secret-store-cert` CI jobs for native secure-storage validation.
+
+### Changed
+- `xyte-cli config path` now reports `secretStoreBackend`, `secretStore`, and `legacySecretStore` so callers can inspect the resolved credential backend.
+
 ## [0.9.0] - 2026-04-15
 
 ### Added

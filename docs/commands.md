@@ -66,6 +66,11 @@ Setup notes:
 - Use `--provider xyte-partner` for partner-only tenants.
 - For `xyte-org`, when `--name` is omitted, setup attempts to populate tenant display name from `organization.getOrganizationInfo`.
 - Explicit `--name` always takes precedence over auto-detected names.
+- Persisted credentials default to `auth.secretStoreBackend=auto`: macOS Keychain, Windows DPAPI, Linux Secret Service.
+- If native secure storage is unavailable under `auto`, `xyte-cli` warns and falls back to the file backend.
+- Advanced override: `auth.secretStoreBackend=auto|native|file`.
+- `xyte-cli config set auth.secretStoreBackend native` requires native secure storage; `xyte-cli config set auth.secretStoreBackend file` uses file storage intentionally.
+- `xyte-cli config path` reports `secretStoreBackend`, `secretStore`, and `legacySecretStore`; `secretStore` may be a backend identifier such as `xyte-cli`, not only a filesystem path.
 
 ## Tenant And Auth Slots
 

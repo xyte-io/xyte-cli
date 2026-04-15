@@ -57,6 +57,8 @@ xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/
   - Continue to incident monitoring only after readiness is healthy.
 - Failure handling:
   - Run `xyte-cli setup run --tenant <tenant-id>` if key provisioning is missing.
+  - If setup or readiness commands emit a secure-storage fallback warning, treat that as degraded-but-usable auth storage under `auto`, not an automatic setup failure.
+  - Inspect backend diagnostics with `xyte-cli config path --output json` when auth storage itself is the issue.
   - If setup must stay offline, use `xyte-cli setup run --tenant <tenant-id> --provider <xyte-org|xyte-partner> --connectivity never`.
   - Re-run this flow after setup.
 

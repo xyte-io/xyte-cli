@@ -48,6 +48,16 @@ xyte-cli setup status --tenant acme --output json
 xyte-cli config doctor --tenant acme --output json
 ```
 
+Credential storage:
+
+- Default persisted credential mode is `auth.secretStoreBackend=auto`.
+- `auto` uses macOS Keychain on macOS, DPAPI on Windows, and Secret Service on Linux.
+- If native secure storage is unavailable, `xyte-cli` warns and falls back to local file storage.
+- Advanced override: `auth.secretStoreBackend=auto|native|file`.
+- Require native secure storage: `xyte-cli config set auth.secretStoreBackend native`
+- Use file storage intentionally: `xyte-cli config set auth.secretStoreBackend file`
+- `xyte-cli config path --format json` reports `secretStoreBackend`, `secretStore`, and `legacySecretStore`. `secretStore` may be a backend identifier such as `xyte-cli`, not only a filesystem path.
+
 Shell-specific non-interactive examples:
 
 PowerShell:
