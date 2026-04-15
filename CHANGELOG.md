@@ -6,6 +6,18 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-04-15
+
+### Added
+- Added `organization.devices.moveDevice` support to the public CLI endpoint catalog and typed client surface.
+- Added `xyte-cli util move-devices` for batch device moves with dry-run/apply execution, duplicate detection, row-level validation, and NDJSON reports.
+- Added the built-in `flow.device-migration` workflow to match devices, dry-run moves, execute approved moves, verify results, and generate migration reports.
+- Added move-verification and migration-reporting contracts so post-move verification and operator-facing summaries can be generated from structured outputs.
+
+### Fixed
+- Fixed the move-device route used by the CLI to match the live organization API path at `/core/v1/organization/devices/:device_id/move`.
+- Fixed `xyte-cli api call --output-mode` handling so invalid values fail fast instead of silently falling back to raw output.
+
 ## [0.8.0] - 2026-03-23
 
 ### Added
