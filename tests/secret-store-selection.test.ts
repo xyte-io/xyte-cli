@@ -101,6 +101,52 @@ function buildDpapiRunProcessMock(options: { available?: boolean; decryptFails?:
   });
 }
 
+function buildSecretServiceRunProcessMock(options: {
+  available?: boolean;
+  wrongReadback?: boolean;
+  decryptFails?: boolean;
+} = {}) {
+  const available = options.available ?? true;
+  const wrongReadback = options.wrongReadback ?? false;
+  const decryptFails = options.decryptFails ?? false;
+  const stored = new Map<string, string>();
+  return vi.fn(
+    async (
+      _command: string,
+      args: string[],
+      runtimeOptions?: { input?: string; stdinMode?: 'pipe' | 'ignore' }
+    ) => {
+      const subcommand = args[0];
+      const attributes = args.slice(subcommand === 'store' ? 3 : 1);
+      const key = attributes.join('\u0000');
+
+      if (!available) {
+        return { code: 1, stdout: '', stderr: 'Secret Service session is unavailable' };
+      }
+
+      if (subcommand === 'store') {
+        stored.set(key, runtimeOptions?.input ?? '');
+        return { code: 0, stdout: '', stderr: '' };
+      }
+      if (subcommand === 'lookup') {
+        if (decryptFails) {
+          return { code: 1, stdout: '', stderr: 'Secret Service lookup failed' };
+        }
+        if (!stored.has(key)) {
+          return { code: 1, stdout: '', stderr: 'No matching secret found' };
+        }
+        const shouldCorruptReadback = wrongReadback && !key.includes('xyte-cli-probe');
+        return { code: 0, stdout: shouldCorruptReadback ? 'wrong-value' : (stored.get(key) ?? ''), stderr: '' };
+      }
+      if (subcommand === 'clear') {
+        stored.delete(key);
+        return { code: 0, stdout: '', stderr: '' };
+      }
+      return { code: 1, stdout: '', stderr: `unexpected secret-tool command: ${subcommand}` };
+    }
+  );
+}
+
 describe('secret store backend selection', () => {
   it('prefers env override over workspace and user config', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'xyte-secret-store-cwd-'));
@@ -203,7 +249,21 @@ describe('secret store backend selection', () => {
     const configDir = mkdtempSync(join(tmpdir(), 'xyte-secret-store-config-'));
     const details = await describeSecretStore({
       env: { ...process.env, XYTE_CLI_CONFIG_DIR: configDir },
-      platform: 'linux'
+      platform: 'linux',
+      runProcessImpl: buildSecretServiceRunProcessMock()
+    });
+
+    expect(details.selector).toBe('auto');
+    expect(details.backend).toBe('secret-service');
+    expect(details.secretStore).toBe('xyte-cli');
+  });
+
+  it('falls back to the file backend when auto is selected and Linux Secret Service is unavailable', async () => {
+    const configDir = mkdtempSync(join(tmpdir(), 'xyte-secret-store-config-'));
+    const details = await describeSecretStore({
+      env: { ...process.env, XYTE_CLI_CONFIG_DIR: configDir },
+      platform: 'linux',
+      runProcessImpl: buildSecretServiceRunProcessMock({ available: false })
     });
 
     expect(details.selector).toBe('auto');
@@ -220,7 +280,7 @@ describe('secret store backend selection', () => {
           XYTE_CLI_CONFIG_DIR: configDir,
           XYTE_CLI_SECRET_STORE_BACKEND: 'native'
         },
-        platform: 'linux'
+        platform: 'freebsd' as NodeJS.Platform
       })
     ).rejects.toThrow('Native secret storage is not supported');
   });
@@ -322,6 +382,37 @@ describe('configured secret-store migration', () => {
     expect(existsSync(legacyPath)).toBe(false);
   });
 
+  it('migrates multiple legacy plaintext secrets into the Linux native backend and deletes the legacy file', async () => {
+    const configDir = mkdtempSync(join(tmpdir(), 'xyte-secret-store-migrate-'));
+    const legacyPath = join(configDir, 'secrets.v1.json');
+    writeFileSync(
+      legacyPath,
+      JSON.stringify(
+        {
+          version: 1,
+          records: {
+            'acme:xyte-org:primary': 'org-key',
+            'acme:xyte-partner:partner-primary': 'partner-key',
+            'globex:xyte-org:secondary': 'org-key-2'
+          }
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const store = createSecretStore({
+      env: { ...process.env, XYTE_CLI_CONFIG_DIR: configDir },
+      platform: 'linux',
+      runProcessImpl: buildSecretServiceRunProcessMock()
+    });
+
+    expect(await store.getSlotSecret('acme', 'xyte-org', 'primary')).toBe('org-key');
+    expect(await store.getSlotSecret('acme', 'xyte-partner', 'partner-primary')).toBe('partner-key');
+    expect(await store.getSlotSecret('globex', 'xyte-org', 'secondary')).toBe('org-key-2');
+    expect(existsSync(legacyPath)).toBe(false);
+  });
+
   it('keeps the legacy file and falls back to it under auto when migration verification fails', async () => {
     const configDir = mkdtempSync(join(tmpdir(), 'xyte-secret-store-migrate-'));
     const legacyPath = join(configDir, 'secrets.v1.json');
@@ -350,7 +441,39 @@ describe('configured secret-store migration', () => {
     expect(await store.getSlotSecret('acme', 'xyte-org', 'primary')).toBe('org-key');
     expect(existsSync(legacyPath)).toBe(true);
     expect(stderr.write).toHaveBeenCalledWith(
-      expect.stringContaining('Native secret-store migration failed, using legacy file secret store for this run.')
+      expect.stringContaining('xyte-cli could not use secure credential storage in this session')
+    );
+  });
+
+  it('keeps the legacy file and falls back to it under auto on Linux when migration verification fails', async () => {
+    const configDir = mkdtempSync(join(tmpdir(), 'xyte-secret-store-migrate-'));
+    const legacyPath = join(configDir, 'secrets.v1.json');
+    writeFileSync(
+      legacyPath,
+      JSON.stringify(
+        {
+          version: 1,
+          records: {
+            'acme:xyte-org:primary': 'org-key'
+          }
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const stderr = { write: vi.fn() };
+    const store = createSecretStore({
+      env: { ...process.env, XYTE_CLI_CONFIG_DIR: configDir },
+      platform: 'linux',
+      stderr,
+      runProcessImpl: buildSecretServiceRunProcessMock({ wrongReadback: true })
+    });
+
+    expect(await store.getSlotSecret('acme', 'xyte-org', 'primary')).toBe('org-key');
+    expect(existsSync(legacyPath)).toBe(true);
+    expect(stderr.write).toHaveBeenCalledWith(
+      expect.stringContaining('xyte-cli could not use secure credential storage in this session')
     );
   });
 
@@ -379,6 +502,39 @@ describe('configured secret-store migration', () => {
       },
       platform: 'darwin',
       runProcessImpl: buildKeychainRunProcessMock({ wrongReadback: true })
+    });
+
+    await expect(store.getSlotSecret('acme', 'xyte-org', 'primary')).rejects.toThrow(
+      'Secret-store migration verification failed'
+    );
+    expect(existsSync(legacyPath)).toBe(true);
+  });
+
+  it('fails under native on Linux when migration verification fails and leaves the legacy file untouched', async () => {
+    const configDir = mkdtempSync(join(tmpdir(), 'xyte-secret-store-migrate-'));
+    const legacyPath = join(configDir, 'secrets.v1.json');
+    writeFileSync(
+      legacyPath,
+      JSON.stringify(
+        {
+          version: 1,
+          records: {
+            'acme:xyte-org:primary': 'org-key'
+          }
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    const store = createSecretStore({
+      env: {
+        ...process.env,
+        XYTE_CLI_CONFIG_DIR: configDir,
+        XYTE_CLI_SECRET_STORE_BACKEND: 'native'
+      },
+      platform: 'linux',
+      runProcessImpl: buildSecretServiceRunProcessMock({ wrongReadback: true })
     });
 
     await expect(store.getSlotSecret('acme', 'xyte-org', 'primary')).rejects.toThrow(
@@ -439,6 +595,124 @@ describe('native secret-store backends', () => {
       'Failed to decrypt secret from Windows DPAPI store'
     );
   });
+
+  it('uses the documented secret-tool command shape for Linux Secret Service operations', async () => {
+    const configDir = mkdtempSync(join(tmpdir(), 'xyte-secret-store-secret-service-'));
+    const runProcessMock = buildSecretServiceRunProcessMock();
+    const store = createSecretStore({
+      env: {
+        ...process.env,
+        XYTE_CLI_CONFIG_DIR: configDir,
+        XYTE_CLI_SECRET_STORE_BACKEND: 'native'
+      },
+      platform: 'linux',
+      runProcessImpl: runProcessMock
+    });
+
+    await store.setSlotSecret('acme', 'xyte-org', 'primary', 'org-key');
+    await store.getSlotSecret('acme', 'xyte-org', 'primary');
+    await store.clearSlotSecret('acme', 'xyte-org', 'primary');
+
+    expect(runProcessMock.mock.calls[0]).toEqual([
+      'secret-tool',
+      ['store', '--label', 'xyte-cli', 'service', 'xyte-cli', 'account', 'xyte-cli-probe'],
+      expect.objectContaining({ input: expect.stringContaining('xyte-cli-secret-service-probe') })
+    ]);
+    expect(runProcessMock.mock.calls[1]).toEqual([
+      'secret-tool',
+      ['lookup', 'service', 'xyte-cli', 'account', 'xyte-cli-probe'],
+      expect.anything()
+    ]);
+    expect(runProcessMock.mock.calls[2]).toEqual(['secret-tool', ['clear', 'service', 'xyte-cli', 'account', 'xyte-cli-probe'], expect.anything()]);
+    expect(runProcessMock.mock.calls[3]).toEqual([
+      'secret-tool',
+      ['store', '--label', 'xyte-cli', 'service', 'xyte-cli', 'account', 'acme:xyte-org:primary'],
+      expect.objectContaining({ input: 'org-key' })
+    ]);
+    expect(runProcessMock.mock.calls[4]).toEqual([
+      'secret-tool',
+      ['lookup', 'service', 'xyte-cli', 'account', 'acme:xyte-org:primary'],
+      expect.anything()
+    ]);
+    expect(runProcessMock.mock.calls[5]).toEqual([
+      'secret-tool',
+      ['clear', 'service', 'xyte-cli', 'account', 'acme:xyte-org:primary'],
+      expect.anything()
+    ]);
+  });
+});
+
+describe('secure-storage fallback warnings', () => {
+  it('prints a first-time-user downgrade warning for macOS auto fallback', async () => {
+    const configDir = mkdtempSync(join(tmpdir(), 'xyte-secret-store-warning-'));
+    const stderr = { write: vi.fn() };
+    const store = createSecretStore({
+      env: { ...process.env, XYTE_CLI_CONFIG_DIR: configDir },
+      platform: 'darwin',
+      stderr,
+      runProcessImpl: buildKeychainRunProcessMock({ available: false })
+    });
+
+    await store.setSlotSecret('acme', 'xyte-org', 'primary', 'org-key');
+
+    expect(stderr.write).toHaveBeenCalledWith(expect.stringContaining('xyte-cli could not use secure credential storage in this session'));
+    expect(stderr.write).toHaveBeenCalledWith(expect.stringContaining('local plaintext file instead'));
+    expect(stderr.write).toHaveBeenCalledWith(expect.stringContaining('macOS: run in a normal logged-in session with your login Keychain available.'));
+    expect(stderr.write).toHaveBeenCalledWith(expect.stringContaining('xyte-cli config set auth.secretStoreBackend native'));
+    expect(stderr.write).toHaveBeenCalledWith(expect.stringContaining('xyte-cli config set auth.secretStoreBackend file'));
+  });
+
+  it('prints a first-time-user downgrade warning for Windows auto fallback', async () => {
+    const configDir = mkdtempSync(join(tmpdir(), 'xyte-secret-store-warning-'));
+    const stderr = { write: vi.fn() };
+    const store = createSecretStore({
+      env: { ...process.env, XYTE_CLI_CONFIG_DIR: configDir },
+      platform: 'win32',
+      stderr,
+      runProcessImpl: buildDpapiRunProcessMock({ available: false })
+    });
+
+    await store.setSlotSecret('acme', 'xyte-org', 'primary', 'org-key');
+
+    expect(stderr.write).toHaveBeenCalledWith(expect.stringContaining('xyte-cli could not use secure credential storage in this session'));
+    expect(stderr.write).toHaveBeenCalledWith(expect.stringContaining('Windows: run in a normal user session with Windows secure credential storage available.'));
+  });
+
+  it('prints a first-time-user downgrade warning for Linux auto fallback', async () => {
+    const configDir = mkdtempSync(join(tmpdir(), 'xyte-secret-store-warning-'));
+    const stderr = { write: vi.fn() };
+    const store = createSecretStore({
+      env: { ...process.env, XYTE_CLI_CONFIG_DIR: configDir },
+      platform: 'linux',
+      stderr,
+      runProcessImpl: buildSecretServiceRunProcessMock({ available: false })
+    });
+
+    await store.setSlotSecret('acme', 'xyte-org', 'primary', 'org-key');
+
+    expect(stderr.write).toHaveBeenCalledWith(expect.stringContaining('xyte-cli could not use secure credential storage in this session'));
+    expect(stderr.write).toHaveBeenCalledWith(expect.stringContaining('Linux: install and enable GNOME Keyring or KDE Wallet, and make sure your session has D-Bus and an unlocked keyring.'));
+    expect(stderr.write).toHaveBeenCalledWith(expect.stringContaining('dbus-run-session'));
+  });
+
+  it('does not print a downgrade warning when file storage was selected explicitly', async () => {
+    const configDir = mkdtempSync(join(tmpdir(), 'xyte-secret-store-warning-'));
+    const stderr = { write: vi.fn() };
+    const store = createSecretStore({
+      env: {
+        ...process.env,
+        XYTE_CLI_CONFIG_DIR: configDir,
+        XYTE_CLI_SECRET_STORE_BACKEND: 'file'
+      },
+      platform: 'linux',
+      stderr,
+      runProcessImpl: buildSecretServiceRunProcessMock({ available: false })
+    });
+
+    await store.setSlotSecret('acme', 'xyte-org', 'primary', 'org-key');
+
+    expect(stderr.write).not.toHaveBeenCalled();
+  });
 });
 
 describe('platform backend smoke tests', () => {
@@ -490,13 +764,15 @@ describe('platform backend smoke tests', () => {
     }
   });
 
-  it.runIf(process.platform === 'linux')('keeps auto mapped to the file backend on Linux', async () => {
+  it.runIf(process.platform === 'linux')('reports a usable Linux auto backend without crashing', async () => {
     const configDir = mkdtempSync(join(tmpdir(), 'xyte-secret-store-linux-live-'));
     const details = await describeSecretStore({
       env: { ...process.env, XYTE_CLI_CONFIG_DIR: configDir }
     });
 
-    expect(details.backend).toBe('file');
-    expect(details.secretStore).toBe(join(configDir, 'secrets.v1.json'));
+    expect(['secret-service', 'file']).toContain(details.backend);
+    expect(details.secretStore).toBe(
+      details.backend === 'secret-service' ? 'xyte-cli' : join(configDir, 'secrets.v1.json')
+    );
   });
 });

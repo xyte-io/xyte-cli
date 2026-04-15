@@ -1054,8 +1054,10 @@ describe('cli integration', () => {
           : join(configDir, 'secrets.v1.json')
       );
     } else {
-      expect(parsed.secretStoreBackend).toBe('file');
-      expect(parsed.secretStore).toBe(join(configDir, 'secrets.v1.json'));
+      expect(['secret-service', 'file']).toContain(parsed.secretStoreBackend);
+      expect(parsed.secretStore).toBe(
+        parsed.secretStoreBackend === 'secret-service' ? 'xyte-cli' : join(configDir, 'secrets.v1.json')
+      );
     }
 
     stdout.write.mockClear();

@@ -17,6 +17,8 @@ import { DEFAULT_SLOT_ID } from './key-slots';
 const LEGACY_SECRET_STORE_VERSION = 1;
 const DPAPI_SECRET_STORE_VERSION = 1;
 const KEYCHAIN_SERVICE_NAME = 'xyte-cli';
+const SECRET_SERVICE_PROBE_ACCOUNT = 'xyte-cli-probe';
+const SECRET_SERVICE_PROBE_PREFIX = 'xyte-cli-secret-service-probe';
 const LEGACY_SECRET_STORE_FILENAME = 'secrets.v1.json';
 const DPAPI_SECRET_STORE_FILENAME = 'secrets.dpapi.v1.json';
 
@@ -30,7 +32,7 @@ interface PersistedCiphertexts {
   records: Record<string, string>;
 }
 
-type EffectiveSecretStoreBackend = 'file' | 'keychain' | 'dpapi';
+type EffectiveSecretStoreBackend = 'file' | 'keychain' | 'dpapi' | 'secret-service';
 
 interface NativeSecretStore extends SecretStore {
   checkAvailability(): Promise<{ available: boolean; reason?: string }>;
@@ -141,6 +143,37 @@ function warnSecretStore(message: string, options: CreateSecretStoreOptions): vo
   stream.write(`${message}\n`);
 }
 
+function buildPlaintextFallbackWarning(reason: string, options: CreateSecretStoreOptions): string {
+  const platform = options.platform ?? process.platform;
+  const reasonText = reason.trim() || 'Unknown reason.';
+  const lines = [
+    'Warning: xyte-cli could not use secure credential storage in this session, so API keys will be stored in a local plaintext file instead.',
+    `Reason: ${reasonText}`,
+    'How to fix this:'
+  ];
+
+  if (platform === 'darwin') {
+    lines.push('- macOS: run in a normal logged-in session with your login Keychain available.');
+  } else if (platform === 'win32') {
+    lines.push('- Windows: run in a normal user session with Windows secure credential storage available.');
+  } else if (platform === 'linux') {
+    lines.push(
+      '- Linux: install and enable GNOME Keyring or KDE Wallet, and make sure your session has D-Bus and an unlocked keyring.'
+    );
+    lines.push('- Linux shells/tests/headless sessions: run xyte-cli under dbus-run-session.');
+  }
+
+  lines.push('Advanced:');
+  lines.push('- Require secure storage and fail otherwise: xyte-cli config set auth.secretStoreBackend native');
+  lines.push('- Use file storage intentionally: xyte-cli config set auth.secretStoreBackend file');
+
+  return lines.join('\n');
+}
+
+function warnPlaintextFallback(reason: string, options: CreateSecretStoreOptions): void {
+  warnSecretStore(buildPlaintextFallbackWarning(reason, options), options);
+}
+
 function isMacKeychainUnavailable(stderr: string): boolean {
   const normalized = stderr.trim().toLowerCase();
   return (
@@ -149,6 +182,16 @@ function isMacKeychainUnavailable(stderr: string): boolean {
     normalized.includes('could not be found in the keychain') ||
     normalized.includes('errsecitemnotfound') ||
     normalized.includes('exit code 44')
+  );
+}
+
+function isSecretServiceUnavailable(stderr: string, stdout = ''): boolean {
+  const normalized = `${stderr}\n${stdout}`.trim().toLowerCase();
+  return (
+    normalized.includes('no matching secret found') ||
+    normalized.includes('no matching secrets') ||
+    normalized.includes('no such secret item') ||
+    normalized.includes('secret service session is unavailable')
   );
 }
 
@@ -559,6 +602,146 @@ export class WindowsDpapiSecretStore implements NativeSecretStore {
   }
 }
 
+export class LinuxSecretServiceStore implements NativeSecretStore {
+  readonly backend = 'secret-service' as const;
+  readonly location = KEYCHAIN_SERVICE_NAME;
+
+  constructor(private readonly runProcessImpl: typeof runProcess = runProcess) {}
+
+  async checkAvailability(): Promise<{ available: boolean; reason?: string }> {
+    const probeValue = `${SECRET_SERVICE_PROBE_PREFIX}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    try {
+      const storeResult = await this.runSecretTool(
+        ['store', '--label', KEYCHAIN_SERVICE_NAME, 'service', KEYCHAIN_SERVICE_NAME, 'account', SECRET_SERVICE_PROBE_ACCOUNT],
+        probeValue
+      );
+      if (storeResult.code !== 0) {
+        return {
+          available: false,
+          reason: storeResult.stderr.trim() || storeResult.stdout.trim() || 'Linux Secret Service is unavailable.'
+        };
+      }
+
+      const lookupResult = await this.runSecretTool(
+        ['lookup', 'service', KEYCHAIN_SERVICE_NAME, 'account', SECRET_SERVICE_PROBE_ACCOUNT],
+        undefined,
+        'ignore'
+      );
+      if (lookupResult.code !== 0) {
+        return {
+          available: false,
+          reason: lookupResult.stderr.trim() || lookupResult.stdout.trim() || 'Linux Secret Service lookup failed.'
+        };
+      }
+
+      const roundTrip = lookupResult.stdout.replace(/\r?\n$/, '');
+      if (roundTrip !== probeValue) {
+        return {
+          available: false,
+          reason: 'Linux Secret Service round-trip mismatch.'
+        };
+      }
+
+      await this.runSecretTool(
+        ['clear', 'service', KEYCHAIN_SERVICE_NAME, 'account', SECRET_SERVICE_PROBE_ACCOUNT],
+        undefined,
+        'ignore'
+      );
+      return { available: true };
+    } catch (error) {
+      return {
+        available: false,
+        reason: errorMessage(error)
+      };
+    }
+  }
+
+  async setSlotSecret(tenantId: string, provider: SecretProvider, slotId: string, value: string): Promise<void> {
+    try {
+      const result = await this.runSecretTool(
+        ['store', '--label', KEYCHAIN_SERVICE_NAME, 'service', KEYCHAIN_SERVICE_NAME, 'account', accountKey(tenantId, provider, slotId)],
+        value
+      );
+      if (result.code !== 0) {
+        throw new CliUserError({
+          summary: 'Failed to write secret to Linux Secret Service.',
+          detail: result.stderr.trim() || result.stdout.trim() || 'secret-tool store failed.'
+        });
+      }
+    } catch (error) {
+      if (error instanceof CliUserError) {
+        throw error;
+      }
+      throw new CliUserError({
+        summary: 'Failed to write secret to Linux Secret Service.',
+        detail: errorMessage(error)
+      });
+    }
+  }
+
+  async getSlotSecret(tenantId: string, provider: SecretProvider, slotId: string): Promise<string | undefined> {
+    try {
+      const result = await this.runSecretTool(
+        ['lookup', 'service', KEYCHAIN_SERVICE_NAME, 'account', accountKey(tenantId, provider, slotId)],
+        undefined,
+        'ignore'
+      );
+      if (result.code === 0) {
+        const value = result.stdout.replace(/\r?\n$/, '');
+        return value || undefined;
+      }
+      if (isSecretServiceUnavailable(result.stderr, result.stdout)) {
+        return undefined;
+      }
+      throw new CliUserError({
+        summary: 'Failed to read secret from Linux Secret Service.',
+        detail: result.stderr.trim() || result.stdout.trim() || 'secret-tool lookup failed.'
+      });
+    } catch (error) {
+      if (error instanceof CliUserError) {
+        throw error;
+      }
+      throw new CliUserError({
+        summary: 'Failed to read secret from Linux Secret Service.',
+        detail: errorMessage(error)
+      });
+    }
+  }
+
+  async clearSlotSecret(tenantId: string, provider: SecretProvider, slotId: string): Promise<void> {
+    try {
+      const result = await this.runSecretTool(
+        ['clear', 'service', KEYCHAIN_SERVICE_NAME, 'account', accountKey(tenantId, provider, slotId)],
+        undefined,
+        'ignore'
+      );
+      if (result.code === 0 || isSecretServiceUnavailable(result.stderr, result.stdout)) {
+        return;
+      }
+      throw new CliUserError({
+        summary: 'Failed to delete secret from Linux Secret Service.',
+        detail: result.stderr.trim() || result.stdout.trim() || 'secret-tool clear failed.'
+      });
+    } catch (error) {
+      if (error instanceof CliUserError) {
+        throw error;
+      }
+      throw new CliUserError({
+        summary: 'Failed to delete secret from Linux Secret Service.',
+        detail: errorMessage(error)
+      });
+    }
+  }
+
+  private async runSecretTool(
+    args: string[],
+    input?: string,
+    stdinMode: 'pipe' | 'ignore' = 'pipe'
+  ): Promise<Awaited<ReturnType<typeof runProcess>>> {
+    return await this.runProcessImpl('secret-tool', args, { input, stdinMode });
+  }
+}
+
 interface SecretStoreSelection {
   selector: SecretStoreBackendSelector;
   backend: EffectiveSecretStoreBackend;
@@ -609,6 +792,9 @@ function createNativeSecretStore(options: CreateSecretStoreOptions): NativeSecre
   }
   if (platform === 'win32') {
     return new WindowsDpapiSecretStore(getDpapiSecretStorePath(configDir), runProcessImpl);
+  }
+  if (platform === 'linux') {
+    return new LinuxSecretServiceStore(runProcessImpl);
   }
   return undefined;
 }
@@ -676,10 +862,7 @@ async function resolveSecretStoreBackendTarget(options: CreateSecretStoreOptions
 async function resolveSecretStoreSelection(options: CreateSecretStoreOptions): Promise<SecretStoreSelection> {
   const selection = await resolveSecretStoreBackendTarget(options);
   if (selection.autoFallbackReason) {
-    warnSecretStore(
-      `Warning: Native secret storage is unavailable, using legacy file secret store instead. ${selection.autoFallbackReason}`.trim(),
-      options
-    );
+    warnPlaintextFallback(selection.autoFallbackReason, options);
     return selection;
   }
   if (selection.backend === 'file') {
@@ -695,10 +878,7 @@ async function resolveSecretStoreSelection(options: CreateSecretStoreOptions): P
     if (selection.selector === 'native') {
       throw error;
     }
-    warnSecretStore(
-      `Warning: Native secret-store migration failed, using legacy file secret store for this run. ${errorMessage(error)}`.trim(),
-      options
-    );
+    warnPlaintextFallback(`Native secret-store migration failed. ${errorMessage(error)}`, options);
     return {
       selector: selection.selector,
       backend: 'file',
