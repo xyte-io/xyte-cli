@@ -100,6 +100,28 @@
     ]
   },
   {
+    "key": "organization.devices.moveDevice",
+    "namespace": "organization",
+    "group": "devices",
+    "action": "moveDevice",
+    "title": "Move Device",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/:device_id/move",
+    "pathParams": [
+      "device_id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/move-device",
+    "bodyExample": "{\n  \"space_id\": 99592\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/move-device"
+    ]
+  },
+  {
     "key": "organization.devices.updateDevice",
     "namespace": "organization",
     "group": "devices",

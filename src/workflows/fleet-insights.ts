@@ -1,111 +1,23 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { z } from 'zod';
+import { writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
+import { ensureParentDir } from '../utils/fs';
 import { asRecord, safeString } from '../utils/json';
 import {
   INSPECT_DEEP_DIVE_SCHEMA_VERSION,
   INSPECT_FLEET_SCHEMA_VERSION,
   REPORT_SCHEMA_VERSION
 } from '../contracts/versions';
-import { parseTimestamp } from './report/time-format';
+import { parseTimestamp } from '../utils/timestamp';
+import { formatDeepDiveMarkdown } from './fleet-insights-format';
+import type { StatusCounts, FleetSnapshot, FleetInspectResult } from '../types/fleet-inspect';
+import type { DeepDiveResult } from '../types/deep-dive';
 
 export { collectFleetSnapshot, InspectProviderScopeError } from './fleet-insights-loaders';
 export { formatFleetInspectAscii, formatDeepDiveAscii, formatDeepDiveMarkdown } from './fleet-insights-format';
-import { formatDeepDiveMarkdown } from './fleet-insights-format';
+export { generateDeviceMigrationReport } from './device-migration-report';
 
-export type { FleetSnapshot, FleetInspectResult } from '../types/fleet-inspect';
-import type { StatusCounts, FleetSnapshot, FleetInspectResult } from '../types/fleet-inspect';
-
-export type { DeepDiveResult } from '../types/deep-dive';
-import type { DeepDiveResult } from '../types/deep-dive';
-
-const DeepDiveTopOfflineSpaceSchema = z.object({
-  space: z.string(),
-  offlineDevices: z.number(),
-  shareOfOfflinePct: z.number()
-});
-
-const DeepDiveTopIncidentDeviceSchema = z.object({
-  device: z.string(),
-  incidentCount: z.number(),
-  activeIncidents: z.number()
-});
-
-const DeepDiveIncidentAgingSchema = z.object({
-  device: z.string(),
-  space: z.string(),
-  ageHours: z.number(),
-  createdAtUtc: z.string()
-});
-
-const DeepDiveChurnEntrySchema = z.object({
-  space: z.string(),
-  incidents: z.number()
-});
-
-const DeepDiveDeviceChurnEntrySchema = z.object({
-  device: z.string(),
-  incidents: z.number()
-});
-
-const DeepDiveOldestTicketSchema = z.object({
-  ticketId: z.string(),
-  title: z.string(),
-  ageHours: z.number(),
-  deviceId: z.string(),
-  createdAtUtc: z.string()
-});
-
-const DeepDiveStatusMismatchSchema = z.object({
-  device: z.string(),
-  status: z.string(),
-  stateStatus: z.string(),
-  lastSeen: z.string(),
-  space: z.string()
-});
-
-const DeepDiveOverviewMetricsSchema = z.object({
-  totalDevices: z.number(),
-  offlineDevices: z.number(),
-  offlinePct: z.number(),
-  totalIncidents: z.number(),
-  activeIncidents: z.number(),
-  activeIncidentPct: z.number(),
-  totalTickets: z.number(),
-  openTickets: z.number(),
-  statusMismatches: z.number()
-});
-
-const DeepDiveResultSchema = z.object({
-  schemaVersion: z.literal(INSPECT_DEEP_DIVE_SCHEMA_VERSION),
-  generatedAtUtc: z.string(),
-  tenantId: z.string(),
-  tenantName: z.string().optional(),
-  windowHours: z.number(),
-  overviewMetrics: DeepDiveOverviewMetricsSchema.optional(),
-  summary: z.array(z.string()),
-  topOfflineSpaces: z.array(DeepDiveTopOfflineSpaceSchema),
-  topIncidentDevices: z.array(DeepDiveTopIncidentDeviceSchema),
-  activeIncidentAging: z.array(DeepDiveIncidentAgingSchema),
-  churnWindow: z.object({
-    incidents: z.number(),
-    devices: z.number(),
-    spaces: z.number(),
-    bySpace: z.array(DeepDiveChurnEntrySchema),
-    byDevice: z.array(DeepDiveDeviceChurnEntrySchema)
-  }),
-  ticketPosture: z.object({
-    openTickets: z.number(),
-    overlappingActiveIncidentDevices: z.number(),
-    oldestOpenTickets: z.array(DeepDiveOldestTicketSchema)
-  }),
-  dataQuality: z.object({
-    statusMismatches: z.array(DeepDiveStatusMismatchSchema)
-  })
-});
-
-interface FleetReportResult {
+export interface FleetReportResult {
   schemaVersion: typeof REPORT_SCHEMA_VERSION;
   generatedAtUtc: string;
   tenantId: string;
@@ -129,13 +41,15 @@ function pct(count: number, total: number): number {
   return Number(((count * 100) / total).toFixed(1));
 }
 
+const MS_PER_HOUR = 3_600_000;
+
 function ageHours(createdAt: unknown): number | undefined {
   const parsed = parseTimestamp(createdAt);
   if (!parsed) {
     return undefined;
   }
   const now = Date.now();
-  return Math.max(0, Math.round((now - parsed.getTime()) / 3_600_000));
+  return Math.max(0, Math.round((now - parsed.getTime()) / MS_PER_HOUR));
 }
 
 function topEntries(counter: Record<string, number>, limit = 10): Array<[string, number]> {
@@ -443,23 +357,6 @@ export function buildDeepDive(snapshot: FleetSnapshot, windowHours = 24): DeepDi
   };
 }
 
-function ensureDir(filePath: string): void {
-  mkdirSync(dirname(resolve(filePath)), { recursive: true });
-}
-
-export function parseDeepDiveForReport(raw: unknown, expectedTenantId?: string): DeepDiveResult {
-  const parsed = DeepDiveResultSchema.safeParse(raw);
-  if (!parsed.success) {
-    throw new Error('Input JSON must be produced by `xyte-cli ops inspect deep-dive --output json`.');
-  }
-
-  if (expectedTenantId && parsed.data.tenantId !== expectedTenantId) {
-    throw new Error(`Input tenant mismatch. Expected ${expectedTenantId}, got ${parsed.data.tenantId}.`);
-  }
-
-  return parsed.data;
-}
-
 export async function generateFleetReport(args: {
   deepDive: DeepDiveResult;
   format: 'markdown' | 'pdf';
@@ -467,7 +364,7 @@ export async function generateFleetReport(args: {
   includeSensitive: boolean;
 }): Promise<FleetReportResult> {
   const markdown = formatDeepDiveMarkdown(args.deepDive, args.includeSensitive);
-  ensureDir(args.outPath);
+  ensureParentDir(args.outPath);
 
   if (args.format === 'markdown') {
     writeFileSync(args.outPath, markdown, 'utf8');
@@ -485,3 +382,4 @@ export async function generateFleetReport(args: {
     includeSensitive: args.includeSensitive
   };
 }
+

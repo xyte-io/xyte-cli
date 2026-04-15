@@ -2,9 +2,8 @@ import { SpanStatusCode, trace, type Attributes, type Span } from '@opentelemetr
 
 import { errorMessage } from '../utils/error-format';
 
-const tracer = trace.getTracer('xyte-cli');
-
 export function withSpan<T>(name: string, attributes: Attributes, operation: (span: Span) => Promise<T>): Promise<T> {
+  const tracer = trace.getTracer('xyte-cli');
   return tracer.startActiveSpan(name, { attributes }, async (span) => {
     try {
       const result = await operation(span);

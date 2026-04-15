@@ -59,6 +59,34 @@ describe('utility prepare workflow', () => {
     expect(readFileSync(result.artifacts.rejected, 'utf8')).toBe('path,space_type,config,reject_reason\n');
   });
 
+  it('builds device.move friendly contract and csv scaffold', () => {
+    const root = makeTempRoot('xyte-prepare-device-move-');
+    const inputPath = join(root, 'source.json');
+    const outDir = join(root, 'out');
+    writeFileSync(inputPath, '[]', 'utf8');
+
+    const result = runUtilityPrepare({
+      inputPath,
+      actionKey: 'device.move',
+      outputDir: outDir,
+      tenantId: 'acme'
+    });
+
+    expect(result.mode).toBe('friendly');
+    expect(result.executionSupport).toBe('device.move');
+    expect(result.canonical.headers).toEqual([
+      'device_id',
+      'target_space_id',
+      'device_name',
+      'current_space_id',
+      'target_space_name'
+    ]);
+    expect(result.suggestedCommands.apply).toContain('util move-devices');
+    expect(readFileSync(result.artifacts.primary, 'utf8')).toBe(
+      'device_id,target_space_id,device_name,current_space_id,target_space_name\n'
+    );
+  });
+
   it('builds generic endpoint contract with path/query/body canonical fields', () => {
     const root = makeTempRoot('xyte-prepare-generic-');
     const inputPath = join(root, 'source.csv');
@@ -152,6 +180,7 @@ describe('utility prepare workflow', () => {
   it('lists actions and validates prepare schema output', () => {
     const actions = listUtilityPrepareActions();
     expect(actions.some((item) => item.actionKey === 'organization.devices.claimDevice')).toBe(true);
+    expect(actions.some((item) => item.actionKey === 'device.move')).toBe(true);
     expect(actions.some((item) => item.actionKey === 'space.import-tree')).toBe(true);
 
     const root = makeTempRoot('xyte-prepare-schema-');

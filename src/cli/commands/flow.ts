@@ -2,26 +2,22 @@ import { readFileSync } from 'node:fs';
 
 import type { Command } from 'commander';
 
-import {
-  getBuiltInFlowDefinition,
-  hasBuiltInFlowDefinition,
-  listBuiltInFlowDefinitions
-} from '../../workflows/flow-catalog';
+import { hasBuiltInFlowDefinition, listBuiltInFlowDefinitions } from '../../workflows/flow-catalog';
 import { parseFlowVarOptions, runDeterministicFlow, type FlowRunMode } from '../../workflows/flow-runner';
 import {
   exportFlowDefinition,
-  getFlowDefinition,
   importFlowDefinition,
   listFlowDefinitions,
   saveFlowDefinition,
   updateFlowDefinition
 } from '../../workflows/flow-user-definitions';
-import { parseInspectProviderScope } from '../../types/settings-enums';
-import { type CliContext, printJson } from '../cli-context';
+import { parseInspectProviderScope } from '../../utils/parse-domain';
+import { type CliContext, printJson, resolveStrictJson } from '../cli-context';
+import { CliUserError } from '../../contracts/user-error';
 
 function parseFlowMode(options: { plan?: boolean; apply?: boolean }): FlowRunMode {
   if (options.apply === true && options.plan === true) {
-    throw new Error('Cannot specify both --plan and --apply.');
+    throw new CliUserError({ summary: 'Cannot specify both --plan and --apply.' });
   }
   if (options.apply === true) {
     return 'apply';
@@ -33,16 +29,22 @@ function parseFlowContextJson(value: string | undefined): Record<string, string>
   if (!value) {
     return {};
   }
-  const raw = readFileSync(value, 'utf8');
+  let raw: string;
+  try {
+    raw = readFileSync(value, 'utf8');
+  } catch (error) {
+    const detail = error instanceof Error ? `: ${error.message}` : '';
+    throw new CliUserError({ summary: `Cannot read context JSON file at "${value}"${detail}` });
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch (error) {
     const detail = error instanceof SyntaxError ? `: ${error.message}` : '';
-    throw new Error(`Failed to parse context JSON at "${value}"${detail}`);
+    throw new CliUserError({ summary: `Failed to parse context JSON at "${value}"${detail}` });
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new Error(`Context JSON at "${value}" must be a plain object.`);
+    throw new CliUserError({ summary: `Context JSON at "${value}" must be a plain object.` });
   }
   const result: Record<string, string> = {};
   for (const [key, val] of Object.entries(parsed as Record<string, unknown>)) {
@@ -65,7 +67,10 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
         intent: item.intent,
         writeCapable: item.writeCapable
       }));
-      const customDefs = await listFlowDefinitions();
+      const { defs: customDefs, skipped } = await listFlowDefinitions();
+      for (const { path: p, reason } of skipped) {
+        ctx.stderr.write(`Warning: skipping invalid flow definition at ${p}: ${reason}\n`);
+      }
       const custom = customDefs.map((item) => ({
         type: 'custom' as const,
         id: item.id,
@@ -113,7 +118,7 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
         }
       ) => {
         if (!hasBuiltInFlowDefinition(options.basedOn)) {
-          throw new Error(`Custom flows must be based on a built-in flow id. Unknown: ${options.basedOn}`);
+          throw new CliUserError({ summary: `Custom flows must be based on a built-in flow id. Unknown: ${options.basedOn}` });
         }
         const defaults = {
           ...parseFlowContextJson(options.contextJson),
@@ -159,7 +164,7 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
         }
       ) => {
         if (options.basedOn && !hasBuiltInFlowDefinition(options.basedOn)) {
-          throw new Error(`Custom flows must be based on a built-in flow id. Unknown: ${options.basedOn}`);
+          throw new CliUserError({ summary: `Custom flows must be based on a built-in flow id. Unknown: ${options.basedOn}` });
         }
         const mergedDefaults = {
           ...parseFlowContextJson(options.contextJson),
@@ -195,7 +200,7 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
     .action(async (options: { file: string; force?: boolean }) => {
       const imported = await importFlowDefinition({ filePath: options.file, force: options.force === true });
       if (!hasBuiltInFlowDefinition(imported.basedOn)) {
-        throw new Error(`Imported flow ${imported.id} references unknown built-in base flow: ${imported.basedOn}`);
+        throw new CliUserError({ summary: `Imported flow ${imported.id} references unknown built-in base flow: ${imported.basedOn}` });
       }
       printJson(ctx.stdout, imported);
     });
@@ -227,7 +232,7 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
           plan?: boolean;
           apply?: boolean;
           resume?: string;
-          outDir?: string;
+          outDir: string;
           inspectProviderScope?: string;
           contextJson?: string;
           var?: string[];
@@ -244,34 +249,15 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
           ...parseFlowVarOptions(options.var)
         };
 
-        let resolvedFlowId = flowId;
-        let defaults: Record<string, string> = {};
-        if (!hasBuiltInFlowDefinition(flowId)) {
-          const custom = await getFlowDefinition(flowId);
-          if (!custom) {
-            throw new Error(`Unknown flow id: ${flowId}`);
-          }
-          if (!hasBuiltInFlowDefinition(custom.basedOn)) {
-            throw new Error(`Custom flow ${flowId} references unknown built-in base flow: ${custom.basedOn}`);
-          }
-          resolvedFlowId = custom.basedOn;
-          defaults = custom.defaults;
-        }
-
-        const definition = getBuiltInFlowDefinition(resolvedFlowId);
+        const settings = await ctx.resolveSettings();
         const summary = await runDeterministicFlow({
           flowId,
-          resolvedFlowId,
-          definition,
           tenantId: options.tenant,
           mode,
-          outDir: options.outDir ?? './tmp/flow-runs',
+          outDir: options.outDir,
           inspectProviderScope,
           resume: options.resume,
-          context: {
-            ...defaults,
-            ...runtimeContext
-          },
+          context: runtimeContext,
           once: options.once === true,
           strictJson: options.strictJson === true,
           profileStore: ctx.profileStore,
@@ -279,7 +265,7 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
           client: await ctx.withClient({ tenantId: options.tenant })
         });
 
-        printJson(ctx.stdout, summary, { strictJson: options.strictJson });
+        printJson(ctx.stdout, summary, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
         if (summary.outcome === 'failed' && summary.classifications.bug > 0) {
           process.exitCode = 1;
         }

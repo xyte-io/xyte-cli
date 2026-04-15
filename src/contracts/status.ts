@@ -1,7 +1,56 @@
 import { z } from 'zod';
 
-import type { ReadinessCheck } from '../config/readiness';
+import type { SecretProvider, TenantProfile } from '../types/profile';
+import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
 import { STATUS_SCHEMA_VERSION } from './versions';
+
+export type ConnectionErrorClass = 'auth' | 'missing_key' | 'network' | 'timeout' | 'rate_limit' | 'unknown';
+
+export type ConnectionState =
+  | 'connected'
+  | 'auth_required'
+  | 'missing_key'
+  | 'network_error'
+  | 'timeout'
+  | 'rate_limited'
+  | 'unknown_error'
+  | 'not_checked';
+
+const CONNECTION_STATES = ['connected', 'auth_required', 'missing_key', 'network_error', 'timeout', 'rate_limited', 'unknown_error', 'not_checked'] as const;
+
+export const CONNECTION_ERROR_CLASSES = ['auth', 'missing_key', 'network', 'timeout', 'rate_limit', 'unknown'] as const;
+
+export const READINESS_STATES = ['ready', 'needs_setup', 'degraded'] as const;
+
+export interface ConnectivityResult {
+  state: ConnectionState;
+  class?: ConnectionErrorClass;
+  message: string;
+  retriable: boolean;
+  endpointKey?: string;
+  statusCode?: number;
+}
+
+export type ReadinessState = 'ready' | 'needs_setup' | 'degraded';
+
+export interface ProviderReadiness {
+  provider: SecretProvider;
+  slotCount: number;
+  activeSlotId?: string;
+  activeSlotName?: string;
+  hasActiveSecret: boolean;
+}
+
+export interface ReadinessCheck {
+  state: ReadinessState;
+  activeTenant?: TenantProfile;
+  tenantId?: string;
+  missingItems: string[];
+  recommendedActions: string[];
+  providers: ProviderReadiness[];
+  connectionState: ConnectivityResult['state'];
+  connectivity: ConnectivityResult;
+}
 
 const StatusModeSchema = z.enum(['fast', 'full']);
 
@@ -14,8 +63,8 @@ const StatusProviderSchema = z.object({
 });
 
 const StatusConnectivitySchema = z.object({
-  state: z.string(),
-  class: z.string().optional(),
+  state: z.enum(CONNECTION_STATES),
+  class: z.enum(['auth', 'missing_key', 'network', 'timeout', 'rate_limit', 'unknown']).optional(),
   message: z.string(),
   retriable: z.boolean(),
   endpointKey: z.string().optional(),
@@ -23,13 +72,33 @@ const StatusConnectivitySchema = z.object({
 });
 
 const StatusReadinessSchema = z.object({
-  state: z.string(),
+  state: z.enum(['ready', 'needs_setup', 'degraded']),
   tenantId: z.string().optional(),
-  activeTenant: z.unknown().optional(),
+  activeTenant: z.object({
+    id: z.string(),
+    name: z.string(),
+    hubBaseUrl: z.string().optional(),
+    entryBaseUrl: z.string().optional(),
+    apiProvider: z.enum([...SUPPORTED_SECRET_PROVIDERS]).optional(),
+    keyRegistry: z.object({
+      slots: z.array(z.object({
+        slotId: z.string(),
+        provider: z.enum([...SUPPORTED_SECRET_PROVIDERS]),
+        name: z.string(),
+        fingerprint: z.string(),
+        createdAt: z.string(),
+        updatedAt: z.string(),
+        lastValidatedAt: z.string().optional()
+      })),
+      activeSlotByProvider: z.record(z.string(), z.string())
+    }),
+    createdAt: z.string(),
+    updatedAt: z.string()
+  }).optional(),
   missingItems: z.array(z.string()),
   recommendedActions: z.array(z.string()),
   providers: z.array(StatusProviderSchema),
-  connectionState: z.string(),
+  connectionState: z.enum(CONNECTION_STATES),
   connectivity: StatusConnectivitySchema
 });
 

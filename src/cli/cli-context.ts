@@ -1,7 +1,7 @@
 import type { Command } from 'commander';
 
-import type { ProfileStore } from '../secure/profile-store';
-import type { SecretStore } from '../secure/secret-store';
+import type { CliActionLogLevel } from './action-logger';
+import type { ProfileStore, SecretStore } from '../types/stores';
 import type { XyteClient } from '../types/client';
 import type { CliOutputMode, ResolvedCliSettingsState, SettingKey } from '../config/settings';
 import { stringifyJsonOutput } from '../utils/json-output';
@@ -34,6 +34,7 @@ export interface CliContext {
     retry?: { attempts?: number; backoffMs?: number };
     flagOverrides?: Partial<Record<SettingKey, unknown>>;
   }) => Promise<XyteClient>;
+  logAction?: (event: string, data?: Record<string, unknown>, level?: CliActionLogLevel) => void;
 }
 
 export interface CliGlobalOptions {
@@ -57,7 +58,7 @@ export function parseCliOutputMode(value: string | undefined): CliOutputMode | u
   if (normalized !== 'auto' && normalized !== 'json' && normalized !== 'text') {
     throw new CliUserError({
       summary: 'Invalid output mode.',
-      cause: `Received "${value}".`,
+      detail: `Received "${value}".`,
       suggestedCommands: ['Use --output auto', 'Use --output json', 'Use --output text']
     });
   }
@@ -65,24 +66,11 @@ export function parseCliOutputMode(value: string | undefined): CliOutputMode | u
 }
 
 export function resolveTextJsonOutput(args: {
-  output?: CliOutputMode | string;
-  format?: string;
+  output?: string;
   stdoutIsTTY: boolean;
   settings: ResolvedCliSettingsState;
 }): OutputFormat {
-  const explicitOutput = parseCliOutputMode(args.output as string | undefined);
-  const localFormat = args.format?.trim().toLowerCase();
-  if (localFormat) {
-    if (localFormat !== 'json' && localFormat !== 'text') {
-      throw new CliUserError({
-        summary: 'Invalid format.',
-        cause: `Received "${args.format}".`,
-        suggestedCommands: ['Use --output json', 'Use --output text']
-      });
-    }
-    return localFormat;
-  }
-
+  const explicitOutput = parseCliOutputMode(args.output);
   const mode = explicitOutput ?? args.settings.values.output.mode;
   if (mode === 'auto') {
     return args.stdoutIsTTY ? 'text' : 'json';
@@ -104,4 +92,16 @@ export function printJson(
 ): void {
   const json = stringifyJsonOutput(value, options);
   stream.write(`${json ?? 'null'}\n`);
+}
+
+export function requireTenantId(tenantId: string | undefined, commandLabel: string): asserts tenantId is string {
+  if (!tenantId) {
+    throw new CliUserError({
+      summary: `Missing tenant for ${commandLabel}.`,
+      suggestedCommands: [
+        'Use --tenant <tenant-id>',
+        'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>'
+      ]
+    });
+  }
 }

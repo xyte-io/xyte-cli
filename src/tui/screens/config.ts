@@ -1,9 +1,9 @@
 import blessed from 'blessed';
 
-import { createXyteClient } from '../../client/create-client';
+import { runSlotConnectivityTest } from '../../client/probe';
 import {
   clampIndex,
-  movePaneWithBoundary,
+  handleHorizontalArrow,
   moveTableSelection,
   scrollBox,
   setListTableData,
@@ -14,8 +14,13 @@ import { SCREEN_PANE_CONFIG } from '../panes';
 import { sceneFromConfigState } from '../scene';
 import { runKeyCreateWizard, runKeyUpdateWizard } from '../key-wizard';
 import type { SecretProvider } from '../../types/profile';
-import { PROVIDER_ORG, PROVIDER_PARTNER, SUPPORTED_SECRET_PROVIDERS } from '../../types/profile';
-import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
+import { PROVIDER_ORG, SUPPORTED_SECRET_PROVIDERS } from '../../types/profile';
+import { CliUserError } from '../../contracts/user-error';
+import type { TuiArrowKey, TuiContext, NavigableScreen } from '../types';
+import { readConfigData } from '../data-loaders';
+import { createRenderErrorTracker } from '../render-error-tracker';
+import { createScreenRenderLogger, logScreenDataFetch } from '../screen-render-logger';
+import { errorMessage } from '../../utils/error-format';
 
 const PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
 
@@ -32,35 +37,13 @@ async function runSlotConnectivityProbe(args: {
   const { context, tenantId, provider, slotId } = args;
   const secret = await context.secretStore.getSlotSecret(tenantId, provider, slotId);
   if (!secret) {
-    throw new Error(`No secret found for slot ${slotId} (${provider}).`);
+    throw new CliUserError({ summary: `No secret found for slot ${slotId} (${provider}).` });
   }
-
-  if (provider === PROVIDER_ORG) {
-    const client = createXyteClient({
-      profileStore: context.profileStore,
-      secretStore: context.secretStore,
-      tenantId,
-      auth: { organization: secret }
-    });
-    await client.organization.getOrganizationInfo({ tenantId });
-    return 'organization.getOrganizationInfo ok';
-  }
-
-  if (provider === PROVIDER_PARTNER) {
-    const client = createXyteClient({
-      profileStore: context.profileStore,
-      secretStore: context.secretStore,
-      tenantId,
-      auth: { partner: secret }
-    });
-    await client.partner.getDevices({ tenantId });
-    return 'partner.getDevices ok';
-  }
-
-  throw new Error(`Unrecognized provider: ${provider}`);
+  const result = await runSlotConnectivityTest({ provider, tenantId, key: secret, profileStore: context.profileStore });
+  return result.strategy;
 }
 
-export function createConfigScreen(): TuiScreen {
+export function createConfigScreen(): NavigableScreen {
   let root: blessed.Widgets.BoxElement | undefined;
   let providerTable: blessed.Widgets.ListTableElement | undefined;
   let slotTable: blessed.Widgets.ListTableElement | undefined;
@@ -95,6 +78,8 @@ export function createConfigScreen(): TuiScreen {
   const paneConfig = SCREEN_PANE_CONFIG.config;
   let activePane = paneConfig.defaultPane;
   let isMounted = false;
+  const renderErrors = createRenderErrorTracker();
+  const renderLog = createScreenRenderLogger('config', () => context.debugLog, renderErrors);
 
   const focusPane = () => {
     if (activePane === 'providers-table') {
@@ -114,31 +99,14 @@ export function createConfigScreen(): TuiScreen {
     }
 
     const activeTenantId = await context.getActiveTenantId();
-    const allSlots = activeTenantId ? await context.profileStore.listKeySlots(activeTenantId) : [];
-
-    providerRowsState = [];
-    for (const provider of PROVIDERS) {
-      const providerSlots = allSlots.filter((slot) => slot.provider === provider);
-      const activeSlot = activeTenantId
-        ? await context.profileStore.getActiveKeySlot(activeTenantId, provider)
-        : undefined;
-      const hasActiveSecret =
-        activeTenantId && activeSlot
-          ? Boolean(await context.secretStore.getSlotSecret(activeTenantId, provider, activeSlot.slotId))
-          : false;
-
-      providerRowsState.push({
-        provider,
-        slotCount: providerSlots.length,
-        activeSlot: activeSlot?.slotId ?? 'none',
-        hasSecret: hasActiveSecret ? 'yes' : 'no',
-        lastValidatedAt: activeSlot?.lastValidatedAt
-      });
-    }
+    logScreenDataFetch(context.debugLog, 'config', 'start', { tenantId: activeTenantId });
+    const { providerRows } = await readConfigData(context.profileStore, context.secretStore, activeTenantId);
+    providerRowsState = providerRows;
 
     selectedProviderIndex = clampIndex(selectedProviderIndex, providerRowsState.length);
     const selectedProvider = providerRowsState[selectedProviderIndex]?.provider ?? PROVIDER_ORG;
 
+    const allSlots = activeTenantId ? await context.profileStore.listKeySlots(activeTenantId) : [];
     const filteredSlots = allSlots.filter((slot) => slot.provider === selectedProvider);
     const activeForProvider =
       activeTenantId && selectedProvider
@@ -159,47 +127,62 @@ export function createConfigScreen(): TuiScreen {
       }))
     );
     selectedSlotIndex = clampIndex(selectedSlotIndex, slotRowsState.length);
+    logScreenDataFetch(context.debugLog, 'config', 'complete', { tenantId: activeTenantId });
 
-    const panels = sceneFromConfigState({
-      tenantId: activeTenantId,
-      providerRows: providerRowsState,
-      selectedProvider,
-      slotRows: slotRowsState,
-      selectedSlot: slotRowsState[selectedSlotIndex],
-      doctorStatus
-    });
+    renderLog.onRenderStart();
+    try {
+      const panels = sceneFromConfigState({
+        tenantId: activeTenantId,
+        providerRows: providerRowsState,
+        selectedProvider,
+        slotRows: slotRowsState,
+        selectedSlot: slotRowsState[selectedSlotIndex],
+        doctorStatus
+      });
 
-    const providerPanel = panels.find((panel) => panel.id === 'config-providers');
-    const slotPanel = panels.find((panel) => panel.id === 'config-slots');
-    const actionPanel = panels.find((panel) => panel.id === 'config-actions');
+      const providerPanel = panels.find((panel) => panel.id === 'config-providers');
+      const slotPanel = panels.find((panel) => panel.id === 'config-slots');
+      const actionPanel = panels.find((panel) => panel.id === 'config-actions');
 
-    setListTableData(
-      providerTable,
-      [
-        (providerPanel?.table?.columns ?? ['Provider', 'Slots', 'Active Slot', 'Has Secret', 'Last Validated']) as [
-          string,
-          string,
-          string,
-          string,
-          string
+      setListTableData(
+        providerTable,
+        [
+          (providerPanel?.table?.columns ?? ['Provider', 'Slots', 'Active Slot', 'Has Secret', 'Last Validated']) as [
+            string,
+            string,
+            string,
+            string,
+            string
+          ],
+          ...((providerPanel?.table?.rows ?? []) as Array<[string, string, string, string, string]>)
         ],
-        ...((providerPanel?.table?.rows ?? []) as Array<[string, string, string, string, string]>)
-      ],
-      providerSelectionSync
-    );
-    syncListSelection(providerTable, selectedProviderIndex, providerSelectionSync);
+        providerSelectionSync
+      );
+      syncListSelection(providerTable, selectedProviderIndex, providerSelectionSync);
 
-    setListTableData(
-      slotTable,
-      [
-        (slotPanel?.table?.columns ?? ['Provider', 'Slot', 'Active', 'Secret']) as [string, string, string, string],
-        ...((slotPanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
-      ],
-      slotSelectionSync
-    );
-    syncListSelection(slotTable, selectedSlotIndex, slotSelectionSync);
+      setListTableData(
+        slotTable,
+        [
+          (slotPanel?.table?.columns ?? ['Provider', 'Slot', 'Active', 'Secret']) as [string, string, string, string],
+          ...((slotPanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
+        ],
+        slotSelectionSync
+      );
+      syncListSelection(slotTable, selectedSlotIndex, slotSelectionSync);
 
-    actionBox?.setContent((actionPanel?.text?.lines ?? []).join('\n'));
+      actionBox?.setContent((actionPanel?.text?.lines ?? []).join('\n'));
+      renderErrors.recordSuccess();
+      renderLog.onRenderComplete();
+    } catch (error) {
+      const message = errorMessage(error);
+      renderErrors.recordError(message);
+      renderLog.onRenderError(message);
+      actionBox?.setContent([
+        'Unable to render config safely.',
+        `Reason: ${message}`,
+        'Try refreshing (r).'
+      ].join('\n'));
+    }
     focusPane();
     context.screen.render();
   };
@@ -299,16 +282,12 @@ export function createConfigScreen(): TuiScreen {
       return paneConfig.panes;
     },
     async handleArrow(key: TuiArrowKey) {
-      if (key === 'left' || key === 'right') {
-        const next = movePaneWithBoundary(paneConfig.panes, activePane, key);
-        if (next.boundary) {
-          return 'boundary';
-        }
-        activePane = next.pane;
+      const h = handleHorizontalArrow(key, paneConfig.panes, activePane, (newPane) => {
+        activePane = newPane;
         focusPane();
         context.setStatus(`Pane: ${activePane}`);
-        return 'handled';
-      }
+      });
+      if (h !== null) return h;
 
       const delta = key === 'up' ? -1 : key === 'down' ? 1 : 0;
       if (!delta) {

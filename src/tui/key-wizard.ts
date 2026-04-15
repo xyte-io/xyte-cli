@@ -1,3 +1,4 @@
+import { CliUserError } from '../contracts/user-error';
 import { makeKeyFingerprint, matchesSlotRef } from '../secure/key-slots';
 import type { ApiKeySlotMeta, SecretProvider } from '../types/profile';
 import { PROVIDER_ORG, SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
@@ -80,23 +81,19 @@ async function promptProvider(
 }
 
 async function promptNonEmpty(context: WizardContext, message: string, initial: string): Promise<string | undefined> {
-  while (true) {
-    const input = await context.prompt(message, initial);
-    if (input === undefined || !input.trim()) {
-      return undefined;
-    }
-    return input.trim();
+  const input = await context.prompt(message, initial);
+  if (input === undefined || !input.trim()) {
+    return undefined;
   }
+  return input.trim();
 }
 
 async function promptSecretNonEmpty(context: WizardContext, message: string): Promise<string | undefined> {
-  while (true) {
-    const input = await context.promptSecret(message, '');
-    if (input === undefined || !input.trim()) {
-      return undefined;
-    }
-    return input.trim();
+  const input = await context.promptSecret(message, '');
+  if (input === undefined || !input.trim()) {
+    return undefined;
   }
+  return input.trim();
 }
 
 async function promptYesNo(
@@ -156,8 +153,7 @@ export async function runKeyCreateWizard(args: RunKeyCreateWizardArgs): Promise<
     return canceledResult();
   }
 
-  const slot = await context.profileStore.addKeySlot(tenantId, {
-    provider,
+  const slot = await context.profileStore.addKeySlot(tenantId, provider, {
     name: slotName,
     fingerprint
   });
@@ -191,7 +187,7 @@ export async function runKeyUpdateWizard(args: RunKeyUpdateWizardArgs): Promise<
   const slots = await context.profileStore.listKeySlots(tenantId, provider);
   const slot = slots.find((item) => matchesSlotRef(item, slotRef));
   if (!slot) {
-    throw new Error(`Unknown slot "${slotRef}" for ${provider}.`);
+    throw new CliUserError({ summary: `Unknown slot "${slotRef}" for ${provider}.` });
   }
 
   const slotName = await promptNonEmpty(context, 'Slot name:', slot.name);

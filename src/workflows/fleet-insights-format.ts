@@ -35,42 +35,44 @@ export function formatFleetInspectAscii(result: FleetInspectResult): string {
   ].join('\n');
 }
 
+function deepDiveSectionFlags(result: DeepDiveResult) {
+  return {
+    hasOfflineSpaceData: result.topOfflineSpaces.length > 0,
+    hasIncidentData:
+      result.topIncidentDevices.length > 0 ||
+      result.activeIncidentAging.length > 0 ||
+      result.churnWindow.incidents > 0 ||
+      result.churnWindow.bySpace.length > 0 ||
+      result.churnWindow.byDevice.length > 0,
+    hasTicketData: result.ticketPosture.openTickets > 0 || result.ticketPosture.oldestOpenTickets.length > 0
+  };
+}
+
 export function formatDeepDiveAscii(result: DeepDiveResult): string {
-  const hasOfflineSpaceData = result.topOfflineSpaces.length > 0;
-  const hasIncidentData =
-    result.topIncidentDevices.length > 0 ||
-    result.activeIncidentAging.length > 0 ||
-    result.churnWindow.incidents > 0 ||
-    result.churnWindow.bySpace.length > 0 ||
-    result.churnWindow.byDevice.length > 0;
-  const hasTicketData = result.ticketPosture.openTickets > 0 || result.ticketPosture.oldestOpenTickets.length > 0;
+  const { hasOfflineSpaceData, hasIncidentData, hasTicketData } = deepDiveSectionFlags(result);
 
   const lines: string[] = [];
   lines.push(`Deep Dive (${result.tenantId})`);
   lines.push(`Generated: ${result.generatedAtUtc}`);
   lines.push('');
   lines.push('SUMMARY');
-  result.summary.forEach((line) => lines.push(`- ${line}`));
+  lines.push(...result.summary.map((line) => `- ${line}`));
 
   if (hasOfflineSpaceData) {
     lines.push('');
     lines.push('TOP OFFLINE SPACES');
-    result.topOfflineSpaces.forEach((row) =>
-      lines.push(`${row.space} | offline=${row.offlineDevices} | share=${row.shareOfOfflinePct}%`)
-    );
+    lines.push(...result.topOfflineSpaces.map((row) => `${row.space} | offline=${row.offlineDevices} | share=${row.shareOfOfflinePct}%`));
   }
 
   if (hasIncidentData) {
     lines.push('');
     lines.push('TOP INCIDENT DEVICES');
-    result.topIncidentDevices.forEach((row) =>
-      lines.push(`${row.device} | incidents=${row.incidentCount} | active=${row.activeIncidents}`)
-    );
+    lines.push(...result.topIncidentDevices.map((row) => `${row.device} | incidents=${row.incidentCount} | active=${row.activeIncidents}`));
     lines.push('');
     lines.push(
       `${result.windowHours}H CHURN: incidents=${result.churnWindow.incidents} devices=${result.churnWindow.devices} spaces=${result.churnWindow.spaces}`
     );
-    result.churnWindow.bySpace.forEach((row) => lines.push(`space: ${row.space} -> ${row.incidents}`));
+    lines.push(...result.churnWindow.bySpace.map((row) => `space: ${row.space} -> ${row.incidents}`));
   }
 
   if (hasTicketData) {
@@ -85,14 +87,7 @@ export function formatDeepDiveAscii(result: DeepDiveResult): string {
 }
 
 export function formatDeepDiveMarkdown(result: DeepDiveResult, includeSensitive = false): string {
-  const hasOfflineSpaceData = result.topOfflineSpaces.length > 0;
-  const hasIncidentData =
-    result.topIncidentDevices.length > 0 ||
-    result.activeIncidentAging.length > 0 ||
-    result.churnWindow.incidents > 0 ||
-    result.churnWindow.bySpace.length > 0 ||
-    result.churnWindow.byDevice.length > 0;
-  const hasTicketData = result.ticketPosture.openTickets > 0 || result.ticketPosture.oldestOpenTickets.length > 0;
+  const { hasOfflineSpaceData, hasIncidentData, hasTicketData } = deepDiveSectionFlags(result);
   const hasDataQualityIssues = result.dataQuality.statusMismatches.length > 0;
   const partnerHighlights = result.summary.filter((line) => line.startsWith('Partner '));
 
@@ -105,13 +100,13 @@ export function formatDeepDiveMarkdown(result: DeepDiveResult, includeSensitive 
   markdown.push('');
   markdown.push('## Summary');
   markdown.push('');
-  result.summary.forEach((line) => markdown.push(`- ${line}`));
+  markdown.push(...result.summary.map((line) => `- ${line}`));
 
   if (partnerHighlights.length > 0) {
     markdown.push('');
     markdown.push('## Partner Highlights');
     markdown.push('');
-    partnerHighlights.forEach((line) => markdown.push(`- ${line}`));
+    markdown.push(...partnerHighlights.map((line) => `- ${line}`));
   }
 
   if (hasOfflineSpaceData) {
@@ -120,9 +115,7 @@ export function formatDeepDiveMarkdown(result: DeepDiveResult, includeSensitive 
     markdown.push('');
     markdown.push('| Space | Offline Devices | Share |');
     markdown.push('| --- | ---: | ---: |');
-    result.topOfflineSpaces.forEach((row) =>
-      markdown.push(`| ${row.space} | ${row.offlineDevices} | ${row.shareOfOfflinePct}% |`)
-    );
+    markdown.push(...result.topOfflineSpaces.map((row) => `| ${row.space} | ${row.offlineDevices} | ${row.shareOfOfflinePct}% |`));
   }
 
   if (hasIncidentData) {
@@ -131,9 +124,7 @@ export function formatDeepDiveMarkdown(result: DeepDiveResult, includeSensitive 
     markdown.push('');
     markdown.push('| Device | Incidents | Active |');
     markdown.push('| --- | ---: | ---: |');
-    result.topIncidentDevices.forEach((row) =>
-      markdown.push(`| ${row.device} | ${row.incidentCount} | ${row.activeIncidents} |`)
-    );
+    markdown.push(...result.topIncidentDevices.map((row) => `| ${row.device} | ${row.incidentCount} | ${row.activeIncidents} |`));
     markdown.push('');
     markdown.push(`## ${result.windowHours}-Hour Churn`);
     markdown.push('');
@@ -144,13 +135,13 @@ export function formatDeepDiveMarkdown(result: DeepDiveResult, includeSensitive 
       markdown.push('');
       markdown.push('| Space | Incidents |');
       markdown.push('| --- | ---: |');
-      result.churnWindow.bySpace.forEach((row) => markdown.push(`| ${row.space} | ${row.incidents} |`));
+      markdown.push(...result.churnWindow.bySpace.map((row) => `| ${row.space} | ${row.incidents} |`));
     }
     if (result.churnWindow.byDevice.length > 0) {
       markdown.push('');
       markdown.push('| Device | Incidents |');
       markdown.push('| --- | ---: |');
-      result.churnWindow.byDevice.forEach((row) => markdown.push(`| ${row.device} | ${row.incidents} |`));
+      markdown.push(...result.churnWindow.byDevice.map((row) => `| ${row.device} | ${row.incidents} |`));
     }
   }
 
@@ -168,14 +159,12 @@ export function formatDeepDiveMarkdown(result: DeepDiveResult, includeSensitive 
       markdown.push('');
       markdown.push('| Ticket ID | Title | Age (h) | Device ID | Created At |');
       markdown.push('| --- | --- | ---: | --- | --- |');
-      result.ticketPosture.oldestOpenTickets.slice(0, 10).forEach((row) => {
-        markdown.push(
-          `| ${redactForDisplay(row.ticketId, includeSensitive)} | ${row.title} | ${row.ageHours} | ${redactForDisplay(
-            row.deviceId,
-            includeSensitive
-          )} | ${row.createdAtUtc} |`
-        );
-      });
+      markdown.push(
+        ...result.ticketPosture.oldestOpenTickets.slice(0, 10).map(
+          (row) =>
+            `| ${redactForDisplay(row.ticketId, includeSensitive)} | ${row.title} | ${row.ageHours} | ${redactForDisplay(row.deviceId, includeSensitive)} | ${row.createdAtUtc} |`
+        )
+      );
     }
   }
 
@@ -185,9 +174,7 @@ export function formatDeepDiveMarkdown(result: DeepDiveResult, includeSensitive 
     markdown.push('');
     markdown.push('| Device | Status | state.status | Last Seen | Space |');
     markdown.push('| --- | --- | --- | --- | --- |');
-    result.dataQuality.statusMismatches.forEach((row) =>
-      markdown.push(`| ${row.device} | ${row.status} | ${row.stateStatus} | ${row.lastSeen} | ${row.space} |`)
-    );
+    markdown.push(...result.dataQuality.statusMismatches.map((row) => `| ${row.device} | ${row.status} | ${row.stateStatus} | ${row.lastSeen} | ${row.space} |`));
   }
 
   return markdown.join('\n');

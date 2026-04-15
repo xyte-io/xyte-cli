@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xyte.dev/schemas/flow-run.v1.schema.json",
+  "title": "Xyte Flow Run V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generatedAtUtc",
+    "runId",
+    "flowId",
+    "resolvedFlowId",
+    "mode",
+    "tenantId",
+    "bundleDir",
+    "manifestPath",
+    "inputsPath",
+    "decisionsPath",
+    "errorsPath",
+    "watchFramesPath",
+    "startedAtUtc",
+    "endedAtUtc",
+    "durationMs",
+    "outcome",
+    "steps",
+    "decisions",
+    "classifications",
+    "cursor"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "xyte.flow.run.v1"
+    },
+    "generatedAtUtc": {
+      "type": "string"
+    },
+    "runId": {
+      "type": "string"
+    },
+    "flowId": {
+      "type": "string"
+    },
+    "resolvedFlowId": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["plan", "apply"]
+    },
+    "tenantId": {
+      "type": "string"
+    },
+    "bundleDir": {
+      "type": "string"
+    },
+    "manifestPath": {
+      "type": "string"
+    },
+    "inputsPath": {
+      "type": "string"
+    },
+    "decisionsPath": {
+      "type": "string"
+    },
+    "errorsPath": {
+      "type": "string"
+    },
+    "watchFramesPath": {
+      "type": "string"
+    },
+    "startedAtUtc": {
+      "type": "string"
+    },
+    "endedAtUtc": {
+      "type": "string"
+    },
+    "durationMs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "resumeFrom": {
+      "type": "string"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": ["completed", "pending_gate", "needs_input", "failed"]
+    },
+    "nextResumeStepId": {
+      "type": "string"
+    },
+    "resumeCommand": {
+      "type": "string"
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["stepId", "title", "kind", "command", "status"],
+        "properties": {
+          "stepId": { "type": "string" },
+          "title": { "type": "string" },
+          "kind": { "type": "string", "enum": ["task", "gate"] },
+          "command": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "completed", "failed", "gate_pending", "gate_approved", "skipped"]
+          },
+          "startedAtUtc": { "type": "string" },
+          "endedAtUtc": { "type": "string" },
+          "durationMs": { "type": "integer", "minimum": 0 },
+          "artifactPath": { "type": "string" },
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "title", "detail", "xyteCode", "retriable"],
+            "properties": {
+              "type": { "type": "string" },
+              "title": { "type": "string" },
+              "status": { "type": "integer" },
+              "detail": { "type": "string" },
+              "instance": { "type": "string" },
+              "xyteCode": { "type": "string" },
+              "retriable": { "type": "boolean" },
+              "upstream": {}
+            }
+          },
+          "classification": {
+            "type": "string",
+            "enum": ["needs_data", "bug"]
+          },
+          "note": { "type": "string" }
+        }
+      }
+    },
+    "decisions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pending", "approved", "blocked"],
+      "properties": {
+        "pending": { "type": "integer", "minimum": 0 },
+        "approved": { "type": "integer", "minimum": 0 },
+        "blocked": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "classifications": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["needs_data", "bug"],
+      "properties": {
+        "needs_data": { "type": "integer", "minimum": 0 },
+        "bug": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "cursor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nextStepIndex"],
+      "properties": {
+        "nextStepIndex": { "type": "integer", "minimum": 0 },
+        "nextStepId": { "type": "string" }
+      }
+    }
+  }
+}

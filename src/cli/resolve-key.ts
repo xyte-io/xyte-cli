@@ -4,10 +4,10 @@ import { CliUserError } from '../contracts/user-error';
 import { errorMessage } from '../utils/error-format';
 import type { OutputStream, PromptValueFn } from './cli-context';
 
-function createSecretConflictError(cause: string): CliUserError {
+function createSecretConflictError(detail: string): CliUserError {
   return new CliUserError({
     summary: 'Conflicting API key sources.',
-    cause,
+    detail,
     suggestedCommands: ['Use exactly one of --key, --key-file, --key-stdin, or XYTE_CLI_KEY']
   });
 }
@@ -19,7 +19,7 @@ async function readKeyFileValue(keyFile: string): Promise<string | undefined> {
   } catch (error) {
     throw new CliUserError({
       summary: 'Could not read API key file.',
-      cause: `${keyFile}: ${errorMessage(error)}`,
+      detail: `${keyFile}: ${errorMessage(error)}`,
       suggestedCommands: [
         'Use --key-file <path> with a readable UTF-8 file.',
         'Use --key-stdin if you prefer piping the key.'

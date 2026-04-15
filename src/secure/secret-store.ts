@@ -5,7 +5,10 @@ import type { SecretProvider } from '../types/profile';
 import { isSecretProvider } from '../types/profile';
 import { getXyteConfigDir } from '../utils/config-dir';
 import { errorMessage } from '../utils/error-format';
+import { getLogger } from '../observability/logger';
 import { DEFAULT_SLOT_ID } from './key-slots';
+import { CliUserError } from '../contracts/user-error';
+import type { SecretStore } from '../types/stores';
 
 const SECRET_STORE_VERSION = 1;
 
@@ -19,14 +22,7 @@ const EMPTY_SECRETS: PersistedSecrets = {
   records: {}
 };
 
-export interface SecretStore {
-  setSecret(tenantId: string, provider: SecretProvider, value: string): Promise<void>;
-  getSecret(tenantId: string, provider: SecretProvider): Promise<string | undefined>;
-  clearSecret(tenantId: string, provider: SecretProvider): Promise<void>;
-  setSlotSecret(tenantId: string, provider: SecretProvider, slotId: string, value: string): Promise<void>;
-  getSlotSecret(tenantId: string, provider: SecretProvider, slotId: string): Promise<string | undefined>;
-  clearSlotSecret(tenantId: string, provider: SecretProvider, slotId: string): Promise<void>;
-}
+export type { SecretStore } from '../types/stores';
 
 function accountKey(tenantId: string, provider: SecretProvider, slotId: string): string {
   return `${tenantId}:${provider}:${slotId}`;
@@ -108,18 +104,6 @@ export class FileSecretStore implements SecretStore {
     await this.writeData(data);
   }
 
-  async setSecret(tenantId: string, provider: SecretProvider, value: string): Promise<void> {
-    await this.setSlotSecret(tenantId, provider, DEFAULT_SLOT_ID, value);
-  }
-
-  async getSecret(tenantId: string, provider: SecretProvider): Promise<string | undefined> {
-    return await this.getSlotSecret(tenantId, provider, DEFAULT_SLOT_ID);
-  }
-
-  async clearSecret(tenantId: string, provider: SecretProvider): Promise<void> {
-    await this.clearSlotSecret(tenantId, provider, DEFAULT_SLOT_ID);
-  }
-
   private async readData(): Promise<PersistedSecrets> {
     let content: string;
     try {
@@ -135,14 +119,14 @@ export class FileSecretStore implements SecretStore {
         maybeErrno.code === 'EROFS' ||
         maybeErrno.code === 'ENOTDIR'
       ) {
-        throw new Error(
-          `Cannot read secret store at ${this.filePath}. Check file permissions or directory access (error=${maybeErrno.code}).`
-        );
+        throw new CliUserError({
+          summary: `Cannot read secret store at ${this.filePath}. Check file permissions or directory access (error=${maybeErrno.code}).`
+        });
       }
       if (maybeErrno instanceof Error) {
-        throw new Error(`Failed to read secret store at ${this.filePath}: ${maybeErrno.message}`);
+        throw new CliUserError({ summary: `Failed to read secret store at ${this.filePath}: ${maybeErrno.message}` });
       }
-      throw new Error(`Failed to read secret store at ${this.filePath}.`);
+      throw new CliUserError({ summary: `Failed to read secret store at ${this.filePath}.` });
     }
 
     let parsed: unknown;
@@ -150,18 +134,18 @@ export class FileSecretStore implements SecretStore {
       parsed = JSON.parse(content) as PersistedSecrets;
     } catch (error) {
       const detail = errorMessage(error);
-      throw new Error(
-        `Secret store is invalid at ${this.filePath}: ${detail}. Delete or fix this file and rerun setup.`
-      );
+      throw new CliUserError({
+        summary: `Secret store is invalid at ${this.filePath}: ${detail}. Delete or fix this file and rerun setup.`
+      });
     }
 
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new Error(`Secret store is invalid at ${this.filePath}. Delete or fix this file and rerun setup.`);
+      throw new CliUserError({ summary: `Secret store is invalid at ${this.filePath}. Delete or fix this file and rerun setup.` });
     }
 
     const asRecord = parsed as PersistedSecrets;
     if (!asRecord.records || typeof asRecord.records !== 'object' || Array.isArray(asRecord.records)) {
-      throw new Error(`Secret store is invalid at ${this.filePath}. Delete or fix this file and rerun setup.`);
+      throw new CliUserError({ summary: `Secret store is invalid at ${this.filePath}. Delete or fix this file and rerun setup.` });
     }
 
     const normalized = cloneData({
@@ -178,7 +162,7 @@ export class FileSecretStore implements SecretStore {
         // Best-effort migration: continue returning normalized data even if we cannot write.
         // This avoids breaking reads when the secrets file is readable but not writable (e.g. read-only filesystem).
          
-        console.warn(`Failed to persist normalized secret data to ${this.filePath}:`, writeError);
+        getLogger().warn({ file: this.filePath, errorMessage: errorMessage(writeError) }, 'Failed to persist normalized secret data');
       }
     }
     return normalized;

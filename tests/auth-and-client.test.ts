@@ -12,8 +12,8 @@ describe('client auth behavior', () => {
     await profileStore.setActiveTenant('acme');
 
     const secretStore = new MemorySecretStore();
-    const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'primary',
       fingerprint: 'sha256:org'
     });
@@ -40,8 +40,8 @@ describe('client auth behavior', () => {
       request: vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } })
     } as any;
 
-    await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'missing-secret',
       fingerprint: 'sha256:none'
     });
@@ -56,8 +56,8 @@ describe('client auth behavior', () => {
     await profileStore.setActiveTenant('acme');
 
     const secretStore = new MemorySecretStore();
-    const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-partner',
+    const slot = await profileStore.addKeySlot('acme', 'xyte-partner', {
+      
       name: 'partner-primary',
       fingerprint: 'sha256:partner'
     });
@@ -80,13 +80,13 @@ describe('client auth behavior', () => {
     await profileStore.setActiveTenant('acme');
 
     const secretStore = new MemorySecretStore();
-    const slotA = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slotA = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'slot-a',
       fingerprint: 'sha256:a'
     });
-    const slotB = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slotB = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'slot-b',
       fingerprint: 'sha256:b'
     });

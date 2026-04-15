@@ -304,7 +304,7 @@ describe('fleet insights provider scope', () => {
     fixture.partner.getDeviceInfo.mockImplementation(async () => {
       active += 1;
       maxActive = Math.max(maxActive, active);
-      await new Promise((resolve) => setTimeout(resolve, 20));
+      await Promise.resolve(); // yield to let other workers start before decrementing
       active -= 1;
       return { device: { model: 'Model A', firmware_version: '1.0.0', last_seen_at: new Date().toISOString() } };
     });

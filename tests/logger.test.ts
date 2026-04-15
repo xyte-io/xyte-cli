@@ -10,7 +10,7 @@ describe('getLogger', () => {
     expect(typeof logger.debug).toBe('function');
   });
 
-  it('returns the same singleton on subsequent calls', () => {
+  it('returns the same singleton instance on repeated calls', () => {
     const a = getLogger();
     const b = getLogger();
     expect(a).toBe(b);

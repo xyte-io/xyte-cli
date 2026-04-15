@@ -9,6 +9,7 @@ Use it as a unified map for flow runner execution, utility pipelines, and endpoi
 - [`flow.incidents-delta-watch`](flows/agent-ops.md#flowincidents-delta-watch): stream incident snapshots and deltas as watch frames.
 - [`flow.watch-to-triage`](flows/agent-ops.md#flowwatch-to-triage): convert watch output into inspect/report triage artifacts.
 - [`flow.guided-remediation`](flows/agent-ops.md#flowguided-remediation): execute org command/ticket/incident actions with verification.
+- [`flow.device-migration`](flows/agent-ops.md#flowdevice-migration): inventory, match, dry-run, execute, and verify device migration.
 - [`flow.daily-deep-dive-report`](flows/agent-ops.md#flowdaily-deep-dive-report): produce daily deep-dive JSON and markdown report outputs.
 
 ## Flow Commands
@@ -36,11 +37,16 @@ xyte-cli flow import --file <path> [--force]
 ## Core
 
 ```bash
-xyte-cli init [--scope project|user|both] [--agents all|claude|copilot|codex] [--force] [--no-setup] [--require-setup]
+xyte-cli init [--target <path>] [--scope project|user|both] [--agents all|claude|copilot|codex] [--force] [--no-setup] [--require-setup]
 xyte-cli status [--tenant <tenant-id>] [--mode fast|full] [--output json|text]
 xyte-cli setup status [--tenant <tenant-id>] [--output json] [--field tenantId]
-xyte-cli setup run [--non-interactive] [--tenant <tenant-id>] [--name <display-name>] [--provider xyte-org|xyte-partner] [--key <value>|--key-file <path>|--key-stdin] [--connectivity auto|always|never]
+xyte-cli setup run [--non-interactive] [--advanced] [--tenant <tenant-id>] [--name <display-name>] [--provider xyte-org|xyte-partner] [--key <value>|--key-file <path>|--key-stdin] [--connectivity auto|always|never]
+xyte-cli config show [--scope user|workspace|resolved] [--format json|text]
+xyte-cli config path [--format json|text]
+xyte-cli config set <key> <value> [--scope user|workspace]
+xyte-cli config unset <key> [--scope user|workspace]
 xyte-cli config doctor --tenant <tenant-id> --output json
+xyte-cli doctor install [--format json|text]
 xyte-cli upgrade --check --output json
 xyte-cli upgrade --yes --output json
 xyte-cli --log-actions [--log-actions-verbose] status --tenant <tenant-id>
@@ -67,6 +73,7 @@ Setup notes:
 xyte-cli config tenant add <tenant-id> --name "Acme"
 xyte-cli config tenant use <tenant-id>
 xyte-cli config tenant list
+xyte-cli config tenant remove <tenant-id>
 
 xyte-cli config key add --tenant <tenant-id> --name primary --key "<value>" --set-active
 xyte-cli config key add --tenant <tenant-id> --name primary --key-file ~/.config/xyte/acme.key --set-active
@@ -90,7 +97,7 @@ Auth note:
 xyte-cli api endpoints list
 xyte-cli api endpoints describe organization.devices.getDevices
 xyte-cli api call organization.devices.getDevices --tenant <tenant-id>
-xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --output-mode envelope --strict-json
+xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --output-mode envelope --strict-json [--note <text>]
 xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once
 xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 10
 ```
@@ -142,7 +149,7 @@ xyte-cli api call organization.commands.cancelCommand \
   --path-json '{"device_id":"DEVICE_ID","command_id":"COMMAND_ID"}'
 ```
 
-## Utility Pipelines And Space Import
+## Utility Pipelines, Space Import, And Device Migration
 
 ```bash
 xyte-cli util list-actions --output text
@@ -150,23 +157,32 @@ xyte-cli util list-actions --output text
 xyte-cli util prepare \
   --action organization.devices.claimDevice \
   --input ./raw-claims.xlsx \
-  --output-dir ./prepared
+  --output-dir ./prepared [--primary-format csv|jsonl] [--force]
 
 xyte-cli util prepare \
   --action space.import-tree \
   --input ./raw-hierarchy.pdf \
   --output-dir ./prepared
 
-xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv
-xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv --apply --report ./reports/space-import.apply.ndjson
+xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv \
+  [--input-format auto|csv|json|jsonl] [--path-field <name>] [--space-type-field <name>] [--config-field <name>] \
+  [--apply] [--continue-on-error] [--report <path>]
+
+xyte-cli util match \
+  --source ./source-devices.json --target ./target-spaces.json \
+  --source-field name --target-field name \
+  --out ./device-moves.csv [--tenant <tenant-id>] [--strict-json]
+
+xyte-cli util move-devices --tenant <tenant-id> --input ./device-moves.csv \
+  [--input-format auto|csv|json|jsonl] [--apply] [--continue-on-error] [--report <path>]
 ```
 
 ## Insights And Reports
 
 ```bash
-xyte-cli ops inspect fleet --tenant <tenant-id> --provider-scope auto --output json
-xyte-cli ops inspect deep-dive --tenant <tenant-id> --provider-scope auto --window 24 --output json --out ./artifacts/deep-dive.json
-xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/deep-dive.json --out ./reports/xyte-report.pdf
+xyte-cli ops inspect fleet --tenant <tenant-id> --provider-scope auto --render json|ascii [--out <path>] [--strict-json]
+xyte-cli ops inspect deep-dive --tenant <tenant-id> --provider-scope auto --window 24 --render json|ascii|markdown [--out <path>] [--strict-json]
+xyte-cli ops report generate --tenant <tenant-id> --input <path> --out <path> [--render markdown|pdf] [--include-sensitive] [--strict-json]
 ```
 
 Provider scope behavior:
@@ -182,7 +198,14 @@ Provider scope behavior:
 xyte-cli ops console
 xyte-cli ops console --headless --screen dashboard --output json --once --tenant <tenant-id>
 xyte-cli ops console --headless --screen spaces --output json --follow --interval-ms 2000 --tenant <tenant-id>
+xyte-cli ops console --no-motion --debug --debug-log ./debug.log --tenant <tenant-id>
 ```
+
+Notes:
+- `--once` renders a single frame and exits (default headless behavior). `--once` overrides `--follow`.
+- `--follow` streams continuous frames with configurable `--interval-ms`.
+- `--no-motion` disables TUI animation effects.
+- `--debug` / `--debug-log <path>` enable TUI debug logging.
 
 ## Action Log Environment Flags
 
@@ -196,18 +219,20 @@ xyte-cli logs stats --path ./logs/xyte-cli.actions.ndjson
 
 Advanced shell-specific environment flags:
 
-`XYTE_LOG_ACTIONS` enables NDJSON logging.
-`XYTE_LOG_ACTIONS_STDERR` independently controls stderr mirroring.
-Set `XYTE_LOG_ACTIONS_MAX_FILES=1` to keep only the active file (no rotated history).
+`XYTE_CLI_LOGS_ENABLED` enables NDJSON logging.
+`XYTE_CLI_LOGS_MIRROR_TO_STDERR` independently controls stderr mirroring.
+Set `XYTE_CLI_LOGS_MAX_FILES=1` to keep only the active file (no rotated history).
 
 ```bash
-XYTE_LOG_ACTIONS=1
-XYTE_LOG_ACTIONS_PATH=./logs/xyte-cli.actions.ndjson
-XYTE_LOG_ACTIONS_STDERR=1
-XYTE_LOG_ACTIONS_VERBOSE=1
-XYTE_LOG_ACTIONS_MAX_FILE_BYTES=10485760
-XYTE_LOG_ACTIONS_MAX_FILES=5
+XYTE_CLI_LOGS_ENABLED=1
+XYTE_CLI_LOGS_PATH=./logs/xyte-cli.actions.ndjson
+XYTE_CLI_LOGS_MIRROR_TO_STDERR=1
+XYTE_CLI_LOGS_VERBOSE=1
+XYTE_CLI_LOGS_MAX_FILE_BYTES=10485760
+XYTE_CLI_LOGS_MAX_FILES=5
 ```
+
+The legacy `XYTE_LOG_ACTIONS_*` names are deprecated aliases — they still work but emit a deprecation warning. Use the `XYTE_CLI_LOGS_*` names above.
 
 Interactive hotkeys on ops screens:
 

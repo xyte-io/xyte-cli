@@ -1,10 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { toProblemDetails } from '../http/problem-mapper';
-import { buildWatchFrame, type WatchDelta, type WatchFrameV1, type WatchProfile } from '../contracts/watch-frame';
+import { toProblemDetails } from '../client/errors';
+import { buildWatchFrame, DEFAULT_WATCH_PROFILE, type WatchDelta, type WatchFrameV1, type WatchProfile } from '../contracts/watch-frame';
 import type { XyteClient } from '../types/client';
-import { asRecord, extractIncidentsArray } from '../utils/json';
+import { asRecord } from '../utils/json';
+import { extractIncidentsArray } from '../utils/incidents';
 
 type QueryValue = string | number | boolean | null | undefined;
 
@@ -13,7 +14,7 @@ export const WATCH_MIN_INTERVAL_MS = 1000;
 const WATCH_DEFAULT_MAX_POLLS = 600;
 export const WATCH_MAX_POLLS = 3600;
 
-export interface NormalizedIncident {
+interface NormalizedIncident {
   id: string;
   raw: unknown;
   stable: string;
@@ -89,14 +90,14 @@ export function computeDelta(previous: NormalizedIncident[], current: Normalized
     .filter((id) => !previousById.has(id))
     .map((id) => ({
       id,
-      current: currentById.get(id)?.raw
+      after: currentById.get(id)?.raw
     }));
 
   const removed = previousIds
     .filter((id) => !currentById.has(id))
     .map((id) => ({
       id,
-      previous: previousById.get(id)?.raw
+      before: previousById.get(id)?.raw
     }));
 
   const updated = currentIds
@@ -143,11 +144,13 @@ interface RunWatchOptions {
   once?: boolean;
   maxPolls?: number;
   onFrame: (frame: WatchFrameV1) => void;
+  delayFn?: (ms: number) => Promise<void>;
 }
 
 export async function runWatch(options: RunWatchOptions): Promise<void> {
-  const profile = options.profile ?? 'incidents-active';
+  const profile = options.profile ?? DEFAULT_WATCH_PROFILE;
   const intervalMs = Math.max(WATCH_MIN_INTERVAL_MS, options.intervalMs ?? 2000);
+  const delayFn = options.delayFn ?? delay;
   const requestedMaxPolls = options.once ? 1 : (options.maxPolls ?? WATCH_DEFAULT_MAX_POLLS);
   const maxPolls = Math.max(1, Math.min(WATCH_MAX_POLLS, requestedMaxPolls));
   const queryOverrides = options.query ?? {};
@@ -261,7 +264,7 @@ export async function runWatch(options: RunWatchOptions): Promise<void> {
         break;
       }
 
-      await delay(intervalMs);
+      await delayFn(intervalMs);
     }
   } finally {
     process.removeListener('SIGINT', stop);

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { CliUserError } from '../contracts/user-error';
 import { isRecord } from './json';
 
 export type UtilityInputFormat = 'auto' | 'csv' | 'json' | 'jsonl';
@@ -112,7 +113,7 @@ function parseCsv(raw: string): Array<Record<string, unknown>> {
 
   const headers = rows[0].map((value) => value.trim());
   if (headers.some((header) => !header)) {
-    throw new Error('CSV header row contains empty column names.');
+    throw new CliUserError({ summary: 'CSV header row contains empty column names.' });
   }
 
   const output: Array<Record<string, unknown>> = [];
@@ -123,7 +124,7 @@ function parseCsv(raw: string): Array<Record<string, unknown>> {
     }
 
     if (row.length > headers.length) {
-      throw new Error(`CSV row ${rowIndex + 1} has more fields than header columns.`);
+      throw new CliUserError({ summary: `CSV row ${rowIndex + 1} has more fields than header columns.` });
     }
 
     const padded = row.concat(new Array(headers.length - row.length).fill(''));
@@ -143,15 +144,15 @@ function parseJsonArray(raw: string): Array<Record<string, unknown>> {
     parsed = JSON.parse(raw);
   } catch (error) {
     const detail = error instanceof SyntaxError ? `: ${error.message}` : '';
-    throw new Error(`JSON input is invalid${detail}`);
+    throw new CliUserError({ summary: `JSON input is invalid${detail}` });
   }
   if (!Array.isArray(parsed)) {
-    throw new Error('JSON input must be an array of objects.');
+    throw new CliUserError({ summary: 'JSON input must be an array of objects.' });
   }
 
   return parsed.map((item, index) => {
     if (!isRecord(item)) {
-      throw new Error(`JSON row ${index + 1} must be an object.`);
+      throw new CliUserError({ summary: `JSON row ${index + 1} must be an object.` });
     }
     return item;
   });
@@ -169,10 +170,10 @@ function parseJsonLines(raw: string): Array<Record<string, unknown>> {
       parsed = JSON.parse(line);
     } catch (error) {
       const detail = error instanceof SyntaxError ? `: ${error.message}` : '';
-      throw new Error(`JSONL row ${index + 1} is invalid JSON${detail}`);
+      throw new CliUserError({ summary: `JSONL row ${index + 1} is invalid JSON${detail}` });
     }
     if (!isRecord(parsed)) {
-      throw new Error(`JSONL row ${index + 1} must be an object.`);
+      throw new CliUserError({ summary: `JSONL row ${index + 1} must be an object.` });
     }
     return parsed;
   });

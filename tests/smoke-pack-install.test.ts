@@ -1,7 +1,7 @@
 import path from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
-import * as smokePackInstall from '../src/smoke/pack-install';
+import * as smokePackInstall from './smoke/pack-install';
 
 describe('pack install smoke script', () => {
   it('runs expected command sequence with provided env', async () => {

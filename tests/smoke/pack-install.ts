@@ -4,7 +4,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path, { delimiter } from 'node:path';
 
-import { getEnvPathValue, setEnvPathValue } from '../utils/env-path';
+import { getEnvPathValue, setEnvPathValue } from '../../src/utils/env-path';
 import {
   NPM_COMMAND,
   XYTE_COMMAND,
@@ -18,7 +18,7 @@ import {
   type LoggerLike,
   type RunCommandOptions
 } from './shared';
-import { errorMessage } from '../utils/error-format';
+import { errorMessage } from '../../src/utils/error-format';
 
 interface MockServerHandle {
   baseUrl: string;

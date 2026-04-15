@@ -1,7 +1,22 @@
 import type { PublicEndpointSpec } from './endpoints';
 import type { HttpTransport } from '../http/transport';
-import type { SecretStore } from '../secure/secret-store';
-import type { ProfileStore } from '../secure/profile-store';
+import type { SecretStore, ProfileStore } from './stores';
+
+export interface XyteClientOptions {
+  tenantId?: string;
+  hubBaseUrl?: string;
+  entryBaseUrl?: string;
+  timeoutMs?: number;
+  retryAttempts?: number;
+  retryBackoffMs?: number;
+  auth?: {
+    organization?: string;
+    partner?: string;
+  };
+  profileStore?: ProfileStore;
+  secretStore?: SecretStore;
+  transport?: HttpTransport;
+}
 
 export interface XyteCallArgs {
   requestId?: string;
@@ -29,6 +44,7 @@ export interface OrganizationNamespace {
   getCommands: NamespaceCall;
   sendCommand: NamespaceCall;
   claimDevice: NamespaceCall;
+  moveDevice: NamespaceCall;
   updateDevice: NamespaceCall;
   deleteDevice: NamespaceCall;
   getDevice: NamespaceCall;
@@ -65,22 +81,6 @@ export interface PartnerNamespace {
   updateTicket: NamespaceCall;
 }
 
-
-export interface XyteClientOptions {
-  tenantId?: string;
-  hubBaseUrl?: string;
-  entryBaseUrl?: string;
-  timeoutMs?: number;
-  retryAttempts?: number;
-  retryBackoffMs?: number;
-  auth?: {
-    organization?: string;
-    partner?: string;
-  };
-  profileStore?: ProfileStore;
-  secretStore?: SecretStore;
-  transport?: HttpTransport;
-}
 
 export interface XyteClient {
   organization: OrganizationNamespace;

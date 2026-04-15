@@ -1,30 +1,12 @@
-import type { SecretStore } from '../secure/secret-store';
-import type { ProfileStore } from '../secure/profile-store';
-import type { SecretProvider, TenantProfile } from '../types/profile';
+import type { ProfileStore, SecretStore } from '../types/stores';
+import type { SecretProvider } from '../types/profile';
 import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
 import type { XyteClient } from '../types/client';
-import { probeConnectivity, type ConnectivityResult } from './connectivity';
+import { probeConnectivity } from './connectivity';
+import type { ConnectivityResult } from '../contracts/status';
+import type { ReadinessState, ProviderReadiness, ReadinessCheck } from '../contracts/status';
 
-export type ReadinessState = 'ready' | 'needs_setup' | 'degraded';
-
-export interface ProviderReadiness {
-  provider: SecretProvider;
-  slotCount: number;
-  activeSlotId?: string;
-  activeSlotName?: string;
-  hasActiveSecret: boolean;
-}
-
-export interface ReadinessCheck {
-  state: ReadinessState;
-  activeTenant?: TenantProfile;
-  tenantId?: string;
-  missingItems: string[];
-  recommendedActions: string[];
-  providers: ProviderReadiness[];
-  connectionState: ConnectivityResult['state'];
-  connectivity: ConnectivityResult;
-}
+export type { ReadinessState, ProviderReadiness, ReadinessCheck };
 
 interface ReadinessOptions {
   profileStore: ProfileStore;

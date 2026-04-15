@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildInstallDoctorReport } from '../src/utils/install-doctor';
+import { buildInstallDoctorReport } from '../src/workflows/install-doctor';
 
 describe('install doctor', () => {
   it('accepts the Windows npm shim when it resolves to the installed package entrypoint', () => {

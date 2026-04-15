@@ -5,7 +5,7 @@ description: "Use for @xyteai/cli operations: first-run setup, config/tenant/key
 
 # XYTE Skill Router (One-Stop, Agent-Native)
 
-Last updated: 2026-03-19
+Last updated: 2026-04-13
 
 This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
 
@@ -50,7 +50,7 @@ Use when the request involves any of:
 ## Mandatory Safety Rules
 
 - Default to read-only.
-- Require explicit user intent before endpoint writes or `util import-tree --apply`.
+- Require explicit user intent before endpoint writes, `util import-tree --apply`, or `util move-devices --apply`.
 - Headless console is read-only; never treat frames as mutation execution.
 - Util preprocessing is external: AI prepares files, `xyte-cli` remains AI-free.
 - For util workflows, always do `xyte-cli util prepare` first.
@@ -80,6 +80,8 @@ Rules:
 - `xyte-cli init --scope both --agents all --force --no-setup`
 - `xyte-cli setup status --tenant <tenant-id> --output json`
 - `xyte-cli config doctor --tenant <tenant-id> --output json`
+- `xyte-cli config show --scope resolved`
+- `xyte-cli doctor install --format json`
 
 2. Auth/tenant (if missing or incomplete):
 - human-guided setup: `xyte-cli setup run --tenant <tenant-id> [--provider <xyte-org|xyte-partner>]`
@@ -89,25 +91,27 @@ Rules:
 - `xyte-cli config key list --tenant <tenant-id> --output json`
 
 3. Endpoint operations:
-- `xyte-cli api endpoints list --tenant <tenant-id>`
+- `xyte-cli api endpoints list`
 - `xyte-cli api endpoints describe <endpoint-key>`
 - `xyte-cli api call <endpoint-key> --tenant <tenant-id> ...`
 
 4. Insights/reports:
-- `xyte-cli ops inspect fleet --tenant <tenant-id> --provider-scope auto --output json`
-- `xyte-cli ops inspect deep-dive --tenant <tenant-id> --provider-scope auto --window <hours> --output json`
-- `xyte-cli ops report generate --tenant <tenant-id> --input <deep-dive.json> --out <report.pdf>`
+- `xyte-cli ops inspect fleet --tenant <tenant-id> --provider-scope auto --render json|ascii`
+- `xyte-cli ops inspect deep-dive --tenant <tenant-id> --provider-scope auto --window <hours> --render json|ascii|markdown`
+- `xyte-cli ops report generate --tenant <tenant-id> --input <input.json> --out <path> [--render markdown|pdf] [--include-sensitive]`
 
 Provider/report behavior:
 - inspect pipelines are scope-strict; no cross-provider calls
 - `--provider-scope auto` chooses the only configured scope and fails when both scopes are configured
 - partner deep-dive/report enrichment is best-effort; optional enrichment failures should not block report generation
 
-5. Util preprocessing:
+5. Util preprocessing and execution:
 - `xyte-cli util list-actions [--output text|json]`
-- `xyte-cli util prepare --action <action-key> --input <file> [--tenant <tenant-id>] [--output-dir <dir>]`
+- `xyte-cli util prepare --action <action-key> --input <file> [--tenant <tenant-id>] [--output-dir <dir>] [--force]`
 - stop and ask for a user decision before any execution command
-- `xyte-cli util import-tree --tenant <tenant-id> --input <file> [--apply]`
+- `xyte-cli util import-tree --tenant <tenant-id> --input <file> [--input-format auto|csv|json|jsonl] [--apply] [--continue-on-error] [--report <path>]`
+- `xyte-cli util match --source <path> --target <path> --source-field <name> --target-field <name> --out <path> [--tenant <tenant-id>]`
+- `xyte-cli util move-devices --tenant <tenant-id> --input <file> [--input-format auto|csv|json|jsonl] [--apply] [--continue-on-error] [--report <path>]`
 - preprocessing contract: `references/ai-utility-preprocessing.md`
 
 6. Headless snapshots:
@@ -132,6 +136,10 @@ Provider/report behavior:
 | Util action catalog | `xyte-cli util list-actions --output text` |
 | Util prepare scaffold | `xyte-cli util prepare --action <action-key> --input <file> --output-dir ./prepared` |
 | Space tree import | `xyte-cli util import-tree --tenant <tenant-id> --input <file> [--apply]` |
+| Device-to-space matching | `xyte-cli util match --source <path> --target <path> --source-field <name> --target-field <name> --out <path>` |
+| Batch device move | `xyte-cli util move-devices --tenant <tenant-id> --input <file> [--apply]` |
+| Install diagnostics | `xyte-cli doctor install --format json` |
+| Settings introspection | `xyte-cli config show --scope resolved` |
 | Interactive console | `xyte-cli ops console` |
 | Headless snapshot | `xyte-cli ops console --headless --screen <screen> --output json --once --tenant <tenant-id>` |
 | Continuous headless monitoring | `xyte-cli ops console --headless --screen <screen> --output json --follow --interval-ms <ms> --tenant <tenant-id>` |
@@ -146,6 +154,7 @@ Use this selector when the user asks for repeatable operator workflows. Full rec
 | Continuous incident monitoring | `flow.incidents-delta-watch` | `xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json` |
 | Convert watch deltas into triage artifacts | `flow.watch-to-triage` | `xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json` |
 | Operator-approved remediation writes | `flow.guided-remediation` | `xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json` |
+| Deterministic device migration with human gates | `flow.device-migration` | `xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id>` |
 | Daily analytics summary and report artifact | `flow.daily-deep-dive-report` | `xyte-cli setup status --tenant <tenant-id> --output json` |
 
 ## Agent-Only Flow Authoring
@@ -260,12 +269,21 @@ cat templates/ai-space-import.prompt.md
 
 Schema/version IDs:
 - call envelope: `xyte.call.envelope.v1`
+- device match: `xyte.device.match.v1`
+- device move verification: `xyte.device.move-verification.v1`
+- flow catalog: `xyte.flow.catalog.v1`
+- flow definition: `xyte.flow.definition.v1`
+- flow run summary: `xyte.flow.run.v1`
 - headless frame: `xyte.headless.frame.v1`
 - inspect fleet: `xyte.inspect.fleet.v1`
 - inspect deep dive: `xyte.inspect.deep-dive.v1`
 - report metadata: `xyte.report.v1`
+- status: `xyte.status.v1`
+- upgrade check: `xyte.upgrade.check.v1`
+- upgrade result: `xyte.upgrade.result.v1`
 - utility batch summary: `xyte.utility.batch.v1`
 - utility prepare: `xyte.utility.prepare.v1`
+- watch frame: `xyte.watch.frame.v1`
 
 Canonical schemas:
 - `schemas/call-envelope.v1.schema.json`
@@ -282,10 +300,13 @@ Canonical schemas:
   - `xyte-cli`
   - `xyte-cli setup run --tenant <tenant-id> [--provider <xyte-org|xyte-partner>]`
   - for automation, use `--key-file <path>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`
+- Install wiring diagnostics:
+  - `xyte-cli doctor install --format json`
 - Readiness/connectivity:
   - `xyte-cli setup status --tenant <tenant-id> --output json`
   - `xyte-cli setup status --tenant <tenant-id> --field tenantId`
   - `xyte-cli config doctor --tenant <tenant-id> --output json`
+  - `xyte-cli config show --scope resolved`
 - Console crash diagnostics:
 
 ```bash

@@ -27,7 +27,7 @@
     "added": [
       {
         "id": "inc-2",
-        "current": {
+        "after": {
           "id": "inc-2",
           "status": "active"
         }

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { runCommand } from '../src/smoke/shared';
+import { runCommand } from './smoke/shared';
 
 describe('smoke shared runner', () => {
   const itWindows = process.platform === 'win32' ? it : it.skip;

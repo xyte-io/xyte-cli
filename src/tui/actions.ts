@@ -3,6 +3,27 @@ import type { TuiContext } from './types';
 type PromptContext = Pick<TuiContext, 'prompt' | 'setStatus'>;
 type GuardContext = Pick<TuiContext, 'confirmWrite' | 'setStatus'>;
 type ErrorContext = Pick<TuiContext, 'showError'>;
+type ActionContext = Pick<TuiContext, 'setStatus' | 'showError' | 'getActiveTenantId'>;
+
+export async function runGuardedAction(
+  context: ActionContext,
+  pendingStatus: string,
+  action: (tenantId: string) => Promise<void>
+): Promise<boolean> {
+  context.setStatus(pendingStatus);
+  try {
+    const tenantId = await context.getActiveTenantId();
+    if (tenantId === undefined) {
+      context.setStatus('No active tenant.');
+      return false;
+    }
+    await action(tenantId);
+    return true;
+  } catch (error) {
+    context.showError(error);
+    return false;
+  }
+}
 
 interface PaletteAction {
   label: string;
@@ -18,7 +39,7 @@ interface PromptChoice {
 
 function parseOneBasedIndex(input: string, total: number): number | undefined {
   const trimmed = input.trim();
-  if (!/^(?:0|[1-9]\d*)$/.test(trimmed)) {
+  if (!/^[1-9]\d*$/.test(trimmed)) {
     return undefined;
   }
   const numeric = Number(trimmed);
@@ -86,10 +107,13 @@ export async function confirmWriteWithToken(args: {
   return true;
 }
 
-export async function promptChoice(
-  context: PromptContext,
-  args: { title: string; choices: PromptChoice[]; emptyStatus?: string }
-): Promise<PromptChoice | undefined> {
+export async function promptChoice(args: {
+  context: PromptContext;
+  title: string;
+  choices: PromptChoice[];
+  emptyStatus?: string;
+}): Promise<PromptChoice | undefined> {
+  const { context } = args;
   if (!args.choices.length) {
     context.setStatus(args.emptyStatus ?? 'No options are available.');
     return undefined;

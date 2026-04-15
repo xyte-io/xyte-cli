@@ -4,15 +4,16 @@ import type { Command } from 'commander';
 
 import { getEndpoint, listEndpoints } from '../../client/catalog';
 import { buildCallEnvelope } from '../../contracts/call-envelope';
-import { toProblemDetails } from '../../http/problem-mapper';
+import { toProblemDetails } from '../../client/errors';
 import { CliUserError } from '../../contracts/user-error';
 import { isMutatingMethod } from '../../client/catalog';
 import { parseJsonObject } from '../../utils/json';
-import { parseQueryJson } from '../parse-options';
+import { parseQueryJson, parseQueryString } from '../parse-options';
 import {
   type CliContext,
-  type CliGlobalOptions,
+  getExplicitGlobalOutput,
   printJson,
+  requireTenantId,
   resolveStrictJson,
   resolveTextJsonOutput
 } from '../cli-context';
@@ -25,7 +26,7 @@ function parsePathJson(value: string | undefined): Record<string, string | numbe
       out[key] = item;
       continue;
     }
-    throw new Error(`Path parameter "${key}" must be string or number.`);
+    throw new CliUserError({ summary: `Path parameter "${key}" must be string or number.` });
   }
   return out;
 }
@@ -38,8 +39,7 @@ async function handleApiEndpointsList(
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
   const payload = tenantId ? await (await ctx.withClient({ tenantId })).listTenantEndpoints(tenantId) : listEndpoints();
   const output = resolveTextJsonOutput({
-    output: options.output,
-    format: options.format,
+    output: options.format ?? options.output,
     stdoutIsTTY: ctx.stdoutIsTTY,
     settings
   });
@@ -59,8 +59,7 @@ async function handleApiEndpointsDescribe(
   const settings = await ctx.resolveSettings();
   const endpoint = getEndpoint(key);
   const output = resolveTextJsonOutput({
-    output: options.output,
-    format: options.format,
+    output: options.format ?? options.output,
     stdoutIsTTY: ctx.stdoutIsTTY,
     settings
   });
@@ -74,11 +73,17 @@ async function handleApiEndpointsDescribe(
 interface ApiCallOptions {
   tenant?: string;
   pathJson?: string;
+  query?: string[];
   queryJson?: string;
   bodyJson?: string;
-  outputMode?: string;
+  note?: string;
+  outputMode?: 'raw' | 'envelope';
   output?: string;
   strictJson?: boolean;
+}
+
+function collectQueryEntries(value: string, previous: string[] = []): string[] {
+  return [...previous, value];
 }
 
 async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptions): Promise<void> {
@@ -86,40 +91,67 @@ async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptio
   const settings = await ctx.resolveSettings(tenantOverride ? { 'defaults.tenant': tenantOverride } : {});
   const endpoint = getEndpoint(key);
   const method = endpoint.method.toUpperCase();
-  const outputMode = String(options.outputMode ?? 'raw')
-    .trim()
-    .toLowerCase();
-  if (!['raw', 'envelope'].includes(outputMode)) {
+  const outputMode = options.outputMode ?? 'raw';
+  if (outputMode !== 'raw' && outputMode !== 'envelope') {
     throw new CliUserError({
-      summary: 'Invalid API call output mode.',
-      cause: `Received "${outputMode}".`,
-      suggestedCommands: ['Use --output-mode raw', 'Use --output-mode envelope']
+      summary: `Invalid --output-mode: ${outputMode}`,
+      detail: 'Use raw or envelope.'
     });
   }
   const requestId = randomUUID();
   const tenantId = tenantOverride ?? settings.values.defaults.tenant;
+  if (endpoint.authScope !== 'none') {
+    requireTenantId(tenantId, 'api call');
+  }
   const path = parsePathJson(options.pathJson);
-  const query = parseQueryJson(options.queryJson);
+  if ((options.query?.length ?? 0) > 0 && options.queryJson) {
+    throw new CliUserError({
+      summary: 'Conflicting query flags.',
+      detail: 'Use either --query or --query-json, not both.',
+      suggestedCommands: ['Use --query key=value', 'Use --query-json \'{"key":"value"}\'']
+    });
+  }
+  const query = (options.query?.length ?? 0) > 0 ? parseQueryString(options.query) : parseQueryJson(options.queryJson);
   let body: unknown;
   if (options.bodyJson) {
     try {
       body = JSON.parse(String(options.bodyJson));
     } catch (error) {
       const detail = error instanceof Error && error.message ? `: ${error.message}` : '';
-      throw new Error(`Invalid --body-json${detail}`);
+      throw new CliUserError({ summary: `Invalid --body-json${detail}` });
     }
   }
   const strictJson = resolveStrictJson({ strictJson: options.strictJson, settings });
   const mutating = isMutatingMethod(method);
+  const note = options.note?.trim() || undefined;
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
 
   const envelopeBase = {
     requestId,
     tenantId,
     endpointKey: key,
     method,
+    ...(note ? { note } : {}),
     guard: { allowWrite: mutating },
     request: { path, query, body }
   };
+
+  if (note) {
+    ctx.logAction?.('api.call.note', {
+      commandPath: 'xyte-cli api call',
+      endpointKey: key,
+      note,
+      mutating,
+      outputMode
+    });
+    if (mutating) {
+      ctx.stderr.write(`Note: ${note}\n`);
+    }
+  }
 
   try {
     const client = await ctx.withClient({ tenantId });
@@ -145,11 +177,6 @@ async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptio
       return;
     }
 
-    const output = resolveTextJsonOutput({
-      output: options.output,
-      stdoutIsTTY: ctx.stdoutIsTTY,
-      settings
-    });
     if (output === 'text') {
       ctx.stdout.write(`${JSON.stringify(result.data, null, 2)}\n`);
       return;
@@ -190,7 +217,7 @@ export function registerApiCommands(parent: Command, ctx: CliContext): void {
     .action(async function (options: { tenant?: string; format?: string }) {
       await handleApiEndpointsList(ctx, {
         ...options,
-        output: (this.optsWithGlobals() as CliGlobalOptions).output
+        output: getExplicitGlobalOutput(this)
       });
     });
 
@@ -201,7 +228,7 @@ export function registerApiCommands(parent: Command, ctx: CliContext): void {
     .action(async function (key: string, options: { format?: string }) {
       await handleApiEndpointsDescribe(ctx, key, {
         ...options,
-        output: (this.optsWithGlobals() as CliGlobalOptions).output
+        output: getExplicitGlobalOutput(this)
       });
     });
 
@@ -211,14 +238,16 @@ export function registerApiCommands(parent: Command, ctx: CliContext): void {
     .description('Call endpoint by key')
     .option('--tenant <tenantId>', 'Tenant id')
     .option('--path-json <json>', 'Path params JSON object')
+    .option('--query <entry>', 'Query param key=value (repeatable or ampersand-separated)', collectQueryEntries, [])
     .option('--query-json <json>', 'Query params JSON object')
     .option('--body-json <json>', 'Body JSON object')
+    .option('--note <text>', 'Attach a human note to the call and action log')
     .option('--output-mode <mode>', 'raw|envelope', 'raw')
     .option('--strict-json', 'Fail on non-serializable output')
     .action(async function (key: string, options: ApiCallOptions) {
       await handleApiCall(ctx, key, {
         ...options,
-        output: (this.optsWithGlobals() as CliGlobalOptions).output
+        output: getExplicitGlobalOutput(this)
       });
     });
 }

@@ -4,12 +4,13 @@ import { createXyteClient } from '../../client/create-client';
 import { evaluateReadiness, type ReadinessCheck } from '../../config/readiness';
 import { makeKeyFingerprint } from '../../secure/key-slots';
 import type { ApiKeySlotMeta, SecretProvider } from '../../types/profile';
-import { parseProvider, PROVIDER_ORG } from '../../types/profile';
+import { PROVIDER_ORG } from '../../types/profile';
+import { parseProvider } from '../../utils/parse-domain';
 import { isRecord } from '../../utils/json';
 import { firstText } from '../../utils/json';
 import { CliUserError } from '../../contracts/user-error';
 import { formatReadinessText } from '../format-readiness';
-import { resolveProviderForKey } from '../provider-resolution';
+import { fetchProviderForKey } from '../provider-resolution';
 import { resolveKeyValue } from '../resolve-key';
 import {
   type CliContext,
@@ -50,7 +51,7 @@ const SIMPLE_SETUP_DEFAULT_TENANT = 'default';
 function parseSetupConnectivityMode(value: string | undefined): SetupConnectivityMode {
   const normalized = (value ?? 'auto').trim().toLowerCase();
   if (normalized !== 'auto' && normalized !== 'always' && normalized !== 'never') {
-    throw new Error(`Invalid connectivity mode: ${value}. Use auto|always|never.`);
+    throw new CliUserError({ summary: `Invalid connectivity mode: "${value}". Use auto|always|never.` });
   }
   return normalized as SetupConnectivityMode;
 }
@@ -85,7 +86,7 @@ function formatScalarFieldValue(value: unknown, field: string): string {
   if (value === undefined || Array.isArray(value) || isRecord(value)) {
     throw new CliUserError({
       summary: 'Invalid setup status field.',
-      cause: `Field "${field}" is missing or not a scalar value.`,
+      detail: `Field "${field}" is missing or not a scalar value.`,
       suggestedCommands: ['Use --field tenantId', 'Omit --field to print the full status payload']
     });
   }
@@ -125,7 +126,7 @@ function extractTenantNameFromOrganizationInfo(payload: unknown): string | undef
 
 export { SIMPLE_SETUP_DEFAULT_TENANT, normalizeTenantId, runSimpleSetup };
 
-async function resolveTenantNameFromKey(
+async function fetchTenantNameFromKey(
   ctx: CliContext,
   args: {
     tenantId: string;
@@ -183,8 +184,7 @@ async function runSetupCore(
     ? await ctx.profileStore.updateKeySlot(args.tenantId, args.provider, existing.slotId, {
         fingerprint: makeKeyFingerprint(args.keyValue)
       })
-    : await ctx.profileStore.addKeySlot(args.tenantId, {
-        provider: args.provider,
+    : await ctx.profileStore.addKeySlot(args.tenantId, args.provider, {
         name: args.slotName,
         fingerprint: makeKeyFingerprint(args.keyValue)
       });
@@ -239,7 +239,7 @@ async function runSimpleSetup(
   const connectivityMode = args.connectivityMode ?? 'auto';
   const provider =
     args.provider ??
-    (await resolveProviderForKey({
+    (await fetchProviderForKey({
       profileStore: ctx.profileStore,
       tenantId: args.tenantId,
       keyValue: args.keyValue,
@@ -286,8 +286,7 @@ async function handleSetupStatus(
 
   if (
     resolveTextJsonOutput({
-      output: options.output,
-      format: options.format,
+      output: options.format ?? options.output,
       stdoutIsTTY: ctx.stdoutIsTTY,
       settings
     }) === 'text'
@@ -296,6 +295,38 @@ async function handleSetupStatus(
     return;
   }
   printJson(ctx.stdout, readiness, { strictJson: resolveStrictJson({ settings }) });
+}
+
+async function fetchProviderAndTenantName(
+  ctx: CliContext,
+  args: {
+    tenantId: string;
+    candidateTenantName: string;
+    keyValue: string;
+    provider: SecretProvider | undefined;
+    connectivityMode: SetupConnectivityMode;
+    explicitTenantName: boolean;
+  }
+): Promise<{ provider: SecretProvider; tenantName: string }> {
+  const resolvedProvider = await fetchProviderForKey({
+    profileStore: ctx.profileStore,
+    tenantId: args.tenantId,
+    keyValue: args.keyValue,
+    provider: args.provider,
+    allowProbe: args.connectivityMode !== 'never'
+  });
+  const resolvedTenantName =
+    args.connectivityMode !== 'never' && !args.explicitTenantName && args.candidateTenantName === args.tenantId
+      ? await fetchTenantNameFromKey(ctx, {
+          tenantId: args.tenantId,
+          provider: resolvedProvider,
+          keyValue: args.keyValue
+        })
+      : undefined;
+  return {
+    provider: resolvedProvider,
+    tenantName: resolvedTenantName ?? args.candidateTenantName
+  };
 }
 
 async function handleSetupRunSimple(
@@ -318,8 +349,7 @@ async function handleSetupRunSimple(
   const explicitTenantName = typeof options.name === 'string' && options.name.trim().length > 0;
   const connectivityMode = parseSetupConnectivityMode(options.connectivity);
   const output = resolveTextJsonOutput({
-    output: options.output,
-    format: options.format,
+    output: options.format ?? options.output,
     stdoutIsTTY: ctx.stdoutIsTTY,
     settings
   });
@@ -351,31 +381,23 @@ async function handleSetupRunSimple(
   if (!keyValue) {
     throw new CliUserError({
       summary: 'Missing API key.',
-      cause: 'Setup needs --key, --key-file, --key-stdin, XYTE_CLI_KEY, or interactive input.',
+      detail: 'Setup needs --key, --key-file, --key-stdin, XYTE_CLI_KEY, or interactive input.',
       suggestedCommands: ['Use xyte-cli setup run --tenant <tenant-id>']
     });
   }
 
   const tenantId = normalizeTenantId(options.tenant?.trim() || tenantLabel);
-  const tenantName = tenantLabel.trim() || tenantId;
-  const provider = await resolveProviderForKey({
-    profileStore: ctx.profileStore,
+  const { provider, tenantName } = await fetchProviderAndTenantName(ctx, {
     tenantId,
+    candidateTenantName: tenantLabel.trim() || tenantId,
     keyValue,
     provider: options.provider ? parseProvider(options.provider) : undefined,
-    allowProbe: connectivityMode !== 'never'
+    connectivityMode,
+    explicitTenantName
   });
-  const resolvedTenantName =
-    connectivityMode !== 'never' && !explicitTenantName && tenantName === tenantId
-      ? await resolveTenantNameFromKey(ctx, {
-          tenantId,
-          provider,
-          keyValue
-        })
-      : undefined;
   const setupResult = await runSimpleSetup(ctx, {
     tenantId,
-    tenantName: resolvedTenantName ?? tenantName,
+    tenantName,
     keyValue,
     provider,
     setActive: options.setActive !== false,
@@ -411,16 +433,14 @@ async function handleSetupRunAdvanced(
   const explicitTenantName = typeof options.name === 'string' && options.name.trim().length > 0;
   const connectivityMode = parseSetupConnectivityMode(options.connectivity);
   const output = resolveTextJsonOutput({
-    output: options.output,
-    format: options.format,
+    output: options.format ?? options.output,
     stdoutIsTTY: ctx.stdoutIsTTY,
     settings
   });
 
-  let tenantId = options.tenant ?? settings.values.defaults.tenant;
-  let tenantName = options.name;
-  let provider = options.provider ? parseProvider(options.provider) : undefined;
-  let slotName = options.slotName ?? 'primary';
+  const rawTenantId = options.tenant ?? settings.values.defaults.tenant;
+  const rawProvider = options.provider ? parseProvider(options.provider) : undefined;
+  const rawSlotName = options.slotName ?? 'primary';
   const keyValue = await resolveKeyValue({
     key: options.key,
     keyFile: options.keyFile,
@@ -432,15 +452,21 @@ async function handleSetupRunAdvanced(
     promptQuestion: 'API key',
     stdout: ctx.stdout
   });
-  if (!options.nonInteractive) {
-    tenantId = tenantId || (await ctx.prompt({ question: 'Tenant id', stdout: ctx.stdout }));
-    tenantName =
-      tenantName || (await ctx.prompt({ question: 'Tenant display name', initial: tenantId, stdout: ctx.stdout }));
-    const providerAnswer =
-      provider || parseProvider(await ctx.prompt({ question: 'Provider', initial: PROVIDER_ORG, stdout: ctx.stdout }));
-    provider = providerAnswer;
-    slotName = await ctx.prompt({ question: 'Slot name', initial: slotName, stdout: ctx.stdout });
-  }
+
+  const tenantId = options.nonInteractive
+    ? rawTenantId
+    : rawTenantId || (await ctx.prompt({ question: 'Tenant id', stdout: ctx.stdout }));
+  const promptedTenantName = options.nonInteractive
+    ? options.name
+    : options.name ||
+      (await ctx.prompt({ question: 'Tenant display name', initial: tenantId, stdout: ctx.stdout }));
+  const provider = options.nonInteractive
+    ? rawProvider
+    : rawProvider ||
+      parseProvider(await ctx.prompt({ question: 'Provider', initial: PROVIDER_ORG, stdout: ctx.stdout }));
+  const slotName = options.nonInteractive
+    ? rawSlotName
+    : await ctx.prompt({ question: 'Slot name', initial: rawSlotName, stdout: ctx.stdout });
 
   if (!tenantId) {
     throw new CliUserError({
@@ -457,34 +483,24 @@ async function handleSetupRunAdvanced(
   if (!keyValue) {
     throw new CliUserError({
       summary: 'Missing API key.',
-      cause: 'Setup needs --key, --key-file, --key-stdin, XYTE_CLI_KEY, or interactive input.',
+      detail: 'Setup needs --key, --key-file, --key-stdin, XYTE_CLI_KEY, or interactive input.',
       suggestedCommands: ['Use xyte-cli setup run --advanced --tenant <tenant-id> --provider xyte-org']
     });
   }
 
-  provider = await resolveProviderForKey({
-    profileStore: ctx.profileStore,
+  const { provider: resolvedProvider, tenantName } = await fetchProviderAndTenantName(ctx, {
     tenantId,
+    candidateTenantName: (promptedTenantName?.trim() || tenantId).trim() || tenantId,
     keyValue,
     provider,
-    allowProbe: connectivityMode !== 'never'
+    connectivityMode,
+    explicitTenantName
   });
-
-  const candidateTenantName = (tenantName?.trim() || tenantId).trim() || tenantId;
-  const resolvedTenantName =
-    connectivityMode !== 'never' && !explicitTenantName && candidateTenantName === tenantId
-      ? await resolveTenantNameFromKey(ctx, {
-          tenantId,
-          provider,
-          keyValue
-        })
-      : undefined;
-  tenantName = resolvedTenantName ?? candidateTenantName;
 
   const result = await runSetupCore(ctx, {
     tenantId,
     tenantName,
-    provider,
+    provider: resolvedProvider,
     slotName,
     keyValue,
     setActive: options.setActive !== false,

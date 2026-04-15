@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import endpoints from '../src/spec/public-endpoints.json';
+import endpoints from '../src/api-catalog/public-endpoints.json';
 
 describe('public endpoint catalog', () => {
   it('maps every key uniquely', () => {
@@ -49,6 +49,20 @@ describe('public endpoint catalog', () => {
     expect(endpoint?.bodyType).toBe('json');
     expect(endpoint?.hasBody).toBe(true);
     expect(endpoint?.pathParams).toEqual(['device_id']);
+  });
+
+  it('includes organization move device endpoint metadata', () => {
+    const endpoint = endpoints.find((item) => item.key === 'organization.devices.moveDevice');
+    expect(endpoint).toBeDefined();
+    expect(endpoint?.method).toBe('POST');
+    expect(endpoint?.pathTemplate).toBe('/core/v1/organization/devices/:device_id/move');
+    expect(endpoint?.authScope).toBe('organization');
+    expect(endpoint?.bodyType).toBe('json');
+    expect(endpoint?.hasBody).toBe(true);
+    expect(endpoint?.pathParams).toEqual(['device_id']);
+    expect(endpoint?.queryParams).toEqual([]);
+    expect(endpoint?.bodyExample).toContain('"space_id": 99592');
+    expect(endpoint?.sourceFile).toBe('https://docs.xyte.io/reference/move-device');
   });
 
   it('includes documented filter params for key read endpoints', () => {

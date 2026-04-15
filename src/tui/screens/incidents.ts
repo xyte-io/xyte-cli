@@ -2,7 +2,7 @@ import blessed from 'blessed';
 
 import {
   clampIndex,
-  movePaneWithBoundary,
+  handleHorizontalArrow,
   moveTableSelection,
   setListTableData,
   scrollBox,
@@ -12,15 +12,17 @@ import {
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
 import { createRenderErrorTracker } from '../render-error-tracker';
-import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
+import { createScreenRenderLogger, logScreenDataFetch } from '../screen-render-logger';
+import type { TuiArrowKey, TuiContext, NavigableScreen, TuiPaneId } from '../types';
 import { loadIncidentsData } from '../data-loaders';
 import { sceneFromIncidentsState } from '../scene';
 import { payloadSummary } from '../serialize';
-import { confirmWriteWithToken, openActionPalette } from '../actions';
+import { confirmWriteWithToken, openActionPalette, runGuardedAction } from '../actions';
 import { errorMessage } from '../../utils/error-format';
+import { asRecordOrUndefined } from '../../utils/json';
 
 function incidentIdOf(incident: unknown): string {
-  const rec = incident && typeof incident === 'object' ? (incident as Record<string, unknown>) : undefined;
+  const rec = asRecordOrUndefined(incident);
   return String(rec?.id ?? rec?._id ?? rec?.uuid ?? '');
 }
 
@@ -46,22 +48,16 @@ export async function closeIncidentWithGuard(args: CloseIncidentWithGuardArgs): 
     return false;
   }
 
-  args.context.setStatus('Closing incident...');
-  try {
-    const tenantId = await args.context.getActiveTenantId();
+  return runGuardedAction(args.context, 'Closing incident...', async (tenantId) => {
     await args.context.client.organization.closeIncident({
       tenantId,
       path: { incident_id: incidentId }
     });
     args.context.setStatus(`Incident ${incidentId} closed.`);
-    return true;
-  } catch (error) {
-    args.context.showError(error);
-    return false;
-  }
+  });
 }
 
-export function castIncidentRecords(items: unknown): Record<string, unknown>[] {
+function castIncidentRecords(items: unknown): Record<string, unknown>[] {
   if (!Array.isArray(items)) {
     return [];
   }
@@ -70,7 +66,7 @@ export function castIncidentRecords(items: unknown): Record<string, unknown>[] {
     .map((incident) => (typeof incident === 'object' ? (incident as Record<string, unknown>) : { value: incident }));
 }
 
-export function createIncidentsScreen(): TuiScreen {
+export function createIncidentsScreen(): NavigableScreen {
   let root: blessed.Widgets.BoxElement | undefined;
   let list: blessed.Widgets.ListTableElement | undefined;
   let detailBox: blessed.Widgets.BoxElement | undefined;
@@ -94,6 +90,13 @@ export function createIncidentsScreen(): TuiScreen {
   let activePane: TuiPaneId = paneConfig.defaultPane;
   let isMounted = false;
   const renderErrors = createRenderErrorTracker();
+  const renderLog = createScreenRenderLogger('incidents', () => context.debugLog, renderErrors);
+
+  const promptOrAbort = async (label: string, current: string): Promise<string | undefined> => {
+    const value = await context.prompt(label, current);
+    if (value === undefined || !isMounted) return undefined;
+    return value;
+  };
 
   const focusPane = () => {
     if (activePane === 'incidents-table') {
@@ -105,14 +108,33 @@ export function createIncidentsScreen(): TuiScreen {
 
   const selectedIncident = () => filtered[selectedIndex];
 
+  const renderIncidentFallbackRows = (incidentList: Record<string, unknown>[]) => {
+    setListTableData(
+      list,
+      [
+        ['ID', 'Severity', 'State', 'Device'],
+        ...incidentList.map((incident, index) => {
+          const deviceObj =
+            incident.device && typeof incident.device === 'object'
+              ? (incident.device as Record<string, unknown>)
+              : undefined;
+          return [
+            String(incident.id ?? incident._id ?? incident.uuid ?? `row-${index + 1}`),
+            String(incident.severity ?? incident.priority ?? 'unknown'),
+            String(incident.status ?? incident.state ?? 'unknown'),
+            String(incident.device_id ?? deviceObj?.id ?? 'n/a')
+          ];
+        })
+      ],
+      selectionSync
+    );
+  };
+
   const renderRows = (restoreIncidentId?: string) => {
     if (!isMounted) {
       return;
     }
-    context.debugLog?.('screen.render.start', {
-      screen: 'incidents',
-      frozen: renderErrors.frozen
-    });
+    renderLog.onRenderStart();
     filtered = severityFilter
       ? incidents.filter((incident) =>
           String(incident?.severity ?? incident?.priority ?? '')
@@ -121,36 +143,16 @@ export function createIncidentsScreen(): TuiScreen {
         )
       : incidents;
 
-    if (restoreIncidentId) {
-      const restoreIndex = filtered.findIndex((incident) => incidentIdOf(incident) === restoreIncidentId);
-      selectedIndex = restoreIndex >= 0 ? restoreIndex : clampIndex(selectedIndex, filtered.length);
-    } else {
-      selectedIndex = clampIndex(selectedIndex, filtered.length);
-    }
+    const restoreIndex = restoreIncidentId
+      ? filtered.findIndex((incident) => incidentIdOf(incident) === restoreIncidentId)
+      : -1;
+    selectedIndex = restoreIndex >= 0 ? restoreIndex : clampIndex(selectedIndex, filtered.length);
 
     const actionsHint = 'actions: a close-incident, f filters, [ ] pages, p per-page';
 
     try {
       if (renderErrors.frozen) {
-        setListTableData(
-          list,
-          [
-            ['ID', 'Severity', 'State', 'Device'],
-            ...filtered.map((incident, index) => {
-              const deviceObj =
-                incident.device && typeof incident.device === 'object'
-                  ? (incident.device as Record<string, unknown>)
-                  : undefined;
-              return [
-                String(incident.id ?? incident._id ?? incident.uuid ?? `row-${index + 1}`),
-                String(incident.severity ?? incident.priority ?? 'unknown'),
-                String(incident.status ?? incident.state ?? 'unknown'),
-                String(incident.device_id ?? deviceObj?.id ?? 'n/a')
-              ];
-            })
-          ],
-          selectionSync
-        );
+        renderIncidentFallbackRows(filtered);
         detailBox?.setContent('Render fallback mode enabled for incident details.');
       } else {
         const panels = sceneFromIncidentsState({
@@ -178,40 +180,12 @@ export function createIncidentsScreen(): TuiScreen {
         detailBox?.setContent((detailPanel?.text?.lines ?? ['No incidents.']).join('\n'));
       }
       renderErrors.recordSuccess();
-      context.debugLog?.('screen.render.complete', {
-        screen: 'incidents',
-        frozen: renderErrors.frozen
-      });
+      renderLog.onRenderComplete();
     } catch (error) {
       const message = errorMessage(error);
       renderErrors.recordError(message);
-      context.debugLog?.('screen.render.error', {
-        screen: 'incidents',
-        message,
-        frozen: renderErrors.frozen
-      });
-      context.debugLog?.('screen.render.fallback.applied', {
-        screen: 'incidents'
-      });
-      setListTableData(
-        list,
-        [
-          ['ID', 'Severity', 'State', 'Device'],
-          ...filtered.map((incident, index) => {
-            const deviceObj =
-              incident.device && typeof incident.device === 'object'
-                ? (incident.device as Record<string, unknown>)
-                : undefined;
-            return [
-              String(incident.id ?? incident._id ?? incident.uuid ?? `row-${index + 1}`),
-              String(incident.severity ?? incident.priority ?? 'unknown'),
-              String(incident.status ?? incident.state ?? 'unknown'),
-              String(incident.device_id ?? deviceObj?.id ?? 'n/a')
-            ];
-          })
-        ],
-        selectionSync
-      );
+      renderLog.onRenderError(message);
+      renderIncidentFallbackRows(filtered);
       detailBox?.setContent(`Unable to render incident detail safely.\nReason: ${message}`);
     }
     syncListSelection(list, selectedIndex, selectionSync);
@@ -223,10 +197,7 @@ export function createIncidentsScreen(): TuiScreen {
       return;
     }
     const tenantId = await context.getActiveTenantId();
-    context.debugLog?.('screen.data.fetch.start', {
-      screen: 'incidents',
-      tenantId
-    });
+    logScreenDataFetch(context.debugLog, 'incidents', 'start', { tenantId });
     const loaded = await loadIncidentsData(context.client, tenantId, {
       paginateAll: false,
       query: {
@@ -245,8 +216,7 @@ export function createIncidentsScreen(): TuiScreen {
       return;
     }
     incidents = castIncidentRecords(loaded.data);
-    context.debugLog?.('screen.data.fetch.complete', {
-      screen: 'incidents',
+    logScreenDataFetch(context.debugLog, 'incidents', 'complete', {
       tenantId,
       count: incidents.length,
       connectionState: loaded.connectionState,
@@ -257,11 +227,7 @@ export function createIncidentsScreen(): TuiScreen {
     });
     if (loaded.error) {
       context.setStatus(`Incidents ${loaded.connectionState}: ${loaded.error.message}`);
-      context.debugLog?.('screen.data.fetch.error', {
-        screen: 'incidents',
-        message: loaded.error.message,
-        state: loaded.connectionState
-      });
+      logScreenDataFetch(context.debugLog, 'incidents', 'error', { message: loaded.error.message, state: loaded.connectionState });
     }
     renderRows(restoreIncidentId);
     context.screen.render();
@@ -348,16 +314,12 @@ export function createIncidentsScreen(): TuiScreen {
       return paneConfig.panes;
     },
     async handleArrow(key: TuiArrowKey) {
-      if (key === 'left' || key === 'right') {
-        const next = movePaneWithBoundary(paneConfig.panes, activePane, key);
-        if (next.boundary) {
-          return 'boundary';
-        }
-        activePane = next.pane;
+      const h = handleHorizontalArrow(key, paneConfig.panes, activePane, (newPane) => {
+        activePane = newPane;
         focusPane();
         context.setStatus(`Pane: ${activePane}`);
-        return 'handled';
-      }
+      });
+      if (h !== null) return h;
 
       const delta = key === 'up' ? -1 : key === 'down' ? 1 : 0;
       if (!delta) {
@@ -408,26 +370,16 @@ export function createIncidentsScreen(): TuiScreen {
       }
 
       if (ch === 'f') {
-        const nextStatus = await context.prompt('Status filter (empty clears):', statusFilter);
-        if (nextStatus === undefined || !isMounted) {
-          return true;
-        }
-        const nextPriority = await context.prompt('Priority filter (empty clears):', priorityFilter);
-        if (nextPriority === undefined || !isMounted) {
-          return true;
-        }
-        const nextSpaceId = await context.prompt('Space ID filter (empty clears):', spaceIdFilter);
-        if (nextSpaceId === undefined || !isMounted) {
-          return true;
-        }
-        const nextTitle = await context.prompt('Title filter (empty clears):', titleFilter);
-        if (nextTitle === undefined || !isMounted) {
-          return true;
-        }
-        const nextIssue = await context.prompt('Issue filter (empty clears):', issueFilter);
-        if (nextIssue === undefined || !isMounted) {
-          return true;
-        }
+        const nextStatus = await promptOrAbort('Status filter (empty clears):', statusFilter);
+        if (nextStatus === undefined) return true;
+        const nextPriority = await promptOrAbort('Priority filter (empty clears):', priorityFilter);
+        if (nextPriority === undefined) return true;
+        const nextSpaceId = await promptOrAbort('Space ID filter (empty clears):', spaceIdFilter);
+        if (nextSpaceId === undefined) return true;
+        const nextTitle = await promptOrAbort('Title filter (empty clears):', titleFilter);
+        if (nextTitle === undefined) return true;
+        const nextIssue = await promptOrAbort('Issue filter (empty clears):', issueFilter);
+        if (nextIssue === undefined) return true;
 
         statusFilter = nextStatus.trim().toLowerCase();
         priorityFilter = nextPriority.trim().toLowerCase();

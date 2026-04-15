@@ -9,45 +9,19 @@ import type {
   TenantProfile
 } from '../types/profile';
 import { SUPPORTED_SECRET_PROVIDERS, isSecretProvider } from '../types/profile';
+import { CliUserError } from '../contracts/user-error';
 import { getXyteConfigDir } from '../utils/config-dir';
 import { errorMessage } from '../utils/error-format';
 import { buildSlotId, ensureSlotName, matchesSlotRef } from './key-slots';
+import { isRecord } from '../utils/json';
+import type { ProfileStore } from '../types/stores';
 
 const DEFAULT_DATA: ProfileStoreData = {
   version: 2,
   tenants: []
 };
 
-export interface ProfileStore {
-  getData(): Promise<ProfileStoreData>;
-  migrateIfNeeded(): Promise<void>;
-  listTenants(): Promise<TenantProfile[]>;
-  getTenant(tenantId: string): Promise<TenantProfile | undefined>;
-  upsertTenant(input: {
-    id: string;
-    name?: string;
-    hubBaseUrl?: string;
-    entryBaseUrl?: string;
-    apiProvider?: SecretProvider;
-  }): Promise<TenantProfile>;
-  removeTenant(tenantId: string): Promise<void>;
-  setActiveTenant(tenantId: string): Promise<void>;
-  getActiveTenant(): Promise<TenantProfile | undefined>;
-  listKeySlots(tenantId: string, provider?: SecretProvider): Promise<ApiKeySlotMeta[]>;
-  addKeySlot(
-    tenantId: string,
-    input: { provider: SecretProvider; name: string; slotId?: string; fingerprint: string }
-  ): Promise<ApiKeySlotMeta>;
-  updateKeySlot(
-    tenantId: string,
-    provider: SecretProvider,
-    slotRef: string,
-    update: { name?: string; fingerprint?: string; lastValidatedAt?: string }
-  ): Promise<ApiKeySlotMeta>;
-  removeKeySlot(tenantId: string, provider: SecretProvider, slotRef: string): Promise<void>;
-  getActiveKeySlot(tenantId: string, provider: SecretProvider): Promise<ApiKeySlotMeta | undefined>;
-  setActiveKeySlot(tenantId: string, provider: SecretProvider, slotRef: string): Promise<ApiKeySlotMeta>;
-}
+export type { ProfileStore } from '../types/stores';
 
 function createEmptyRegistry(): TenantKeyRegistry {
   return {
@@ -85,12 +59,13 @@ function deriveTenantProvider(rawProvider: unknown, registry: TenantKeyRegistry)
   return configuredProviders.length === 1 ? configuredProviders[0] : undefined;
 }
 
-function normalizeTenant(raw: TenantProfile): { tenant: TenantProfile; changed: boolean } {
-  const now = new Date().toISOString();
-  const registry = cloneRegistry(raw.keyRegistry);
+function normalizeSlots(
+  slots: ApiKeySlotMeta[],
+  now: string
+): { slots: ApiKeySlotMeta[]; changed: boolean } {
   let changed = false;
-  const normalizedSlots: ApiKeySlotMeta[] = [];
-  for (const slot of registry.slots) {
+  const result: ApiKeySlotMeta[] = [];
+  for (const slot of slots) {
     if (!slot || typeof slot.provider !== 'string' || typeof slot.slotId !== 'string') {
       changed = true;
       continue;
@@ -99,8 +74,7 @@ function normalizeTenant(raw: TenantProfile): { tenant: TenantProfile; changed: 
       changed = true;
       continue;
     }
-
-    const normalizedSlot: ApiKeySlotMeta = {
+    const normalized: ApiKeySlotMeta = {
       slotId: slot.slotId,
       provider: slot.provider,
       name: slot.name || slot.slotId,
@@ -109,37 +83,37 @@ function normalizeTenant(raw: TenantProfile): { tenant: TenantProfile; changed: 
       updatedAt: slot.updatedAt || now,
       lastValidatedAt: slot.lastValidatedAt
     };
-
     if (
-      normalizedSlot.name !== slot.name ||
-      normalizedSlot.fingerprint !== slot.fingerprint ||
-      normalizedSlot.createdAt !== slot.createdAt ||
-      normalizedSlot.updatedAt !== slot.updatedAt
+      normalized.name !== slot.name ||
+      normalized.fingerprint !== slot.fingerprint ||
+      normalized.createdAt !== slot.createdAt ||
+      normalized.updatedAt !== slot.updatedAt
     ) {
       changed = true;
     }
-
-    normalizedSlots.push(normalizedSlot);
+    result.push(normalized);
   }
+  return { slots: result, changed };
+}
 
+function repairActiveSlots(
+  rawActive: Record<string, unknown> | undefined,
+  validSlots: ApiKeySlotMeta[]
+): { activeSlotByProvider: Partial<Record<SecretProvider, string>>; changed: boolean } {
+  let changed = false;
   const activeSlotByProvider: Partial<Record<SecretProvider, string>> = {};
-  for (const [provider, slotId] of Object.entries(registry.activeSlotByProvider ?? {})) {
-    if (!isSecretProvider(provider)) {
-      changed = true;
-      continue;
-    }
-    if (typeof slotId !== 'string') {
+  for (const [provider, slotId] of Object.entries(rawActive ?? {})) {
+    if (!isSecretProvider(provider) || typeof slotId !== 'string') {
       changed = true;
       continue;
     }
     activeSlotByProvider[provider] = slotId;
   }
-
   for (const provider of SUPPORTED_SECRET_PROVIDERS) {
     const active = activeSlotByProvider[provider];
-    const exists = normalizedSlots.some((slot) => slot.provider === provider && slot.slotId === active);
+    const exists = validSlots.some((slot) => slot.provider === provider && slot.slotId === active);
     if (!exists) {
-      const fallback = normalizedSlots.find((slot) => slot.provider === provider)?.slotId;
+      const fallback = validSlots.find((slot) => slot.provider === provider)?.slotId;
       if (fallback) {
         activeSlotByProvider[provider] = fallback;
       } else {
@@ -150,6 +124,15 @@ function normalizeTenant(raw: TenantProfile): { tenant: TenantProfile; changed: 
       }
     }
   }
+  return { activeSlotByProvider, changed };
+}
+
+function normalizeTenant(raw: TenantProfile): { tenant: TenantProfile; changed: boolean } {
+  const now = new Date().toISOString();
+  const registry = cloneRegistry(raw.keyRegistry);
+
+  const slotsResult = normalizeSlots(registry.slots, now);
+  const activeResult = repairActiveSlots(registry.activeSlotByProvider, slotsResult.slots);
 
   const tenant: TenantProfile = {
     id: raw.id,
@@ -157,29 +140,26 @@ function normalizeTenant(raw: TenantProfile): { tenant: TenantProfile; changed: 
     hubBaseUrl: raw.hubBaseUrl,
     entryBaseUrl: raw.entryBaseUrl,
     apiProvider: deriveTenantProvider((raw as TenantProfile & { apiProvider?: unknown }).apiProvider, {
-      slots: normalizedSlots,
-      activeSlotByProvider
+      slots: slotsResult.slots,
+      activeSlotByProvider: activeResult.activeSlotByProvider
     }),
     keyRegistry: {
-      slots: normalizedSlots,
-      activeSlotByProvider
+      slots: slotsResult.slots,
+      activeSlotByProvider: activeResult.activeSlotByProvider
     },
     createdAt: raw.createdAt ?? now,
     updatedAt: raw.updatedAt ?? now
   };
 
-  if (
+  const fieldsChanged =
     tenant.name !== raw.name ||
     tenant.apiProvider !== (raw as TenantProfile & { apiProvider?: SecretProvider }).apiProvider ||
     tenant.createdAt !== raw.createdAt ||
-    tenant.updatedAt !== raw.updatedAt
-  ) {
-    changed = true;
-  }
+    tenant.updatedAt !== raw.updatedAt;
 
   return {
     tenant,
-    changed
+    changed: slotsResult.changed || activeResult.changed || fieldsChanged
   };
 }
 
@@ -193,36 +173,51 @@ export class FileProfileStore implements ProfileStore {
   async getData(): Promise<ProfileStoreData> {
     try {
       const content = await fs.readFile(this.filePath, 'utf8');
-      let parsed: ProfileStoreData;
+      let parsed: unknown;
       try {
-        parsed = JSON.parse(content) as ProfileStoreData;
+        parsed = JSON.parse(content);
       } catch (error) {
         const detail = errorMessage(error);
-        throw new Error(
-          `Profile store is invalid at ${this.filePath}: ${detail}. Delete or fix this file and rerun setup.`
-        );
+        throw new CliUserError({
+          summary: `Profile store is invalid at ${this.filePath}: ${detail}.`,
+          detail: 'Delete or fix this file and rerun setup.'
+        });
       }
       return this.normalize(parsed).data;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      const errno = error as NodeJS.ErrnoException;
+      if (errno.code === 'ENOENT') {
         return structuredClone(DEFAULT_DATA);
+      }
+      if (errno.code === 'EACCES' || errno.code === 'EPERM' || errno.code === 'EROFS' || errno.code === 'ENOTDIR') {
+        throw new CliUserError({
+          summary: `Cannot read profile store at ${this.filePath}.`,
+          detail: `Check file permissions or directory access (error=${errno.code}).`
+        });
       }
       throw error;
     }
   }
 
+  // Runs normalize() over the persisted file and rewrites it if anything changed.
+  // This is a continuous normalization pass (not a versioned migration), so it
+  // remains valid to call across all profile versions and has no removal deadline.
   async migrateIfNeeded(): Promise<void> {
     try {
       const content = await fs.readFile(this.filePath, 'utf8');
-      const parsed = JSON.parse(content) as ProfileStoreData;
+      const parsed: unknown = JSON.parse(content);
       const normalized = this.normalize(parsed);
       if (normalized.changed) {
         await this.writeData(normalized.data);
       }
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
-      if (code === 'ENOENT' || error instanceof SyntaxError) {
-        return; // No file or invalid JSON — nothing to migrate.
+      if (code === 'ENOENT') {
+        return;
+      }
+      if (error instanceof SyntaxError) {
+        process.stderr.write(`Warning: profile ${this.filePath} contains invalid JSON — skipping migration.\n`);
+        return;
       }
       throw error;
     }
@@ -298,7 +293,7 @@ export class FileProfileStore implements ProfileStore {
     const data = await this.getData();
     const tenant = data.tenants.find((item) => item.id === tenantId);
     if (!tenant) {
-      throw new Error(`Unknown tenant: ${tenantId}`);
+      throw new CliUserError({ summary: `Unknown tenant: ${tenantId}` });
     }
     data.activeTenantId = tenantId;
     await this.writeData(data);
@@ -320,28 +315,29 @@ export class FileProfileStore implements ProfileStore {
 
   async addKeySlot(
     tenantId: string,
-    input: { provider: SecretProvider; name: string; slotId?: string; fingerprint: string }
+    provider: SecretProvider,
+    input: { name: string; slotId?: string; fingerprint: string }
   ): Promise<ApiKeySlotMeta> {
     const data = await this.getData();
     const { tenant, index } = this.getRequiredTenantFromData(data, tenantId);
     const registry = cloneRegistry(tenant.keyRegistry);
     const now = new Date().toISOString();
     const slotName = ensureSlotName(input.name);
-    const providerSlots = registry.slots.filter((slot) => slot.provider === input.provider);
+    const providerSlots = registry.slots.filter((slot) => slot.provider === provider);
 
     if (providerSlots.some((slot) => slot.name.toLowerCase() === slotName.toLowerCase())) {
-      throw new Error(`A key slot named "${slotName}" already exists for provider ${input.provider}.`);
+      throw new CliUserError({ summary: `A key slot named "${slotName}" already exists for provider ${provider}.` });
     }
 
     const existingIds = new Set(providerSlots.map((slot) => slot.slotId));
     const slotId = input.slotId?.trim() || buildSlotId(slotName, existingIds);
     if (existingIds.has(slotId)) {
-      throw new Error(`A key slot with id "${slotId}" already exists for provider ${input.provider}.`);
+      throw new CliUserError({ summary: `A key slot with id "${slotId}" already exists for provider ${provider}.` });
     }
 
     const slot: ApiKeySlotMeta = {
       slotId,
-      provider: input.provider,
+      provider,
       name: slotName,
       fingerprint: input.fingerprint,
       createdAt: now,
@@ -349,8 +345,8 @@ export class FileProfileStore implements ProfileStore {
     };
 
     registry.slots.push(slot);
-    if (!registry.activeSlotByProvider[input.provider]) {
-      registry.activeSlotByProvider[input.provider] = slotId;
+    if (!registry.activeSlotByProvider[provider]) {
+      registry.activeSlotByProvider[provider] = slotId;
     }
 
     data.tenants[index] = {
@@ -374,7 +370,7 @@ export class FileProfileStore implements ProfileStore {
     const registry = cloneRegistry(tenant.keyRegistry);
     const slotIndex = registry.slots.findIndex((slot) => slot.provider === provider && matchesSlotRef(slot, slotRef));
     if (slotIndex === -1) {
-      throw new Error(`Unknown slot "${slotRef}" for provider ${provider}.`);
+      throw new CliUserError({ summary: `Unknown slot "${slotRef}" for provider ${provider}.` });
     }
 
     const slot = registry.slots[slotIndex];
@@ -385,7 +381,7 @@ export class FileProfileStore implements ProfileStore {
           idx !== slotIndex && item.provider === provider && item.name.toLowerCase() === nextName.toLowerCase()
       );
       if (duplicate) {
-        throw new Error(`A key slot named "${nextName}" already exists for provider ${provider}.`);
+        throw new CliUserError({ summary: `A key slot named "${nextName}" already exists for provider ${provider}.` });
       }
     }
 
@@ -413,7 +409,7 @@ export class FileProfileStore implements ProfileStore {
     const registry = cloneRegistry(tenant.keyRegistry);
     const slot = registry.slots.find((item) => item.provider === provider && matchesSlotRef(item, slotRef));
     if (!slot) {
-      throw new Error(`Unknown slot "${slotRef}" for provider ${provider}.`);
+      throw new CliUserError({ summary: `Unknown slot "${slotRef}" for provider ${provider}.` });
     }
 
     registry.slots = registry.slots.filter((item) => !(item.provider === provider && item.slotId === slot.slotId));
@@ -457,7 +453,7 @@ export class FileProfileStore implements ProfileStore {
     const registry = cloneRegistry(tenant.keyRegistry);
     const slot = registry.slots.find((item) => item.provider === provider && matchesSlotRef(item, slotRef));
     if (!slot) {
-      throw new Error(`Unknown slot "${slotRef}" for provider ${provider}.`);
+      throw new CliUserError({ summary: `Unknown slot "${slotRef}" for provider ${provider}.` });
     }
 
     registry.activeSlotByProvider[provider] = slot.slotId;
@@ -472,10 +468,11 @@ export class FileProfileStore implements ProfileStore {
     return slot;
   }
 
-  private normalize(input: ProfileStoreData): { data: ProfileStoreData; changed: boolean } {
+  private normalize(input: unknown): { data: ProfileStoreData; changed: boolean } {
     let changed = false;
-    const rawTenants = Array.isArray(input.tenants) ? input.tenants : [];
-    if (!Array.isArray(input.tenants)) {
+    const raw = isRecord(input) ? input : {};
+    const rawTenants = Array.isArray(raw.tenants) ? raw.tenants : [];
+    if (!Array.isArray(raw.tenants)) {
       changed = true;
     }
 
@@ -492,8 +489,8 @@ export class FileProfileStore implements ProfileStore {
       }
     }
 
-    const incomingActiveTenantId = typeof input.activeTenantId === 'string' ? input.activeTenantId : undefined;
-    if (input.activeTenantId !== incomingActiveTenantId) {
+    const incomingActiveTenantId = typeof raw.activeTenantId === 'string' ? raw.activeTenantId : undefined;
+    if (raw.activeTenantId !== incomingActiveTenantId) {
       changed = true;
     }
 
@@ -505,7 +502,7 @@ export class FileProfileStore implements ProfileStore {
       changed = true;
     }
 
-    if (input.version !== 2) {
+    if (raw.version !== 2) {
       changed = true;
     }
 
@@ -527,7 +524,7 @@ export class FileProfileStore implements ProfileStore {
   private async getRequiredTenant(tenantId: string): Promise<TenantProfile> {
     const tenant = await this.getTenant(tenantId);
     if (!tenant) {
-      throw new Error(`Unknown tenant: ${tenantId}`);
+      throw new CliUserError({ summary: `Unknown tenant: ${tenantId}` });
     }
     return tenant;
   }
@@ -538,7 +535,7 @@ export class FileProfileStore implements ProfileStore {
   ): { tenant: TenantProfile; index: number } {
     const index = data.tenants.findIndex((tenant) => tenant.id === tenantId);
     if (index === -1) {
-      throw new Error(`Unknown tenant: ${tenantId}`);
+      throw new CliUserError({ summary: `Unknown tenant: ${tenantId}` });
     }
     return {
       tenant: data.tenants[index],

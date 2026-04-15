@@ -37,4 +37,16 @@ describe('namespace endpoint mappings', () => {
       body: { nickname: 'Lab Unit' }
     });
   });
+
+  it('maps organization.moveDevice to organization.devices.moveDevice', async () => {
+    const call = vi.fn().mockResolvedValue({ ok: true });
+    const organization = createOrganizationNamespace(call);
+
+    await organization.moveDevice({ path: { device_id: 'dev-1' }, body: { space_id: 99592 } });
+
+    expect(call).toHaveBeenCalledWith('organization.devices.moveDevice', {
+      path: { device_id: 'dev-1' },
+      body: { space_id: 99592 }
+    });
+  });
 });

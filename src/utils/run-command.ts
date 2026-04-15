@@ -1,14 +1,15 @@
-import crossSpawn from 'cross-spawn';
 import type { ChildProcess } from 'node:child_process';
 
-export interface ProcessRunOptions {
+import crossSpawn from 'cross-spawn';
+
+interface ProcessRunOptions {
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   input?: string;
   stdinMode?: 'pipe' | 'ignore';
 }
 
-export interface ProcessRunResult {
+interface ProcessRunResult {
   code: number;
   stdout: string;
   stderr: string;
@@ -21,7 +22,7 @@ export async function runProcess(
 ): Promise<ProcessRunResult> {
   const stdinMode = options.stdinMode ?? 'pipe';
 
-  return await new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const child: ChildProcess = crossSpawn(command, args, {
       cwd: options.cwd,
       env: options.env,

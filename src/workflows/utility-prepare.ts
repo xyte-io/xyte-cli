@@ -1,48 +1,53 @@
 import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { z } from 'zod';
 
+import { CliUserError } from '../contracts/user-error';
 import { UTILITY_PREPARE_SCHEMA_VERSION } from '../contracts/versions';
 import { getUtilityActionProfile, listUtilityActionProfiles } from './utility-action-catalog';
 import type {
   UtilityActionProfile,
   UtilityExecutionSupport,
-  UtilityPreparePrimaryFormat
+  UtilityPreparePrimaryFormat,
+  UtilityPrepareMode
 } from './utility-action-profiles';
 
-type UtilityPrepareInputKind = 'tabular' | 'document' | 'image' | 'unknown';
+type UtilityPrepareInputKind = UtilityPrepareResult['input']['kind'];
 
-interface UtilityPrepareResult {
-  schemaVersion: typeof UTILITY_PREPARE_SCHEMA_VERSION;
-  generatedAtUtc: string;
-  actionKey: string;
-  entity: string;
-  mode: 'friendly' | 'generic';
-  input: {
-    path: string;
-    kind: UtilityPrepareInputKind;
-    extension: string;
-    sizeBytes: number;
-  };
-  canonical: {
-    primaryFormat: UtilityPreparePrimaryFormat;
-    headers: string[];
-    jsonShape: Record<string, unknown>;
-  };
-  decodeRules: string[];
-  artifacts: {
-    primary: string;
-    rejected: string;
-    notes: string;
-  };
-  promptTemplatePath: string;
-  skillNodePath: string;
-  suggestedCommands: {
-    next: string;
-    apply: string;
-    verify: string;
-  };
-  executionSupport: 'space.import-tree' | 'call-loop-only';
-}
+const UtilityPrepareResultSchema = z.object({
+  schemaVersion: z.literal(UTILITY_PREPARE_SCHEMA_VERSION),
+  generatedAtUtc: z.string(),
+  actionKey: z.string(),
+  entity: z.string(),
+  mode: z.enum(['friendly', 'generic']),
+  input: z.object({
+    path: z.string(),
+    kind: z.enum(['tabular', 'document', 'image', 'unknown']),
+    extension: z.string(),
+    sizeBytes: z.number()
+  }),
+  canonical: z.object({
+    primaryFormat: z.enum(['csv', 'jsonl']),
+    headers: z.array(z.string()),
+    jsonShape: z.record(z.string(), z.unknown())
+  }),
+  decodeRules: z.array(z.string()),
+  artifacts: z.object({
+    primary: z.string(),
+    rejected: z.string(),
+    notes: z.string()
+  }),
+  promptTemplatePath: z.string(),
+  skillNodePath: z.string(),
+  suggestedCommands: z.object({
+    next: z.string(),
+    apply: z.string(),
+    verify: z.string()
+  }),
+  executionSupport: z.enum(['space.import-tree', 'device.move', 'call-loop-only'])
+});
+
+type UtilityPrepareResult = z.infer<typeof UtilityPrepareResultSchema>;
 
 const TABULAR_EXTENSIONS = new Set(['.csv', '.tsv', '.xlsx', '.xls', '.json', '.jsonl', '.ndjson']);
 const DOCUMENT_EXTENSIONS = new Set(['.pdf', '.md', '.txt', '.doc', '.docx', '.rtf']);
@@ -64,7 +69,7 @@ function detectInputKind(extension: string): UtilityPrepareInputKind {
 
 function writeScaffoldFile(filePath: string, content: string, force: boolean): void {
   if (existsSync(filePath) && !force) {
-    throw new Error(`Scaffold file already exists: ${filePath}. Re-run with --force to overwrite.`);
+    throw new CliUserError({ summary: `Scaffold file already exists: ${filePath}. Re-run with --force to overwrite.` });
   }
   writeFileSync(filePath, content, 'utf8');
 }
@@ -122,6 +127,18 @@ function buildSuggestedCommands(
     };
   }
 
+  if (profile.actionKey === 'device.move') {
+    return {
+      next: [
+        `Review ${primaryPath}.`,
+        'Validate the target_space_id column before any writes.',
+        'Run util move-devices without --apply first and only execute after the dry-run report looks correct.'
+      ].join(' '),
+      apply: `xyte-cli util move-devices --tenant ${tenant} --input ${primaryPath} --apply --report ${path.join(outputDir, 'device-move.apply.ndjson')}`,
+      verify: `xyte-cli api call organization.devices.getDevice --tenant ${tenant} --path-json '{"device_id":"<device_id>"}'`
+    };
+  }
+
   if (profile.executionSupport === 'space.import-tree') {
     return {
       next: `xyte-cli util import-tree --tenant ${tenant} --input ${primaryPath}`,
@@ -170,6 +187,7 @@ function buildCsvHeader(headers: string[]): string {
   return `${headers.join(',')}\n`;
 }
 
+/** Intentionally synchronous: all I/O uses synchronous Node.js APIs (existsSync, statSync, mkdirSync, writeFileSync). */
 export function runUtilityPrepare(args: {
   inputPath: string;
   actionKey: string;
@@ -180,11 +198,11 @@ export function runUtilityPrepare(args: {
 }): UtilityPrepareResult {
   const inputPath = path.resolve(args.inputPath);
   if (!existsSync(inputPath)) {
-    throw new Error(`Input file does not exist: ${inputPath}`);
+    throw new CliUserError({ summary: `Input file does not exist: ${inputPath}` });
   }
   const inputStats = statSync(inputPath);
   if (!inputStats.isFile()) {
-    throw new Error(`Input path must be a file: ${inputPath}`);
+    throw new CliUserError({ summary: `Input path must be a file: ${inputPath}` });
   }
 
   const profile = getUtilityActionProfile(args.actionKey);
@@ -243,7 +261,7 @@ interface UtilityActionSummary {
   actionKey: string;
   entity: string;
   title: string;
-  mode: 'friendly' | 'generic';
+  mode: UtilityPrepareMode;
   method: string | null;
   pathTemplate: string | null;
   executionSupport: UtilityExecutionSupport;

@@ -55,7 +55,7 @@ xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/
   - Stop if setup status is not ready.
   - Stop if config doctor reports failed connectivity.
   - Continue to incident monitoring only after readiness is healthy.
-- Failure fallback:
+- Failure handling:
   - Run `xyte-cli setup run --tenant <tenant-id>` if key provisioning is missing.
   - If setup must stay offline, use `xyte-cli setup run --tenant <tenant-id> --provider <xyte-org|xyte-partner> --connectivity never`.
   - Re-run this flow after setup.
@@ -80,7 +80,7 @@ xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --i
 - Stop/decision gates:
   - Stop and open triage if any `delta` frame contains added/updated incidents.
   - Stop if repeated `error` frames occur.
-- Failure fallback:
+- Failure handling:
   - Run `xyte-cli api endpoints describe organization.incidents.getIncidents`.
   - Re-run `organization.incidents.getIncidents` with explicit integer `from`, `to`, `page`, and `per_page` values using native shell syntax for your environment.
 
@@ -108,7 +108,7 @@ xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/xyte-deep-
 - Stop/decision gates:
   - Human decision gate: choose read-only monitoring or switch to `flow.guided-remediation`.
   - Stop if deep-dive/report generation fails validation.
-- Failure fallback:
+- Failure handling:
   - Re-run watch once and deep-dive with `--window 6`.
   - If failures persist, return to `flow.setup-readiness-10m`.
 
@@ -169,7 +169,7 @@ xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --o
   - Stop if update-device read-back does not reflect the expected field changes.
   - Stop immediately on any non-2xx write response.
   - Stop if post-remediation watch still shows unchanged high-priority incidents.
-- Failure fallback:
+- Failure handling:
   - Re-run endpoint contract checks and correct payload shape:
     - `xyte-cli api endpoints describe organization.commands.sendCommand`
     - `xyte-cli api endpoints describe organization.tickets.sendMessage`
@@ -181,11 +181,48 @@ xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --o
   - `xyte-cli util import-tree` is dry-run by default unless `--apply` is provided.
   - Human decision gate is mandatory before any write/apply loop.
   - Re-run dry-run import before any `--apply`.
-- Write safety requirements:
-  - Non-read endpoint calls execute directly once the operator clears the human gate.
-  - Destructive deletes execute directly once the operator clears the human gate.
-  - `xyte-cli util import-tree` is dry-run by default unless `--apply` is provided.
-  - Human decision gate is mandatory before any write/apply loop.
+
+## flow.device-migration
+
+- Flow ID: `flow.device-migration`
+- Intent: inventory, match, dry-run, execute, and verify device-to-space migration with human gates.
+- Prerequisites:
+  - `<tenant-id>` is active and authorized.
+  - `<source-space-id>` identifies the source space to inventory from.
+  - `<target-path>` scopes the target space inventory (for example `Regional Offices`).
+- Exact commands:
+
+```bash
+mkdir -p ./artifacts ./reports
+xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id> --output json > ./artifacts/source-devices.json
+xyte-cli api call organization.spaces.getSpaces --tenant <tenant-id> --query path_includes=<target-path> --output json > ./artifacts/target-spaces.json
+xyte-cli util match --tenant <tenant-id> --source ./artifacts/source-devices.json --target ./artifacts/target-spaces.json --source-field name --target-field name --out ./artifacts/device-moves.csv
+xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/device-moves.csv.summary.json --out ./reports/device-migration-pre.md --render markdown
+xyte-cli util move-devices --tenant <tenant-id> --input ./artifacts/device-moves.csv --report ./artifacts/device-migration.dry-run.ndjson
+xyte-cli util move-devices --tenant <tenant-id> --input ./artifacts/device-moves.csv --apply --report ./artifacts/device-migration.apply.ndjson > ./artifacts/device-migration.apply.json
+xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/xyte-fleet.device-migration.json
+```
+
+- Expected artifacts:
+  - source device inventory JSON and target space inventory JSON.
+  - deterministic move CSV at `./artifacts/device-moves.csv` plus summary JSON sidecar.
+  - pre-migration markdown report at `./reports/device-migration-pre.md`.
+  - dry-run and apply NDJSON row reports for move execution.
+  - fleet verification JSON at `./artifacts/xyte-fleet.device-migration.json`.
+  - when run through `xyte-cli flow run flow.device-migration`, the flow runner also executes:
+    - **verify_moved_devices** (`device.verify-batch`): re-fetches each moved device and confirms its `space_id` matches the target.
+    - **post_migration_report** (`report.generate`): composes a post-migration markdown report from execution, verification, and fleet artifacts.
+- Stop/decision gates:
+  - Human decision gate before dry-run review (`gate_approve_mapping`).
+  - Human decision gate before execution (`gate_approve_execution`).
+  - Stop on any failed move row unless `--continue-on-error` is explicitly used.
+- Verification semantics:
+  - the flow verifies only the devices listed in `./artifacts/device-moves.csv`
+  - devices not listed in the move plan are irrelevant to flow success, even if they remain in the source space
+- Failure handling:
+  - Re-run `xyte-cli util match` after correcting names or target spaces.
+  - Re-run `xyte-cli util move-devices` without `--apply` if the dry-run report shows invalid targets or duplicate device rows.
+  - Confirm the move endpoint contract with `xyte-cli api endpoints describe organization.devices.moveDevice`.
 
 ## flow.daily-deep-dive-report
 
@@ -210,6 +247,6 @@ xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/
 - Stop/decision gates:
   - Stop if setup status is not ready.
   - Human decision gate: approve report distribution or escalate to `flow.watch-to-triage`.
-- Failure fallback:
+- Failure handling:
   - Re-run with a shorter analysis window (`--window 12`).
   - If still failing, return to `flow.setup-readiness-10m`.

@@ -2,7 +2,7 @@ import type { PublicEndpointSpec } from '../types/endpoints';
 
 export type UtilityPreparePrimaryFormat = 'csv' | 'jsonl';
 export type UtilityPrepareMode = 'friendly' | 'generic';
-export type UtilityExecutionSupport = 'space.import-tree' | 'call-loop-only';
+export type UtilityExecutionSupport = 'space.import-tree' | 'device.move' | 'call-loop-only';
 
 export interface UtilityActionProfile {
   actionKey: string;
@@ -85,6 +85,37 @@ export function buildFriendlyClaimDeviceProfile(endpoint: PublicEndpointSpec): U
     promptTemplatePath: GENERIC_PROMPT_TEMPLATE_PATH,
     skillNodePath: UTILITIES_SKILL_NODE_PATH,
     executionSupport: 'call-loop-only'
+  };
+}
+
+export function buildFriendlyMoveDeviceProfile(endpoint: PublicEndpointSpec): UtilityActionProfile {
+  return {
+    actionKey: 'device.move',
+    title: endpoint.title,
+    entity: endpoint.group,
+    mode: 'friendly',
+    endpointKey: endpoint.key,
+    method: endpoint.method,
+    pathTemplate: endpoint.pathTemplate,
+    primaryFormat: 'csv',
+    headers: ['device_id', 'target_space_id', 'device_name', 'current_space_id', 'target_space_name'],
+    jsonShape: {
+      device_id: '12345',
+      target_space_id: 99592,
+      device_name: 'South Wing Display',
+      current_space_id: 55123,
+      target_space_name: 'South Wing'
+    },
+    decodeRules: [
+      'Map source rows into device_id,target_space_id,device_name,current_space_id,target_space_name columns.',
+      'device_id and target_space_id are required and must be non-empty.',
+      'target_space_id must stay numeric so the move endpoint receives an integer space_id.',
+      'Do not guess device ids or target spaces; reject ambiguous rows.',
+      'Write unresolved rows to rejected output with reject_reason.'
+    ],
+    promptTemplatePath: GENERIC_PROMPT_TEMPLATE_PATH,
+    skillNodePath: UTILITIES_SKILL_NODE_PATH,
+    executionSupport: 'device.move'
   };
 }
 

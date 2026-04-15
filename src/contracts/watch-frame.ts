@@ -9,8 +9,6 @@ const WatchEventTypeSchema = z.enum(['snapshot', 'delta', 'heartbeat', 'error'])
 
 const WatchDeltaEntrySchema = z.object({
   id: z.string(),
-  current: z.unknown().optional(),
-  previous: z.unknown().optional(),
   before: z.unknown().optional(),
   after: z.unknown().optional()
 });

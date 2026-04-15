@@ -46,7 +46,7 @@ function toLowerCaseMap(headers: Headers): Record<string, string> {
 function summarizeHttpErrorDetails(details: unknown): string | undefined {
   if (typeof details === 'string') {
     const value = details.trim();
-    return value ? value : undefined;
+    return value || undefined;
   }
 
   if (!details || typeof details !== 'object') {
@@ -89,8 +89,8 @@ async function parseResponseBody(response: Response): Promise<unknown> {
   if (contentType.includes('application/json')) {
     try {
       return await response.json();
-    } catch {
-      return undefined;
+    } catch (error) {
+      throw new Error('Failed to parse JSON response body', { cause: error });
     }
   }
 
@@ -112,7 +112,7 @@ export class HttpTransport {
   private readonly timeoutMs: number;
   private readonly retryAttempts: number;
   private readonly retryBackoffMs: number;
-  private readonly logger = getLogger();
+  private get logger() { return getLogger(); }
 
   constructor(options: TransportOptions = {}) {
     this.timeoutMs = options.timeoutMs ?? 15_000;

@@ -32,6 +32,9 @@
     "method": {
       "type": "string"
     },
+    "note": {
+      "type": "string"
+    },
     "guard": {
       "type": "object",
       "additionalProperties": false,

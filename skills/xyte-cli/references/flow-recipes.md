@@ -11,7 +11,6 @@ These recipes mirror `docs/flows/agent-ops.md` for agent routing.
 ## flow.setup-readiness-10m
 
 ```bash
-xyte-cli status --mode fast --output json
 xyte-cli setup status --tenant <tenant-id> --output json
 xyte-cli config doctor --tenant <tenant-id> --output json
 xyte-cli status --tenant <tenant-id> --mode fast --output json
@@ -39,7 +38,7 @@ xyte-cli api call organization.incidents.getIncidents \
 xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json --out ./artifacts/xyte-watch.triage.ndjson
 xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/xyte-fleet.triage.json
 xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json --out ./artifacts/xyte-deep-dive.triage.json
-xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/xyte-deep-dive.triage.json --out ./artifacts/xyte-triage.md --render markdown
+xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/xyte-deep-dive.triage.json --out ./reports/xyte-triage.md --render markdown
 ```
 
 ## flow.guided-remediation
@@ -85,11 +84,28 @@ xyte-cli api call organization.incidents.closeIncident \
 xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json --out ./artifacts/xyte-watch.after.ndjson
 ```
 
+## flow.device-migration
+
+```bash
+mkdir -p ./artifacts ./reports
+xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id> --output json > ./artifacts/source-devices.json
+xyte-cli api call organization.spaces.getSpaces --tenant <tenant-id> --query path_includes=<target-path> --output json > ./artifacts/target-spaces.json
+xyte-cli util match --tenant <tenant-id> --source ./artifacts/source-devices.json --target ./artifacts/target-spaces.json --source-field name --target-field name --out ./artifacts/device-moves.csv
+xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/device-moves.csv.summary.json --out ./reports/device-migration-pre.md --render markdown
+xyte-cli util move-devices --tenant <tenant-id> --input ./artifacts/device-moves.csv --report ./artifacts/device-migration.dry-run.ndjson
+xyte-cli util move-devices --tenant <tenant-id> --input ./artifacts/device-moves.csv --apply --report ./artifacts/device-migration.apply.ndjson > ./artifacts/device-migration.apply.json
+xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/xyte-fleet.device-migration.json
+```
+
+When run through `xyte-cli flow run flow.device-migration`, the flow runner also executes two additional verification steps not in the manual recipe:
+- **verify_moved_devices** (`device.verify-batch`): re-fetches each moved device and confirms its `space_id` matches the target from the move plan.
+- **post_migration_report** (`report.generate`): composes a post-migration markdown report from the execution, verification, and fleet artifacts.
+
 ## flow.daily-deep-dive-report
 
 ```bash
 xyte-cli setup status --tenant <tenant-id> --output json
 xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json --out ./artifacts/xyte-deep-dive.daily.json
-xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/xyte-deep-dive.daily.json --out ./artifacts/xyte-daily.md --render markdown
+xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/xyte-deep-dive.daily.json --out ./reports/xyte-daily.md --render markdown
 xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/xyte-fleet.daily.json
 ```
