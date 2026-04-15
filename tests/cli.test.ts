@@ -1041,6 +1041,18 @@ describe('cli integration', () => {
     expect(parsed.configDir).toBe(configDir);
     expect(parsed.user).toBe(join(configDir, 'settings.json'));
     expect(parsed.workspace).toBe(join(cwd, '.xyte', 'config.json'));
+    expect(parsed.profile).toBe(join(configDir, 'profile.json'));
+    expect(parsed.legacySecretStore).toBe(join(configDir, 'secrets.v1.json'));
+    if (process.platform === 'darwin') {
+      expect(parsed.secretStoreBackend).toBe('keychain');
+      expect(parsed.secretStore).toBe('xyte-cli');
+    } else if (process.platform === 'win32') {
+      expect(parsed.secretStoreBackend).toBe('dpapi');
+      expect(parsed.secretStore).toBe(join(configDir, 'secrets.dpapi.v1.json'));
+    } else {
+      expect(parsed.secretStoreBackend).toBe('file');
+      expect(parsed.secretStore).toBe(join(configDir, 'secrets.v1.json'));
+    }
 
     stdout.write.mockClear();
     await program.parseAsync([
@@ -1129,6 +1141,138 @@ describe('cli integration', () => {
     output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     parsed = JSON.parse(output);
     expect(parsed.readiness.tenantId).toBe('cli-tenant');
+  });
+
+  it('stores setup secrets in the selected file backend without changing the setup flow', async () => {
+    const profileStore = new MemoryProfileStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const cwd = mkdtempSync(join(tmpdir(), 'xyte-cli-setup-file-backend-workspace-'));
+    const configDir = mkdtempSync(join(tmpdir(), 'xyte-cli-setup-file-backend-user-'));
+    const env = {
+      ...process.env,
+      XYTE_CLI_CONFIG_DIR: configDir,
+      XYTE_CLI_SECRET_STORE_BACKEND: 'file'
+    };
+    const program = createCli({ profileStore, stdout, stderr, cwd, env });
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'setup',
+      'run',
+      '--non-interactive',
+      '--tenant',
+      'acme',
+      '--provider',
+      'xyte-org',
+      '--key',
+      'org-key',
+      '--connectivity',
+      'never',
+      '--output',
+      'json'
+    ]);
+
+    const secretPath = join(configDir, 'secrets.v1.json');
+    expect(existsSync(secretPath)).toBe(true);
+    const raw = JSON.parse(readFileSync(secretPath, 'utf8')) as { records: Record<string, string> };
+    expect(raw.records['acme:xyte-org:primary']).toBe('org-key');
+  });
+
+  it('uses the selected file backend for config key add, update, list, and test', async () => {
+    const profileStore = new MemoryProfileStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const cwd = mkdtempSync(join(tmpdir(), 'xyte-cli-config-file-backend-workspace-'));
+    const configDir = mkdtempSync(join(tmpdir(), 'xyte-cli-config-file-backend-user-'));
+    const env = {
+      ...process.env,
+      XYTE_CLI_CONFIG_DIR: configDir,
+      XYTE_CLI_SECRET_STORE_BACKEND: 'file'
+    };
+    const program = createCli({ profileStore, stdout, stderr, cwd, env });
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'config',
+      'key',
+      'add',
+      '--tenant',
+      'acme',
+      '--provider',
+      'xyte-org',
+      '--name',
+      'primary',
+      '--key',
+      'org-key'
+    ]);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'config',
+      'key',
+      'update',
+      '--tenant',
+      'acme',
+      '--provider',
+      'xyte-org',
+      '--slot',
+      'primary',
+      '--key',
+      'org-key-updated'
+    ]);
+
+    stdout.write.mockClear();
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'config',
+      'key',
+      'list',
+      '--tenant',
+      'acme',
+      '--format',
+      'json',
+      '--output',
+      'json'
+    ]);
+    let output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    let parsed = JSON.parse(output);
+    expect(parsed.slots[0].hasSecret).toBe(true);
+    const raw = JSON.parse(readFileSync(join(configDir, 'secrets.v1.json'), 'utf8')) as { records: Record<string, string> };
+    expect(raw.records['acme:xyte-org:primary']).toBe('org-key-updated');
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+    );
+
+    stdout.write.mockClear();
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'config',
+      'key',
+      'test',
+      '--tenant',
+      'acme',
+      '--provider',
+      'xyte-org',
+      '--slot',
+      'primary'
+    ]);
+    output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    parsed = JSON.parse(output);
+    expect(parsed.probe.ok).toBe(true);
+    expect(parsed.probe.strategy).toBe('organization.getOrganizationInfo');
   });
 
   it('prints status contract in fast mode', async () => {

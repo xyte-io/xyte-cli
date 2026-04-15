@@ -13,6 +13,7 @@ import {
 } from '../../config/settings';
 import { CliUserError } from '../../contracts/user-error';
 import { makeKeyFingerprint, matchesSlotRef } from '../../secure/key-slots';
+import { describeSecretStore } from '../../secure/secret-store';
 import type { ProfileStore, SecretStore } from '../../types/stores';
 import { SUPPORTED_SECRET_PROVIDERS, type SecretProvider } from '../../types/profile';
 import { parseProvider } from '../../utils/parse-domain';
@@ -224,6 +225,12 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
     .action(async (options: { format?: OutputFormat }, command: Command) => {
       const explicitOutput = getExplicitGlobalOutput(command);
       const settings = await ctx.resolveSettings();
+      const secretStore = await describeSecretStore({
+        cwd: ctx.cwd,
+        env: ctx.env,
+        settings,
+        stderr: ctx.stderr
+      });
       const output = resolveTextJsonOutput({
         output: options.format ?? explicitOutput,
         stdoutIsTTY: ctx.stdoutIsTTY,
@@ -234,13 +241,15 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
         configDir: settings.paths.configDir,
         user: settings.paths.user,
         workspace: settings.paths.workspace,
-        secretStore: path.join(settings.paths.configDir, 'secrets.v1.json'),
+        secretStoreBackend: secretStore.backend,
+        secretStore: secretStore.secretStore,
+        legacySecretStore: secretStore.legacySecretStore,
         profile: path.join(settings.paths.configDir, 'profile.json')
       };
 
       if (output === 'text') {
         ctx.stdout.write(
-          `configDir: ${payload.configDir}\nuser: ${payload.user}\nworkspace: ${payload.workspace}\nprofile: ${payload.profile}\nsecretStore: ${payload.secretStore}\n`
+          `configDir: ${payload.configDir}\nuser: ${payload.user}\nworkspace: ${payload.workspace}\nprofile: ${payload.profile}\nsecretStoreBackend: ${payload.secretStoreBackend}\nsecretStore: ${payload.secretStore}\nlegacySecretStore: ${payload.legacySecretStore}\n`
         );
         return;
       }
