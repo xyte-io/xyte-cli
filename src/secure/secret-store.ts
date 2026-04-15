@@ -544,9 +544,13 @@ export class WindowsDpapiSecretStore implements NativeSecretStore {
     input?: string,
     stdinMode: 'pipe' | 'ignore' = 'pipe'
   ): Promise<Awaited<ReturnType<typeof runProcess>>> {
+    const wrappedScript = [
+      "Add-Type -AssemblyName 'System.Security';",
+      script
+    ].join(' ');
     return await this.runProcessImpl(
       'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-Command', script],
+      ['-NoProfile', '-NonInteractive', '-Command', wrappedScript],
       {
         input,
         stdinMode

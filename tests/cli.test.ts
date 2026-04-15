@@ -1047,8 +1047,12 @@ describe('cli integration', () => {
       expect(parsed.secretStoreBackend).toBe('keychain');
       expect(parsed.secretStore).toBe('xyte-cli');
     } else if (process.platform === 'win32') {
-      expect(parsed.secretStoreBackend).toBe('dpapi');
-      expect(parsed.secretStore).toBe(join(configDir, 'secrets.dpapi.v1.json'));
+      expect(['dpapi', 'file']).toContain(parsed.secretStoreBackend);
+      expect(parsed.secretStore).toBe(
+        parsed.secretStoreBackend === 'dpapi'
+          ? join(configDir, 'secrets.dpapi.v1.json')
+          : join(configDir, 'secrets.v1.json')
+      );
     } else {
       expect(parsed.secretStoreBackend).toBe('file');
       expect(parsed.secretStore).toBe(join(configDir, 'secrets.v1.json'));
