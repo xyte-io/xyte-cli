@@ -25,13 +25,18 @@ function writeSettings(
 function buildKeychainRunProcessMock(options: {
   available?: boolean;
   wrongReadback?: boolean;
+  rejectOnAvailability?: boolean;
 } = {}) {
   const available = options.available ?? true;
   const wrongReadback = options.wrongReadback ?? false;
+  const rejectOnAvailability = options.rejectOnAvailability ?? false;
   const stored = new Map<string, string>();
   return vi.fn(async (_command: string, args: string[]) => {
     const subcommand = args[0];
     if (subcommand === 'default-keychain') {
+      if (rejectOnAvailability) {
+        throw new Error('failed to spawn security');
+      }
       if (available) {
         return { code: 0, stdout: '/Users/test/Library/Keychains/login.keychain-db\n', stderr: '' };
       }
@@ -68,12 +73,16 @@ function buildKeychainRunProcessMock(options: {
   });
 }
 
-function buildDpapiRunProcessMock(options: { available?: boolean; decryptFails?: boolean } = {}) {
+function buildDpapiRunProcessMock(options: { available?: boolean; decryptFails?: boolean; rejectOnAvailability?: boolean } = {}) {
   const available = options.available ?? true;
   const decryptFails = options.decryptFails ?? false;
+  const rejectOnAvailability = options.rejectOnAvailability ?? false;
   return vi.fn(async (_command: string, args: string[], runtimeOptions?: { input?: string; stdinMode?: 'pipe' | 'ignore' }) => {
     const script = args.join(' ');
     if (script.includes('Protect(') && script.includes('Unprotect(') && script.includes("[Console]::Out.Write('ok')")) {
+      if (rejectOnAvailability) {
+        throw new Error('failed to spawn powershell.exe');
+      }
       if (available) {
         return { code: 0, stdout: 'ok', stderr: '' };
       }
@@ -105,10 +114,12 @@ function buildSecretServiceRunProcessMock(options: {
   available?: boolean;
   wrongReadback?: boolean;
   decryptFails?: boolean;
+  clearFails?: boolean;
 } = {}) {
   const available = options.available ?? true;
   const wrongReadback = options.wrongReadback ?? false;
   const decryptFails = options.decryptFails ?? false;
+  const clearFails = options.clearFails ?? false;
   const stored = new Map<string, string>();
   return vi.fn(
     async (
@@ -139,6 +150,9 @@ function buildSecretServiceRunProcessMock(options: {
         return { code: 0, stdout: shouldCorruptReadback ? 'wrong-value' : (stored.get(key) ?? ''), stderr: '' };
       }
       if (subcommand === 'clear') {
+        if (clearFails) {
+          return { code: 1, stdout: '', stderr: 'Secret Service clear failed' };
+        }
         stored.delete(key);
         return { code: 0, stdout: '', stderr: '' };
       }
@@ -218,6 +232,20 @@ describe('secret store backend selection', () => {
     expect(details.legacySecretStore).toBe(join(configDir, 'secrets.v1.json'));
   });
 
+  it('falls back to the file backend when macOS availability probing throws', async () => {
+    const configDir = mkdtempSync(join(tmpdir(), 'xyte-secret-store-config-'));
+    const details = await describeSecretStore({
+      env: { ...process.env, XYTE_CLI_CONFIG_DIR: configDir },
+      platform: 'darwin',
+      runProcessImpl: buildKeychainRunProcessMock({ rejectOnAvailability: true })
+    });
+
+    expect(details.selector).toBe('auto');
+    expect(details.backend).toBe('file');
+    expect(details.secretStore).toBe(join(configDir, 'secrets.v1.json'));
+    expect(details.legacySecretStore).toBe(join(configDir, 'secrets.v1.json'));
+  });
+
   it('maps auto to the native Windows backend', async () => {
     const configDir = mkdtempSync(join(tmpdir(), 'xyte-secret-store-config-'));
     const details = await describeSecretStore({
@@ -245,7 +273,21 @@ describe('secret store backend selection', () => {
     expect(details.legacySecretStore).toBe(join(configDir, 'secrets.v1.json'));
   });
 
-  it('maps auto to the file backend on Linux', async () => {
+  it('falls back to the file backend when Windows availability probing throws', async () => {
+    const configDir = mkdtempSync(join(tmpdir(), 'xyte-secret-store-config-'));
+    const details = await describeSecretStore({
+      env: { ...process.env, XYTE_CLI_CONFIG_DIR: configDir },
+      platform: 'win32',
+      runProcessImpl: buildDpapiRunProcessMock({ rejectOnAvailability: true })
+    });
+
+    expect(details.selector).toBe('auto');
+    expect(details.backend).toBe('file');
+    expect(details.secretStore).toBe(join(configDir, 'secrets.v1.json'));
+    expect(details.legacySecretStore).toBe(join(configDir, 'secrets.v1.json'));
+  });
+
+  it('maps auto to the native Linux backend', async () => {
     const configDir = mkdtempSync(join(tmpdir(), 'xyte-secret-store-config-'));
     const details = await describeSecretStore({
       env: { ...process.env, XYTE_CLI_CONFIG_DIR: configDir },
@@ -269,6 +311,20 @@ describe('secret store backend selection', () => {
     expect(details.selector).toBe('auto');
     expect(details.backend).toBe('file');
     expect(details.secretStore).toBe(join(configDir, 'secrets.v1.json'));
+  });
+
+  it('falls back to the file backend when Linux Secret Service probe cleanup fails', async () => {
+    const configDir = mkdtempSync(join(tmpdir(), 'xyte-secret-store-config-'));
+    const details = await describeSecretStore({
+      env: { ...process.env, XYTE_CLI_CONFIG_DIR: configDir },
+      platform: 'linux',
+      runProcessImpl: buildSecretServiceRunProcessMock({ clearFails: true })
+    });
+
+    expect(details.selector).toBe('auto');
+    expect(details.backend).toBe('file');
+    expect(details.secretStore).toBe(join(configDir, 'secrets.v1.json'));
+    expect(details.legacySecretStore).toBe(join(configDir, 'secrets.v1.json'));
   });
 
   it('fails when native backend is requested on unsupported platforms', async () => {

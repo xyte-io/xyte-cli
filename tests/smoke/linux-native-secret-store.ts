@@ -257,13 +257,14 @@ export async function runLinuxNativeSecretStoreSmoke(
       throw new Error('Migrated secret mismatch for migrate-globex:xyte-org:secondary');
     }
 
-    await nativeStore.clearSlotSecret('native-smoke', 'xyte-org', 'primary');
-    await nativeStore.clearSlotSecret('migrate-acme', 'xyte-org', 'primary');
-    await nativeStore.clearSlotSecret('migrate-acme', 'xyte-partner', 'partner-primary');
-    await nativeStore.clearSlotSecret('migrate-globex', 'xyte-org', 'secondary');
-
     logger.log('Linux native secret-store smoke passed using Secret Service.');
   } finally {
+    await Promise.allSettled([
+      nativeStore.clearSlotSecret('native-smoke', 'xyte-org', 'primary'),
+      nativeStore.clearSlotSecret('migrate-acme', 'xyte-org', 'primary'),
+      nativeStore.clearSlotSecret('migrate-acme', 'xyte-partner', 'partner-primary'),
+      nativeStore.clearSlotSecret('migrate-globex', 'xyte-org', 'secondary')
+    ]);
     await (options.rmFn ?? rm)(tempRoot, { recursive: true, force: true });
   }
 }

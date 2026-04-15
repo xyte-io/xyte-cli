@@ -398,14 +398,21 @@ export class MacKeychainSecretStore implements NativeSecretStore {
   constructor(private readonly runProcessImpl: typeof runProcess = runProcess) {}
 
   async checkAvailability(): Promise<{ available: boolean; reason?: string }> {
-    const result = await this.runProcessImpl('security', ['default-keychain'], { stdinMode: 'ignore' });
-    if (result.code === 0 && result.stdout.trim()) {
-      return { available: true };
+    try {
+      const result = await this.runProcessImpl('security', ['default-keychain'], { stdinMode: 'ignore' });
+      if (result.code === 0 && result.stdout.trim()) {
+        return { available: true };
+      }
+      return {
+        available: false,
+        reason: result.stderr.trim() || result.stdout.trim() || 'macOS Keychain is unavailable.'
+      };
+    } catch (error) {
+      return {
+        available: false,
+        reason: errorMessage(error)
+      };
     }
-    return {
-      available: false,
-      reason: result.stderr.trim() || result.stdout.trim() || 'macOS Keychain is unavailable.'
-    };
   }
 
   async setSlotSecret(tenantId: string, provider: SecretProvider, slotId: string, value: string): Promise<void> {
@@ -480,35 +487,42 @@ export class WindowsDpapiSecretStore implements NativeSecretStore {
 
   async checkAvailability(): Promise<{ available: boolean; reason?: string }> {
     const probe = `xyte-cli-dpapi-probe-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const result = await this.runPowerShell(
-      [
-        '$inputValue = [Console]::In.ReadToEnd();',
-        '$bytes = [System.Text.Encoding]::UTF8.GetBytes($inputValue);',
-        '$protected = [System.Security.Cryptography.ProtectedData]::Protect(',
-        '  $bytes,',
-        '  $null,',
-        '  [System.Security.Cryptography.DataProtectionScope]::CurrentUser',
-        ');',
-        '$roundTripBytes = [System.Security.Cryptography.ProtectedData]::Unprotect(',
-        '  $protected,',
-        '  $null,',
-        '  [System.Security.Cryptography.DataProtectionScope]::CurrentUser',
-        ');',
-        '$roundTrip = [System.Text.Encoding]::UTF8.GetString($roundTripBytes);',
-        'if ($roundTrip -ne $inputValue) {',
-        "  throw 'Windows DPAPI CurrentUser round-trip mismatch.'",
-        '}',
-        "[Console]::Out.Write('ok');"
-      ].join(' '),
-      probe
-    );
-    if (result.code === 0 && result.stdout.trim() === 'ok') {
-      return { available: true };
+    try {
+      const result = await this.runPowerShell(
+        [
+          '$inputValue = [Console]::In.ReadToEnd();',
+          '$bytes = [System.Text.Encoding]::UTF8.GetBytes($inputValue);',
+          '$protected = [System.Security.Cryptography.ProtectedData]::Protect(',
+          '  $bytes,',
+          '  $null,',
+          '  [System.Security.Cryptography.DataProtectionScope]::CurrentUser',
+          ');',
+          '$roundTripBytes = [System.Security.Cryptography.ProtectedData]::Unprotect(',
+          '  $protected,',
+          '  $null,',
+          '  [System.Security.Cryptography.DataProtectionScope]::CurrentUser',
+          ');',
+          '$roundTrip = [System.Text.Encoding]::UTF8.GetString($roundTripBytes);',
+          'if ($roundTrip -ne $inputValue) {',
+          "  throw 'Windows DPAPI CurrentUser round-trip mismatch.'",
+          '}',
+          "[Console]::Out.Write('ok');"
+        ].join(' '),
+        probe
+      );
+      if (result.code === 0 && result.stdout.trim() === 'ok') {
+        return { available: true };
+      }
+      return {
+        available: false,
+        reason: result.stderr.trim() || result.stdout.trim() || 'Windows DPAPI is unavailable.'
+      };
+    } catch (error) {
+      return {
+        available: false,
+        reason: errorMessage(error)
+      };
     }
-    return {
-      available: false,
-      reason: result.stderr.trim() || result.stdout.trim() || 'Windows DPAPI is unavailable.'
-    };
   }
 
   async setSlotSecret(tenantId: string, provider: SecretProvider, slotId: string, value: string): Promise<void> {
@@ -642,11 +656,17 @@ export class LinuxSecretServiceStore implements NativeSecretStore {
         };
       }
 
-      await this.runSecretTool(
+      const clearResult = await this.runSecretTool(
         ['clear', 'service', KEYCHAIN_SERVICE_NAME, 'account', SECRET_SERVICE_PROBE_ACCOUNT],
         undefined,
         'ignore'
       );
+      if (clearResult.code !== 0) {
+        return {
+          available: false,
+          reason: clearResult.stderr.trim() || clearResult.stdout.trim() || 'Linux Secret Service cleanup failed.'
+        };
+      }
       return { available: true };
     } catch (error) {
       return {
