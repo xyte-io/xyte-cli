@@ -831,4 +831,36 @@ describe('platform backend smoke tests', () => {
       details.backend === 'secret-service' ? 'xyte-cli' : join(configDir, 'secrets.v1.json')
     );
   });
+
+  it('strips a trailing newline from Windows DPAPI decrypt output', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'xyte-secret-store-dpapi-newline-'));
+    const filePath = join(root, 'secrets.dpapi.v1.json');
+    const runProcessMock = vi.fn(
+      async (
+        _command: string,
+        args: string[],
+        runtimeOptions?: { input?: string; stdinMode?: 'pipe' | 'ignore' }
+      ) => {
+        const script = args.join(' ');
+        if (script.includes('Protect(')) {
+          const plaintext = runtimeOptions?.input ?? '';
+          return {
+            code: 0,
+            stdout: Buffer.from(`cipher:${plaintext}`, 'utf8').toString('base64'),
+            stderr: ''
+          };
+        }
+        if (script.includes('Unprotect(')) {
+          const payload = Buffer.from(runtimeOptions?.input ?? '', 'base64').toString('utf8');
+          // Simulate PowerShell stdio appending a CRLF even though [Console]::Out.Write does not.
+          return { code: 0, stdout: `${payload.slice('cipher:'.length)}\r\n`, stderr: '' };
+        }
+        return { code: 1, stdout: '', stderr: 'unexpected PowerShell command' };
+      }
+    );
+    const store = new WindowsDpapiSecretStore(filePath, runProcessMock);
+
+    await store.setSlotSecret('acme', 'xyte-org', 'primary', 'secret-value');
+    expect(await store.getSlotSecret('acme', 'xyte-org', 'primary')).toBe('secret-value');
+  });
 });

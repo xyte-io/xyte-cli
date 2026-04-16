@@ -593,7 +593,7 @@ export class WindowsDpapiSecretStore implements NativeSecretStore {
         detail: result.stderr.trim() || result.stdout.trim() || 'PowerShell DPAPI unprotect failed.'
       });
     }
-    return result.stdout;
+    return result.stdout.replace(/\r?\n$/, '');
   }
 
   private async runPowerShell(
