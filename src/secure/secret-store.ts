@@ -624,6 +624,7 @@ export class LinuxSecretServiceStore implements NativeSecretStore {
 
   async checkAvailability(): Promise<{ available: boolean; reason?: string }> {
     const probeValue = `${SECRET_SERVICE_PROBE_PREFIX}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    let probeStored = false;
     try {
       const storeResult = await this.runSecretTool(
         ['store', '--label', KEYCHAIN_SERVICE_NAME, 'service', KEYCHAIN_SERVICE_NAME, 'account', SECRET_SERVICE_PROBE_ACCOUNT],
@@ -635,6 +636,7 @@ export class LinuxSecretServiceStore implements NativeSecretStore {
           reason: storeResult.stderr.trim() || storeResult.stdout.trim() || 'Linux Secret Service is unavailable.'
         };
       }
+      probeStored = true;
 
       const lookupResult = await this.runSecretTool(
         ['lookup', 'service', KEYCHAIN_SERVICE_NAME, 'account', SECRET_SERVICE_PROBE_ACCOUNT],
@@ -661,6 +663,7 @@ export class LinuxSecretServiceStore implements NativeSecretStore {
         undefined,
         'ignore'
       );
+      probeStored = false;
       if (clearResult.code !== 0) {
         return {
           available: false,
@@ -673,6 +676,18 @@ export class LinuxSecretServiceStore implements NativeSecretStore {
         available: false,
         reason: errorMessage(error)
       };
+    } finally {
+      if (probeStored) {
+        try {
+          await this.runSecretTool(
+            ['clear', 'service', KEYCHAIN_SERVICE_NAME, 'account', SECRET_SERVICE_PROBE_ACCOUNT],
+            undefined,
+            'ignore'
+          );
+        } catch {
+          // Best-effort cleanup — swallow so we don't mask the real availability reason.
+        }
+      }
     }
   }
 

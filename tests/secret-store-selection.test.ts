@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createSecretStore,
   describeSecretStore,
+  LinuxSecretServiceStore,
   MacKeychainSecretStore,
   WindowsDpapiSecretStore
 } from '../src/secure/secret-store';
@@ -862,5 +863,29 @@ describe('platform backend smoke tests', () => {
 
     await store.setSlotSecret('acme', 'xyte-org', 'primary', 'secret-value');
     expect(await store.getSlotSecret('acme', 'xyte-org', 'primary')).toBe('secret-value');
+  });
+
+  it('clears the Linux Secret Service probe entry when lookup fails', async () => {
+    const calls: Array<{ args: string[] }> = [];
+    const runProcessMock = vi.fn(async (_command: string, args: string[]) => {
+      calls.push({ args: [...args] });
+      const subcommand = args[0];
+      if (subcommand === 'store') {
+        return { code: 0, stdout: '', stderr: '' };
+      }
+      if (subcommand === 'lookup') {
+        return { code: 1, stdout: '', stderr: 'Secret Service lookup failed' };
+      }
+      if (subcommand === 'clear') {
+        return { code: 0, stdout: '', stderr: '' };
+      }
+      return { code: 1, stdout: '', stderr: `unexpected secret-tool command: ${subcommand}` };
+    });
+    const store = new LinuxSecretServiceStore(runProcessMock);
+
+    const result = await store.checkAvailability();
+    expect(result.available).toBe(false);
+    const clearCalls = calls.filter((call) => call.args[0] === 'clear');
+    expect(clearCalls.length).toBeGreaterThan(0);
   });
 });
