@@ -73,7 +73,17 @@ defaults → profile (active tenant) → user settings file → workspace file �
 - User settings: `~/Library/Application Support/xyte-cli/settings.json`
 - Workspace settings: `.xyte/config.json` in CWD
 - Profile (tenants): same config dir, `profile.json` (schema version 2)
-- Secrets: same config dir, `secrets.v1.json` (chmod 600, atomic writes)
+- Legacy file secret store: same config dir, `secrets.v1.json`
+- Windows DPAPI ciphertext store: same config dir, `secrets.dpapi.v1.json`
+
+**Persisted credential backends:**
+- `auth.secretStoreBackend=auto` (default)
+  - macOS: Keychain
+  - Windows: DPAPI
+  - Linux: Secret Service
+- If native storage is unavailable under `auto`, the CLI warns and falls back to the file backend.
+- `auth.secretStoreBackend=native` requires native secure storage.
+- `auth.secretStoreBackend=file` uses file storage intentionally.
 
 Override config dir with `XYTE_CLI_CONFIG_DIR` env var.
 
@@ -110,7 +120,7 @@ All in `.github/workflows/`:
 ### ci.yml — Every push to main + PRs
 - Matrix: Ubuntu / macOS / Windows, Node 22
 - Steps: typecheck → test → build → `npm pack --dry-run`
-- Separate jobs: pack-install smoke, `npm audit --audit-level=high`, upgrade smoke
+- Separate jobs: pack-install smoke, Windows native secret-store cert, Linux native secret-store cert, `npm audit --audit-level=high`, upgrade smoke
 
 ### publish.yml — On semver tag push or manual dispatch
 - Validates tag matches `package.json` version
@@ -179,10 +189,13 @@ npm run test:commit         # typecheck + test + pack-install smoke (pre-commit 
 
 ## Secrets & Security Posture
 
-- API keys stored in `secrets.v1.json` with `chmod 600` + atomic rename writes
+- API keys default to OS-native secure storage on macOS, Windows, and Linux
+- Legacy/file backend uses `secrets.v1.json` with atomic rename writes
+- Windows DPAPI ciphertexts are stored in `secrets.dpapi.v1.json`
 - Config directory created with `0700` permissions
 - Action logs written with `0600` permissions
 - Sensitive data redacted in all error output and log entries
+- `config path` now reports backend diagnostics, not only file paths; `secretStore` is a filesystem path when `secretStoreBackend` is `file`, and an OS keychain service name (e.g. `xyte-cli`) for native backends (`keychain`, `dpapi`, `secret-service`)
 - `npm audit --audit-level=high` runs in CI
 - npm provenance (SLSA) attestation on every publish
 - SBOM (CycloneDX) attached to every GitHub Release
@@ -239,7 +252,7 @@ npm run test:commit         # full pre-commit gate
 
 3. **The endpoint catalog is static.** `public-endpoints.json` must be updated manually when backend APIs change. There's a `drift-overrides.json` for known deviations.
 
-4. **Secrets store has no encryption at rest.** It relies on filesystem permissions (`chmod 600`). Fine for a CLI tool, but something to know.
+4. **Persisted secret storage is backend-dependent.** macOS uses Keychain, Windows uses DPAPI, Linux uses Secret Service, and `file` / legacy fallback uses `secrets.v1.json`.
 
 5. **OpenTelemetry is wired but inert by default.** No SDK is bundled. Consumers need to register their own tracer provider to get spans exported anywhere.
 

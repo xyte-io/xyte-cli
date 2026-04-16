@@ -1,7 +1,11 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { createXyteClient } from '../src/client/create-client';
-import { MemorySecretStore } from '../src/secure/secret-store';
+import { createSecretStore, MemorySecretStore } from '../src/secure/secret-store';
 import { XyteAuthError } from '../src/http/errors';
 import { MemoryProfileStore } from './support/memory-profile-store';
 
@@ -102,5 +106,35 @@ describe('client auth behavior', () => {
     await client.organization.getDevices();
 
     expect(transport.request.mock.calls[0][0].headers.Authorization).toBe('org-key-b');
+  });
+
+  it('injects auth headers from the selected persisted file backend', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+
+    const configDir = mkdtempSync(join(tmpdir(), 'xyte-client-file-backend-'));
+    const secretStore = createSecretStore({
+      env: {
+        ...process.env,
+        XYTE_CLI_CONFIG_DIR: configDir,
+        XYTE_CLI_SECRET_STORE_BACKEND: 'file'
+      },
+      platform: 'linux'
+    });
+    const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      name: 'primary',
+      fingerprint: 'sha256:file'
+    });
+    await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key-file');
+
+    const transport = {
+      request: vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } })
+    } as any;
+
+    const client = createXyteClient({ profileStore, secretStore, transport });
+    await client.organization.getDevices();
+
+    expect(transport.request.mock.calls[0][0].headers.Authorization).toBe('org-key-file');
   });
 });

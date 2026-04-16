@@ -67,7 +67,7 @@ xyte-cli setup run
 xyte-cli setup status --field tenantId
 ```
 
-Use that value as `<tenant-id>` in the examples below. For non-interactive automation, use the shell-neutral `--key-stdin` path documented in [`docs/getting-started.md`](./docs/getting-started.md).
+Use that value as `<tenant-id>` in the examples below. Persisted credentials default to secure OS-native storage: macOS Keychain, Windows DPAPI, Linux Secret Service. If native storage is unavailable, `xyte-cli` warns and falls back to file storage. For non-interactive automation and backend details, use the setup guidance in [`docs/getting-started.md`](./docs/getting-started.md).
 
 ---
 

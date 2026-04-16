@@ -26,6 +26,8 @@ This repository ships one npm package: `@xyteai/cli`.
 - `npm test`
 - `npm run build`
 - packaged-install smoke from the built tarball (`npm run smoke:pack-install`)
+- Windows native secret-store certification (`windows-native-secret-store-cert`)
+- Linux native secret-store certification (`linux-native-secret-store-cert`)
 - separate security job: `npm audit --audit-level=high`
 - controlled upgrade smoke job: `npm run smoke:upgrade:controlled` on `ubuntu-latest`
 

@@ -227,7 +227,7 @@ export function runUtilityPrepare(args: {
   }
   writeScaffoldFile(notes, `${buildNotes(profile, inputPath)}\n`, force);
 
-  return {
+  return UtilityPrepareResultSchema.parse({
     schemaVersion: UTILITY_PREPARE_SCHEMA_VERSION,
     generatedAtUtc: new Date().toISOString(),
     actionKey: profile.actionKey,
@@ -254,7 +254,7 @@ export function runUtilityPrepare(args: {
     skillNodePath: profile.skillNodePath,
     suggestedCommands: buildSuggestedCommands(profile, tenant, primary, outputDir),
     executionSupport: profile.executionSupport
-  };
+  });
 }
 
 interface UtilityActionSummary {

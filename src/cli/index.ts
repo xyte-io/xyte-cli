@@ -427,7 +427,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       return runtime.secretStore;
     }
     if (!cachedSecretStore) {
-      cachedSecretStore = createSecretStore();
+      cachedSecretStore = createSecretStore({ cwd, env, stderr });
     }
     return cachedSecretStore;
   };

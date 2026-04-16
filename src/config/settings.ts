@@ -5,7 +5,12 @@ import path from 'node:path';
 import { CliUserError } from '../contracts/user-error';
 import { getXyteConfigDir } from '../utils/config-dir';
 import { isRecord } from '../utils/json';
-import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';
+import {
+  INSPECT_PROVIDER_SCOPES,
+  SECRET_STORE_BACKEND_SELECTORS,
+  type InspectProviderScope,
+  type SecretStoreBackendSelector
+} from '../types/settings-enums';
 import { DEFAULT_WATCH_PROFILE, type WatchProfile } from '../contracts/watch-frame';
 import { TUI_SCREEN_IDS, type TuiScreenId } from '../types/tui-screens';
 
@@ -17,6 +22,9 @@ interface CliSettingsFile {
   version?: 'settings.v1';
   defaults?: {
     tenant?: string;
+  };
+  auth?: {
+    secretStoreBackend?: SecretStoreBackendSelector;
   };
   output?: {
     mode?: CliOutputMode;
@@ -57,6 +65,9 @@ interface CliSettingsFile {
 interface ResolvedCliSettings {
   defaults: {
     tenant?: string;
+  };
+  auth: {
+    secretStoreBackend: SecretStoreBackendSelector;
   };
   output: {
     mode: CliOutputMode;
@@ -108,6 +119,9 @@ export interface ResolvedCliSettingsState {
 
 const DEFAULT_SETTINGS: ResolvedCliSettings = {
   defaults: {},
+  auth: {
+    secretStoreBackend: 'auto'
+  },
   output: {
     mode: 'auto',
     strictJson: false
@@ -143,6 +157,7 @@ const DEFAULT_SETTINGS: ResolvedCliSettings = {
 
 const SETTING_PATHS = [
   'defaults.tenant',
+  'auth.secretStoreBackend',
   'output.mode',
   'output.strictJson',
   'ops.providerScope',
@@ -322,6 +337,8 @@ function validateSettingValue(keyPath: SettingPath, value: unknown): unknown {
     case 'console.debugLogPath':
     case 'logs.path':
       return parseOptionalString(value);
+    case 'auth.secretStoreBackend':
+      return parseEnum(value, keyPath, [...SECRET_STORE_BACKEND_SELECTORS]);
     case 'output.mode':
       return parseEnum(value, keyPath, [...CLI_OUTPUT_MODES]);
     case 'output.strictJson':
@@ -358,6 +375,8 @@ function getEnvValue(env: NodeJS.ProcessEnv, keyPath: SettingPath): unknown {
   switch (keyPath) {
     case 'defaults.tenant':
       return env.XYTE_CLI_DEFAULT_TENANT;
+    case 'auth.secretStoreBackend':
+      return env.XYTE_CLI_SECRET_STORE_BACKEND;
     case 'output.mode':
       return env.XYTE_CLI_OUTPUT_MODE;
     case 'output.strictJson':

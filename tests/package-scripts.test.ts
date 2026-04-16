@@ -14,6 +14,8 @@ describe('package scripts', () => {
     expect(pkg.scripts?.clean).toBe('node scripts/clean.mjs');
     expect(pkg.scripts?.['smoke:local:flow-pack']).toBe('tsx tests/smoke/flow-pack-local.ts');
     expect(pkg.scripts?.['smoke:pack-install']).toBe('tsx tests/smoke/pack-install.ts');
+    expect(pkg.scripts?.['smoke:linux:native-secret-store']).toBe('tsx tests/smoke/linux-native-secret-store.ts');
+    expect(pkg.scripts?.['smoke:windows:native-secret-store']).toBe('tsx tests/smoke/windows-native-secret-store.ts');
     expect(pkg.scripts?.['smoke:external-live']).toBe('tsx tests/smoke/external-user-live.ts');
     expect(pkg.scripts?.prepublishOnly).toBe(
       'npm run typecheck && npm test && npm run build && npm run smoke:pack-install'
