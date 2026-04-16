@@ -801,25 +801,41 @@ async function migrateLegacySecretFile(args: {
     return { migrated: false };
   }
   const legacy = await readLegacyRecordFile(args.legacySecretStorePath);
-  for (const [storedKey, value] of Object.entries(legacy.records)) {
-    const parsed = parseAccountKey(storedKey);
-    if (!parsed) {
-      continue;
+  const written: Array<{ tenantId: string; provider: SecretProvider; slotId: string }> = [];
+  try {
+    for (const [storedKey, value] of Object.entries(legacy.records)) {
+      const parsed = parseAccountKey(storedKey);
+      if (!parsed) {
+        continue;
+      }
+      await args.targetSecretStore.setSlotSecret(parsed.tenantId, parsed.provider, parsed.slotId, value);
+      written.push(parsed);
     }
-    await args.targetSecretStore.setSlotSecret(parsed.tenantId, parsed.provider, parsed.slotId, value);
-  }
-  for (const [storedKey, value] of Object.entries(legacy.records)) {
-    const parsed = parseAccountKey(storedKey);
-    if (!parsed) {
-      continue;
+    for (const [storedKey, value] of Object.entries(legacy.records)) {
+      const parsed = parseAccountKey(storedKey);
+      if (!parsed) {
+        continue;
+      }
+      const actual = await args.targetSecretStore.getSlotSecret(parsed.tenantId, parsed.provider, parsed.slotId);
+      if (actual !== value) {
+        throw new CliUserError({
+          summary: 'Secret-store migration verification failed.',
+          detail: `Imported secret for ${storedKey} did not round-trip from the native secret store.`
+        });
+      }
     }
-    const actual = await args.targetSecretStore.getSlotSecret(parsed.tenantId, parsed.provider, parsed.slotId);
-    if (actual !== value) {
-      throw new CliUserError({
-        summary: 'Secret-store migration verification failed.',
-        detail: `Imported secret for ${storedKey} did not round-trip from the native secret store.`
-      });
+  } catch (error) {
+    // Roll back any entries we wrote to the native store so a retry starts from
+    // a clean keyring. Legacy file is still intact because the delete below
+    // only runs on full success.
+    for (const entry of written) {
+      try {
+        await args.targetSecretStore.clearSlotSecret(entry.tenantId, entry.provider, entry.slotId);
+      } catch {
+        // Best-effort rollback — swallow so the original error surfaces.
+      }
     }
+    throw error;
   }
   await deleteFileIfExists(args.legacySecretStorePath);
   return { migrated: true };
