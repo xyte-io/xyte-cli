@@ -195,7 +195,7 @@ npm run test:commit         # typecheck + test + pack-install smoke (pre-commit 
 - Config directory created with `0700` permissions
 - Action logs written with `0600` permissions
 - Sensitive data redacted in all error output and log entries
-- `config path` now reports backend diagnostics, not only file paths; `secretStore` may be a backend identifier such as `xyte-cli`
+- `config path` now reports backend diagnostics, not only file paths; `secretStore` is a filesystem path when `secretStoreBackend` is `file`, and an OS keychain service name (e.g. `xyte-cli`) for native backends (`keychain`, `dpapi`, `secret-service`)
 - `npm audit --audit-level=high` runs in CI
 - npm provenance (SLSA) attestation on every publish
 - SBOM (CycloneDX) attached to every GitHub Release

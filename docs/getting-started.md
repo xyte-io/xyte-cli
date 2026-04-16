@@ -56,7 +56,7 @@ Credential storage:
 - Advanced override: `auth.secretStoreBackend=auto|native|file`.
 - Require native secure storage: `xyte-cli config set auth.secretStoreBackend native`
 - Use file storage intentionally: `xyte-cli config set auth.secretStoreBackend file`
-- `xyte-cli config path --format json` reports `secretStoreBackend`, `secretStore`, and `legacySecretStore`. `secretStore` may be a backend identifier such as `xyte-cli`, not only a filesystem path.
+- `xyte-cli config path --format json` reports `secretStoreBackend`, `secretStore`, and `legacySecretStore`. `secretStore` is the effective location for the selected backend: a filesystem path when `secretStoreBackend` is `file`, and the service name used in the OS keychain (e.g. `xyte-cli`) when it is `keychain`, `dpapi`, or `secret-service`.
 
 Shell-specific non-interactive examples:
 
