@@ -332,7 +332,14 @@ async function readDpapiRecordFile(filePath: string): Promise<PersistedCiphertex
   });
   const changed = raw.version !== DPAPI_SECRET_STORE_VERSION || sanitized.changed;
   if (changed) {
-    await writeJsonRecordFile(filePath, normalized, DPAPI_SECRET_STORE_VERSION);
+    try {
+      await writeJsonRecordFile(filePath, normalized, DPAPI_SECRET_STORE_VERSION);
+    } catch (writeError) {
+      getLogger().warn(
+        { file: filePath, errorMessage: errorMessage(writeError) },
+        'Failed to persist normalized DPAPI secret data'
+      );
+    }
   }
   return normalized;
 }
