@@ -269,7 +269,7 @@ xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <devi
 ```
 
 - Expected artifacts:
-  - `xyte.edge.claim-batch.v1` single-row summary on stdout (JSON) and under `./tmp/flow-runs/flow.edge-claim/...`.
+  - `xyte.edge.claim.v1` single-row summary on stdout (JSON) and under `./tmp/flow-runs/flow.edge-claim/...`.
 - Stop/decision gates:
   - Default to `--plan`. Only advance to `--apply` after explicit user approval.
 - Failure handling:

@@ -36,6 +36,13 @@ export interface ProblemLike {
   detail: string;
 }
 
+export interface EdgeProbeProgress {
+  attempts: number;
+  elapsedMs: number;
+  lastState?: EdgePollState;
+  lastPayload?: unknown;
+}
+
 export class EdgeProbeAbortError extends Error {
   readonly problem: ProblemLike;
   constructor(message: string, problem: ProblemLike) {
@@ -47,10 +54,12 @@ export class EdgeProbeAbortError extends Error {
 
 export class EdgeProbeRowError extends Error {
   readonly problem: ProblemLike;
-  constructor(message: string, problem: ProblemLike) {
+  readonly progress: EdgeProbeProgress;
+  constructor(message: string, problem: ProblemLike, progress: EdgeProbeProgress) {
     super(message);
     this.name = 'EdgeProbeRowError';
     this.problem = problem;
+    this.progress = progress;
   }
 }
 
@@ -73,7 +82,7 @@ function notInitiatedMatches(detail: string): boolean {
   return normalized.includes('not initiated') || normalized.includes('no claim for');
 }
 
-function parseRetryAfterMs(headerValue: string | undefined): number | undefined {
+function parseRetryAfterMs(headerValue: string | undefined, now: () => number): number | undefined {
   if (!headerValue) return undefined;
   const trimmed = headerValue.trim();
   if (!trimmed) return undefined;
@@ -83,7 +92,7 @@ function parseRetryAfterMs(headerValue: string | undefined): number | undefined 
   }
   const asDate = Date.parse(trimmed);
   if (Number.isFinite(asDate)) {
-    const delta = asDate - Date.now();
+    const delta = asDate - now();
     return delta > 0 ? delta : 0;
   }
   return undefined;
@@ -172,13 +181,19 @@ export async function pollEdgeStatus(args: EdgeProbePollArgs): Promise<EdgePollR
         if (rateLimitedSeen >= rateLimitMaxRetries) {
           throw new EdgeProbeRowError(
             problem.detail || 'Edge status probe rate-limited beyond retry ceiling.',
-            { status: 429, detail: problem.detail }
+            { status: 429, detail: problem.detail },
+            {
+              attempts,
+              elapsedMs: now() - startedAt,
+              lastState,
+              lastPayload
+            }
           );
         }
         rateLimitedSeen += 1;
         const retryAfterMs =
           error instanceof XyteHttpError
-            ? parseRetryAfterMs(error.headers?.['retry-after'])
+            ? parseRetryAfterMs(error.headers?.['retry-after'], now)
             : undefined;
         const backoffMs = computeRateLimitBackoffMs({
           headerValueMs: retryAfterMs,
@@ -198,6 +213,11 @@ export async function pollEdgeStatus(args: EdgeProbePollArgs): Promise<EdgePollR
         throw new EdgeProbeRowError(problem.detail || 'Edge status probe failed.', {
           status: problem.status ?? 500,
           detail: problem.detail
+        }, {
+          attempts,
+          elapsedMs: now() - startedAt,
+          lastState,
+          lastPayload
         });
       }
     }
@@ -218,7 +238,11 @@ export async function pollEdgeStatus(args: EdgeProbePollArgs): Promise<EdgePollR
 
 export function parsePositiveInt(raw: string | undefined, label: string): number | undefined {
   if (raw === undefined || raw === null || raw === '') return undefined;
-  const parsed = Number.parseInt(raw, 10);
+  const trimmed = raw.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    throw new CliUserError({ summary: `${label} must be a positive integer, got "${raw}".` });
+  }
+  const parsed = Number(trimmed);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     throw new CliUserError({ summary: `${label} must be a positive integer, got "${raw}".` });
   }

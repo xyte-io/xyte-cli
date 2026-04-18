@@ -1505,6 +1505,61 @@ describe('flow runner', () => {
     expect(summary.steps.find((item) => item.stepId === 'edge_ping_single')?.status).toBe('pending');
   });
 
+  it('reports the resolved custom poll key name when edge poll timing is invalid', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.edge-ping',
+      title: 'Edge Ping Key Labels',
+      intent: 'test custom poll key labels',
+      writeCapable: false,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'task',
+          id: 'edge_ping_single',
+          title: 'Edge Ping Single',
+          task: 'edge.ping',
+          mutating: true,
+          requiresContext: ['proxy_id', 'device_ip', 'custom_interval'],
+          edgePing: {
+            pollIntervalMsKey: 'custom_interval'
+          },
+          command: 'xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --apply'
+        }
+      ]
+    };
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-ping-custom-key`);
+
+    const fetchMock = vi.fn(async () => {
+      throw new Error('invalid poll config must fail before fetch');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const summary = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      context: {
+        proxy_id: 'proxy-1',
+        device_ip: '192.168.1.10',
+        custom_interval: '10s'
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('failed');
+    expect(fetchMock).not.toHaveBeenCalled();
+    const failedStep = summary.steps.find((item) => item.stepId === 'edge_ping_single');
+    expect(failedStep?.status).toBe('failed');
+    expect(String(failedStep?.error?.detail ?? '')).toContain('custom_interval');
+  });
+
   it('runs inspect.deep-dive and report.generate with partner-only provider scope', async () => {
     const { profileStore, secretStore, client } = await makeClientWithProviders(['xyte-partner']);
 

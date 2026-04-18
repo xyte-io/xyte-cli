@@ -287,6 +287,7 @@ describe('runEdgeClaim edge-case matrix', () => {
     });
 
     expect(outcome.disposition).toBe('failed');
+    expect(outcome.attempts).toBe(1);
   });
 
   it('case 11: 429 with Retry-After honored, then success', async () => {
@@ -347,6 +348,7 @@ describe('runEdgeClaim edge-case matrix', () => {
 
     expect(outcome.disposition).toBe('failed');
     expect(outcome.detail).toContain('rate limited');
+    expect(outcome.attempts).toBe(3);
   });
 });
 

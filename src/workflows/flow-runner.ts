@@ -673,10 +673,12 @@ async function handleSpaceImportTree(step: FlowTaskStep, _stepIndex: number, ctx
 
 function resolvePollOptions(ctx: RunContext, intervalKey?: string, timeoutKey?: string): { intervalMs?: number; timeoutMs?: number } {
   const options: { intervalMs?: number; timeoutMs?: number } = {};
-  const intervalRaw = ctx.resolvedContext[intervalKey ?? 'edge_poll_interval_ms'];
-  const timeoutRaw = ctx.resolvedContext[timeoutKey ?? 'edge_poll_timeout_ms'];
-  const interval = parseEdgePollPositiveInt(intervalRaw, 'edge_poll_interval_ms');
-  const timeout = parseEdgePollPositiveInt(timeoutRaw, 'edge_poll_timeout_ms');
+  const resolvedIntervalKey = intervalKey ?? 'edge_poll_interval_ms';
+  const resolvedTimeoutKey = timeoutKey ?? 'edge_poll_timeout_ms';
+  const intervalRaw = ctx.resolvedContext[resolvedIntervalKey];
+  const timeoutRaw = ctx.resolvedContext[resolvedTimeoutKey];
+  const interval = parseEdgePollPositiveInt(intervalRaw, resolvedIntervalKey);
+  const timeout = parseEdgePollPositiveInt(timeoutRaw, resolvedTimeoutKey);
   if (interval !== undefined) options.intervalMs = interval;
   if (timeout !== undefined) options.timeoutMs = timeout;
   return options;

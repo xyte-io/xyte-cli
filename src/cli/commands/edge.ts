@@ -266,7 +266,7 @@ export function registerEdgeCommands(parent: Command, ctx: CliContext): void {
     .option('--input-format <format>', 'auto|csv|json|jsonl', 'auto')
     .option('--plan', 'Print planned actions without calling the API')
     .option('--apply', 'Execute claims for every row')
-    .option('--resume-artifact <path>', 'NDJSON resume artifact (skip rows already terminal)')
+    .option('--resume-artifact <path>', 'NDJSON resume artifact (skip rows already marked succeeded or already-claimed)')
     .option('--report <path>', 'Write NDJSON row report file')
     .option('--poll-interval-ms <ms>', 'Status poll interval (ms)')
     .option('--poll-timeout-ms <ms>', 'Status poll timeout (ms)')

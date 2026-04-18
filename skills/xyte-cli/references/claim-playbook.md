@@ -137,8 +137,8 @@ The public Xyte API does not expose C2C claiming today. Do not invent an endpoin
 | 5 | Device already claimed behind the same edge | `already-claimed` | Skip row; batch continues. |
 | 6 | Proxy offline (terminal-failed or 422 "edge offline") | `proxy-offline` | Group in summary for retry-after-fix; run `xyte-cli edge ping` to confirm before re-running. |
 | 7 | `skip_connectivity_check=false` and ping fails mid-claim | `failed` | Surface both claim id and ping reason. |
-| 8 | N-of-M rows succeed | exit 1 | Per-row disposition CSV; rerun with `--resume-artifact`. |
-| 9 | Resume after ctrl-C | — | `--resume-artifact` skips terminal rows, re-polls pending, reinitiates nothing already initiated. |
+| 8 | N-of-M rows succeed | exit 1 | Per-row NDJSON report via `--report`; rerun with `--resume-artifact`. |
+| 9 | Resume after ctrl-C | — | `--resume-artifact` skips rows previously recorded as `succeeded` or `already-claimed` and re-runs all other rows. |
 | 10 | Malformed CSV/XLSX | — | `util prepare` routes bad rows to `organization-edge-startclaim.rejected.csv`; batch refuses to start on schema violations. |
 | 11 | `startClaim` → 429 | — | Exponential backoff w/ jitter; honor `Retry-After`. |
 | 12 | `getClaimStatus` → 422 "not initiated" (race against 204) | — | Tolerate a bounded number of 422-not-initiated on first polls; real 422 thereafter is a hard reject. |

@@ -98,7 +98,7 @@ Edge-claim terminal-state decision tree:
 - Duplicate claim (detail mentions "already claimed") → row marked `already-claimed`; batch exits clean if all rows are terminal-success or already-claimed.
 - Status returns 422 "not initiated" → first poll tolerates a bounded race; real 422 thereafter is rejection.
 - 429 → exponential backoff with jitter; honor `Retry-After`.
-- Partial batch failure or `proxy-offline` rows → exit code 1 with a per-row disposition CSV; fix rejects, re-run with `--resume-artifact`.
+- Partial batch failure or `proxy-offline` rows → exit code 1 with a per-row NDJSON report (`--report`); fix rejects, re-run with the NDJSON `--resume-artifact`.
 - `--plan` over a batch → zero API calls; exit 0 only if every row would succeed.
 
 Full recipes and the 20-row edge-case matrix: `references/claim-playbook.md`.

@@ -225,7 +225,7 @@ Notes:
 - `edge claim`, `edge claim-batch`, and `edge ping` are mutating. `--plan` is the safe default; `--apply` only after explicit user approval.
 - `edge claim-status` and `edge ping-status` are read-only.
 - Poll defaults: 5 s interval, 10 min timeout.
-- `edge claim-batch` on a half-finished run requires `--resume-artifact <ndjson-artifact>`; it skips terminal rows and re-polls only pending ones.
+- `edge claim-batch` on a half-finished run requires `--resume-artifact <ndjson-artifact>`; it skips rows previously recorded as `succeeded` or `already-claimed` and re-runs all other rows from the prior artifact.
 - `edge claim-batch` exits with code 1 if any row ends in `failed`, `rejected`, `timeout`, `proxy-offline`, or `aborted`; per-row dispositions are written to `--report`.
 - Raw endpoints remain available for advanced cases: `organization.edge.startClaim`, `organization.edge.getClaimStatus`, `organization.edge.startPing`, `organization.edge.getPingStatus`.
 

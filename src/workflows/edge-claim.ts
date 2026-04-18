@@ -304,9 +304,11 @@ export async function runEdgeClaim(args: RunEdgeClaimArgs): Promise<EdgeRowOutco
         proxy_id: args.row.proxy_id,
         device_ip: args.row.device_ip,
         disposition: proxyOfflineMatches(detail) ? 'proxy-offline' : 'failed',
-        attempts: 0,
-        elapsedMs: (args.now ?? Date.now)() - startedAt,
-        detail
+        attempts: error.progress.attempts,
+        elapsedMs: error.progress.elapsedMs,
+        lastState: error.progress.lastState,
+        detail,
+        response: error.progress.lastPayload
       };
     }
     throw error;

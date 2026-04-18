@@ -124,7 +124,7 @@ xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-e
 
 Resume after interruption: re-run the `--apply` line with the same `--resume-artifact` path. Never re-run a half-finished batch without it.
 
-Failure path: 2-of-3 rows succeed, 1 row rejected → exit 1 with per-row disposition CSV; fix reject row and re-run with `--resume-artifact`.
+Failure path: 2-of-3 rows succeed, 1 row rejected → exit 1 with a per-row NDJSON report (`--report`); fix reject row and re-run with `--resume-artifact`.
 
 ## flow.edge-ping
 

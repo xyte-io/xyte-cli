@@ -86,9 +86,11 @@ export async function runEdgePing(args: RunEdgePingArgs): Promise<EdgePingResult
         ...base,
         generatedAtUtc: new Date().toISOString(),
         disposition: 'failed',
-        attempts: 0,
-        elapsedMs: (args.now ?? Date.now)() - startedAt,
-        detail: error.problem.detail
+        attempts: error.progress.attempts,
+        elapsedMs: error.progress.elapsedMs,
+        lastState: error.progress.lastState,
+        detail: error.problem.detail,
+        response: error.progress.lastPayload
       };
     }
     throw error;

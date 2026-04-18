@@ -222,6 +222,33 @@ describe('edge command group', () => {
     expect(printed).toContain('proxy-offline');
   });
 
+  it('edge ping rejects non-numeric poll timing values', async () => {
+    const { profileStore, secretStore } = await bootstrapTenant();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    vi.stubGlobal('fetch', vi.fn());
+
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await expect(
+      program.parseAsync([
+        'node',
+        'xyte-cli',
+        'edge',
+        'ping',
+        '--tenant',
+        'acme',
+        '--proxy-id',
+        'proxy-1',
+        '--device-ip',
+        '192.168.1.10',
+        '--apply',
+        '--poll-timeout-ms',
+        '10s'
+      ])
+    ).rejects.toThrow(/positive integer/);
+  });
+
   it('edge claim-status calls organization.edge.getClaimStatus with query params', async () => {
     const { profileStore, secretStore } = await bootstrapTenant();
     const stdout = { write: vi.fn() };
