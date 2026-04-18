@@ -110,15 +110,63 @@ xyte-cli api call organization.commands.sendCommand \
 Organization:
 - `organization.devices.getDevices`
 - `organization.devices.getDevice`
+- `organization.devices.claimDevice` (native claim)
 - `organization.incidents.closeIncident`
 - `organization.incidents.getIncidents`
 - `organization.tickets.getTickets`
 - `organization.commands.sendCommand`
+- `organization.edge.startClaim` (edge claim — async, poll with `getClaimStatus`)
+- `organization.edge.getClaimStatus`
+- `organization.edge.startPing` (edge connectivity probe — async, poll with `getPingStatus`)
+- `organization.edge.getPingStatus`
 
 Partner:
 - `partner.devices.getDevices`
 - `partner.devices.getDeviceInfo`
 - `partner.tickets.getTickets`
+
+## Edge Devices (Async)
+
+Edge devices sit behind an Xyte Edge proxy. Claim/ping are **asynchronous**: the start endpoint returns 204, then you poll the matching status endpoint until terminal (`success` or `failed`). Prefer the `xyte-cli edge` command group or `flow.edge-claim*` flows over raw `api call` — they handle polling, backoff, and resume.
+
+### `organization.edge.startClaim` + `organization.edge.getClaimStatus`
+
+```bash
+xyte-cli api call organization.edge.startClaim \
+  --tenant <tenant-id> \
+  --body-json '{
+    "proxy_id":"<proxy-id>",
+    "device_ip":"192.168.1.100",
+    "device_model_id":"<device-model-id>",
+    "space_id":<space-id>,
+    "display_name":"Conference Room Display",
+    "skip_connectivity_check":false
+  }'
+
+xyte-cli api call organization.edge.getClaimStatus \
+  --tenant <tenant-id> \
+  --query-json '{"proxy_id":"<proxy-id>","device_ip":"192.168.1.100"}'
+```
+
+### `organization.edge.startPing` + `organization.edge.getPingStatus`
+
+```bash
+xyte-cli api call organization.edge.startPing \
+  --tenant <tenant-id> \
+  --body-json '{"proxy_id":"<proxy-id>","device_ip":"192.168.1.100"}'
+
+xyte-cli api call organization.edge.getPingStatus \
+  --tenant <tenant-id> \
+  --query-json '{"proxy_id":"<proxy-id>","device_ip":"192.168.1.100"}'
+```
+
+Ergonomic wrappers (recommended):
+- Single claim: `xyte-cli edge claim --plan|--apply`
+- Bulk claim: `xyte-cli edge claim-batch --input <primary-csv> --plan|--apply [--resume-artifact <path>]`
+- Status peek: `xyte-cli edge claim-status`, `xyte-cli edge ping-status`
+- Connectivity probe: `xyte-cli edge ping --plan|--apply`
+
+See `references/claim-playbook.md` for the full decision tree and `references/flow-recipes.md` for flow-level recipes.
 
 ## Util Prepare + Import Tree
 

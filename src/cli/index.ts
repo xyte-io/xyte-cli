@@ -41,6 +41,7 @@ import {
 import { registerOpsCommands } from './commands/ops';
 import { registerApiCommands } from './commands/api';
 import { registerUtilCommands } from './commands/util';
+import { registerEdgeCommands } from './commands/edge';
 import { formatReadinessText } from './format-readiness';
 import { resolveKeyValue } from './resolve-key';
 import {
@@ -914,6 +915,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
   registerApiCommands(program, cliContext);
   registerOpsCommands(program, cliContext, runTui, runtime.watchDelayFn);
   registerUtilCommands(program, cliContext);
+  registerEdgeCommands(program, cliContext);
   registerFlowCommands(program, cliContext);
   registerSetupCommands(program, cliContext);
   registerConfigCommands(program, cliContext);

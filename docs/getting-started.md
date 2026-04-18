@@ -121,6 +121,27 @@ Install paths:
   - Copilot: `~/.copilot/skills/xyte-cli`
   - Codex: `~/.agents/skills/xyte-cli`
 
+## Claim Devices (Native, Edge, C2C)
+
+See [`claim-devices.md`](claim-devices.md) for the full native-vs-edge-vs-C2C decision guide. Two rules up front:
+
+- **Ask first.** When the path isn't explicit, ask which of native / edge / C2C applies; do not auto-pick from spreadsheet columns.
+- **C2C is not available** via the public API today — use the End Customer Portal.
+
+One-liners:
+
+```bash
+# Native / direct (sn + mac + cloud_id known):
+xyte-cli api call organization.devices.claimDevice --tenant <tenant-id> --body-json '{"name":"<name>","space_id":<space-id>,"sn":"<sn>","mac":"<mac>","cloud_id":"<cloud-id>"}'
+
+# Edge (behind an Xyte Edge proxy):
+xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip> --device-model-id <model-id> --space-id <space-id> --apply
+
+# Bulk edge:
+xyte-cli util prepare --action organization.edge.startClaim --input ./edge-devices.xlsx --output-dir ./prepared
+xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --report ./artifacts/edge-claim-report.ndjson --apply
+```
+
 ## Skills-Less Operation
 
 You can skip skill installation and drive everything directly from CLI help and command outputs.

@@ -246,6 +246,102 @@
     ]
   },
   {
+    "key": "organization.edge.startClaim",
+    "namespace": "organization",
+    "group": "edge",
+    "action": "startClaim",
+    "title": "Start Edge Claim",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/edge/claim",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/edge-start-claim",
+    "bodyExample": "{\n  \"proxy_id\": \"proxy-uuid\",\n  \"device_ip\": \"192.168.1.100\",\n  \"device_model_id\": \"model-uuid\",\n  \"space_id\": 10000,\n  \"display_name\": \"Conference Room Display\",\n  \"custom_parameters\": {},\n  \"skip_connectivity_check\": false\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/edge-start-claim",
+      "Docs category: Edge Devices",
+      "Async endpoint: returns 204; poll organization.edge.getClaimStatus until pending/success/failed.",
+      "Path inferred — ReadMe docs page carries no OpenAPI spec and the public Bruno/Postman collection omits it. Verify against a live Edge-enabled tenant before trusting."
+    ]
+  },
+  {
+    "key": "organization.edge.getClaimStatus",
+    "namespace": "organization",
+    "group": "edge",
+    "action": "getClaimStatus",
+    "title": "Get Edge Claim Status",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/edge/claim",
+    "pathParams": [],
+    "queryParams": [
+      "proxy_id",
+      "device_ip"
+    ],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/get-claim-status",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-claim-status",
+      "Docs category: Edge Devices",
+      "Response: { \"result\": \"pending\" | \"success\" | \"failed\" }.",
+      "Path inferred — ReadMe docs page carries no OpenAPI spec and the public Bruno/Postman collection omits it. Verify against a live Edge-enabled tenant before trusting."
+    ]
+  },
+  {
+    "key": "organization.edge.startPing",
+    "namespace": "organization",
+    "group": "edge",
+    "action": "startPing",
+    "title": "Start Edge Ping",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/edge/ping",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/start-ping",
+    "bodyExample": "{\n  \"proxy_id\": \"proxy-uuid\",\n  \"device_ip\": \"192.168.1.100\"\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/start-ping",
+      "Docs category: Edge Devices",
+      "Async endpoint: returns 204; poll organization.edge.getPingStatus until pending/success/failed.",
+      "Path inferred — ReadMe docs page carries no OpenAPI spec and the public Bruno/Postman collection omits it. Verify against a live Edge-enabled tenant before trusting."
+    ]
+  },
+  {
+    "key": "organization.edge.getPingStatus",
+    "namespace": "organization",
+    "group": "edge",
+    "action": "getPingStatus",
+    "title": "Get Edge Ping Status",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/edge/ping",
+    "pathParams": [],
+    "queryParams": [
+      "proxy_id",
+      "device_ip"
+    ],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/get-ping-status",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-ping-status",
+      "Docs category: Edge Devices",
+      "Response: { \"status\": \"pending\" | \"success\" | \"failed\" }.",
+      "Path inferred — ReadMe docs page carries no OpenAPI spec and the public Bruno/Postman collection omits it. Verify against a live Edge-enabled tenant before trusting."
+    ]
+  },
+  {
     "key": "organization.getOrganizationInfo",
     "namespace": "organization",
     "group": "general",

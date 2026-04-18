@@ -158,7 +158,8 @@ export class HttpTransport {
                 status: response.status,
                 statusText: response.statusText,
                 endpointKey: request.endpointKey,
-                details: parsed
+                details: parsed,
+                headers: toLowerCaseMap(response.headers)
               });
             }
 

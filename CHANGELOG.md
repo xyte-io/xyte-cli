@@ -7,12 +7,22 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 ## [Unreleased]
 
 ### Added
+- Added the Edge Devices API surface to the CLI catalog: `organization.edge.startClaim`, `organization.edge.getClaimStatus`, `organization.edge.startPing`, `organization.edge.getPingStatus` (async claim/ping lifecycle).
+- Added the `xyte-cli edge` command group: `edge claim`, `edge claim-batch`, `edge claim-status`, `edge ping`, `edge ping-status` with plan/apply semantics, poll overrides, and resume artifacts.
+- Added the `organization.edge.startClaim` utility-prepare profile with `proxy_id,device_ip,device_model_id,space_id,...` columns, deterministic primary/rejected/notes outputs, and a documented reject-reason taxonomy.
+- Added three built-in flows: `flow.edge-claim`, `flow.edge-claim-batch` (the north-star bulk-claim workflow with resume), and `flow.edge-ping`.
+- Added `docs/claim-devices.md`, a native-vs-edge-vs-C2C tutorial that codifies the mandatory disambiguation rule agents must ask, and the canonical C2C-unsupported response template.
+- Added `skills/xyte-cli/references/claim-playbook.md` — single-doc claim playbook for agents covering both claim paths plus the 20-row edge-case decision tree.
+- Added `scripts/sync_skills_data.mjs` and wired it into `npm run build` / `prepublishOnly` to keep `src/api-catalog/public-endpoints.json` and `skills/xyte-cli/data/public-endpoints.json` byte-identical.
 - Native persisted secret storage on Linux via Secret Service, alongside macOS Keychain and Windows DPAPI.
 - Secure-storage downgrade warnings that explain when `auth.secretStoreBackend=auto` falls back to file storage and how to require `native` or opt into `file`.
 - Dedicated `windows-native-secret-store-cert` and `linux-native-secret-store-cert` CI jobs for native secure-storage validation.
 
 ### Changed
 - `xyte-cli config path` now reports `secretStoreBackend`, `secretStore`, and `legacySecretStore` so callers can inspect the resolved credential backend.
+
+### Removed
+- Removed the committed `HANDOFF.md` root document.
 
 ## [0.9.0] - 2026-04-15
 

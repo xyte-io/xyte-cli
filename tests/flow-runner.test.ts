@@ -1471,6 +1471,40 @@ describe('flow runner', () => {
     }
   });
 
+  it('pauses flow.edge-ping in plan mode before the mutating ping step', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition = getBuiltInFlowDefinition('flow.edge-ping');
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-ping-plan`);
+
+    const fetchMock = vi.fn(async () => {
+      throw new Error('flow.edge-ping --plan must not call fetch');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const summary = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: {
+        proxy_id: 'proxy-1',
+        device_ip: '192.168.1.10'
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('pending_gate');
+    expect(summary.cursor.nextStepId).toBe('gate_edge_ping');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(summary.steps.find((item) => item.stepId === 'gate_edge_ping')?.status).toBe('gate_pending');
+    expect(summary.steps.find((item) => item.stepId === 'edge_ping_single')?.status).toBe('pending');
+  });
+
   it('runs inspect.deep-dive and report.generate with partner-only provider scope', async () => {
     const { profileStore, secretStore, client } = await makeClientWithProviders(['xyte-partner']);
 

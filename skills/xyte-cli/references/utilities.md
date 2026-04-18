@@ -34,6 +34,64 @@ Decision gate:
 2. Run a single probe claim with `--output-mode envelope`; if upstream returns `No device found`, stop bulk claim writes.
 3. Ask the user whether to execute this action via an `xyte-cli api call` loop or stop.
 
+## SOP A2: Bulk Edge Claim Preprocessing + Execution (`organization.edge.startClaim`)
+
+Scope check first: edge claim is for devices **behind an Xyte Edge proxy** identified by IP + device model id. For devices on the same network as the platform with known sn/mac/cloud_id, use SOP A (native claim) instead. If the user mentions Cloud-to-Cloud (C2C), tell them the public API does not expose C2C claiming — point to the End Customer Portal. Full disambiguation guidance: `references/claim-playbook.md`.
+
+Prepare:
+
+```bash
+xyte-cli util prepare \
+  --action organization.edge.startClaim \
+  --input /path/to/edge-devices.xlsx \
+  --tenant <tenant-id> \
+  --output-dir ./prepared
+```
+
+Expected files:
+1. `./prepared/organization-edge-startclaim.csv` — rows ready for `edge claim-batch`.
+2. `./prepared/organization-edge-startclaim.rejected.csv` — rows with `reject_reason` (missing `proxy_id`, malformed `device_ip`, non-numeric `space_id`, etc.).
+3. `./prepared/organization-edge-startclaim.notes.md` — column glossary + action taxonomy.
+
+Dry-run (`--plan`) — zero API calls, per-row intended action:
+
+```bash
+xyte-cli edge claim-batch \
+  --tenant <tenant-id> \
+  --input ./prepared/organization-edge-startclaim.csv \
+  --report ./artifacts/edge-claim-report.ndjson \
+  --plan
+```
+
+Apply — only after explicit user approval:
+
+```bash
+xyte-cli edge claim-batch \
+  --tenant <tenant-id> \
+  --input ./prepared/organization-edge-startclaim.csv \
+  --report ./artifacts/edge-claim-report.ndjson \
+  --apply
+```
+
+Resume after interruption:
+
+```bash
+xyte-cli edge claim-batch \
+  --tenant <tenant-id> \
+  --input ./prepared/organization-edge-startclaim.csv \
+  --report ./artifacts/edge-claim-report.ndjson \
+  --resume-artifact ./artifacts/edge-claim.resume.ndjson \
+  --apply
+```
+
+Decision gate:
+1. Review `organization-edge-startclaim.rejected.csv` before running `--plan`.
+2. Review `edge-claim-report.ndjson` after `--plan`; confirm zero unexpected rejections.
+3. Ask the user before running `--apply`.
+4. On partial batch failure (exit 1), re-run with `--resume-artifact`.
+
+Full edge-case matrix and terminal-state handling: `references/claim-playbook.md`.
+
 ## SOP B: Space Import Preprocessing + Execution (`space.import-tree`)
 
 Prepare:

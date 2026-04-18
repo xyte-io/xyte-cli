@@ -154,6 +154,8 @@
       "type": "string",
       "enum": [
         "space.import-tree",
+        "device.move",
+        "edge.claim-batch",
         "call-loop-only"
       ]
     }

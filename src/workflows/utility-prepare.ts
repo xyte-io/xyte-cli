@@ -44,7 +44,7 @@ const UtilityPrepareResultSchema = z.object({
     apply: z.string(),
     verify: z.string()
   }),
-  executionSupport: z.enum(['space.import-tree', 'device.move', 'call-loop-only'])
+  executionSupport: z.enum(['space.import-tree', 'device.move', 'edge.claim-batch', 'call-loop-only'])
 });
 
 type UtilityPrepareResult = z.infer<typeof UtilityPrepareResultSchema>;
@@ -136,6 +136,22 @@ function buildSuggestedCommands(
       ].join(' '),
       apply: `xyte-cli util move-devices --tenant ${tenant} --input ${primaryPath} --apply --report ${path.join(outputDir, 'device-move.apply.ndjson')}`,
       verify: `xyte-cli api call organization.devices.getDevice --tenant ${tenant} --path-json '{"device_id":"<device_id>"}'`
+    };
+  }
+
+  if (profile.actionKey === 'organization.edge.startClaim') {
+    const reportPath = path.join(outputDir, 'edge-claim.apply.ndjson');
+    const resumePath = path.join(outputDir, 'edge-claim.resume.ndjson');
+    return {
+      next: [
+        `Review ${primaryPath}.`,
+        'Run xyte-cli edge claim-batch with --plan first; apply only after the dry-run plan looks correct.',
+        'Resume interrupted runs by re-running --apply with the same --resume-artifact <path>.'
+      ].join(' '),
+      apply:
+        `xyte-cli edge claim-batch --tenant ${tenant} --input ${primaryPath} --apply ` +
+        `--report ${reportPath} --resume-artifact ${resumePath}`,
+      verify: `xyte-cli edge claim-status --tenant ${tenant} --proxy-id <proxy-id> --device-ip <device-ip>`
     };
   }
 

@@ -27,6 +27,10 @@ export function createOrganizationNamespace(
     getTickets: (args) => call('organization.tickets.getTickets', args),
     markResolved: (args) => call('organization.tickets.markResolved', args),
     sendMessage: (args) => call('organization.tickets.sendMessage', args),
-    updateTicket: (args) => call('organization.tickets.updateTicket', args)
+    updateTicket: (args) => call('organization.tickets.updateTicket', args),
+    startEdgeClaim: (args) => call('organization.edge.startClaim', args),
+    getEdgeClaimStatus: (args) => call('organization.edge.getClaimStatus', args),
+    startEdgePing: (args) => call('organization.edge.startPing', args),
+    getEdgePingStatus: (args) => call('organization.edge.getPingStatus', args)
   };
 }

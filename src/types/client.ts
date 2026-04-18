@@ -63,6 +63,10 @@ export interface OrganizationNamespace {
   markResolved: NamespaceCall;
   sendMessage: NamespaceCall;
   updateTicket: NamespaceCall;
+  startEdgeClaim: NamespaceCall;
+  getEdgeClaimStatus: NamespaceCall;
+  startEdgePing: NamespaceCall;
+  getEdgePingStatus: NamespaceCall;
 }
 
 export interface PartnerNamespace {

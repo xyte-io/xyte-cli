@@ -36,6 +36,9 @@ import { runSpaceImportTree } from './utility-commands';
 import { runDeviceMatch } from './device-match';
 import { runMoveDevices } from './move-devices';
 import { runVerifyMovedDevices } from './verify-device-moves';
+import { runEdgeClaim, runEdgeClaimBatch, validateEdgeClaimRow, batchExitedClean } from './edge-claim';
+import { runEdgePing } from './edge-ping';
+import { parsePositiveInt as parseEdgePollPositiveInt } from './edge-poll';
 import {
   buildDeepDive,
   buildFleetInspect,
@@ -668,6 +671,104 @@ async function handleSpaceImportTree(step: FlowTaskStep, _stepIndex: number, ctx
   return { ok: true, output: result, artifactPath: reportPath, primaryOutputPath: reportPath };
 }
 
+function resolvePollOptions(ctx: RunContext, intervalKey?: string, timeoutKey?: string): { intervalMs?: number; timeoutMs?: number } {
+  const options: { intervalMs?: number; timeoutMs?: number } = {};
+  const intervalRaw = ctx.resolvedContext[intervalKey ?? 'edge_poll_interval_ms'];
+  const timeoutRaw = ctx.resolvedContext[timeoutKey ?? 'edge_poll_timeout_ms'];
+  const interval = parseEdgePollPositiveInt(intervalRaw, 'edge_poll_interval_ms');
+  const timeout = parseEdgePollPositiveInt(timeoutRaw, 'edge_poll_timeout_ms');
+  if (interval !== undefined) options.intervalMs = interval;
+  if (timeout !== undefined) options.timeoutMs = timeout;
+  return options;
+}
+
+async function handleEdgeClaim(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  const context = ctx.resolvedContext;
+  const raw: Record<string, unknown> = {
+    proxy_id: context.proxy_id,
+    device_ip: context.device_ip,
+    device_model_id: context.device_model_id,
+    space_id: context.space_id,
+    display_name: context.display_name,
+    skip_connectivity_check: context.skip_connectivity_check,
+    custom_parameters: context.custom_parameters,
+    custom_partner_name: context.custom_partner_name,
+    custom_model_name: context.custom_model_name
+  };
+  const validation = validateEdgeClaimRow(raw, 1);
+  if (!validation.ok) {
+    return { ok: false, failureDetail: `Step ${step.id}: ${validation.reason}` };
+  }
+  const outcome = await runEdgeClaim({
+    client: ctx.args.client,
+    tenantId: ctx.args.tenantId,
+    row: validation.row,
+    pollOptions: resolvePollOptions(ctx, step.edgeClaim?.pollIntervalMsKey, step.edgeClaim?.pollTimeoutMsKey)
+  });
+  const ok = outcome.disposition === 'succeeded' || outcome.disposition === 'already-claimed';
+  if (!ok) {
+    return {
+      ok: false,
+      failureDetail: `Edge claim ${outcome.disposition}${outcome.detail ? `: ${outcome.detail}` : ''}.`,
+      output: outcome
+    };
+  }
+  return { ok: true, output: outcome };
+}
+
+async function handleEdgeClaimBatch(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  const config = requireStepConfig(step.edgeClaimBatch, step.id, 'edge claim batch');
+  const inputPath = path.resolve(resolveTemplateString(config.inputPath, ctx.resolvedContext));
+  const reportPath = path.join(ctx.outputsDir, path.basename(config.reportPath));
+  const resumePath = path.join(ctx.outputsDir, path.basename(config.resumePath));
+  const result = await runEdgeClaimBatch({
+    client: ctx.args.client,
+    tenantId: ctx.args.tenantId,
+    inputPath,
+    apply: config.apply,
+    reportPath,
+    resumePath,
+    pollOptions: resolvePollOptions(ctx, config.pollIntervalMsKey, config.pollTimeoutMsKey)
+  });
+  const contextUpdates: Record<string, string> = config.apply
+    ? { edge_claim_apply_report_path: reportPath }
+    : { edge_claim_dry_run_report_path: reportPath };
+  if (!batchExitedClean(result)) {
+    return {
+      ok: false,
+      failureDetail: `Edge claim batch reported ${result.totals.failed} failed, ${result.totals.rejected} rejected, ${result.totals.timeout} timeout, ${result.totals.proxyOffline} proxy-offline, ${result.totals.aborted} aborted row(s).`,
+      output: result,
+      primaryOutputPath: reportPath,
+      contextUpdates
+    };
+  }
+  return { ok: true, output: result, primaryOutputPath: reportPath, contextUpdates };
+}
+
+async function handleEdgePing(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  const context = ctx.resolvedContext;
+  const proxyId = context.proxy_id?.trim();
+  const deviceIp = context.device_ip?.trim();
+  if (!proxyId || !deviceIp) {
+    return { ok: false, failureDetail: `Step ${step.id} requires context keys proxy_id and device_ip.` };
+  }
+  const outcome = await runEdgePing({
+    client: ctx.args.client,
+    tenantId: ctx.args.tenantId,
+    proxy_id: proxyId,
+    device_ip: deviceIp,
+    pollOptions: resolvePollOptions(ctx, step.edgePing?.pollIntervalMsKey, step.edgePing?.pollTimeoutMsKey)
+  });
+  if (outcome.disposition !== 'succeeded') {
+    return {
+      ok: false,
+      failureDetail: `Edge ping ${outcome.disposition}${outcome.detail ? `: ${outcome.detail}` : ''}.`,
+      output: outcome
+    };
+  }
+  return { ok: true, output: outcome };
+}
+
 async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
   promoteWatchOutputKeys(ctx);
   applyDefinitionContextDefaults(ctx);
@@ -688,6 +789,9 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
     case 'device.move-batch': return handleDeviceMoveBatch(step, stepIndex, ctx);
     case 'device.verify-batch': return handleDeviceVerifyBatch(step, stepIndex, ctx);
     case 'space.import-tree': return handleSpaceImportTree(step, stepIndex, ctx);
+    case 'edge.claim':        return handleEdgeClaim(step, stepIndex, ctx);
+    case 'edge.claim-batch':  return handleEdgeClaimBatch(step, stepIndex, ctx);
+    case 'edge.ping':         return handleEdgePing(step, stepIndex, ctx);
     default: throw new Error(`Unsupported flow task type: ${(step as { task: string }).task}`);
   }
 }

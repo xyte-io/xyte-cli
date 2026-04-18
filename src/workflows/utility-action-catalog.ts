@@ -3,6 +3,7 @@ import type { PublicEndpointSpec } from '../types/endpoints';
 import { CliUserError } from '../contracts/user-error';
 import {
   buildFriendlyClaimDeviceProfile,
+  buildFriendlyEdgeClaimProfile,
   buildFriendlyMoveDeviceProfile,
   buildFriendlySpaceImportProfile,
   buildGenericEndpointProfile,
@@ -28,6 +29,10 @@ function buildProfiles(): UtilityActionProfile[] {
   for (const endpoint of writeEndpoints) {
     if (endpoint.key === 'organization.devices.claimDevice') {
       profiles.set(endpoint.key, buildFriendlyClaimDeviceProfile(endpoint));
+      continue;
+    }
+    if (endpoint.key === 'organization.edge.startClaim') {
+      profiles.set(endpoint.key, buildFriendlyEdgeClaimProfile(endpoint));
       continue;
     }
     if (endpoint.key === 'organization.devices.moveDevice') {

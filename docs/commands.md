@@ -11,6 +11,9 @@ Use it as a unified map for flow runner execution, utility pipelines, and endpoi
 - [`flow.guided-remediation`](flows/agent-ops.md#flowguided-remediation): execute org command/ticket/incident actions with verification.
 - [`flow.device-migration`](flows/agent-ops.md#flowdevice-migration): inventory, match, dry-run, execute, and verify device migration.
 - [`flow.daily-deep-dive-report`](flows/agent-ops.md#flowdaily-deep-dive-report): produce daily deep-dive JSON and markdown report outputs.
+- [`flow.edge-claim`](flows/agent-ops.md#flowedge-claim): claim a single edge device end-to-end (async start + poll).
+- [`flow.edge-claim-batch`](flows/agent-ops.md#flowedge-claim-batch): bulk-claim edge devices from a prepared CSV with plan/apply and resume.
+- [`flow.edge-ping`](flows/agent-ops.md#flowedge-ping): async connectivity probe for a device behind an Edge proxy.
 
 ## Flow Commands
 
@@ -181,6 +184,50 @@ xyte-cli util match \
 xyte-cli util move-devices --tenant <tenant-id> --input ./device-moves.csv \
   [--input-format auto|csv|json|jsonl] [--apply] [--continue-on-error] [--report <path>]
 ```
+
+## Edge Devices
+
+Edge devices sit behind an Xyte Edge proxy. Claim and ping are asynchronous: a start call returns 204, then the CLI polls the matching status endpoint until terminal. Prefer the `xyte-cli edge` command group over raw `api call` — it handles polling, backoff, and resume.
+
+See [`docs/claim-devices.md`](claim-devices.md) for the full native-vs-edge-vs-C2C decision guide before you pick a command.
+
+```bash
+xyte-cli edge claim \
+  --tenant <tenant-id> \
+  --proxy-id <proxy-id> \
+  --device-ip <device-ip> \
+  --device-model-id <device-model-id> \
+  --space-id <space-id> \
+  [--display-name <name>] [--skip-connectivity-check] \
+  [--poll-interval-ms 5000] [--poll-timeout-ms 600000] \
+  [--plan|--apply] [--output json|text]
+
+xyte-cli edge claim-batch \
+  --tenant <tenant-id> \
+  --input ./prepared/organization-edge-startclaim.csv \
+  [--report <path>] [--resume-artifact <path>] \
+  [--poll-interval-ms 5000] [--poll-timeout-ms 600000] \
+  [--plan|--apply] [--output json|text]
+
+xyte-cli edge claim-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> [--output json|text]
+
+xyte-cli edge ping \
+  --tenant <tenant-id> \
+  --proxy-id <proxy-id> \
+  --device-ip <device-ip> \
+  [--poll-interval-ms 5000] [--poll-timeout-ms 600000] \
+  [--plan|--apply] [--output json|text]
+
+xyte-cli edge ping-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> [--output json|text]
+```
+
+Notes:
+- `edge claim`, `edge claim-batch`, and `edge ping` are mutating. `--plan` is the safe default; `--apply` only after explicit user approval.
+- `edge claim-status` and `edge ping-status` are read-only.
+- Poll defaults: 5 s interval, 10 min timeout.
+- `edge claim-batch` on a half-finished run requires `--resume-artifact <ndjson-artifact>`; it skips terminal rows and re-polls only pending ones.
+- `edge claim-batch` exits with code 1 if any row ends in `failed`, `rejected`, `timeout`, `proxy-offline`, or `aborted`; per-row dispositions are written to `--report`.
+- Raw endpoints remain available for advanced cases: `organization.edge.startClaim`, `organization.edge.getClaimStatus`, `organization.edge.startPing`, `organization.edge.getPingStatus`.
 
 ## Insights And Reports
 

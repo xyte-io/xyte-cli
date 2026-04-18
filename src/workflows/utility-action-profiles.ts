@@ -2,7 +2,11 @@ import type { PublicEndpointSpec } from '../types/endpoints';
 
 export type UtilityPreparePrimaryFormat = 'csv' | 'jsonl';
 export type UtilityPrepareMode = 'friendly' | 'generic';
-export type UtilityExecutionSupport = 'space.import-tree' | 'device.move' | 'call-loop-only';
+export type UtilityExecutionSupport =
+  | 'space.import-tree'
+  | 'device.move'
+  | 'edge.claim-batch'
+  | 'call-loop-only';
 
 export interface UtilityActionProfile {
   actionKey: string;
@@ -85,6 +89,54 @@ export function buildFriendlyClaimDeviceProfile(endpoint: PublicEndpointSpec): U
     promptTemplatePath: GENERIC_PROMPT_TEMPLATE_PATH,
     skillNodePath: UTILITIES_SKILL_NODE_PATH,
     executionSupport: 'call-loop-only'
+  };
+}
+
+export function buildFriendlyEdgeClaimProfile(endpoint: PublicEndpointSpec): UtilityActionProfile {
+  return {
+    actionKey: endpoint.key,
+    title: endpoint.title,
+    entity: endpoint.group,
+    mode: 'friendly',
+    endpointKey: endpoint.key,
+    method: endpoint.method,
+    pathTemplate: endpoint.pathTemplate,
+    primaryFormat: 'csv',
+    headers: [
+      'proxy_id',
+      'device_ip',
+      'device_model_id',
+      'space_id',
+      'display_name',
+      'custom_parameters',
+      'custom_partner_name',
+      'custom_model_name',
+      'skip_connectivity_check'
+    ],
+    jsonShape: {
+      proxy_id: 'proxy-uuid',
+      device_ip: '192.168.1.100',
+      device_model_id: 'model-uuid',
+      space_id: 10000,
+      display_name: 'Conference Room Display',
+      custom_parameters: {},
+      custom_partner_name: '',
+      custom_model_name: '',
+      skip_connectivity_check: false
+    },
+    decodeRules: [
+      'Map source rows into proxy_id,device_ip,device_model_id,space_id,display_name,custom_parameters,custom_partner_name,custom_model_name,skip_connectivity_check columns.',
+      'proxy_id, device_ip, device_model_id, and space_id are required and must be non-empty.',
+      'space_id must stay numeric so the claim endpoint receives an integer space_id.',
+      'device_ip must parse as an IPv4/IPv6 address or a resolvable hostname; reject rows that do not.',
+      'skip_connectivity_check, when present, must be the literal "true" or "false" (case-insensitive); blanks default to false.',
+      'custom_parameters, when present, must be a valid JSON object string or empty.',
+      'Do not guess proxy_id or device_model_id from context; reject ambiguous rows.',
+      'Write unresolved rows to rejected output with reject_reason.'
+    ],
+    promptTemplatePath: GENERIC_PROMPT_TEMPLATE_PATH,
+    skillNodePath: UTILITIES_SKILL_NODE_PATH,
+    executionSupport: 'edge.claim-batch'
   };
 }
 

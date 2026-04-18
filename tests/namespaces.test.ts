@@ -49,4 +49,66 @@ describe('namespace endpoint mappings', () => {
       body: { space_id: 99592 }
     });
   });
+
+  it('maps organization.startEdgeClaim to organization.edge.startClaim', async () => {
+    const call = vi.fn().mockResolvedValue({ ok: true });
+    const organization = createOrganizationNamespace(call);
+
+    await organization.startEdgeClaim({
+      body: {
+        proxy_id: 'proxy-1',
+        device_ip: '192.168.1.100',
+        device_model_id: 'model-1',
+        space_id: 10000
+      }
+    });
+
+    expect(call).toHaveBeenCalledWith('organization.edge.startClaim', {
+      body: {
+        proxy_id: 'proxy-1',
+        device_ip: '192.168.1.100',
+        device_model_id: 'model-1',
+        space_id: 10000
+      }
+    });
+  });
+
+  it('maps organization.getEdgeClaimStatus to organization.edge.getClaimStatus', async () => {
+    const call = vi.fn().mockResolvedValue({ result: 'pending' });
+    const organization = createOrganizationNamespace(call);
+
+    await organization.getEdgeClaimStatus({
+      query: { proxy_id: 'proxy-1', device_ip: '192.168.1.100' }
+    });
+
+    expect(call).toHaveBeenCalledWith('organization.edge.getClaimStatus', {
+      query: { proxy_id: 'proxy-1', device_ip: '192.168.1.100' }
+    });
+  });
+
+  it('maps organization.startEdgePing to organization.edge.startPing', async () => {
+    const call = vi.fn().mockResolvedValue({ ok: true });
+    const organization = createOrganizationNamespace(call);
+
+    await organization.startEdgePing({
+      body: { proxy_id: 'proxy-1', device_ip: '192.168.1.100' }
+    });
+
+    expect(call).toHaveBeenCalledWith('organization.edge.startPing', {
+      body: { proxy_id: 'proxy-1', device_ip: '192.168.1.100' }
+    });
+  });
+
+  it('maps organization.getEdgePingStatus to organization.edge.getPingStatus', async () => {
+    const call = vi.fn().mockResolvedValue({ status: 'pending' });
+    const organization = createOrganizationNamespace(call);
+
+    await organization.getEdgePingStatus({
+      query: { proxy_id: 'proxy-1', device_ip: '192.168.1.100' }
+    });
+
+    expect(call).toHaveBeenCalledWith('organization.edge.getPingStatus', {
+      query: { proxy_id: 'proxy-1', device_ip: '192.168.1.100' }
+    });
+  });
 });
