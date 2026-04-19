@@ -129,6 +129,12 @@ Partner:
 
 Edge devices sit behind an Xyte Edge proxy. Claim/ping are **asynchronous**: the start endpoint returns 204, then you poll the matching status endpoint until terminal (`success` or `failed`). Prefer the `xyte-cli edge` command group or `flow.edge-claim*` flows over raw `api call` — they handle polling, backoff, and resume.
 
+Verified raw route mapping:
+- `organization.edge.startClaim` -> `POST /core/v1/organization/edge/devices/start_claim`
+- `organization.edge.getClaimStatus` -> `GET /core/v1/organization/edge/devices/get_claim_status`
+- `organization.edge.startPing` -> `POST /core/v1/organization/edge/devices/start_ping`
+- `organization.edge.getPingStatus` -> `GET /core/v1/organization/edge/devices/get_ping_status`
+
 ### `organization.edge.startClaim` + `organization.edge.getClaimStatus`
 
 ```bash

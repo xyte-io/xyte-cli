@@ -228,6 +228,7 @@ Notes:
 - `edge claim-batch` on a half-finished run requires `--resume-artifact <ndjson-artifact>`; it skips rows previously recorded as `succeeded` or `already-claimed` and re-runs all other rows from the prior artifact.
 - `edge claim-batch` exits with code 1 if any row ends in `failed`, `rejected`, `timeout`, `proxy-offline`, or `aborted`; per-row dispositions are written to `--report`.
 - Raw endpoints remain available for advanced cases: `organization.edge.startClaim`, `organization.edge.getClaimStatus`, `organization.edge.startPing`, `organization.edge.getPingStatus`.
+- Raw route mapping: `startClaim` -> `POST /core/v1/organization/edge/devices/start_claim`, `getClaimStatus` -> `GET /core/v1/organization/edge/devices/get_claim_status`, `startPing` -> `POST /core/v1/organization/edge/devices/start_ping`, `getPingStatus` -> `GET /core/v1/organization/edge/devices/get_ping_status`.
 
 ## Insights And Reports
 

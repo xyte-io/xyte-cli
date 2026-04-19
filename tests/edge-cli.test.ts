@@ -278,7 +278,7 @@ describe('edge command group', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const url = fetchMock.mock.calls[0]?.[0] as string;
-    expect(url).toContain('/core/v1/organization/devices/edge/claim');
+    expect(url).toContain('/core/v1/organization/edge/devices/get_claim_status');
     expect(url).toContain('proxy_id=proxy-1');
     expect(url).toContain('device_ip=192.168.1.10');
 
@@ -316,7 +316,7 @@ describe('edge command group', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const url = fetchMock.mock.calls[0]?.[0] as string;
-    expect(url).toContain('/core/v1/organization/devices/edge/ping');
+    expect(url).toContain('/core/v1/organization/edge/devices/get_ping_status');
     expect(url).toContain('proxy_id=proxy-1');
     expect(url).toContain('device_ip=192.168.1.10');
 

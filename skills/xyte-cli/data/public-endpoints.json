@@ -253,19 +253,19 @@
     "title": "Start Edge Claim",
     "method": "POST",
     "base": "hub",
-    "pathTemplate": "/core/v1/organization/devices/edge/claim",
+    "pathTemplate": "/core/v1/organization/edge/devices/start_claim",
     "pathParams": [],
     "queryParams": [],
     "authScope": "organization",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "https://docs.xyte.io/reference/edge-start-claim",
+    "sourceFile": "https://docs.xyte.io/reference/edgeclaim-device",
     "bodyExample": "{\n  \"proxy_id\": \"proxy-uuid\",\n  \"device_ip\": \"192.168.1.100\",\n  \"device_model_id\": \"model-uuid\",\n  \"space_id\": 10000,\n  \"display_name\": \"Conference Room Display\",\n  \"custom_parameters\": {},\n  \"skip_connectivity_check\": false\n}",
     "notes": [
-      "Docs page: https://docs.xyte.io/reference/edge-start-claim",
+      "Docs page: https://docs.xyte.io/reference/edgeclaim-device",
       "Docs category: Edge Devices",
       "Async endpoint: returns 204; poll organization.edge.getClaimStatus until pending/success/failed.",
-      "Path inferred — ReadMe docs page carries no OpenAPI spec and the public Bruno/Postman collection omits it. Verify against a live Edge-enabled tenant before trusting."
+      "Live route verified on 2026-04-19: POST /core/v1/organization/edge/devices/start_claim returns 400 \"Must provide proxy id\" when called with an empty JSON body."
     ]
   },
   {
@@ -276,7 +276,7 @@
     "title": "Get Edge Claim Status",
     "method": "GET",
     "base": "hub",
-    "pathTemplate": "/core/v1/organization/devices/edge/claim",
+    "pathTemplate": "/core/v1/organization/edge/devices/get_claim_status",
     "pathParams": [],
     "queryParams": [
       "proxy_id",
@@ -285,12 +285,12 @@
     "authScope": "organization",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "https://docs.xyte.io/reference/get-claim-status",
+    "sourceFile": "https://docs.xyte.io/reference/edgeget-claim-status",
     "notes": [
-      "Docs page: https://docs.xyte.io/reference/get-claim-status",
+      "Docs page: https://docs.xyte.io/reference/edgeget-claim-status",
       "Docs category: Edge Devices",
       "Response: { \"result\": \"pending\" | \"success\" | \"failed\" }.",
-      "Path inferred — ReadMe docs page carries no OpenAPI spec and the public Bruno/Postman collection omits it. Verify against a live Edge-enabled tenant before trusting."
+      "Live route verified on 2026-04-19: GET /core/v1/organization/edge/devices/get_claim_status returns 400 \"Proxy not found\" for an unknown proxy_id/device_ip pair."
     ]
   },
   {
@@ -301,19 +301,19 @@
     "title": "Start Edge Ping",
     "method": "POST",
     "base": "hub",
-    "pathTemplate": "/core/v1/organization/devices/edge/ping",
+    "pathTemplate": "/core/v1/organization/edge/devices/start_ping",
     "pathParams": [],
     "queryParams": [],
     "authScope": "organization",
     "bodyType": "json",
     "hasBody": true,
-    "sourceFile": "https://docs.xyte.io/reference/start-ping",
+    "sourceFile": "https://docs.xyte.io/reference/edgestart-ping",
     "bodyExample": "{\n  \"proxy_id\": \"proxy-uuid\",\n  \"device_ip\": \"192.168.1.100\"\n}",
     "notes": [
-      "Docs page: https://docs.xyte.io/reference/start-ping",
+      "Docs page: https://docs.xyte.io/reference/edgestart-ping",
       "Docs category: Edge Devices",
       "Async endpoint: returns 204; poll organization.edge.getPingStatus until pending/success/failed.",
-      "Path inferred — ReadMe docs page carries no OpenAPI spec and the public Bruno/Postman collection omits it. Verify against a live Edge-enabled tenant before trusting."
+      "Live route verified on 2026-04-19: POST /core/v1/organization/edge/devices/start_ping returns 400 \"Must provide proxy id\" when called with an empty JSON body."
     ]
   },
   {
@@ -324,7 +324,7 @@
     "title": "Get Edge Ping Status",
     "method": "GET",
     "base": "hub",
-    "pathTemplate": "/core/v1/organization/devices/edge/ping",
+    "pathTemplate": "/core/v1/organization/edge/devices/get_ping_status",
     "pathParams": [],
     "queryParams": [
       "proxy_id",
@@ -333,12 +333,12 @@
     "authScope": "organization",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "https://docs.xyte.io/reference/get-ping-status",
+    "sourceFile": "https://docs.xyte.io/reference/edgeget-ping-status",
     "notes": [
-      "Docs page: https://docs.xyte.io/reference/get-ping-status",
+      "Docs page: https://docs.xyte.io/reference/edgeget-ping-status",
       "Docs category: Edge Devices",
       "Response: { \"status\": \"pending\" | \"success\" | \"failed\" }.",
-      "Path inferred — ReadMe docs page carries no OpenAPI spec and the public Bruno/Postman collection omits it. Verify against a live Edge-enabled tenant before trusting."
+      "Live route verified on 2026-04-19: GET /core/v1/organization/edge/devices/get_ping_status returns 400 \"Proxy not found\" for an unknown proxy_id/device_ip pair."
     ]
   },
   {

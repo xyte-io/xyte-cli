@@ -66,7 +66,7 @@ describe('utility-action-profiles', () => {
         group: 'edge',
         action: 'startClaim',
         title: 'Start Edge Claim',
-        pathTemplate: '/core/v1/organization/devices/edge/claim'
+        pathTemplate: '/core/v1/organization/edge/devices/start_claim'
       });
       const profile = buildFriendlyEdgeClaimProfile(endpoint);
       expect(profile.actionKey).toBe('organization.edge.startClaim');
