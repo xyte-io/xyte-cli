@@ -7,7 +7,7 @@ import { UTILITY_BATCH_SCHEMA_VERSION } from '../contracts/versions';
 import { errorMessage } from '../utils/error-format';
 import type { XyteClient, XyteCallResult } from '../types/client';
 
-export type UtilityBatchCommand = 'space.import-tree' | 'device.move' | 'edge.claim' | 'edge.ping';
+export type UtilityBatchCommand = 'space.import-tree' | 'device.move';
 
 export interface UtilityBatchValidationOutcome {
   skip: true;
@@ -34,7 +34,7 @@ export const UtilityBatchResultSchema = z.object({
   schemaVersion: z.literal(UTILITY_BATCH_SCHEMA_VERSION),
   generatedAtUtc: z.string(),
   tenantId: z.string(),
-  command: z.enum(['space.import-tree', 'device.move', 'edge.claim', 'edge.ping']),
+  command: z.enum(['space.import-tree', 'device.move']),
   mode: z.enum(['dry-run', 'apply']),
   totals: z.object({
     rows: z.number(),
