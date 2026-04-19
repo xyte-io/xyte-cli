@@ -2393,4 +2393,49 @@ describe('flow runner', () => {
     expect(apply.steps.find((item) => item.stepId === 'gate_edge_claim_prepare_review')?.status).toBe('gate_pending');
     expect(apply.steps.find((item) => item.stepId === 'edge_claim_dry_run')?.status).toBe('pending');
   });
+
+  it('approves the prepare review gate on resumed edge-claim-batch apply runs', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-claim-batch-resume`);
+    const sourcePath = join(tmpdir(), `edge-claim-source-${Date.now()}-resume.csv`);
+    writeFileSync(sourcePath, 'source\nplaceholder\n');
+
+    const firstApply = await runDeterministicFlow({
+      flowId: 'flow.edge-claim-batch',
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      context: {
+        edge_claim_input_path: sourcePath
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    const resumedApply = await runDeterministicFlow({
+      flowId: 'flow.edge-claim-batch',
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: firstApply.runId,
+      context: {
+        edge_claim_input_path: sourcePath
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(resumedApply.outcome).toBe('pending_gate');
+    expect(resumedApply.cursor.nextStepId).toBe('gate_edge_claim_batch_apply');
+    expect(resumedApply.steps.find((item) => item.stepId === 'gate_edge_claim_prepare_review')?.status).toBe(
+      'gate_approved'
+    );
+    expect(resumedApply.steps.find((item) => item.stepId === 'edge_claim_dry_run')?.status).toBe('completed');
+  });
 });

@@ -1172,7 +1172,7 @@ async function handleGateStep(
     return { action: 'pause', nextStepIndex: index, gateApprovalsThisRun, outcome: 'pending_gate' };
   }
 
-  if (step.pauseOnFirstApply === true && gateApprovalsThisRun === 0) {
+  if (step.pauseOnFirstApply === true && gateApprovalsThisRun === 0 && stepState.status !== 'gate_pending') {
     await recordGatePending(stepState, {
       stepId: step.id,
       requiresWrite: step.mutating,
