@@ -731,6 +731,14 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         command: 'xyte-cli util prepare --action organization.edge.startClaim --tenant <tenant-id> --input ./devices.xlsx --output-dir ./artifacts/edge-claim'
       },
       {
+        kind: 'gate',
+        id: 'gate_edge_claim_prepare_review',
+        title: 'Review Prepared Edge Claim CSV',
+        mutating: false,
+        detail: 'Populate and review the prepared edge-claim CSV before running the batch dry run.',
+        command: 'Human decision gate after reviewing organization-edge-startclaim.csv'
+      },
+      {
         kind: 'task',
         id: 'edge_claim_dry_run',
         title: 'Edge Claim Dry Run',

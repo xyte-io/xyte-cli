@@ -190,6 +190,26 @@ describe('runEdgeClaim edge-case matrix', () => {
     expect(calls.every((call) => call.endpointKey !== 'organization.edge.getClaimStatus')).toBe(true);
   });
 
+  it('classifies transient startClaim failures as failed instead of rejected', async () => {
+    const { client, calls } = buildClientFromScript({
+      'organization.edge.startClaim': [
+        { ok: false, status: 429, detail: 'rate limited' }
+      ]
+    });
+
+    const outcome = await runEdgeClaim({
+      client,
+      tenantId: 'acme',
+      row: makeRow(),
+      sleeper: async () => undefined,
+      now: () => 0
+    });
+
+    expect(outcome.disposition).toBe('failed');
+    expect(outcome.detail).toContain('rate limited');
+    expect(calls.every((call) => call.endpointKey !== 'organization.edge.getClaimStatus')).toBe(true);
+  });
+
   it('case 4: startClaim 401 → EdgeProbeAbortError bubbles up', async () => {
     const { client } = buildClientFromScript({
       'organization.edge.startClaim': [
@@ -548,6 +568,70 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
     expect(
       calls[0]?.args?.body && (calls[0].args.body as Record<string, unknown>).device_ip
     ).toBe('10.0.0.50');
+  });
+
+  it('fails closed when the resume artifact contains a malformed line', async () => {
+    const tmp = makeTempDir();
+    const inputPath = writeCsv(tmp, [CSV_HEADER, 'proxy-1,192.168.1.10,model-1,99'].join('\n'));
+    const resumePath = join(tmp, 'resume.ndjson');
+    writeFileSync(
+      resumePath,
+      `${JSON.stringify({
+        rowIndex: 1,
+        proxy_id: 'proxy-1',
+        device_ip: '192.168.1.10',
+        disposition: 'succeeded'
+      })}\n{"rowIndex":2`,
+      'utf8'
+    );
+    const { client } = buildClientFromScript({
+      'organization.edge.startClaim': []
+    });
+
+    await expect(
+      runEdgeClaimBatch({
+        client,
+        tenantId: 'acme',
+        inputPath,
+        apply: true,
+        runId: 'run-malformed-resume',
+        resumePath,
+        pollOptions: { intervalMs: 1, timeoutMs: 1_000 },
+        sleeper: async () => undefined,
+        now: () => 0
+      })
+    ).rejects.toThrow(/Resume artifact .* malformed at line 2/);
+  });
+
+  it('skips duplicate device identities after they succeed earlier in the same run', async () => {
+    const tmp = makeTempDir();
+    const inputPath = writeCsv(
+      tmp,
+      [
+        CSV_HEADER,
+        'proxy-1,192.168.1.10,model-1,99',
+        'proxy-1,192.168.1.10,model-1,99'
+      ].join('\n')
+    );
+    const { client, calls } = buildClientFromScript({
+      'organization.edge.startClaim': [{ ok: true, data: null }],
+      'organization.edge.getClaimStatus': [{ ok: true, data: { result: 'success' } }]
+    });
+
+    const result = await runEdgeClaimBatch({
+      client,
+      tenantId: 'acme',
+      inputPath,
+      apply: true,
+      runId: 'run-duplicate-device',
+      pollOptions: { intervalMs: 1, timeoutMs: 1_000 },
+      sleeper: async () => undefined,
+      now: () => 0
+    });
+
+    expect(result.rows[0]?.disposition).toBe('succeeded');
+    expect(result.rows[1]?.disposition).toBe('skipped');
+    expect(calls.filter((call) => call.endpointKey === 'organization.edge.startClaim')).toHaveLength(1);
   });
 
   it('case 15: mixed-proxy batch processes every proxy independently', async () => {

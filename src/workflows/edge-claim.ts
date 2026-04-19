@@ -220,6 +220,13 @@ function proxyOfflineMatches(detail: string): boolean {
   );
 }
 
+function classifyStartClaimDisposition(status: number | undefined): EdgeRowDisposition {
+  if (status === 400 || status === 422) {
+    return 'rejected';
+  }
+  return 'failed';
+}
+
 export interface RunEdgeClaimArgs {
   client: XyteClient;
   tenantId: string;
@@ -273,7 +280,7 @@ export async function runEdgeClaim(args: RunEdgeClaimArgs): Promise<EdgeRowOutco
       rowIndex: args.row.rowIndex,
       proxy_id: args.row.proxy_id,
       device_ip: args.row.device_ip,
-      disposition: 'rejected',
+      disposition: classifyStartClaimDisposition(problem.status),
       attempts: 0,
       elapsedMs: (args.now ?? Date.now)() - startedAt,
       detail
@@ -353,9 +360,12 @@ function loadResumeEntries(resumePath: string | undefined): Map<string, ResumeEn
   const map = new Map<string, ResumeEntry>();
   if (!resumePath || !existsSync(resumePath)) return map;
   const raw = readFileSync(resumePath, 'utf8');
-  for (const line of raw.split('\n')) {
+  const lines = raw.split('\n');
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
     const trimmed = line.trim();
     if (!trimmed) continue;
+    const lineNumber = index + 1;
     try {
       const parsed = JSON.parse(trimmed) as ResumeEntry;
       if (
@@ -363,13 +373,26 @@ function loadResumeEntries(resumePath: string | undefined): Map<string, ResumeEn
         typeof parsed.rowIndex === 'number' &&
         typeof parsed.proxy_id === 'string' &&
         typeof parsed.device_ip === 'string' &&
-        typeof parsed.disposition === 'string' &&
-        RESUMABLE_DISPOSITIONS.has(parsed.disposition)
+        typeof parsed.disposition === 'string'
       ) {
-        map.set(resumeIdentityKey(parsed.proxy_id, parsed.device_ip), parsed);
+        if (RESUMABLE_DISPOSITIONS.has(parsed.disposition)) {
+          map.set(resumeIdentityKey(parsed.proxy_id, parsed.device_ip), parsed);
+          continue;
+        }
+        if (parsed.disposition === 'skipped') {
+          continue;
+        }
       }
-    } catch {
-      // Ignore malformed resume lines.
+      throw new CliUserError({
+        summary: `Resume artifact ${resumePath} is malformed at line ${lineNumber}.`
+      });
+    } catch (error) {
+      if (error instanceof CliUserError) {
+        throw error;
+      }
+      throw new CliUserError({
+        summary: `Resume artifact ${resumePath} is malformed at line ${lineNumber}.`
+      });
     }
   }
   return map;
@@ -518,6 +541,12 @@ export async function runEdgeClaimBatch(args: RunEdgeClaimBatchArgs): Promise<Ed
       }
       appendReportLine(args.reportPath, { ...outcome, runId, mode });
       appendResumeEntry(args.resumePath, {
+        rowIndex,
+        proxy_id: validation.row.proxy_id,
+        device_ip: validation.row.device_ip,
+        disposition: outcome.disposition
+      });
+      resumeMap.set(resumeIdentityKey(validation.row.proxy_id, validation.row.device_ip), {
         rowIndex,
         proxy_id: validation.row.proxy_id,
         device_ip: validation.row.device_ip,

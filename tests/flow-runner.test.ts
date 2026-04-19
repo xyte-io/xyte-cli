@@ -2336,4 +2336,33 @@ describe('flow runner', () => {
     // <stepId>_output must be set so downstream steps can reference {{import_tree_output}}
     expect(inputs.context.import_tree_output).toBeDefined();
   });
+
+  it('pauses edge-claim-batch after prepare so the scaffold can be filled before dry-run', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-claim-batch`);
+    const sourcePath = join(tmpdir(), `edge-claim-source-${Date.now()}.csv`);
+    writeFileSync(sourcePath, 'source\nplaceholder\n');
+
+    const plan = await runDeterministicFlow({
+      flowId: 'flow.edge-claim-batch',
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: {
+        edge_claim_input_path: sourcePath
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(plan.outcome).toBe('pending_gate');
+    expect(plan.cursor.nextStepId).toBe('gate_edge_claim_prepare_review');
+    expect(plan.steps.find((item) => item.stepId === 'edge_claim_prepare')?.status).toBe('completed');
+    expect(plan.steps.find((item) => item.stepId === 'edge_claim_dry_run')?.status).toBe('pending');
+    const plannedInputs = JSON.parse(readFileSync(plan.inputsPath, 'utf8'));
+    expect(plannedInputs.context.edge_claim_prepare_csv).toContain('organization-edge-startclaim.csv');
+  });
 });

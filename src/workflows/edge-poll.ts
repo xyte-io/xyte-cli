@@ -16,8 +16,8 @@ export interface EdgePollOptions {
   rateLimitCeilingMs?: number;
 }
 
-export const DEFAULT_EDGE_POLL_INTERVAL_MS = 2_000;
-export const DEFAULT_EDGE_POLL_TIMEOUT_MS = 120_000;
+export const DEFAULT_EDGE_POLL_INTERVAL_MS = 5_000;
+export const DEFAULT_EDGE_POLL_TIMEOUT_MS = 600_000;
 export const DEFAULT_NOT_INITIATED_TOLERANCE = 3;
 export const DEFAULT_RATE_LIMIT_MAX_RETRIES = 5;
 export const DEFAULT_RATE_LIMIT_BASE_BACKOFF_MS = 500;

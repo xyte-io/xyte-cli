@@ -292,6 +292,8 @@ xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-e
 xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --apply --report ./artifacts/edge-claim.report.ndjson --resume-artifact ./artifacts/edge-claim.resume.ndjson
 ```
 
+Before `--plan`, populate `./prepared/organization-edge-startclaim.csv` from the source material and review the rejected/notes artifacts.
+
 Resume after interruption: re-run the `--apply` line with the same `--resume-artifact` path. Never re-run a half-finished batch without `--resume-artifact`.
 
 - Expected artifacts:
@@ -299,6 +301,7 @@ Resume after interruption: re-run the `--apply` line with the same `--resume-art
   - `./artifacts/edge-claim-report.ndjson` — per-row NDJSON used for resume and audit.
   - `xyte.edge.claim-batch.v1` summary on stdout.
 - Stop/decision gates:
+  - Human decision gate after `util prepare`: populate and review the prepared CSV before dry-run.
   - Human decision gate between dry-run and apply.
   - Partial failure (any row `failed`, `rejected`, `timeout`, `proxy-offline`, or `aborted`) → exit 1; fix reject rows and re-run with `--resume-artifact`.
 - Failure handling:

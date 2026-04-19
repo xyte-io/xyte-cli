@@ -73,6 +73,16 @@ function validateMutationMode(plan: boolean | undefined, apply: boolean | undefi
   return apply === true;
 }
 
+function resolveEdgePollOptions(options: {
+  pollIntervalMs?: string;
+  pollTimeoutMs?: string;
+}): { intervalMs?: number; timeoutMs?: number } {
+  return {
+    intervalMs: parsePositiveInt(options.pollIntervalMs, '--poll-interval-ms'),
+    timeoutMs: parsePositiveInt(options.pollTimeoutMs, '--poll-timeout-ms')
+  };
+}
+
 async function handleEdgeClaim(ctx: CliContext, options: EdgeClaimOptions): Promise<void> {
   const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
@@ -95,6 +105,7 @@ async function handleEdgeClaim(ctx: CliContext, options: EdgeClaimOptions): Prom
   if (!validation.ok) {
     throw new CliUserError({ summary: `Invalid edge claim input: ${validation.reason}` });
   }
+  const pollOptions = resolveEdgePollOptions(options);
   const strictJson = resolveStrictJson({ strictJson: options.strictJson, settings });
   if (!apply) {
     printJson(
@@ -114,10 +125,7 @@ async function handleEdgeClaim(ctx: CliContext, options: EdgeClaimOptions): Prom
     client,
     tenantId,
     row: validation.row,
-    pollOptions: {
-      intervalMs: parsePositiveInt(options.pollIntervalMs, '--poll-interval-ms'),
-      timeoutMs: parsePositiveInt(options.pollTimeoutMs, '--poll-timeout-ms')
-    }
+    pollOptions
   });
   printJson(ctx.stdout, { schemaVersion: 'xyte.edge.claim.v1', tenantId, mode: 'apply', outcome }, { strictJson });
   if (outcome.disposition !== 'succeeded' && outcome.disposition !== 'already-claimed') {
@@ -130,6 +138,7 @@ async function handleEdgeClaimBatch(ctx: CliContext, options: EdgeClaimBatchOpti
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
   requireTenantId(tenantId, 'edge claim-batch');
   const apply = validateMutationMode(options.plan, options.apply, 'edge claim-batch');
+  const pollOptions = resolveEdgePollOptions(options);
   const client = await ctx.withClient({ tenantId });
   const result = await runEdgeClaimBatch({
     client,
@@ -139,10 +148,7 @@ async function handleEdgeClaimBatch(ctx: CliContext, options: EdgeClaimBatchOpti
     apply,
     reportPath: options.report,
     resumePath: options.resumeArtifact,
-    pollOptions: {
-      intervalMs: parsePositiveInt(options.pollIntervalMs, '--poll-interval-ms'),
-      timeoutMs: parsePositiveInt(options.pollTimeoutMs, '--poll-timeout-ms')
-    }
+    pollOptions
   });
   printJson(ctx.stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
   const { failed, rejected, timeout, aborted, proxyOffline } = result.totals;
@@ -172,6 +178,7 @@ async function handleEdgePing(ctx: CliContext, options: EdgePingOptions): Promis
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
   requireTenantId(tenantId, 'edge ping');
   const apply = validateMutationMode(options.plan, options.apply, 'edge ping');
+  const pollOptions = resolveEdgePollOptions(options);
   const strictJson = resolveStrictJson({ strictJson: options.strictJson, settings });
   if (!apply) {
     printJson(
@@ -192,10 +199,7 @@ async function handleEdgePing(ctx: CliContext, options: EdgePingOptions): Promis
     tenantId,
     proxy_id: options.proxyId,
     device_ip: options.deviceIp,
-    pollOptions: {
-      intervalMs: parsePositiveInt(options.pollIntervalMs, '--poll-interval-ms'),
-      timeoutMs: parsePositiveInt(options.pollTimeoutMs, '--poll-timeout-ms')
-    }
+    pollOptions
   });
   printJson(ctx.stdout, outcome, { strictJson });
   if (outcome.disposition !== 'succeeded') {

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { XyteHttpError } from '../src/http/errors';
 import {
+  DEFAULT_EDGE_POLL_INTERVAL_MS,
+  DEFAULT_EDGE_POLL_TIMEOUT_MS,
   pollEdgeStatus,
   parsePositiveInt,
   type EdgeProbePollArgs,
@@ -75,6 +77,11 @@ async function runPoll(args: Partial<EdgeProbePollArgs> & Pick<EdgeProbePollArgs
 }
 
 describe('edge poll helpers', () => {
+  it('ships the documented default edge poll timing', () => {
+    expect(DEFAULT_EDGE_POLL_INTERVAL_MS).toBe(5_000);
+    expect(DEFAULT_EDGE_POLL_TIMEOUT_MS).toBe(600_000);
+  });
+
   it('honors HTTP-date Retry-After values using the injected clock', async () => {
     const clock = controlledClock();
     const sleepCalls: number[] = [];

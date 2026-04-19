@@ -85,10 +85,11 @@ xyte-cli edge claim-batch \
 ```
 
 Decision gate:
-1. Review `organization-edge-startclaim.rejected.csv` before running `--plan`.
-2. Review `edge-claim-report.ndjson` after `--plan`; confirm zero unexpected rejections.
-3. Ask the user before running `--apply`.
-4. On partial batch failure (exit 1), re-run with `--resume-artifact`.
+1. Populate `organization-edge-startclaim.csv` from the source material before running `--plan`.
+2. Review `organization-edge-startclaim.rejected.csv` before running `--plan`.
+3. Review `edge-claim-report.ndjson` after `--plan`; confirm zero unexpected rejections.
+4. Ask the user before running `--apply`.
+5. On partial batch failure (exit 1), re-run with `--resume-artifact`.
 
 Full edge-case matrix and terminal-state handling: `references/claim-playbook.md`.
 

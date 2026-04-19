@@ -86,6 +86,7 @@ Rules:
 Edge-claim safety:
 - `edge claim`, `edge claim-batch`, and `edge ping` are mutating. Default to `--plan`; only run `--apply` after explicit user approval.
 - `edge claim-status` and `edge ping-status` are read-only.
+- After `xyte-cli util prepare --action organization.edge.startClaim`, populate the generated `organization-edge-startclaim.csv` before running `edge claim-batch --plan`.
 - If a batch is interrupted (ctrl-C, network blip), resume with `xyte-cli edge claim-batch --input <primary-csv> --apply --resume-artifact <path>`; never re-run without `--resume-artifact` on a half-finished run.
 - Heartbeat device model id: `5dc4ba6c-c323-4118-a4e4-504f074426f2`. `proxy_id` lives in the End Customer Portal.
 - Poll defaults: 5 s interval, 10 min timeout. Override with `--poll-interval-ms` / `--poll-timeout-ms`.

@@ -235,6 +235,37 @@ describe('edge command group', () => {
         'node',
         'xyte-cli',
         'edge',
+        'claim',
+        '--tenant',
+        'acme',
+        '--proxy-id',
+        'proxy-1',
+        '--device-ip',
+        '192.168.1.10',
+        '--device-model-id',
+        'model-1',
+        '--space-id',
+        '99',
+        '--plan',
+        '--poll-timeout-ms',
+        '10s'
+      ])
+    ).rejects.toThrow(/positive integer/);
+  });
+
+  it('edge ping validates poll timing values in --plan mode', async () => {
+    const { profileStore, secretStore } = await bootstrapTenant();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    vi.stubGlobal('fetch', vi.fn());
+
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await expect(
+      program.parseAsync([
+        'node',
+        'xyte-cli',
+        'edge',
         'ping',
         '--tenant',
         'acme',
@@ -242,7 +273,7 @@ describe('edge command group', () => {
         'proxy-1',
         '--device-ip',
         '192.168.1.10',
-        '--apply',
+        '--plan',
         '--poll-timeout-ms',
         '10s'
       ])
