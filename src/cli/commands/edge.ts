@@ -7,13 +7,16 @@ import { runEdgePing } from '../../workflows/edge-ping';
 import { parsePositiveInt } from '../../workflows/edge-poll';
 import {
   type CliContext,
+  getExplicitGlobalOutput,
   printJson,
   requireTenantId,
-  resolveStrictJson
+  resolveStrictJson,
+  resolveTextJsonOutput
 } from '../cli-context';
 
 interface EdgeClaimOptions {
   tenant?: string;
+  output?: string;
   proxyId: string;
   deviceIp: string;
   deviceModelId: string;
@@ -32,6 +35,7 @@ interface EdgeClaimOptions {
 
 interface EdgeClaimBatchOptions {
   tenant?: string;
+  output?: string;
   input: string;
   inputFormat?: string;
   apply?: boolean;
@@ -45,6 +49,7 @@ interface EdgeClaimBatchOptions {
 
 interface EdgeStatusOptions {
   tenant?: string;
+  output?: string;
   proxyId: string;
   deviceIp: string;
   strictJson?: boolean;
@@ -83,11 +88,20 @@ function resolveEdgePollOptions(options: {
   };
 }
 
+function writeEdgeText(ctx: CliContext, value: unknown): void {
+  ctx.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
+}
+
 async function handleEdgeClaim(ctx: CliContext, options: EdgeClaimOptions): Promise<void> {
   const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
   requireTenantId(tenantId, 'edge claim');
   const apply = validateMutationMode(options.plan, options.apply, 'edge claim');
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
   const validation = validateEdgeClaimRow(
     {
       proxy_id: options.proxyId,
@@ -108,16 +122,17 @@ async function handleEdgeClaim(ctx: CliContext, options: EdgeClaimOptions): Prom
   const pollOptions = resolveEdgePollOptions(options);
   const strictJson = resolveStrictJson({ strictJson: options.strictJson, settings });
   if (!apply) {
-    printJson(
-      ctx.stdout,
-      {
-        schemaVersion: 'xyte.edge.claim.plan.v1',
-        tenantId,
-        mode: 'plan',
-        planned: validation.row
-      },
-      { strictJson }
-    );
+    const payload = {
+      schemaVersion: 'xyte.edge.claim.plan.v1',
+      tenantId,
+      mode: 'plan',
+      planned: validation.row
+    };
+    if (output === 'text') {
+      writeEdgeText(ctx, payload);
+      return;
+    }
+    printJson(ctx.stdout, payload, { strictJson });
     return;
   }
   const client = await ctx.withClient({ tenantId });
@@ -127,7 +142,12 @@ async function handleEdgeClaim(ctx: CliContext, options: EdgeClaimOptions): Prom
     row: validation.row,
     pollOptions
   });
-  printJson(ctx.stdout, { schemaVersion: 'xyte.edge.claim.v1', tenantId, mode: 'apply', outcome }, { strictJson });
+  const payload = { schemaVersion: 'xyte.edge.claim.v1', tenantId, mode: 'apply', outcome };
+  if (output === 'text') {
+    writeEdgeText(ctx, payload);
+  } else {
+    printJson(ctx.stdout, payload, { strictJson });
+  }
   if (outcome.disposition !== 'succeeded' && outcome.disposition !== 'already-claimed') {
     process.exitCode = 1;
   }
@@ -138,6 +158,11 @@ async function handleEdgeClaimBatch(ctx: CliContext, options: EdgeClaimBatchOpti
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
   requireTenantId(tenantId, 'edge claim-batch');
   const apply = validateMutationMode(options.plan, options.apply, 'edge claim-batch');
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
   const pollOptions = resolveEdgePollOptions(options);
   const client = await ctx.withClient({ tenantId });
   const result = await runEdgeClaimBatch({
@@ -150,7 +175,11 @@ async function handleEdgeClaimBatch(ctx: CliContext, options: EdgeClaimBatchOpti
     resumePath: options.resumeArtifact,
     pollOptions
   });
-  printJson(ctx.stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+  if (output === 'text') {
+    writeEdgeText(ctx, result);
+  } else {
+    printJson(ctx.stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+  }
   const { failed, rejected, timeout, aborted, proxyOffline } = result.totals;
   if (result.stoppedEarly || failed > 0 || rejected > 0 || timeout > 0 || aborted > 0 || proxyOffline > 0) {
     process.exitCode = 1;
@@ -161,16 +190,22 @@ async function handleEdgeClaimStatus(ctx: CliContext, options: EdgeStatusOptions
   const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
   requireTenantId(tenantId, 'edge claim-status');
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
   const client = await ctx.withClient({ tenantId });
   const response = await client.callWithMeta('organization.edge.getClaimStatus', {
     tenantId,
     query: { proxy_id: options.proxyId, device_ip: options.deviceIp }
   });
-  printJson(
-    ctx.stdout,
-    { schemaVersion: 'xyte.edge.claim-status.v1', tenantId, response: response.data },
-    { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) }
-  );
+  const payload = { schemaVersion: 'xyte.edge.claim-status.v1', tenantId, response: response.data };
+  if (output === 'text') {
+    writeEdgeText(ctx, payload);
+  } else {
+    printJson(ctx.stdout, payload, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+  }
 }
 
 async function handleEdgePing(ctx: CliContext, options: EdgePingOptions): Promise<void> {
@@ -180,17 +215,23 @@ async function handleEdgePing(ctx: CliContext, options: EdgePingOptions): Promis
   const apply = validateMutationMode(options.plan, options.apply, 'edge ping');
   const pollOptions = resolveEdgePollOptions(options);
   const strictJson = resolveStrictJson({ strictJson: options.strictJson, settings });
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
   if (!apply) {
-    printJson(
-      ctx.stdout,
-      {
-        schemaVersion: 'xyte.edge.ping.plan.v1',
-        tenantId,
-        mode: 'plan',
-        planned: { proxy_id: options.proxyId, device_ip: options.deviceIp }
-      },
-      { strictJson }
-    );
+    const payload = {
+      schemaVersion: 'xyte.edge.ping.plan.v1',
+      tenantId,
+      mode: 'plan',
+      planned: { proxy_id: options.proxyId, device_ip: options.deviceIp }
+    };
+    if (output === 'text') {
+      writeEdgeText(ctx, payload);
+      return;
+    }
+    printJson(ctx.stdout, payload, { strictJson });
     return;
   }
   const client = await ctx.withClient({ tenantId });
@@ -201,7 +242,11 @@ async function handleEdgePing(ctx: CliContext, options: EdgePingOptions): Promis
     device_ip: options.deviceIp,
     pollOptions
   });
-  printJson(ctx.stdout, outcome, { strictJson });
+  if (output === 'text') {
+    writeEdgeText(ctx, outcome);
+  } else {
+    printJson(ctx.stdout, outcome, { strictJson });
+  }
   if (outcome.disposition !== 'succeeded') {
     process.exitCode = 1;
   }
@@ -211,16 +256,22 @@ async function handleEdgePingStatus(ctx: CliContext, options: EdgeStatusOptions)
   const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
   requireTenantId(tenantId, 'edge ping-status');
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
   const client = await ctx.withClient({ tenantId });
   const response = await client.callWithMeta('organization.edge.getPingStatus', {
     tenantId,
     query: { proxy_id: options.proxyId, device_ip: options.deviceIp }
   });
-  printJson(
-    ctx.stdout,
-    { schemaVersion: 'xyte.edge.ping-status.v1', tenantId, response: response.data },
-    { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) }
-  );
+  const payload = { schemaVersion: 'xyte.edge.ping-status.v1', tenantId, response: response.data };
+  if (output === 'text') {
+    writeEdgeText(ctx, payload);
+  } else {
+    printJson(ctx.stdout, payload, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+  }
 }
 
 export function registerEdgeCommands(parent: Command, ctx: CliContext): void {
@@ -258,8 +309,8 @@ export function registerEdgeCommands(parent: Command, ctx: CliContext): void {
     .option('--plan', 'Print the planned claim without calling the API')
     .option('--apply', 'Execute the claim')
     .option('--strict-json', 'Fail on non-serializable output')
-    .action(async (options: EdgeClaimOptions) => {
-      await handleEdgeClaim(ctx, options);
+    .action(async function (options: EdgeClaimOptions) {
+      await handleEdgeClaim(ctx, { ...options, output: getExplicitGlobalOutput(this) });
     });
 
   edge
@@ -275,8 +326,8 @@ export function registerEdgeCommands(parent: Command, ctx: CliContext): void {
     .option('--poll-interval-ms <ms>', 'Status poll interval (ms)')
     .option('--poll-timeout-ms <ms>', 'Status poll timeout (ms)')
     .option('--strict-json', 'Fail on non-serializable output')
-    .action(async (options: EdgeClaimBatchOptions) => {
-      await handleEdgeClaimBatch(ctx, options);
+    .action(async function (options: EdgeClaimBatchOptions) {
+      await handleEdgeClaimBatch(ctx, { ...options, output: getExplicitGlobalOutput(this) });
     });
 
   edge
@@ -286,8 +337,8 @@ export function registerEdgeCommands(parent: Command, ctx: CliContext): void {
     .requiredOption('--device-ip <ip>', 'Device IP or hostname behind the edge')
     .option('--tenant <tenantId>', 'Tenant id override')
     .option('--strict-json', 'Fail on non-serializable output')
-    .action(async (options: EdgeStatusOptions) => {
-      await handleEdgeClaimStatus(ctx, options);
+    .action(async function (options: EdgeStatusOptions) {
+      await handleEdgeClaimStatus(ctx, { ...options, output: getExplicitGlobalOutput(this) });
     });
 
   edge
@@ -301,8 +352,8 @@ export function registerEdgeCommands(parent: Command, ctx: CliContext): void {
     .option('--plan', 'Print the planned ping without calling the API')
     .option('--apply', 'Execute the ping')
     .option('--strict-json', 'Fail on non-serializable output')
-    .action(async (options: EdgePingOptions) => {
-      await handleEdgePing(ctx, options);
+    .action(async function (options: EdgePingOptions) {
+      await handleEdgePing(ctx, { ...options, output: getExplicitGlobalOutput(this) });
     });
 
   edge
@@ -312,7 +363,7 @@ export function registerEdgeCommands(parent: Command, ctx: CliContext): void {
     .requiredOption('--device-ip <ip>', 'Device IP or hostname behind the edge')
     .option('--tenant <tenantId>', 'Tenant id override')
     .option('--strict-json', 'Fail on non-serializable output')
-    .action(async (options: EdgeStatusOptions) => {
-      await handleEdgePingStatus(ctx, options);
+    .action(async function (options: EdgeStatusOptions) {
+      await handleEdgePingStatus(ctx, { ...options, output: getExplicitGlobalOutput(this) });
     });
 }

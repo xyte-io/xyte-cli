@@ -814,12 +814,48 @@ describe('validateEdgeClaimRow', () => {
     if (!result.ok) expect(result.reason).toContain('true or false');
   });
 
+  it('rejects malformed device_ip values before execution', () => {
+    const result = validateEdgeClaimRow(
+      {
+        proxy_id: 'p',
+        device_ip: 'not a host name',
+        device_model_id: 'm',
+        space_id: 1
+      },
+      6
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toContain('device_ip must be a valid IPv4, IPv6, or hostname');
+  });
+
+  it('rejects dotted numeric values that are not valid IPs', () => {
+    const result = validateEdgeClaimRow(
+      {
+        proxy_id: 'p',
+        device_ip: '999.999.999.999',
+        device_model_id: 'm',
+        space_id: 1
+      },
+      7
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toContain('device_ip must be a valid IPv4, IPv6, or hostname');
+  });
+
   it('accepts a row with only the required fields', () => {
     const result = validateEdgeClaimRow(
       { proxy_id: 'p', device_ip: '1.2.3.4', device_model_id: 'm', space_id: '12' },
-      6
+      8
     );
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.row.space_id).toBe(12);
+  });
+
+  it('accepts hostnames as device_ip values', () => {
+    const result = validateEdgeClaimRow(
+      { proxy_id: 'p', device_ip: 'printer-01.local', device_model_id: 'm', space_id: '12' },
+      9
+    );
+    expect(result.ok).toBe(true);
   });
 });

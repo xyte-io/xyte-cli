@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 
 import { ensureParentDir } from '../utils/fs';
@@ -113,6 +114,27 @@ function parseCustomParameters(value: unknown): { value?: Record<string, unknown
   }
 }
 
+function isValidHostname(value: string): boolean {
+  if (!value || value.length > 253 || value.startsWith('.') || value.endsWith('.') || /^[0-9.]+$/.test(value)) {
+    return false;
+  }
+
+  const labels = value.split('.');
+  return labels.every((label) => {
+    if (!label || label.length > 63) {
+      return false;
+    }
+    if (label.startsWith('-') || label.endsWith('-')) {
+      return false;
+    }
+    return /^[A-Za-z0-9-]+$/.test(label);
+  });
+}
+
+function isValidEdgeDeviceIp(value: string): boolean {
+  return isIP(value) !== 0 || isValidHostname(value);
+}
+
 export interface EdgeClaimRowValidation {
   ok: true;
   row: EdgeClaimRow;
@@ -139,6 +161,9 @@ export function validateEdgeClaimRow(
   }
   if (!deviceIp) {
     return { ok: false, rowIndex, reason: 'device_ip is required.', input: raw };
+  }
+  if (!isValidEdgeDeviceIp(deviceIp)) {
+    return { ok: false, rowIndex, reason: 'device_ip must be a valid IPv4, IPv6, or hostname.', input: raw };
   }
   if (!deviceModelId) {
     return { ok: false, rowIndex, reason: 'device_model_id is required.', input: raw };

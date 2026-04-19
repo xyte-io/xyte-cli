@@ -117,6 +117,7 @@ export interface FlowGateStep extends FlowStepBase {
   kind: 'gate';
   mutating: boolean;
   detail: string;
+  pauseOnFirstApply?: boolean;
 }
 
 export type FlowStep = FlowTaskStep | FlowGateStep;
@@ -735,6 +736,7 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         id: 'gate_edge_claim_prepare_review',
         title: 'Review Prepared Edge Claim CSV',
         mutating: false,
+        pauseOnFirstApply: true,
         detail: 'Populate and review the prepared edge-claim CSV before running the batch dry run.',
         command: 'Human decision gate after reviewing organization-edge-startclaim.csv'
       },

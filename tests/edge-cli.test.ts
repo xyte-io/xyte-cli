@@ -151,6 +151,35 @@ describe('edge command group', () => {
     expect(printed).toContain('proxy-1');
   });
 
+  it('edge ping honors global --output text in plan mode', async () => {
+    const { profileStore, secretStore } = await bootstrapTenant();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      '--output',
+      'text',
+      'edge',
+      'ping',
+      '--tenant',
+      'acme',
+      '--proxy-id',
+      'proxy-1',
+      '--device-ip',
+      '192.168.1.10'
+    ]);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    const printed = stdout.write.mock.calls.map(([chunk]) => chunk).join('');
+    expect(printed).toContain('\n  "schemaVersion": "xyte.edge.ping.plan.v1"');
+  });
+
   it('edge claim-batch honors --input-format for ambiguous input files', async () => {
     const { profileStore, secretStore } = await bootstrapTenant();
     const stdout = { write: vi.fn() };
@@ -316,6 +345,40 @@ describe('edge command group', () => {
     const printed = stdout.write.mock.calls.map(([chunk]) => chunk).join('');
     expect(printed).toContain('xyte.edge.claim-status.v1');
     expect(printed).toContain('"result": "pending"');
+  });
+
+  it('edge claim-status honors global --output text', async () => {
+    const { profileStore, secretStore } = await bootstrapTenant();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ result: 'pending' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      '--output',
+      'text',
+      'edge',
+      'claim-status',
+      '--tenant',
+      'acme',
+      '--proxy-id',
+      'proxy-1',
+      '--device-ip',
+      '192.168.1.10'
+    ]);
+
+    const printed = stdout.write.mock.calls.map(([chunk]) => chunk).join('');
+    expect(printed).toContain('\n  "schemaVersion": "xyte.edge.claim-status.v1"');
+    expect(printed).toContain('\n    "result": "pending"');
   });
 
   it('edge ping-status calls organization.edge.getPingStatus with query params', async () => {

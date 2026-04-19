@@ -1172,6 +1172,17 @@ async function handleGateStep(
     return { action: 'pause', nextStepIndex: index, gateApprovalsThisRun, outcome: 'pending_gate' };
   }
 
+  if (step.pauseOnFirstApply === true && gateApprovalsThisRun === 0) {
+    await recordGatePending(stepState, {
+      stepId: step.id,
+      requiresWrite: step.mutating,
+      detail: 'Apply mode paused at a gate that requires explicit resume approval.',
+      decisionsPath: ctx.decisionsPath,
+      decisions
+    });
+    return { action: 'pause', nextStepIndex: index, gateApprovalsThisRun, outcome: 'pending_gate' };
+  }
+
   if (gateApprovalsThisRun >= 1) {
     await recordGatePending(stepState, {
       stepId: step.id,
