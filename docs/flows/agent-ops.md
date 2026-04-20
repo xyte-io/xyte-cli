@@ -252,3 +252,77 @@ xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/
 - Failure handling:
   - Re-run with a shorter analysis window (`--window 12`).
   - If still failing, return to `flow.setup-readiness-10m`.
+
+## flow.edge-claim
+
+- Flow ID: `flow.edge-claim`
+- Intent: claim one device that sits behind an Xyte Edge proxy — async `startClaim` then poll `getClaimStatus` to terminal.
+- Disambiguation: only run this flow after confirming the user means **edge** claim (not native direct claim via `organization.devices.claimDevice`, and not C2C which is unsupported). See [`../claim-devices.md`](../claim-devices.md).
+- Prerequisites:
+  - `<tenant-id>` is active and authorized.
+  - `proxy_id`, `device_ip`, `device_model_id`, `space_id` are known.
+- Exact commands:
+
+```bash
+xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --plan
+xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --apply
+```
+
+- Expected artifacts:
+  - `xyte.edge.claim.v1` single-row summary on stdout (JSON) and under `./tmp/flow-runs/flow.edge-claim/...`.
+- Stop/decision gates:
+  - Default to `--plan`. Only advance to `--apply` after explicit user approval.
+- Failure handling:
+  - 401 aborts the flow — fix with `xyte-cli setup run` or `xyte-cli config key`.
+  - 422 at start → row disposition `rejected`; no poll.
+  - Poll timeout → disposition `timeout`; re-run the flow or `xyte-cli edge claim-status` to re-check.
+
+## flow.edge-claim-batch
+
+- Flow ID: `flow.edge-claim-batch`
+- Intent: bulk-claim a spreadsheet of edge devices — `util prepare` → dry-run → gate → apply → resume.
+- Prerequisites:
+  - `<tenant-id>` is active and authorized.
+  - A messy or clean spreadsheet/CSV is available for `util prepare`.
+- Exact commands:
+
+```bash
+xyte-cli util prepare --action organization.edge.startClaim --tenant <tenant-id> --input ./devices.xlsx --output-dir ./prepared
+xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --plan
+xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --apply --report ./artifacts/edge-claim.report.ndjson --resume-artifact ./artifacts/edge-claim.resume.ndjson
+```
+
+Before `--plan`, populate `./prepared/organization-edge-startclaim.csv` from the source material and review the rejected/notes artifacts.
+
+Resume after interruption: re-run the `--apply` line with the same `--resume-artifact` path. Never re-run a half-finished batch without `--resume-artifact`.
+
+- Expected artifacts:
+  - `./prepared/organization-edge-startclaim.csv`, `organization-edge-startclaim.rejected.csv`, `organization-edge-startclaim.notes.md`.
+  - `./artifacts/edge-claim-report.ndjson` — per-row NDJSON used for resume and audit.
+  - `xyte.edge.claim-batch.v1` summary on stdout.
+- Stop/decision gates:
+  - Human decision gate after `util prepare`: populate and review the prepared CSV before dry-run.
+  - Human decision gate between dry-run and apply.
+  - Partial failure (any row `failed`, `rejected`, `timeout`, `proxy-offline`, or `aborted`) → exit 1; fix reject rows and re-run with `--resume-artifact`.
+- Failure handling:
+  - 401 → abort; fix auth, then resume.
+  - 429 → automatic exponential backoff with jitter, honors `Retry-After`.
+  - Never re-run a half-finished batch without `--resume-artifact`.
+
+## flow.edge-ping
+
+- Flow ID: `flow.edge-ping`
+- Intent: async connectivity probe for a device behind an Edge proxy — `startPing` then poll `getPingStatus`.
+- Exact commands:
+
+```bash
+xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --plan
+xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --apply
+```
+
+- Expected artifacts:
+  - `xyte.edge.ping.v1` summary on stdout.
+- Stop/decision gates:
+  - `--plan` first, `--apply` after approval.
+- Failure handling:
+  - Poll timeout → disposition `timeout`; fix upstream connectivity and re-run.

@@ -101,6 +101,40 @@ When run through `xyte-cli flow run flow.device-migration`, the flow runner also
 - **verify_moved_devices** (`device.verify-batch`): re-fetches each moved device and confirms its `space_id` matches the target from the move plan.
 - **post_migration_report** (`report.generate`): composes a post-migration markdown report from the execution, verification, and fleet artifacts.
 
+## flow.edge-claim
+
+Claim one edge device end-to-end. `startClaim` is mutating; default to `--plan` and require explicit approval before `--apply`. See `references/claim-playbook.md` for disambiguation vs native/direct claim.
+
+```bash
+xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --plan
+xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --apply
+```
+
+Failure path (happens-once example): `startClaim` returns 422 (unknown device model id) → disposition `rejected`, no poll; fix model id and re-run.
+
+## flow.edge-claim-batch
+
+North-star bulk-claim flow: `util prepare` → dry-run → gate → apply. Writes a per-row NDJSON report used for resume.
+
+```bash
+xyte-cli util prepare --action organization.edge.startClaim --tenant <tenant-id> --input ./devices.xlsx --output-dir ./prepared
+xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --plan
+xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --apply --report ./artifacts/edge-claim.report.ndjson --resume-artifact ./artifacts/edge-claim.resume.ndjson
+```
+
+Resume after interruption: re-run the `--apply` line with the same `--resume-artifact` path. Never re-run a half-finished batch without it.
+
+Failure path: 2-of-3 rows succeed, 1 row rejected → exit 1 with a per-row NDJSON report (`--report`); fix reject row and re-run with `--resume-artifact`.
+
+## flow.edge-ping
+
+```bash
+xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --plan
+xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --apply
+```
+
+Failure path: status stays `pending` past timeout → disposition `timeout`; re-run after fixing connectivity upstream.
+
 ## flow.daily-deep-dive-report
 
 ```bash

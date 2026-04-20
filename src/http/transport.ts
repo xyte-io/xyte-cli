@@ -85,6 +85,10 @@ function buildHttpErrorMessage(status: number, statusText: string, details: unkn
 }
 
 async function parseResponseBody(response: Response): Promise<unknown> {
+  if (response.status === 204) {
+    return undefined;
+  }
+
   const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
   if (contentType.includes('application/json')) {
     try {
@@ -158,7 +162,8 @@ export class HttpTransport {
                 status: response.status,
                 statusText: response.statusText,
                 endpointKey: request.endpointKey,
-                details: parsed
+                details: parsed,
+                headers: toLowerCaseMap(response.headers)
               });
             }
 

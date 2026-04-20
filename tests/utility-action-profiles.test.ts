@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildFriendlySpaceImportProfile,
   buildFriendlyClaimDeviceProfile,
+  buildFriendlyEdgeClaimProfile,
   buildFriendlyMoveDeviceProfile,
   buildGenericEndpointProfile
 } from '../src/workflows/utility-action-profiles';
@@ -55,6 +56,51 @@ describe('utility-action-profiles', () => {
       const profile = buildFriendlyClaimDeviceProfile(makeEndpoint());
       expect(profile.headers).toContain('name');
       expect(profile.headers).toContain('sn');
+    });
+  });
+
+  describe('buildFriendlyEdgeClaimProfile', () => {
+    it('targets the edge-claim-batch execution support', () => {
+      const endpoint = makeEndpoint({
+        key: 'organization.edge.startClaim',
+        group: 'edge',
+        action: 'startClaim',
+        title: 'Start Edge Claim',
+        pathTemplate: '/core/v1/organization/edge/devices/start_claim'
+      });
+      const profile = buildFriendlyEdgeClaimProfile(endpoint);
+      expect(profile.actionKey).toBe('organization.edge.startClaim');
+      expect(profile.mode).toBe('friendly');
+      expect(profile.executionSupport).toBe('edge.claim-batch');
+      expect(profile.title).toBe('Start Edge Claim');
+      expect(profile.entity).toBe('edge');
+    });
+
+    it('exposes the documented header set', () => {
+      const endpoint = makeEndpoint({ key: 'organization.edge.startClaim', group: 'edge' });
+      const profile = buildFriendlyEdgeClaimProfile(endpoint);
+      expect(profile.headers).toEqual([
+        'proxy_id',
+        'device_ip',
+        'device_model_id',
+        'space_id',
+        'display_name',
+        'custom_parameters',
+        'custom_partner_name',
+        'custom_model_name',
+        'skip_connectivity_check'
+      ]);
+    });
+
+    it('documents required-field rejection rules', () => {
+      const endpoint = makeEndpoint({ key: 'organization.edge.startClaim', group: 'edge' });
+      const profile = buildFriendlyEdgeClaimProfile(endpoint);
+      const joined = profile.decodeRules.join(' ');
+      expect(joined).toContain('proxy_id');
+      expect(joined).toContain('device_ip');
+      expect(joined).toContain('device_model_id');
+      expect(joined).toContain('space_id');
+      expect(joined).toMatch(/reject/i);
     });
   });
 

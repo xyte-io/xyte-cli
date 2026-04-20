@@ -30,6 +30,11 @@ Friendly profiles:
 - `path,space_type,config`
 2. `organization.devices.claimDevice`:
 - `name,space_id,sn,mac,cloud_id`
+3. `organization.edge.startClaim`:
+- `proxy_id,device_ip,device_model_id,space_id,display_name,custom_parameters,custom_partner_name,custom_model_name,skip_connectivity_check`
+- outputs: `./prepared/organization-edge-startclaim.csv`, `./prepared/organization-edge-startclaim.rejected.csv`, `./prepared/organization-edge-startclaim.notes.md`
+- reject taxonomy: `missing_proxy_id`, `missing_device_ip`, `invalid_device_ip`, `missing_device_model_id`, `missing_space_id`, `invalid_space_id` (non-integer), `invalid_skip_connectivity_check` (non-boolean), `invalid_custom_parameters` (not a JSON object string)
+- downstream execution command: [`xyte-cli edge claim-batch`](commands.md#edge-devices)
 
 Generic profiles:
 1. `<path params...>,query_json,body_json`
@@ -59,6 +64,18 @@ xyte-cli util prepare \
   --tenant <tenant-id> \
   --output-dir ./prepared
 ```
+
+Prepare edge-claim action:
+
+```bash
+xyte-cli util prepare \
+  --action organization.edge.startClaim \
+  --input ./input/edge-devices.xlsx \
+  --tenant <tenant-id> \
+  --output-dir ./prepared
+```
+
+Then drive the bulk-claim workflow via [`xyte-cli edge claim-batch`](commands.md#edge-devices) (plan → gate → apply → resume). Disambiguation against native / C2C paths lives in [`docs/claim-devices.md`](claim-devices.md).
 
 Prepare space import action:
 

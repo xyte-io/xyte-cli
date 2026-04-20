@@ -100,4 +100,64 @@ describe('public endpoint catalog', () => {
       'path_includes'
     ]);
   });
+
+  it('includes organization edge startClaim endpoint metadata', () => {
+    const endpoint = endpoints.find((item) => item.key === 'organization.edge.startClaim');
+    expect(endpoint).toBeDefined();
+    expect(endpoint?.method).toBe('POST');
+    expect(endpoint?.pathTemplate).toBe('/core/v1/organization/edge/devices/start_claim');
+    expect((endpoint as { namespace: string }).namespace).toBe('organization');
+    expect((endpoint as { group: string }).group).toBe('edge');
+    expect(endpoint?.authScope).toBe('organization');
+    expect(endpoint?.bodyType).toBe('json');
+    expect(endpoint?.hasBody).toBe(true);
+    expect(endpoint?.pathParams).toEqual([]);
+    expect(endpoint?.queryParams).toEqual([]);
+    expect(endpoint?.bodyExample).toContain('proxy_id');
+    expect(endpoint?.bodyExample).toContain('device_ip');
+    expect(endpoint?.bodyExample).toContain('device_model_id');
+    expect(endpoint?.bodyExample).toContain('space_id');
+    expect(endpoint?.sourceFile).toBe('https://docs.xyte.io/reference/edgeclaim-device');
+  });
+
+  it('includes organization edge getClaimStatus endpoint metadata', () => {
+    const endpoint = endpoints.find((item) => item.key === 'organization.edge.getClaimStatus');
+    expect(endpoint).toBeDefined();
+    expect(endpoint?.method).toBe('GET');
+    expect(endpoint?.pathTemplate).toBe('/core/v1/organization/edge/devices/get_claim_status');
+    expect(endpoint?.authScope).toBe('organization');
+    expect(endpoint?.bodyType).toBe('none');
+    expect(endpoint?.hasBody).toBe(false);
+    expect(endpoint?.pathParams).toEqual([]);
+    expect(endpoint?.queryParams).toEqual(['proxy_id', 'device_ip']);
+    expect(endpoint?.sourceFile).toBe('https://docs.xyte.io/reference/edgeget-claim-status');
+  });
+
+  it('includes organization edge startPing endpoint metadata', () => {
+    const endpoint = endpoints.find((item) => item.key === 'organization.edge.startPing');
+    expect(endpoint).toBeDefined();
+    expect(endpoint?.method).toBe('POST');
+    expect(endpoint?.pathTemplate).toBe('/core/v1/organization/edge/devices/start_ping');
+    expect(endpoint?.authScope).toBe('organization');
+    expect(endpoint?.bodyType).toBe('json');
+    expect(endpoint?.hasBody).toBe(true);
+    expect(endpoint?.pathParams).toEqual([]);
+    expect(endpoint?.queryParams).toEqual([]);
+    expect(endpoint?.bodyExample).toContain('proxy_id');
+    expect(endpoint?.bodyExample).toContain('device_ip');
+    expect(endpoint?.sourceFile).toBe('https://docs.xyte.io/reference/edgestart-ping');
+  });
+
+  it('includes organization edge getPingStatus endpoint metadata', () => {
+    const endpoint = endpoints.find((item) => item.key === 'organization.edge.getPingStatus');
+    expect(endpoint).toBeDefined();
+    expect(endpoint?.method).toBe('GET');
+    expect(endpoint?.pathTemplate).toBe('/core/v1/organization/edge/devices/get_ping_status');
+    expect(endpoint?.authScope).toBe('organization');
+    expect(endpoint?.bodyType).toBe('none');
+    expect(endpoint?.hasBody).toBe(false);
+    expect(endpoint?.pathParams).toEqual([]);
+    expect(endpoint?.queryParams).toEqual(['proxy_id', 'device_ip']);
+    expect(endpoint?.sourceFile).toBe('https://docs.xyte.io/reference/edgeget-ping-status');
+  });
 });

@@ -140,6 +140,32 @@ describe('utility prepare workflow', () => {
     expect(result.suggestedCommands.verify).toContain('organization.devices.getDevice');
   });
 
+  it('uses the generated edge-claim scaffold path and resume-artifact guidance', () => {
+    const root = makeTempRoot('xyte-prepare-edge-claim-');
+    const inputPath = join(root, 'source.csv');
+    const outDir = join(root, 'out');
+    writeFileSync(inputPath, 'x', 'utf8');
+
+    const result = runUtilityPrepare({
+      inputPath,
+      actionKey: 'organization.edge.startClaim',
+      outputDir: outDir,
+      tenantId: 'acme'
+    });
+
+    expect(result.executionSupport).toBe('edge.claim-batch');
+    expect(result.artifacts.primary).toBe(join(outDir, 'organization-edge-startclaim.csv'));
+    expect(result.artifacts.rejected).toBe(join(outDir, 'organization-edge-startclaim.rejected.csv'));
+    expect(result.artifacts.notes).toBe(join(outDir, 'organization-edge-startclaim.notes.md'));
+    expect(result.suggestedCommands.apply).toContain(result.artifacts.primary);
+    expect(result.suggestedCommands.apply).toContain('--report');
+    expect(result.suggestedCommands.apply).toContain('--resume-artifact');
+    expect(result.suggestedCommands.apply).toContain(join(outDir, 'edge-claim.apply.ndjson'));
+    expect(result.suggestedCommands.apply).toContain(join(outDir, 'edge-claim.resume.ndjson'));
+    expect(result.suggestedCommands.next).toContain('--resume-artifact <path>');
+    expect(result.suggestedCommands.next).not.toContain('--resume <run-id>');
+  });
+
   it('fails on unknown action and on scaffold collision without force', () => {
     const root = makeTempRoot('xyte-prepare-force-');
     const inputPath = join(root, 'source.csv');

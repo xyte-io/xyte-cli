@@ -92,4 +92,25 @@ describe('http transport', () => {
       })
     ).rejects.toThrow('Either a valid command or friendly_name is required');
   });
+
+  it('treats empty 204 json responses as successful no-body results', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(null, {
+        status: 204,
+        headers: { 'content-type': 'application/json' }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const transport = new HttpTransport({ retryAttempts: 0 });
+    const response = await transport.request({
+      method: 'POST',
+      url: 'https://example.test/v1/edge/start',
+      endpointKey: 'organization.edge.startClaim',
+      idempotent: false
+    });
+
+    expect(response.status).toBe(204);
+    expect(response.data).toBeUndefined();
+  });
 });

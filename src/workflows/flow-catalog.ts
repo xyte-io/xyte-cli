@@ -6,7 +6,10 @@ export type BuiltInFlowId =
   | 'flow.watch-to-triage'
   | 'flow.guided-remediation'
   | 'flow.device-migration'
-  | 'flow.daily-deep-dive-report';
+  | 'flow.daily-deep-dive-report'
+  | 'flow.edge-claim'
+  | 'flow.edge-claim-batch'
+  | 'flow.edge-ping';
 
 export type FlowTaskType =
   | 'doctor.install'
@@ -22,7 +25,10 @@ export type FlowTaskType =
   | 'device.match'
   | 'device.move-batch'
   | 'device.verify-batch'
-  | 'space.import-tree';
+  | 'space.import-tree'
+  | 'edge.claim'
+  | 'edge.claim-batch'
+  | 'edge.ping';
 
 interface FlowStepBase {
   id: string;
@@ -89,12 +95,29 @@ export interface FlowTaskStep extends FlowStepBase {
     apply: boolean;
     reportPath: string;
   };
+  edgeClaim?: {
+    pollIntervalMsKey?: string;
+    pollTimeoutMsKey?: string;
+  };
+  edgeClaimBatch?: {
+    inputPath: string;
+    apply: boolean;
+    reportPath: string;
+    resumePath: string;
+    pollIntervalMsKey?: string;
+    pollTimeoutMsKey?: string;
+  };
+  edgePing?: {
+    pollIntervalMsKey?: string;
+    pollTimeoutMsKey?: string;
+  };
 }
 
 export interface FlowGateStep extends FlowStepBase {
   kind: 'gate';
   mutating: boolean;
   detail: string;
+  pauseOnFirstApply?: boolean;
 }
 
 export type FlowStep = FlowTaskStep | FlowGateStep;
@@ -653,6 +676,138 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
       }
     ]
   },
+  'flow.edge-claim': {
+    id: 'flow.edge-claim',
+    title: 'Edge Claim',
+    intent: 'Claim a single device behind an Edge proxy and poll to terminal state.',
+    writeCapable: true,
+    recipeCommands: [
+      'xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --plan',
+      'xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --apply'
+    ],
+    steps: [
+      {
+        kind: 'gate',
+        id: 'gate_edge_claim',
+        title: 'Approve Edge Claim',
+        mutating: true,
+        detail: 'Human approval required before initiating edge claim.',
+        command: 'Human decision gate before edge claim'
+      },
+      {
+        kind: 'task',
+        id: 'edge_claim_single',
+        title: 'Edge Claim Single',
+        task: 'edge.claim',
+        edgeClaim: {},
+        requiresContext: ['proxy_id', 'device_ip', 'device_model_id', 'space_id'],
+        mutating: true,
+        command: 'xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --apply'
+      }
+    ]
+  },
+  'flow.edge-claim-batch': {
+    id: 'flow.edge-claim-batch',
+    title: 'Edge Claim Batch',
+    intent: 'Claim many devices behind one or more Edge proxies from a prepared CSV.',
+    writeCapable: true,
+    recipeCommands: [
+      'xyte-cli util prepare --action organization.edge.startClaim --tenant <tenant-id> --input ./devices.xlsx --output-dir ./prepared',
+      'xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --plan',
+      'xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --apply --report ./artifacts/edge-claim.report.ndjson --resume-artifact ./artifacts/edge-claim.resume.ndjson'
+    ],
+    steps: [
+      {
+        kind: 'task',
+        id: 'edge_claim_prepare',
+        title: 'Prepare Edge Claim CSV',
+        task: 'utility.prepare',
+        utilityPrepare: {
+          actionKey: 'organization.edge.startClaim',
+          inputPath: '{{edge_claim_input_path}}',
+          outputDir: 'edge-claim'
+        },
+        requiresContext: ['edge_claim_input_path'],
+        mutating: false,
+        command: 'xyte-cli util prepare --action organization.edge.startClaim --tenant <tenant-id> --input ./devices.xlsx --output-dir ./artifacts/edge-claim'
+      },
+      {
+        kind: 'gate',
+        id: 'gate_edge_claim_prepare_review',
+        title: 'Review Prepared Edge Claim CSV',
+        mutating: false,
+        pauseOnFirstApply: true,
+        detail: 'Populate and review the prepared edge-claim CSV before running the batch dry run.',
+        command: 'Human decision gate after reviewing organization-edge-startclaim.csv'
+      },
+      {
+        kind: 'task',
+        id: 'edge_claim_dry_run',
+        title: 'Edge Claim Dry Run',
+        task: 'edge.claim-batch',
+        edgeClaimBatch: {
+          inputPath: '{{edge_claim_prepare_csv}}',
+          apply: false,
+          reportPath: 'edge-claim.dry-run.ndjson',
+          resumePath: 'edge-claim.resume.ndjson'
+        },
+        mutating: false,
+        command: 'xyte-cli edge claim-batch --tenant <tenant-id> --input ./artifacts/edge-claim/organization-edge-startclaim.csv --plan'
+      },
+      {
+        kind: 'gate',
+        id: 'gate_edge_claim_batch_apply',
+        title: 'Approve Edge Claim Batch',
+        mutating: true,
+        detail: 'Human approval required before applying edge claim batch.',
+        command: 'Human decision gate before edge claim batch apply'
+      },
+      {
+        kind: 'task',
+        id: 'edge_claim_apply',
+        title: 'Edge Claim Apply',
+        task: 'edge.claim-batch',
+        edgeClaimBatch: {
+          inputPath: '{{edge_claim_prepare_csv}}',
+          apply: true,
+          reportPath: 'edge-claim.apply.ndjson',
+          resumePath: 'edge-claim.resume.ndjson'
+        },
+        mutating: true,
+        command: 'xyte-cli edge claim-batch --tenant <tenant-id> --input ./artifacts/edge-claim/organization-edge-startclaim.csv --apply --report ./artifacts/edge-claim.apply.ndjson --resume-artifact ./artifacts/edge-claim.resume.ndjson'
+      }
+    ]
+  },
+  'flow.edge-ping': {
+    id: 'flow.edge-ping',
+    title: 'Edge Ping',
+    intent: 'Probe connectivity for a single device behind an Edge proxy.',
+    writeCapable: true,
+    recipeCommands: [
+      'xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --plan',
+      'xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --apply'
+    ],
+    steps: [
+      {
+        kind: 'gate',
+        id: 'gate_edge_ping',
+        title: 'Approve Edge Ping',
+        mutating: true,
+        detail: 'Human approval required before initiating edge ping.',
+        command: 'Human decision gate before edge ping'
+      },
+      {
+        kind: 'task',
+        id: 'edge_ping_single',
+        title: 'Edge Ping Single',
+        task: 'edge.ping',
+        edgePing: {},
+        requiresContext: ['proxy_id', 'device_ip'],
+        mutating: true,
+        command: 'xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --apply'
+      }
+    ]
+  },
   'flow.daily-deep-dive-report': {
     id: 'flow.daily-deep-dive-report',
     title: 'Daily Deep Dive Report',
@@ -726,7 +881,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
 export const UTILITY_PREPARE_CONTEXT_KEY: Record<string, string> = {
   'space.import-tree': 'space_import_tree_csv',
   'organization.devices.claimDevice': 'claim_prepare_csv',
-  'device.move': 'device_move_csv'
+  'device.move': 'device_move_csv',
+  'organization.edge.startClaim': 'edge_claim_prepare_csv'
 };
 
 export function listBuiltInFlowDefinitions(): BuiltInFlowDefinition[] {
