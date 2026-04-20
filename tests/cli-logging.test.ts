@@ -351,7 +351,7 @@ describe('cli action logging', () => {
       )
     );
 
-    const keyCommand = nodeEvalCommand("process.stdout.write('super-secret-key\\n')");
+    const keyCommand = nodeEvalCommand("process.stdout.write('super-secret-key')");
 
     await program.parseAsync([
       'node',
@@ -416,7 +416,7 @@ describe('cli action logging', () => {
           '--tenant',
           'acme',
           '--key-command',
-          nodeEvalCommand("process.stderr.write('super-secret-key\\n'); process.exit(7)")
+          nodeEvalCommand("process.stderr.write('super-secret-key'); process.exit(7)")
         ],
         { profileStore, secretStore, stdout, stderr }
       )

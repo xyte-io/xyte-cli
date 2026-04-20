@@ -3095,7 +3095,7 @@ describe('cli integration', () => {
       '--tenant',
       'playground',
       '--key-command',
-      nodeEvalCommand("process.stdout.write('cmd-key\\n')")
+      nodeEvalCommand("process.stdout.write('cmd-key')")
     ]);
 
     const slots = await profileStore.listKeySlots('playground', 'xyte-org');
