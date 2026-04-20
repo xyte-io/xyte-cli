@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createCli } from '../src/cli/index';
+import { createCli, runCli } from '../src/cli/index';
 import { createCliActionLogger, listCliActionLogFiles, pruneCliActionLogFiles, sanitizeArgvForLog } from '../src/cli/action-logger';
 import { readCliActionLog } from '../src/cli/action-log-store';
 import { MemorySecretStore } from '../src/secure/secret-store';
@@ -12,6 +12,10 @@ import { MemoryProfileStore } from './support/memory-profile-store';
 
 function asRecord(value: unknown): Record<string, unknown> {
   return (value ?? {}) as Record<string, unknown>;
+}
+
+function nodeEvalCommand(script: string): string {
+  return `"${process.execPath}" -e ${JSON.stringify(script)}`;
 }
 
 describe('cli action logging', () => {
@@ -324,6 +328,107 @@ describe('cli action logging', () => {
     expect(argv).toContain('--key-file');
     expect(argv).toContain(keyPath);
     expect(argv).not.toContain('super-secret-key');
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('redacts the --key-command argument from action logs', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-key-command-log-'));
+    const logPath = join(dir, 'key-command.ndjson');
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ id: 'org-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+    );
+
+    const keyCommand = nodeEvalCommand("process.stdout.write('super-secret-key')");
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      '--log-actions',
+      '--log-actions-verbose',
+      '--log-actions-path',
+      logPath,
+      'setup',
+      'run',
+      '--non-interactive',
+      '--tenant',
+      'acme',
+      '--key-command',
+      keyCommand
+    ]);
+
+    const rawLog = readFileSync(logPath, 'utf8');
+    expect(rawLog).not.toContain('super-secret-key');
+    expect(rawLog).not.toContain(keyCommand);
+
+    const result = readCliActionLog({ path: logPath, event: 'command.start', limit: 1 });
+    const data = asRecord(result.entries[0]?.data);
+    const argv = (data.argv ?? []) as string[];
+    expect(argv).toContain('--key-command');
+    expect(argv).not.toContain(keyCommand);
+    expect(argv).toContain('[REDACTED]');
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('does not log stderr from failed --key-command executions', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-key-command-error-log-'));
+    const logPath = join(dir, 'key-command-error.ndjson');
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ id: 'org-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+    );
+
+    await expect(
+      runCli(
+        [
+          'node',
+          'xyte-cli',
+          '--log-actions',
+          '--log-actions-verbose',
+          '--log-actions-path',
+          logPath,
+          'setup',
+          'run',
+          '--non-interactive',
+          '--tenant',
+          'acme',
+          '--key-command',
+          nodeEvalCommand("process.stderr.write('super-secret-key'); process.exit(7)")
+        ],
+        { profileStore, secretStore, stdout, stderr }
+      )
+    ).rejects.toThrow('API key command exited with a non-zero status');
+
+    const rawLog = readFileSync(logPath, 'utf8');
+    expect(rawLog).not.toContain('super-secret-key');
+
+    const result = readCliActionLog({ path: logPath, event: 'command.error', limit: 1 });
+    const data = asRecord(result.entries[0]?.data);
+    const error = asRecord(data.error);
+    expect(error.cause).toBe('exit 7');
 
     rmSync(dir, { recursive: true, force: true });
   });

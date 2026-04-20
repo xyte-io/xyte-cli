@@ -338,6 +338,7 @@ async function handleSetupRunSimple(
     key?: string;
     keyFile?: string;
     keyStdin?: boolean;
+    keyCommand?: string;
     setActive?: boolean;
     connectivity?: string;
     nonInteractive?: boolean;
@@ -361,6 +362,7 @@ async function handleSetupRunSimple(
     key: options.key,
     keyFile: options.keyFile,
     keyStdin: options.keyStdin,
+    keyCommand: options.keyCommand,
     envKey: ctx.env.XYTE_CLI_KEY,
     allowPrompt: !options.nonInteractive,
     prompt: ctx.prompt,
@@ -381,7 +383,7 @@ async function handleSetupRunSimple(
   if (!keyValue) {
     throw new CliUserError({
       summary: 'Missing API key.',
-      detail: 'Setup needs --key, --key-file, --key-stdin, XYTE_CLI_KEY, or interactive input.',
+      detail: 'Setup needs --key, --key-file, --key-stdin, --key-command, XYTE_CLI_KEY, or interactive input.',
       suggestedCommands: ['Use xyte-cli setup run --tenant <tenant-id>']
     });
   }
@@ -422,6 +424,7 @@ async function handleSetupRunAdvanced(
     key?: string;
     keyFile?: string;
     keyStdin?: boolean;
+    keyCommand?: string;
     setActive?: boolean;
     connectivity?: string;
     nonInteractive?: boolean;
@@ -445,6 +448,7 @@ async function handleSetupRunAdvanced(
     key: options.key,
     keyFile: options.keyFile,
     keyStdin: options.keyStdin,
+    keyCommand: options.keyCommand,
     envKey: ctx.env.XYTE_CLI_KEY,
     allowPrompt: !options.nonInteractive,
     prompt: ctx.prompt,
@@ -483,7 +487,7 @@ async function handleSetupRunAdvanced(
   if (!keyValue) {
     throw new CliUserError({
       summary: 'Missing API key.',
-      detail: 'Setup needs --key, --key-file, --key-stdin, XYTE_CLI_KEY, or interactive input.',
+      detail: 'Setup needs --key, --key-file, --key-stdin, --key-command, XYTE_CLI_KEY, or interactive input.',
       suggestedCommands: ['Use xyte-cli setup run --advanced --tenant <tenant-id> --provider xyte-org']
     });
   }
@@ -526,6 +530,7 @@ async function handleSetupRun(
     key?: string;
     keyFile?: string;
     keyStdin?: boolean;
+    keyCommand?: string;
     setActive?: boolean;
     connectivity?: string;
     nonInteractive?: boolean;
@@ -577,6 +582,7 @@ export function registerSetupCommands(parent: Command, ctx: CliContext): void {
     .option('--key <value>', 'API key value')
     .option('--key-file <path>', 'Read API key value from a file')
     .option('--key-stdin', 'Read API key value from stdin')
+    .option('--key-command <command>', 'Run a shell command and use its stdout as the API key (for secret managers)')
     .option('--set-active', 'Set slot active (default true in setup flow)')
     .option('--connectivity <mode>', 'auto|always|never', 'auto')
     .option('--non-interactive', 'Disable prompts and require needed options')
@@ -592,6 +598,7 @@ export function registerSetupCommands(parent: Command, ctx: CliContext): void {
           key?: string;
           keyFile?: string;
           keyStdin?: boolean;
+          keyCommand?: string;
           setActive?: boolean;
           connectivity?: string;
           nonInteractive?: boolean;

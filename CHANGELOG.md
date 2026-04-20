@@ -6,6 +6,9 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+### Added
+- `--key-command <command>` on `setup run`, `config key add`, and `config key update`: runs an arbitrary shell command and uses its stdout as the API key. Intended for resolving keys from external secret managers (`op read`, `vault kv get`, `aws secretsmanager get-secret-value`, `pass show`, …) without shell glue or wrapper processes. The command value is redacted from action logs.
+
 ## [0.10.0] - 2026-04-20
 
 ### Added
