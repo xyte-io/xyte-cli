@@ -6,6 +6,8 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-04-20
+
 ### Added
 - Added the Edge Devices API surface to the CLI catalog: `organization.edge.startClaim`, `organization.edge.getClaimStatus`, `organization.edge.startPing`, `organization.edge.getPingStatus` (async claim/ping lifecycle).
 - Added the `xyte-cli edge` command group: `edge claim`, `edge claim-batch`, `edge claim-status`, `edge ping`, `edge ping-status` with plan/apply semantics, poll overrides, and resume artifacts.
