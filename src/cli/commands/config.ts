@@ -397,6 +397,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
     .option('--key <value>', 'API key value')
     .option('--key-file <path>', 'Read API key value from a file')
     .option('--key-stdin', 'Read API key value from stdin')
+    .option('--key-command <command>', 'Run a shell command and use its stdout as the API key')
     .option('--set-active', 'Set as active slot for provider')
     .action(
       async (options: {
@@ -407,12 +408,14 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
         key?: string;
         keyFile?: string;
         keyStdin?: boolean;
+        keyCommand?: string;
         setActive?: boolean;
       }) => {
         const value = await resolveKeyValue({
           key: options.key,
           keyFile: options.keyFile,
           keyStdin: options.keyStdin,
+          keyCommand: options.keyCommand,
           envKey: ctx.env.XYTE_CLI_KEY,
           prompt: ctx.prompt,
           readStdin: ctx.readStdin,
@@ -422,7 +425,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
         if (!value) {
           throw new CliUserError({
             summary: 'Missing key value.',
-            detail: 'Use --key, --key-file, --key-stdin, or XYTE_CLI_KEY.',
+            detail: 'Use --key, --key-file, --key-stdin, --key-command, or XYTE_CLI_KEY.',
             suggestedCommands: ['Use xyte-cli config key add --tenant <tenant-id> --provider xyte-org --name primary']
           });
         }
@@ -526,6 +529,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
     .option('--key <value>', 'API key value')
     .option('--key-file <path>', 'Read API key value from a file')
     .option('--key-stdin', 'Read API key value from stdin')
+    .option('--key-command <command>', 'Run a shell command and use its stdout as the API key')
     .action(
       async (options: {
         tenant: string;
@@ -534,6 +538,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
         key?: string;
         keyFile?: string;
         keyStdin?: boolean;
+        keyCommand?: string;
       }) => {
         const provider = parseProvider(options.provider);
         const slot = await fetchSlotByRef(ctx.profileStore, options.tenant, provider, options.slot);
@@ -541,6 +546,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
           key: options.key,
           keyFile: options.keyFile,
           keyStdin: options.keyStdin,
+          keyCommand: options.keyCommand,
           envKey: ctx.env.XYTE_CLI_KEY,
           prompt: ctx.prompt,
           readStdin: ctx.readStdin,
@@ -550,7 +556,7 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
         if (!value) {
           throw new CliUserError({
             summary: 'Missing key value.',
-            detail: 'Use --key, --key-file, --key-stdin, or XYTE_CLI_KEY.',
+            detail: 'Use --key, --key-file, --key-stdin, --key-command, or XYTE_CLI_KEY.',
             suggestedCommands: [
               'Use xyte-cli config key update --tenant <tenant-id> --provider xyte-org --slot <slot-id>'
             ]

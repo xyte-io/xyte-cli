@@ -3065,6 +3065,92 @@ describe('cli integration', () => {
     ).rejects.toThrow('Conflicting API key sources');
   });
 
+  it('resolves the API key via --key-command during setup', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ id: 'org-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+    );
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'setup',
+      'run',
+      '--non-interactive',
+      '--tenant',
+      'playground',
+      '--key-command',
+      `${process.execPath} -e "process.stdout.write('cmd-key\\n')"`
+    ]);
+
+    const slots = await profileStore.listKeySlots('playground', 'xyte-org');
+    const stored = await secretStore.getSlotSecret('playground', 'xyte-org', slots[0]!.slotId);
+    expect(stored).toBe('cmd-key');
+  });
+
+  it('surfaces a CliUserError when --key-command exits non-zero', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const program = createCli({
+      profileStore,
+      secretStore,
+      stdout: { write: vi.fn() },
+      stderr: { write: vi.fn() }
+    });
+
+    await expect(
+      program.parseAsync([
+        'node',
+        'xyte-cli',
+        'setup',
+        'run',
+        '--non-interactive',
+        '--tenant',
+        'playground',
+        '--key-command',
+        `${process.execPath} -e "process.exit(3)"`
+      ])
+    ).rejects.toThrow('API key command exited with a non-zero status');
+  });
+
+  it('rejects --key and --key-command used together', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const program = createCli({
+      profileStore,
+      secretStore,
+      stdout: { write: vi.fn() },
+      stderr: { write: vi.fn() }
+    });
+
+    await expect(
+      program.parseAsync([
+        'node',
+        'xyte-cli',
+        'setup',
+        'run',
+        '--non-interactive',
+        '--tenant',
+        'playground',
+        '--key',
+        'inline',
+        '--key-command',
+        'echo x'
+      ])
+    ).rejects.toThrow('Conflicting API key sources');
+  });
+
   it('rejects conflicting file and stdin key sources during setup', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();

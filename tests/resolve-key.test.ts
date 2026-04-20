@@ -8,6 +8,7 @@ function makeArgs(overrides: Record<string, unknown> = {}) {
   return {
     prompt: async () => '',
     readStdin: async () => '',
+    runCommand: async () => ({ code: 0, stdout: '', stderr: '' }),
     promptQuestion: 'Enter key:',
     stdout,
     ...overrides
@@ -88,5 +89,109 @@ describe('resolveKeyValue', () => {
       })
     );
     expect(result).toBe('env');
+  });
+
+  describe('--key-command', () => {
+    it('runs the command and uses stdout as the key', async () => {
+      const result = await resolveKeyValue(
+        makeArgs({
+          keyCommand: 'op read op://vault/item/field',
+          runCommand: async () => ({ code: 0, stdout: 'secret-from-op\n', stderr: '' })
+        })
+      );
+      expect(result).toBe('secret-from-op');
+    });
+
+    it('passes the command string through to runCommand verbatim', async () => {
+      let seen = '';
+      await resolveKeyValue(
+        makeArgs({
+          keyCommand: 'my helper --flag=x',
+          runCommand: async (cmd: string) => {
+            seen = cmd;
+            return { code: 0, stdout: 'val', stderr: '' };
+          }
+        })
+      );
+      expect(seen).toBe('my helper --flag=x');
+    });
+
+    it('trims stdout whitespace', async () => {
+      const result = await resolveKeyValue(
+        makeArgs({
+          keyCommand: 'echo',
+          runCommand: async () => ({ code: 0, stdout: '  spaced-key\r\n', stderr: '' })
+        })
+      );
+      expect(result).toBe('spaced-key');
+    });
+
+    it('returns undefined when command prints nothing', async () => {
+      const result = await resolveKeyValue(
+        makeArgs({
+          keyCommand: 'true',
+          runCommand: async () => ({ code: 0, stdout: '', stderr: '' })
+        })
+      );
+      expect(result).toBeUndefined();
+    });
+
+    it('throws CliUserError when command exits non-zero', async () => {
+      await expect(
+        resolveKeyValue(
+          makeArgs({
+            keyCommand: 'op read op://missing',
+            runCommand: async () => ({ code: 1, stdout: '', stderr: 'item not found' })
+          })
+        )
+      ).rejects.toThrow(CliUserError);
+    });
+
+    it('does not include the secret value in error detail on non-zero exit', async () => {
+      try {
+        await resolveKeyValue(
+          makeArgs({
+            keyCommand: 'buggy',
+            runCommand: async () => ({ code: 2, stdout: 'partial-secret', stderr: 'boom' })
+          })
+        );
+        expect.fail('should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(CliUserError);
+        const detail = (error as CliUserError).detail ?? '';
+        expect(detail).not.toContain('partial-secret');
+      }
+    });
+
+    it('conflicts with --key', async () => {
+      await expect(
+        resolveKeyValue(makeArgs({ key: 'inline', keyCommand: 'op read' }))
+      ).rejects.toThrow(CliUserError);
+    });
+
+    it('conflicts with --key-file', async () => {
+      await expect(
+        resolveKeyValue(makeArgs({ keyFile: '/tmp/x', keyCommand: 'op read' }))
+      ).rejects.toThrow(CliUserError);
+    });
+
+    it('conflicts with --key-stdin', async () => {
+      await expect(
+        resolveKeyValue(makeArgs({ keyStdin: true, keyCommand: 'op read' }))
+      ).rejects.toThrow(CliUserError);
+    });
+
+    it('takes precedence over env key and prompt', async () => {
+      const result = await resolveKeyValue(
+        makeArgs({
+          keyCommand: 'op read op://vault/item/field',
+          runCommand: async () => ({ code: 0, stdout: 'from-command', stderr: '' }),
+          envKey: 'env-key',
+          allowPrompt: true,
+          prompt: async () => 'prompted'
+        })
+      );
+      expect(result).toBe('from-command');
+    });
   });
 });

@@ -43,7 +43,7 @@ xyte-cli flow import --file <path> [--force]
 xyte-cli init [--target <path>] [--scope project|user|both] [--agents all|claude|copilot|codex] [--force] [--no-setup] [--require-setup]
 xyte-cli status [--tenant <tenant-id>] [--mode fast|full] [--output json|text]
 xyte-cli setup status [--tenant <tenant-id>] [--output json] [--field tenantId]
-xyte-cli setup run [--non-interactive] [--advanced] [--tenant <tenant-id>] [--name <display-name>] [--provider xyte-org|xyte-partner] [--key <value>|--key-file <path>|--key-stdin] [--connectivity auto|always|never]
+xyte-cli setup run [--non-interactive] [--advanced] [--tenant <tenant-id>] [--name <display-name>] [--provider xyte-org|xyte-partner] [--key <value>|--key-file <path>|--key-stdin|--key-command <cmd>] [--connectivity auto|always|never]
 xyte-cli config show [--scope user|workspace|resolved] [--format json|text]
 xyte-cli config path [--format json|text]
 xyte-cli config set <key> <value> [--scope user|workspace]
@@ -63,6 +63,7 @@ Setup notes:
 - Interactive `xyte-cli setup run` is the primary human onboarding path.
 - `--key-file <path>` is the primary file-based automation path when the key already exists on disk.
 - Piping a key on stdin into `xyte-cli setup run --key-stdin` is the primary shell-neutral automation path.
+- `--key-command "<cmd>"` runs a shell command and uses its stdout as the API key. Use this to resolve keys from secret managers without shell glue — for example `--key-command "op read op://Employee/Xyte/credential"` (1Password), `--key-command "vault kv get -field=key secret/xyte"` (Vault), `--key-command "aws secretsmanager get-secret-value --secret-id xyte --query SecretString --output text"` (AWS Secrets Manager), or `--key-command "pass show xyte/api-key"` (pass). The command must print only the key on stdout and exit 0; stderr and non-zero exits are surfaced as `CliUserError`.
 - `xyte-cli setup status --field tenantId` is the primary shell-neutral extractor for follow-up commands.
 - If `--provider` is omitted, setup probes `xyte-org` first, then `xyte-partner`.
 - `--connectivity never` requires an explicit `--provider`.
@@ -85,11 +86,13 @@ xyte-cli config tenant remove <tenant-id>
 
 xyte-cli config key add --tenant <tenant-id> --name primary --key "<value>" --set-active
 xyte-cli config key add --tenant <tenant-id> --name primary --key-file ~/.config/xyte/acme.key --set-active
+xyte-cli config key add --tenant <tenant-id> --name primary --key-command "op read op://Employee/Xyte/credential" --set-active
 xyte-cli config key add --tenant <tenant-id> --provider xyte-org --name primary --key "<value>" --set-active
 xyte-cli config key list --tenant <tenant-id> --output json
 xyte-cli config key use --tenant <tenant-id> --provider xyte-org --slot primary
 xyte-cli config key update --tenant <tenant-id> --provider xyte-org --slot primary --key "<value>"
 xyte-cli config key update --tenant <tenant-id> --provider xyte-org --slot primary --key-file ~/.config/xyte/acme.key
+xyte-cli config key update --tenant <tenant-id> --provider xyte-org --slot primary --key-command "op read op://Employee/Xyte/credential"
 xyte-cli config key rename --tenant <tenant-id> --provider xyte-org --slot primary --name prod-primary
 xyte-cli config key test --tenant <tenant-id> --provider xyte-org --slot prod-primary
 xyte-cli config key remove --tenant <tenant-id> --provider xyte-org --slot prod-primary --confirm

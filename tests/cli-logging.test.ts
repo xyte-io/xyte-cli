@@ -328,6 +328,57 @@ describe('cli action logging', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it('redacts the --key-command argument from action logs', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-key-command-log-'));
+    const logPath = join(dir, 'key-command.ndjson');
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ id: 'org-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      )
+    );
+
+    const keyCommand = `${process.execPath} -e "process.stdout.write('super-secret-key\\n')"`;
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      '--log-actions',
+      '--log-actions-verbose',
+      '--log-actions-path',
+      logPath,
+      'setup',
+      'run',
+      '--non-interactive',
+      '--tenant',
+      'acme',
+      '--key-command',
+      keyCommand
+    ]);
+
+    const rawLog = readFileSync(logPath, 'utf8');
+    expect(rawLog).not.toContain('super-secret-key');
+    expect(rawLog).not.toContain(keyCommand);
+
+    const result = readCliActionLog({ path: logPath, event: 'command.start', limit: 1 });
+    const data = asRecord(result.entries[0]?.data);
+    const argv = (data.argv ?? []) as string[];
+    expect(argv).toContain('--key-command');
+    expect(argv).not.toContain(keyCommand);
+    expect(argv).toContain('[REDACTED]');
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it('does not log API keys read from stdin for config key add', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-key-add-log-'));
     const logPath = join(dir, 'key-add.ndjson');

@@ -35,6 +35,8 @@ Primary automation contract:
 
 Use `--key-file <path>` when the key already lives on disk, or pipe the API key on stdin into `xyte-cli setup run --non-interactive --tenant acme --key-stdin`. `--key-stdin` alone waits for stdin; it does not fetch a key by itself.
 
+If the key lives in a secret manager, use `--key-command "<cmd>"`: xyte-cli runs the command, trims trailing whitespace from stdout, and uses the result as the API key. The command must print only the key on stdout and exit 0.
+
 Provider behavior:
 
 - If `--provider` is omitted, setup validates `xyte-org` first and falls through to `xyte-partner`.
@@ -83,6 +85,24 @@ Key file:
 ```bash
 xyte-cli setup run --non-interactive --tenant acme --key-file ~/.config/xyte/acme.key
 ```
+
+Secret manager via `--key-command`:
+
+```bash
+# 1Password
+xyte-cli setup run --non-interactive --tenant acme --key-command "op read op://Employee/Xyte/credential"
+
+# HashiCorp Vault
+xyte-cli setup run --non-interactive --tenant acme --key-command "vault kv get -field=key secret/xyte"
+
+# AWS Secrets Manager
+xyte-cli setup run --non-interactive --tenant acme --key-command "aws secretsmanager get-secret-value --secret-id xyte --query SecretString --output text"
+
+# pass (the standard Unix password manager)
+xyte-cli setup run --non-interactive --tenant acme --key-command "pass show xyte/api-key"
+```
+
+Authenticate the secret manager before running xyte-cli (e.g. `eval $(op signin)` or `vault login`). Make sure the command prints only the key on stdout — extra lines or banners will be trimmed only at the edges.
 
 Offline example:
 

@@ -65,6 +65,7 @@ const DEFAULT_MAX_FILES = 5;
 
 const SENSITIVE_ARG_FLAGS = new Set([
   '--key',
+  '--key-command',
   '--api-key',
   '--x-api-key',
   '--token',
@@ -82,6 +83,8 @@ const SENSITIVE_ARG_FLAGS = new Set([
 
 const SENSITIVE_OPTION_FIELDS = new Set([
   'key',
+  'keycommand',
+  'key_command',
   'apikey',
   'api_key',
   'xapikey',
