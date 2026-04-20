@@ -38,10 +38,17 @@ async function readKeyFileValue(keyFile: string): Promise<string | undefined> {
 }
 
 export const runKeyCommand: RunKeyCommandFn = (command) =>
-  new Promise((resolve) => {
+  new Promise((resolve, reject) => {
     exec(command, { windowsHide: true }, (error: ExecException | null, stdout: string, stderr: string) => {
-      const code = error ? (typeof error.code === 'number' ? error.code : 1) : 0;
-      resolve({ code, stdout, stderr });
+      if (!error) {
+        resolve({ code: 0, stdout, stderr });
+        return;
+      }
+      if (typeof error.code === 'number' && !error.signal) {
+        resolve({ code: error.code, stdout, stderr });
+        return;
+      }
+      reject(error);
     });
   });
 
@@ -60,10 +67,9 @@ async function resolveKeyCommandValue(
     });
   }
   if (result.code !== 0) {
-    const stderr = result.stderr.trim();
     throw new CliUserError({
       summary: 'API key command exited with a non-zero status.',
-      detail: stderr ? `exit ${result.code}: ${stderr}` : `exit ${result.code}`,
+      detail: `exit ${result.code}`,
       suggestedCommands: [
         'Run the --key-command manually to verify it prints the key on stdout.',
         'Ensure the secret manager session is authenticated before running xyte-cli.'

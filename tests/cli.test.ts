@@ -8,6 +8,10 @@ import { MemorySecretStore } from '../src/secure/secret-store';
 import { MemoryProfileStore } from './support/memory-profile-store';
 import { buildDeepDive } from '../src/workflows/fleet-insights';
 
+function nodeEvalCommand(script: string): string {
+  return `"${process.execPath}" -e ${JSON.stringify(script)}`;
+}
+
 describe('cli integration', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -3091,7 +3095,7 @@ describe('cli integration', () => {
       '--tenant',
       'playground',
       '--key-command',
-      `${process.execPath} -e "process.stdout.write('cmd-key\\n')"`
+      nodeEvalCommand("process.stdout.write('cmd-key\\n')")
     ]);
 
     const slots = await profileStore.listKeySlots('playground', 'xyte-org');
@@ -3119,7 +3123,7 @@ describe('cli integration', () => {
         '--tenant',
         'playground',
         '--key-command',
-        `${process.execPath} -e "process.exit(3)"`
+        nodeEvalCommand('process.exit(3)')
       ])
     ).rejects.toThrow('API key command exited with a non-zero status');
   });

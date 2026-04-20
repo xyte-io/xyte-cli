@@ -35,7 +35,7 @@ Primary automation contract:
 
 Use `--key-file <path>` when the key already lives on disk, or pipe the API key on stdin into `xyte-cli setup run --non-interactive --tenant acme --key-stdin`. `--key-stdin` alone waits for stdin; it does not fetch a key by itself.
 
-If the key lives in a secret manager, use `--key-command "<cmd>"`: xyte-cli runs the command, trims trailing whitespace from stdout, and uses the result as the API key. The command must print only the key on stdout and exit 0.
+If the key lives in a secret manager, use `--key-command "<cmd>"`: xyte-cli runs the command, trims leading and trailing whitespace from stdout, and uses the result as the API key. The command must print only the key on stdout and exit 0.
 
 Provider behavior:
 

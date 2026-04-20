@@ -147,20 +147,38 @@ describe('resolveKeyValue', () => {
       ).rejects.toThrow(CliUserError);
     });
 
-    it('does not include the secret value in error detail on non-zero exit', async () => {
+    it('does not include stdout or stderr in error detail on non-zero exit', async () => {
       try {
         await resolveKeyValue(
           makeArgs({
             keyCommand: 'buggy',
-            runCommand: async () => ({ code: 2, stdout: 'partial-secret', stderr: 'boom' })
+            runCommand: async () => ({ code: 2, stdout: 'partial-secret', stderr: 'stderr-secret' })
           })
         );
         expect.fail('should have thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(CliUserError);
         const detail = (error as CliUserError).detail ?? '';
+        expect(detail).toBe('exit 2');
         expect(detail).not.toContain('partial-secret');
+        expect(detail).not.toContain('stderr-secret');
       }
+    });
+
+    it('throws CliUserError when the command runner rejects before an exit code is available', async () => {
+      await expect(
+        resolveKeyValue(
+          makeArgs({
+            keyCommand: 'op read op://vault/item/field',
+            runCommand: async () => {
+              throw new Error('spawn ENOMEM');
+            }
+          })
+        )
+      ).rejects.toMatchObject({
+        summary: 'API key command failed to start.',
+        detail: 'spawn ENOMEM'
+      });
     });
 
     it('conflicts with --key', async () => {

@@ -63,7 +63,7 @@ Setup notes:
 - Interactive `xyte-cli setup run` is the primary human onboarding path.
 - `--key-file <path>` is the primary file-based automation path when the key already exists on disk.
 - Piping a key on stdin into `xyte-cli setup run --key-stdin` is the primary shell-neutral automation path.
-- `--key-command "<cmd>"` runs a shell command and uses its stdout as the API key. Use this to resolve keys from secret managers without shell glue — for example `--key-command "op read op://Employee/Xyte/credential"` (1Password), `--key-command "vault kv get -field=key secret/xyte"` (Vault), `--key-command "aws secretsmanager get-secret-value --secret-id xyte --query SecretString --output text"` (AWS Secrets Manager), or `--key-command "pass show xyte/api-key"` (pass). The command must print only the key on stdout and exit 0; stderr and non-zero exits are surfaced as `CliUserError`.
+- `--key-command "<cmd>"` runs a shell command and uses its stdout as the API key. Use this to resolve keys from secret managers without shell glue — for example `--key-command "op read op://Employee/Xyte/credential"` (1Password), `--key-command "vault kv get -field=key secret/xyte"` (Vault), `--key-command "aws secretsmanager get-secret-value --secret-id xyte --query SecretString --output text"` (AWS Secrets Manager), or `--key-command "pass show xyte/api-key"` (pass). The command must print only the key on stdout and exit 0; non-zero exits surface as `CliUserError` with the exit code only.
 - `xyte-cli setup status --field tenantId` is the primary shell-neutral extractor for follow-up commands.
 - If `--provider` is omitted, setup probes `xyte-org` first, then `xyte-partner`.
 - `--connectivity never` requires an explicit `--provider`.
