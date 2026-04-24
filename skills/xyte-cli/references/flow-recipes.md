@@ -5,8 +5,9 @@ These recipes mirror `docs/flows/agent-ops.md` for agent routing.
 ## Shared Safety
 
 1. Endpoint writes execute only after explicit user approval.
-2. `xyte-cli util import-tree` is dry-run by default unless `--apply` is provided.
+2. `xyte-cli util import-tree` and `xyte-cli util move-devices` are dry-run by default unless `--apply` is provided.
 3. Human decision gates are mandatory before any write or apply loop.
+4. When a flow stops at a gate, continue with `xyte-cli flow run <flow-id> --tenant <tenant-id> --apply --resume <run-id-or-path>`.
 
 ## flow.setup-readiness-10m
 
@@ -114,7 +115,7 @@ Failure path (happens-once example): `startClaim` returns 422 (unknown device mo
 
 ## flow.edge-claim-batch
 
-North-star bulk-claim flow: `util prepare` → dry-run → gate → apply. Writes a per-row NDJSON report used for resume.
+North-star bulk-claim flow: `util prepare` → dry-run → gate → apply. Writes a per-row NDJSON report used for resume. Blank or `skip_connectivity_check=false` rows run a pre-claim ping inside the batch before `startClaim`.
 
 ```bash
 xyte-cli util prepare --action organization.edge.startClaim --tenant <tenant-id> --input ./devices.xlsx --output-dir ./prepared
@@ -124,7 +125,7 @@ xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-e
 
 Resume after interruption: re-run the `--apply` line with the same `--resume-artifact` path. Never re-run a half-finished batch without it.
 
-Failure path: 2-of-3 rows succeed, 1 row rejected → exit 1 with a per-row NDJSON report (`--report`); fix reject row and re-run with `--resume-artifact`.
+Failure path: 2-of-3 rows succeed, 1 row rejected or `ping-failed` → exit 1 with a per-row NDJSON report (`--report`); fix the row or connectivity and re-run with `--resume-artifact`.
 
 ## flow.edge-ping
 

@@ -177,22 +177,82 @@ function buildSuggestedCommands(
   };
 }
 
-function buildNotes(profile: UtilityActionProfile, inputPath: string): string {
+function requiredHeadersForProfile(profile: UtilityActionProfile): string[] {
+  if (profile.actionKey === 'space.import-tree') {
+    return ['path'];
+  }
+  if (profile.actionKey === 'organization.edge.startClaim') {
+    return ['proxy_id', 'device_ip', 'device_model_id', 'space_id'];
+  }
+  if (profile.actionKey === 'device.move') {
+    return ['device_id', 'target_space_id'];
+  }
+  if (profile.mode === 'generic') {
+    return profile.headers.filter((header) => header !== 'query_json' && header !== 'body_json');
+  }
+  return profile.headers.filter((header) => !['cloud_id', 'mac', 'sn', 'custom_parameters'].includes(header));
+}
+
+function exampleForHeader(profile: UtilityActionProfile, header: string): string {
+  const value = profile.jsonShape[header];
+  if (value !== undefined) {
+    return JSON.stringify(value);
+  }
+  if (header === 'query_json' || header === 'body_json') {
+    return '{}';
+  }
+  const nestedPath = profile.jsonShape.path;
+  if (nestedPath && typeof nestedPath === 'object' && !Array.isArray(nestedPath) && header in nestedPath) {
+    return JSON.stringify((nestedPath as Record<string, unknown>)[header]);
+  }
+  return JSON.stringify(`<${header}>`);
+}
+
+function rejectTaxonomy(profile: UtilityActionProfile, requiredHeaders: string[]): string[] {
+  const reasons = requiredHeaders.map((header) => `missing_${header}`);
+  const jsonHeaders = profile.headers.filter((header) => header.endsWith('_json') || header === 'config' || header === 'custom_parameters');
+  reasons.push(...jsonHeaders.map((header) => `invalid_${header}`));
+  reasons.push('ambiguous_row');
+  return [...new Set(reasons)];
+}
+
+function buildNotes(
+  profile: UtilityActionProfile,
+  inputPath: string,
+  suggestedCommands: UtilityPrepareResult['suggestedCommands']
+): string {
+  const requiredHeaders = requiredHeadersForProfile(profile);
+  const requiredSet = new Set(requiredHeaders);
+  const rejectReasons = rejectTaxonomy(profile, requiredHeaders);
   return [
     '# Utility Prepare Notes',
     '',
     `Action: ${profile.actionKey}`,
     `Mode: ${profile.mode}`,
+    `Execution support: ${profile.executionSupport}`,
     `Source input: ${inputPath}`,
     '',
     '## Canonical Fields',
-    `- ${profile.headers.join(', ')}`,
+    ...profile.headers.map((header) => `- ${header}: ${requiredSet.has(header) ? 'required' : 'optional'}; example ${exampleForHeader(profile, header)}`),
+    '',
+    '## JSONL Example',
+    '```json',
+    JSON.stringify(profile.jsonShape, null, 2),
+    '```',
     '',
     '## Decode Rules',
     ...profile.decodeRules.map((rule) => `- ${rule}`),
     '',
+    '## Reject Taxonomy',
+    ...rejectReasons.map((reason) => `- ${reason}`),
+    '',
     '## Ambiguities',
     '- Place unresolved rows into the rejected file with reject_reason.',
+    '',
+    '## Safe Next Commands',
+    `- Next: ${suggestedCommands.next}`,
+    `- Apply: ${suggestedCommands.apply}`,
+    `- Verify: ${suggestedCommands.verify}`,
     '',
     '## Operator Decision Gate',
     '- After preprocessing is complete, ask what to do next (execute or stop).'
@@ -241,7 +301,8 @@ export function runUtilityPrepare(args: {
     writeScaffoldFile(primary, '', force);
     writeScaffoldFile(rejected, '', force);
   }
-  writeScaffoldFile(notes, `${buildNotes(profile, inputPath)}\n`, force);
+  const suggestedCommands = buildSuggestedCommands(profile, tenant, primary, outputDir);
+  writeScaffoldFile(notes, `${buildNotes(profile, inputPath, suggestedCommands)}\n`, force);
 
   return UtilityPrepareResultSchema.parse({
     schemaVersion: UTILITY_PREPARE_SCHEMA_VERSION,
@@ -268,7 +329,7 @@ export function runUtilityPrepare(args: {
     },
     promptTemplatePath: profile.promptTemplatePath,
     skillNodePath: profile.skillNodePath,
-    suggestedCommands: buildSuggestedCommands(profile, tenant, primary, outputDir),
+    suggestedCommands,
     executionSupport: profile.executionSupport
   });
 }
@@ -284,18 +345,35 @@ interface UtilityActionSummary {
 }
 
 export function listUtilityPrepareActions(
-  args: { entity?: string; includeGeneric?: boolean } = {}
+  args: {
+    entity?: string;
+    includeGeneric?: boolean;
+    mode?: UtilityPrepareMode;
+    executionSupport?: UtilityExecutionSupport;
+  } = {}
 ): UtilityActionSummary[] {
   return listUtilityActionProfiles({
     entity: args.entity,
     includeGeneric: args.includeGeneric
-  }).map((profile) => ({
-    actionKey: profile.actionKey,
-    entity: profile.entity,
-    title: profile.title,
-    mode: profile.mode,
-    method: profile.method ?? null,
-    pathTemplate: profile.pathTemplate ?? null,
-    executionSupport: profile.executionSupport
-  }));
+  })
+    .filter((profile) => !args.mode || profile.mode === args.mode)
+    .filter((profile) => !args.executionSupport || profile.executionSupport === args.executionSupport)
+    .sort((left, right) => {
+      if (left.mode !== right.mode) {
+        return left.mode === 'friendly' ? -1 : 1;
+      }
+      if (left.executionSupport !== right.executionSupport) {
+        return left.executionSupport.localeCompare(right.executionSupport);
+      }
+      return left.actionKey.localeCompare(right.actionKey);
+    })
+    .map((profile) => ({
+      actionKey: profile.actionKey,
+      entity: profile.entity,
+      title: profile.title,
+      mode: profile.mode,
+      method: profile.method ?? null,
+      pathTemplate: profile.pathTemplate ?? null,
+      executionSupport: profile.executionSupport
+    }));
 }

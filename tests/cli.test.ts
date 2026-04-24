@@ -18,6 +18,32 @@ describe('cli integration', () => {
     vi.restoreAllMocks();
   });
 
+  it('rejects invalid global output before command-local defaults shadow it', async () => {
+    const program = createCli({
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout: { write: vi.fn() },
+      stderr: { write: vi.fn() }
+    });
+
+    await expect(program.parseAsync(['node', 'xyte-cli', '--output', 'banana', 'logs', 'list'])).rejects.toThrow(
+      'Invalid output mode'
+    );
+  });
+
+  it('rejects invalid global error format before command execution', async () => {
+    const program = createCli({
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout: { write: vi.fn() },
+      stderr: { write: vi.fn() }
+    });
+
+    await expect(program.parseAsync(['node', 'xyte-cli', '--error-format', 'xml', 'logs', 'list'])).rejects.toThrow(
+      'Invalid error format'
+    );
+  });
+
   it('allows read-only calls without --allow-write', async () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });
@@ -454,6 +480,29 @@ describe('cli integration', () => {
     expect(parsed.some((item: any) => item.actionKey === 'device.move')).toBe(true);
     expect(parsed.some((item: any) => item.actionKey === 'organization.devices.claimDevice')).toBe(true);
     expect(parsed.some((item: any) => item.actionKey === 'space.import-tree')).toBe(true);
+    expect(parsed[0].mode).toBe('friendly');
+
+    stdout.write.mockClear();
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'util',
+      'list-actions',
+      '--format',
+      'json',
+      '--mode',
+      'friendly',
+      '--execution-support',
+      'edge.claim-batch'
+    ]);
+    const filtered = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(filtered.map((item: any) => item.actionKey)).toEqual(['organization.edge.startClaim']);
+
+    stdout.write.mockClear();
+    await program.parseAsync(['node', 'xyte-cli', 'util', 'list-actions', '--format', 'text', '--mode', 'friendly']);
+    const text = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(text).toContain('organization.edge.startClaim |');
+    expect(text).toContain('execution=edge.claim-batch');
   });
 
   it('fails utility prepare when action is missing', async () => {
@@ -570,7 +619,8 @@ describe('cli integration', () => {
     expect(parsed.command).toBe('device.move');
     expect(parsed.mode).toBe('dry-run');
     expect(existsSync(reportPath)).toBe(true);
-    expect(parsed.totals.succeeded).toBe(1);
+    expect(parsed.totals.planned).toBe(1);
+    expect(parsed.totals.succeeded).toBe(0);
     expect(parsed.totals.skipped).toBe(0);
   });
 
@@ -1283,6 +1333,37 @@ describe('cli integration', () => {
     parsed = JSON.parse(output);
     expect(parsed.probe.ok).toBe(true);
     expect(parsed.probe.strategy).toBe('organization.getOrganizationInfo');
+  });
+
+  it('requires confirmation for tenant removal and clears known key-slot secrets', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      name: 'primary',
+      fingerprint: 'sha256:test'
+    });
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await expect(program.parseAsync(['node', 'xyte-cli', 'config', 'tenant', 'remove', 'acme'])).rejects.toThrow(
+      'Tenant removal is destructive'
+    );
+    expect(await profileStore.getTenant('acme')).toBeDefined();
+    expect(await secretStore.getSlotSecret('acme', 'xyte-org', slot.slotId)).toBe('org-key');
+
+    await program.parseAsync(['node', 'xyte-cli', 'config', 'tenant', 'remove', 'acme', '--confirm']);
+    const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(parsed).toMatchObject({
+      tenantId: 'acme',
+      removedTenant: true,
+      removedKeySlots: 1,
+      clearedSecrets: 1
+    });
+    expect(await profileStore.getTenant('acme')).toBeUndefined();
+    expect(await secretStore.getSlotSecret('acme', 'xyte-org', slot.slotId)).toBeUndefined();
   });
 
   it('prints status contract in fast mode', async () => {
@@ -4181,8 +4262,38 @@ describe('cli integration', () => {
     expect(parsed.resolvedFlowId).toBe('flow.device-migration');
     expect(parsed.outcome).toBe('pending_gate');
     expect(parsed.nextResumeStepId).toBe('gate_approve_mapping');
+    expect(parsed.resumeCommand).toContain('--apply');
+    expect(parsed.nextAction).toMatchObject({
+      kind: 'approve_gate',
+      stepId: 'gate_approve_mapping',
+      title: 'Approve Mapping',
+      requiresWrite: false
+    });
+    expect(parsed.nextAction.command).toBe(parsed.resumeCommand);
+    expect(parsed.nextAction.artifactPaths.length).toBeGreaterThan(0);
     expect(parsed.steps.find((item: any) => item.stepId === 'match_devices')?.status).toBe('completed');
     expect(parsed.steps.find((item: any) => item.stepId === 'pre_migration_report')?.status).toBe('completed');
+  });
+
+  it('lists flows with required context and safe first commands', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await program.parseAsync(['node', 'xyte-cli', 'flow', 'list', '--format', 'json']);
+    const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    const migration = parsed.builtIn.find((item: any) => item.id === 'flow.device-migration');
+    expect(migration.requiredContext).toEqual(['source_space_id', 'target_path_includes']);
+    expect(migration.safeFirstCommand).toBe('xyte-cli flow run flow.device-migration --tenant <tenant-id> --plan');
+
+    stdout.write.mockClear();
+    await program.parseAsync(['node', 'xyte-cli', 'flow', 'list', '--format', 'text']);
+    const text = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(text).toContain('flow.device-migration');
+    expect(text).toContain('required context: source_space_id, target_path_includes');
+    expect(text).toContain('start: xyte-cli flow run flow.device-migration --tenant <tenant-id> --plan');
   });
 
   it('returns needs_input when flow inspect scope is auto and both providers are configured', async () => {

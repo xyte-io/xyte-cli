@@ -9,7 +9,7 @@ Custom flows do not define new step graphs. They alias one built-in flow and pin
 List built-in flow IDs:
 
 ```bash
-xyte-cli flow list
+xyte-cli flow list --format text
 ```
 
 Create a custom flow:

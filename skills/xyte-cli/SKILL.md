@@ -30,7 +30,7 @@ This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
 - If `--connectivity never` is used, require `--provider`.
 - persisted credentials default to secure OS-native storage: macOS Keychain, Windows DPAPI, Linux Secret Service
 - if native storage is unavailable under `auth.secretStoreBackend=auto`, `xyte-cli` warns on `stderr` and falls back to file storage; do not treat that warning alone as command failure
-- `xyte-cli config path --format json` reports `secretStoreBackend`, `secretStore`, and `legacySecretStore`; `secretStore` may be a backend identifier such as `xyte-cli`, not only a file path
+- `xyte-cli config path --output json` reports `secretStoreBackend`, `secretStore`, and `legacySecretStore`; `secretStore` may be a backend identifier such as `xyte-cli`, not only a file path
 - `xyte-cli setup status --tenant <tenant-id> --field tenantId`
 
 ## Purpose And Trigger Conditions
@@ -54,7 +54,7 @@ Use when the request involves any of:
 ## Mandatory Safety Rules
 
 - Default to read-only.
-- Require explicit user intent before endpoint writes, `util import-tree --apply`, or `util move-devices --apply`.
+- Require explicit user intent before endpoint writes, `util import-tree --apply`, `util move-devices --apply`, `edge claim --apply`, `edge claim-batch --apply`, or `edge ping --apply`.
 - Headless console is read-only; never treat frames as mutation execution.
 - Util preprocessing is external: AI prepares files, `xyte-cli` remains AI-free.
 - For util workflows, always do `xyte-cli util prepare` first.
@@ -81,13 +81,15 @@ Rules:
 | Path | Catalog key | One-off command | Batch command |
 | --- | --- | --- | --- |
 | Native | `organization.devices.claimDevice` | `xyte-cli api call organization.devices.claimDevice --tenant <tenant-id> --body-json '{"name":"<name>","space_id":<space-id>,"sn":"<sn>","mac":"<mac>","cloud_id":"<cloud-id>"}'` | `xyte-cli util prepare --action organization.devices.claimDevice ...` then call per row |
-| Edge | `organization.edge.startClaim` | `xyte-cli edge claim --proxy-id <proxy-id> --device-ip <ip> --device-model-id <model-id> --space-id <space-id> --apply` | `xyte-cli util prepare --action organization.edge.startClaim ...` then `xyte-cli edge claim-batch --input ./prepared/organization-edge-startclaim.csv --apply` |
+| Edge | `organization.edge.startClaim` | `xyte-cli edge claim --proxy-id <proxy-id> --device-ip <ip> --device-model-id <model-id> --space-id <space-id> --plan` | `xyte-cli util prepare --action organization.edge.startClaim ...` then `xyte-cli edge claim-batch --input ./prepared/organization-edge-startclaim.csv --plan` |
 | C2C | (none — not public) | Point the user at the End Customer Portal | Same |
 
 Edge-claim safety:
 - `edge claim`, `edge claim-batch`, and `edge ping` are mutating. Default to `--plan`; only run `--apply` after explicit user approval.
 - `edge claim-status` and `edge ping-status` are read-only.
 - After `xyte-cli util prepare --action organization.edge.startClaim`, populate the generated `organization-edge-startclaim.csv` before running `edge claim-batch --plan`.
+- In `edge claim-batch`, blank or `skip_connectivity_check=false` rows run a pre-claim `edge ping` inside the batch before `startClaim`; `skip_connectivity_check=true` skips that ping.
+- `edge claim-batch --skip-connectivity-check` makes blank rows skip ping and send `skip_connectivity_check: true`; explicit row `false` conflicts and is rejected.
 - If a batch is interrupted (ctrl-C, network blip), resume with `xyte-cli edge claim-batch --input <primary-csv> --apply --resume-artifact <path>`; never re-run without `--resume-artifact` on a half-finished run.
 - Heartbeat device model id: `5dc4ba6c-c323-4118-a4e4-504f074426f2`. `proxy_id` lives in the End Customer Portal.
 - Poll defaults: 5 s interval, 10 min timeout. Override with `--poll-interval-ms` / `--poll-timeout-ms`.
@@ -100,6 +102,7 @@ Edge-claim terminal-state decision tree:
 - Duplicate claim (detail mentions "already claimed") → row marked `already-claimed`; batch exits clean if all rows are terminal-success or already-claimed.
 - Status returns 422 "not initiated" → first poll tolerates a bounded race; real 422 thereafter is rejection.
 - 429 → exponential backoff with jitter; honor `Retry-After`.
+- Pre-claim ping rejected/failed/timeout in batch → row marked `ping-failed`; no `startClaim`; resume retries the row.
 - Partial batch failure or `proxy-offline` rows → exit code 1 with a per-row NDJSON report (`--report`); fix rejects, re-run with the NDJSON `--resume-artifact`.
 - `--plan` over a batch → zero API calls; exit 0 only if every row would succeed.
 
@@ -116,7 +119,8 @@ Rules:
 - default to `--plan`
 - only use `--apply` after explicit user approval
 - treat flow IDs as agent-facing contracts; users can speak naturally and the agent maps intent to a flow ID
-- use `xyte-cli flow list` for discoverability before proposing a flow
+- use `xyte-cli flow list --format text` for human discoverability before proposing a flow
+- prefer `nextAction` from `xyte.flow.run.v1` over raw step scanning when a run stops before completion
 - parse run summary contract `xyte.flow.run.v1` and return artifact paths plus resume command to users
 
 ## Deterministic Execution Order
@@ -127,7 +131,7 @@ Rules:
 - `xyte-cli setup status --tenant <tenant-id> --output json`
 - `xyte-cli config doctor --tenant <tenant-id> --output json`
 - `xyte-cli config show --scope resolved`
-- `xyte-cli doctor install --format json`
+- `xyte-cli doctor install --output json`
 
 2. Auth/tenant (if missing or incomplete):
 - human-guided setup: `xyte-cli setup run --tenant <tenant-id> [--provider <xyte-org|xyte-partner>]`
@@ -143,8 +147,8 @@ Rules:
 - `xyte-cli api call <endpoint-key> --tenant <tenant-id> ...`
 
 4. Insights/reports:
-- `xyte-cli ops inspect fleet --tenant <tenant-id> --provider-scope auto --render json|ascii`
-- `xyte-cli ops inspect deep-dive --tenant <tenant-id> --provider-scope auto --window <hours> --render json|ascii|markdown`
+- `xyte-cli ops inspect fleet --tenant <tenant-id> --provider-scope auto --output json`
+- `xyte-cli ops inspect deep-dive --tenant <tenant-id> --provider-scope auto --window <hours> --output json`
 - `xyte-cli ops report generate --tenant <tenant-id> --input <input.json> --out <path> [--render markdown|pdf] [--include-sensitive]`
 
 Provider/report behavior:
@@ -153,7 +157,7 @@ Provider/report behavior:
 - partner deep-dive/report enrichment is best-effort; optional enrichment failures should not block report generation
 
 5. Util preprocessing and execution:
-- `xyte-cli util list-actions [--output text|json]`
+- `xyte-cli util list-actions [--output text|json] [--mode friendly|generic] [--execution-support space.import-tree|device.move|edge.claim-batch|call-loop-only]`
 - `xyte-cli util prepare --action <action-key> --input <file> [--tenant <tenant-id>] [--output-dir <dir>] [--force]`
 - stop and ask for a user decision before any execution command
 - `xyte-cli util import-tree --tenant <tenant-id> --input <file> [--input-format auto|csv|json|jsonl] [--apply] [--continue-on-error] [--report <path>]`
@@ -181,17 +185,17 @@ Provider/report behavior:
 | Fleet summary | `xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/fleet.json` |
 | Deep-dive analytics | `xyte-cli ops inspect deep-dive --tenant <tenant-id> --window <hours> --output json --out ./artifacts/deep-dive.json` |
 | PDF report generation | `xyte-cli ops report generate --tenant <tenant-id> --input <deep-dive.json> --out <path>.pdf` |
-| Util action catalog | `xyte-cli util list-actions --output text` |
+| Util action catalog | `xyte-cli util list-actions --output text --mode friendly` |
 | Util prepare scaffold | `xyte-cli util prepare --action <action-key> --input <file> --output-dir ./prepared` |
 | Space tree import | `xyte-cli util import-tree --tenant <tenant-id> --input <file> [--apply]` |
 | Device-to-space matching | `xyte-cli util match --source <path> --target <path> --source-field <name> --target-field <name> --out <path>` |
 | Batch device move | `xyte-cli util move-devices --tenant <tenant-id> --input <file> [--apply]` |
-| Claim one edge device | `xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip> --device-model-id <model-id> --space-id <space-id> [--apply]` |
-| Bulk claim edge devices | `xyte-cli util prepare --action organization.edge.startClaim --input <file> --output-dir ./prepared` then `xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv [--apply] [--resume-artifact <path>]` |
+| Claim one edge device | `xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip> --device-model-id <model-id> --space-id <space-id> --plan` |
+| Bulk claim edge devices | `xyte-cli util prepare --action organization.edge.startClaim --input <file> --output-dir ./prepared` then `xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --plan [--skip-connectivity-check]` |
 | Edge claim status | `xyte-cli edge claim-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip>` |
-| Edge connectivity probe | `xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip> [--apply]` |
+| Edge connectivity probe | `xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip> --plan` |
 | Edge ping status | `xyte-cli edge ping-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip>` |
-| Install diagnostics | `xyte-cli doctor install --format json` |
+| Install diagnostics | `xyte-cli doctor install --output json` |
 | Settings introspection | `xyte-cli config show --scope resolved` |
 | Interactive console | `xyte-cli ops console` |
 | Headless snapshot | `xyte-cli ops console --headless --screen <screen> --output json --once --tenant <tenant-id>` |
@@ -303,7 +307,7 @@ xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/deep-dive.
 Util prepare then execute:
 
 ```bash
-xyte-cli util list-actions --output text
+xyte-cli util list-actions --output text --mode friendly
 xyte-cli util prepare --action organization.devices.claimDevice --input ./raw-source.xlsx --tenant <tenant-id> --output-dir ./prepared
 
 xyte-cli api call organization.spaces.getSpace --tenant <tenant-id> --path-json '{"space_id":"<space-id>"}'
@@ -312,6 +316,14 @@ xyte-cli api call organization.devices.claimDevice --tenant <tenant-id> --output
 xyte-cli util prepare --action space.import-tree --input ./raw-tree.pdf --tenant <tenant-id> --output-dir ./prepared
 xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv
 xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv --apply --report ./artifacts/space-import-report.ndjson
+```
+
+Action log lookup:
+
+```bash
+xyte-cli logs list --session-id <session-id> --output text
+xyte-cli logs show --entry <session-id>:<seq> --output json
+xyte-cli logs show --request-id <request-id> --output json
 ```
 
 AI preprocessing prompt templates:
@@ -358,7 +370,7 @@ Canonical schemas:
   - for automation, use `--key-file <path>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`
   - for secret managers, use `--key-command "<cmd>"`, e.g. `--key-command "op read op://Employee/Xyte/credential"` — xyte-cli runs the command and uses its stdout as the key
 - Install wiring diagnostics:
-  - `xyte-cli doctor install --format json`
+  - `xyte-cli doctor install --output json`
 - Readiness/connectivity:
   - `xyte-cli setup status --tenant <tenant-id> --output json`
   - `xyte-cli setup status --tenant <tenant-id> --field tenantId`

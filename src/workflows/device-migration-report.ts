@@ -107,7 +107,7 @@ export function generateDeviceMigrationReport(args: {
 }
 
 export function formatDeviceMoveBatchReportMarkdown(result: z.infer<typeof DeviceMoveBatchReportSchema>): string {
-  const succeededLabel = result.mode === 'dry-run' ? 'Ready to apply' : 'Succeeded';
+  const planned = result.totals.planned ?? 0;
   const lines = [
     '# Device Migration Execution Report',
     '',
@@ -117,7 +117,9 @@ export function formatDeviceMoveBatchReportMarkdown(result: z.infer<typeof Devic
     '## Execution',
     `- Mode: ${result.mode}`,
     `- Rows: ${result.totals.rows}`,
-    `- ${succeededLabel}: ${result.totals.succeeded}`,
+    ...(result.mode === 'dry-run'
+      ? [`- Planned/validated: ${planned}`]
+      : [`- Succeeded: ${result.totals.succeeded}`]),
     `- Failed: ${result.totals.failed}`,
     `- Skipped: ${result.totals.skipped}`,
     `- Stopped early: ${result.stoppedEarly ? 'yes' : 'no'}`

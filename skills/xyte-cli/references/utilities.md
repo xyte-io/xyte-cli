@@ -10,8 +10,9 @@ References:
 ## Safety Defaults
 
 1. Always run preprocessing first.
-2. After files are generated, ask the user what to do next.
-3. Never auto-run `--apply`.
+2. Review the generated `.notes.md` file; it is the column glossary, required/optional guide, reject taxonomy, JSONL example, and safe-command checklist.
+3. After files are generated, ask the user what to do next.
+4. Never auto-run `--apply`.
 
 ## SOP A: Bulk Claim Preprocessing (`organization.devices.claimDevice`)
 
@@ -49,7 +50,7 @@ xyte-cli util prepare \
 ```
 
 Expected files:
-1. `./prepared/organization-edge-startclaim.csv` — rows ready for `edge claim-batch`.
+1. `./prepared/organization-edge-startclaim.csv` — rows ready for `edge claim-batch`; blank `skip_connectivity_check` means the batch will ping before claim.
 2. `./prepared/organization-edge-startclaim.rejected.csv` — rows with `reject_reason` (missing `proxy_id`, malformed `device_ip`, non-numeric `space_id`, etc.).
 3. `./prepared/organization-edge-startclaim.notes.md` — column glossary + action taxonomy.
 
@@ -70,6 +71,7 @@ xyte-cli edge claim-batch \
   --tenant <tenant-id> \
   --input ./prepared/organization-edge-startclaim.csv \
   --report ./artifacts/edge-claim-report.ndjson \
+  --resume-artifact ./artifacts/edge-claim.resume.ndjson \
   --apply
 ```
 
@@ -90,6 +92,7 @@ Decision gate:
 3. Review `edge-claim-report.ndjson` after `--plan`; confirm zero unexpected rejections.
 4. Ask the user before running `--apply`.
 5. On partial batch failure (exit 1), re-run with `--resume-artifact`.
+6. Use row `skip_connectivity_check=true` or command `--skip-connectivity-check` only when the batch should skip its internal pre-claim ping.
 
 Full edge-case matrix and terminal-state handling: `references/claim-playbook.md`.
 
@@ -115,6 +118,8 @@ xyte-cli util import-tree \
   [--continue-on-error] \
   --report ./artifacts/space-import-tree.dryrun.ndjson
 ```
+
+Dry-run summaries report validated rows as `totals.planned`; `totals.succeeded` is reserved for apply mode.
 
 Apply:
 
@@ -165,6 +170,8 @@ xyte-cli util move-devices \
   --report ./artifacts/device-migration.dry-run.ndjson
 ```
 
+Dry-run summaries report validated rows as `totals.planned`; `totals.succeeded` is reserved for apply mode.
+
 Apply:
 
 ```bash
@@ -189,7 +196,8 @@ Decision gate:
 List actions:
 
 ```bash
-xyte-cli util list-actions --output text
+xyte-cli util list-actions --output text --mode friendly
+xyte-cli util list-actions --output text --execution-support edge.claim-batch
 ```
 
 Prepare generic action:

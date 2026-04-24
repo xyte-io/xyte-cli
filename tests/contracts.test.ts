@@ -166,6 +166,7 @@ describe('schema contracts', () => {
         mode: 'apply',
         totals: {
           rows: 3,
+          planned: 0,
           succeeded: 2,
           failed: 0,
           skipped: 1

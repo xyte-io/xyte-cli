@@ -29,9 +29,39 @@ function formatActionLogText(entry: CliActionLogEntry): string {
   return `${entry.timestamp} | ${entry.level} | ${entry.event} | ${commandPath} | ${duration}`;
 }
 
+function entryContainsRequestId(value: unknown, requestId: string): boolean {
+  if (Array.isArray(value)) {
+    return value.some((item) => entryContainsRequestId(item, requestId));
+  }
+  if (!isRecord(value)) {
+    return false;
+  }
+  if (value.requestId === requestId) {
+    return true;
+  }
+  return Object.values(value).some((item) => entryContainsRequestId(item, requestId));
+}
+
+function parseEntryRef(value: string): { sessionId: string; seq: number } {
+  const separator = value.lastIndexOf(':');
+  if (separator <= 0 || separator === value.length - 1) {
+    throw new CliUserError({
+      summary: 'Invalid log entry reference.',
+      detail: 'Use <sessionId>:<seq>.',
+      suggestedCommands: ['xyte-cli logs show --entry <sessionId>:<seq>']
+    });
+  }
+  const sessionId = value.slice(0, separator);
+  const seq = Number(value.slice(separator + 1));
+  if (!Number.isInteger(seq) || seq <= 0) {
+    throw new CliUserError({ summary: 'Invalid log entry sequence.', detail: 'The sequence must be a positive integer.' });
+  }
+  return { sessionId, seq };
+}
+
 async function handleLogsList(
   ctx: CliContext,
-  options: { path?: string; limit?: string; event?: string; command?: string; format?: string },
+  options: { path?: string; limit?: string; event?: string; command?: string; sessionId?: string; format?: string },
   command: Command
 ): Promise<void> {
   const settings = await ctx.resolveSettings();
@@ -40,7 +70,8 @@ async function handleLogsList(
     path: options.path,
     limit,
     event: options.event,
-    command: options.command
+    command: options.command,
+    sessionId: options.sessionId
   });
 
   if (
@@ -75,6 +106,61 @@ async function handleLogsList(
   if (result.parseErrors > 0) {
     ctx.stdout.write(`Ignored ${result.parseErrors} malformed log line(s).\n`);
   }
+}
+
+async function handleLogsShow(
+  ctx: CliContext,
+  options: { path?: string; entry?: string; requestId?: string; format?: string },
+  command: Command
+): Promise<void> {
+  if (Boolean(options.entry) === Boolean(options.requestId)) {
+    throw new CliUserError({
+      summary: 'logs show requires exactly one lookup selector.',
+      suggestedCommands: [
+        'xyte-cli logs show --entry <sessionId>:<seq>',
+        'xyte-cli logs show --request-id <request-id>'
+      ]
+    });
+  }
+  const settings = await ctx.resolveSettings();
+  const result = readCliActionLog({ path: options.path, limit: 5000 });
+  let matches: CliActionLogEntry[];
+  if (options.entry) {
+    const ref = parseEntryRef(options.entry);
+    matches = result.entries.filter((entry) => entry.sessionId === ref.sessionId && entry.seq === ref.seq);
+  } else {
+    const requestId = options.requestId as string;
+    matches = result.entries.filter((entry) => entryContainsRequestId(entry, requestId));
+  }
+
+  if (matches.length === 0) {
+    throw new CliUserError({ summary: 'No matching action log entry found.' });
+  }
+  if (matches.length > 1) {
+    throw new CliUserError({
+      summary: 'Multiple action log entries matched.',
+      detail: 'Use --entry <sessionId>:<seq> to inspect one exact entry.'
+    });
+  }
+
+  const payload = {
+    schemaVersion: 'xyte.cli.action-log.entry.v1',
+    path: result.path,
+    entry: matches[0]
+  };
+  if (
+    resolveTextJsonOutput({
+      output: options.format ?? getExplicitGlobalOutput(command),
+      stdoutIsTTY: ctx.stdoutIsTTY,
+      settings
+    }) === 'json'
+  ) {
+    printJson(ctx.stdout, payload, { strictJson: resolveStrictJson({ settings }) });
+    return;
+  }
+
+  ctx.stdout.write(`${formatActionLogText(matches[0])}\n`);
+  ctx.stdout.write(`${JSON.stringify(matches[0], null, 2)}\n`);
 }
 
 async function handleLogsStats(
@@ -192,8 +278,18 @@ export function registerLogsCommands(parent: Command, ctx: CliContext): void {
     .option('--limit <n>', 'Max number of entries', '100')
     .option('--event <event>', 'Filter by event name')
     .option('--command <text>', 'Filter by command path substring')
+    .option('--session-id <id>', 'Filter by action log session id')
     .option('--format <format>', 'text|json', 'text')
     .action((options, command) => handleLogsList(ctx, options, command));
+
+  logs
+    .command('show')
+    .description('Show one action log entry by entry ref or request id')
+    .option('--path <path>', 'Action log file override')
+    .option('--entry <sessionId:seq>', 'Exact log entry reference')
+    .option('--request-id <id>', 'Find an entry containing requestId')
+    .option('--format <format>', 'text|json', 'text')
+    .action((options, command) => handleLogsShow(ctx, options, command));
 
   logs
     .command('stats')

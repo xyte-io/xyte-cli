@@ -12,7 +12,7 @@ xyte-cli ops console --headless --screen <screen> --output json --once --tenant 
 
 - Persisted credentials default to secure OS-native storage under `auth.secretStoreBackend=auto`: macOS Keychain, Windows DPAPI, Linux Secret Service.
 - If native storage is unavailable under `auto`, setup/config/readiness commands may warn on `stderr` and fall back to file storage. Treat that warning alone as non-fatal when the exit code and `stdout` JSON are otherwise valid.
-- `xyte-cli config path --format json` reports backend diagnostics. `secretStore` may be a backend identifier, not always a filesystem path.
+- `xyte-cli config path --output json` reports backend diagnostics. `secretStore` may be a backend identifier, not always a filesystem path.
 
 ## Watch-First Triage Handoff
 

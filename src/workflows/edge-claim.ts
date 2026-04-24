@@ -14,6 +14,7 @@ import {
   type EdgePollOptions,
   type EdgePollResult
 } from './edge-poll';
+import { runEdgePing, type EdgePingResult } from './edge-ping';
 
 export type EdgeRowDisposition =
   | 'succeeded'
@@ -22,6 +23,7 @@ export type EdgeRowDisposition =
   | 'timeout'
   | 'already-claimed'
   | 'proxy-offline'
+  | 'ping-failed'
   | 'skipped'
   | 'aborted';
 
@@ -49,6 +51,13 @@ export interface EdgeRowOutcome {
   detail?: string;
   rejectReason?: string;
   response?: unknown;
+  preClaimPing?: EdgePingResult;
+  planned?: EdgeRowPlan;
+}
+
+export interface EdgeRowPlan {
+  preClaimPing: 'required' | 'skipped';
+  claimBody: Record<string, unknown>;
 }
 
 export interface EdgeBatchTotals {
@@ -59,6 +68,7 @@ export interface EdgeBatchTotals {
   timeout: number;
   alreadyClaimed: number;
   proxyOffline: number;
+  pingFailed: number;
   skipped: number;
   aborted: number;
 }
@@ -226,6 +236,38 @@ function buildClaimBody(row: EdgeClaimRow): Record<string, unknown> {
   return body;
 }
 
+interface ResolvedBatchClaim {
+  row: EdgeClaimRow;
+  requiresPing: boolean;
+  planned: EdgeRowPlan;
+}
+
+function resolveBatchClaim(
+  row: EdgeClaimRow,
+  forceSkipConnectivityCheck: boolean
+): ResolvedBatchClaim | { rejectReason: string } {
+  if (forceSkipConnectivityCheck && row.skip_connectivity_check === false) {
+    return {
+      rejectReason:
+        'skip_connectivity_check=false conflicts with --skip-connectivity-check; fix the row or remove the flag.'
+    };
+  }
+
+  const effectiveRow: EdgeClaimRow =
+    forceSkipConnectivityCheck && row.skip_connectivity_check === undefined
+      ? { ...row, skip_connectivity_check: true }
+      : row;
+  const requiresPing = effectiveRow.skip_connectivity_check !== true;
+  return {
+    row: effectiveRow,
+    requiresPing,
+    planned: {
+      preClaimPing: requiresPing ? 'required' : 'skipped',
+      claimBody: buildClaimBody(effectiveRow)
+    }
+  };
+}
+
 function duplicateMatches(detail: string): boolean {
   const normalized = detail.toLowerCase();
   return (
@@ -374,6 +416,7 @@ const RESUMABLE_DISPOSITIONS = new Set<EdgeRowDisposition>([
   'timeout',
   'already-claimed',
   'proxy-offline',
+  'ping-failed',
   'aborted'
 ]);
 
@@ -445,6 +488,7 @@ export interface RunEdgeClaimBatchArgs {
   resumePath?: string;
   runId?: string;
   pollOptions?: EdgePollOptions;
+  skipConnectivityCheck?: boolean;
   sleeper?: (ms: number) => Promise<void>;
   now?: () => number;
 }
@@ -461,6 +505,7 @@ export async function runEdgeClaimBatch(args: RunEdgeClaimBatchArgs): Promise<Ed
     timeout: 0,
     alreadyClaimed: 0,
     proxyOffline: 0,
+    pingFailed: 0,
     skipped: 0,
     aborted: 0
   };
@@ -496,15 +541,30 @@ export async function runEdgeClaimBatch(args: RunEdgeClaimBatchArgs): Promise<Ed
       continue;
     }
 
-    const existing = resumeMap.get(resumeIdentityKey(validation.row.proxy_id, validation.row.device_ip));
-    if (
-      existing &&
-      (existing.disposition === 'succeeded' || existing.disposition === 'already-claimed')
-    ) {
+    const resolved = resolveBatchClaim(validation.row, args.skipConnectivityCheck === true);
+    if ('rejectReason' in resolved) {
       const outcome: EdgeRowOutcome = {
         rowIndex,
         proxy_id: validation.row.proxy_id,
         device_ip: validation.row.device_ip,
+        disposition: 'rejected',
+        attempts: 0,
+        elapsedMs: 0,
+        rejectReason: resolved.rejectReason,
+        detail: resolved.rejectReason
+      };
+      outcomes.push(outcome);
+      totals.rejected += 1;
+      appendReportLine(args.reportPath, { ...outcome, input: raw, runId, mode });
+      continue;
+    }
+
+    const existing = resumeMap.get(resumeIdentityKey(resolved.row.proxy_id, resolved.row.device_ip));
+    if (existing && (existing.disposition === 'succeeded' || existing.disposition === 'already-claimed')) {
+      const outcome: EdgeRowOutcome = {
+        rowIndex,
+        proxy_id: resolved.row.proxy_id,
+        device_ip: resolved.row.device_ip,
         disposition: 'skipped',
         attempts: 0,
         elapsedMs: 0,
@@ -519,28 +579,75 @@ export async function runEdgeClaimBatch(args: RunEdgeClaimBatchArgs): Promise<Ed
     if (!args.apply) {
       const outcome: EdgeRowOutcome = {
         rowIndex,
-        proxy_id: validation.row.proxy_id,
-        device_ip: validation.row.device_ip,
+        proxy_id: resolved.row.proxy_id,
+        device_ip: resolved.row.device_ip,
         disposition: 'skipped',
         attempts: 0,
         elapsedMs: 0,
-        detail: 'Plan mode: skipped actual claim call.'
+        detail: 'Plan mode: skipped actual claim call.',
+        planned: resolved.planned
       };
       outcomes.push(outcome);
       totals.skipped += 1;
-      appendReportLine(args.reportPath, { ...outcome, runId, mode, planned: buildClaimBody(validation.row) });
+      appendReportLine(args.reportPath, { ...outcome, runId, mode });
       continue;
     }
 
     try {
+      let preClaimPing: EdgePingResult | undefined;
+      if (resolved.requiresPing) {
+        preClaimPing = await runEdgePing({
+          client: args.client,
+          tenantId: args.tenantId,
+          proxy_id: resolved.row.proxy_id,
+          device_ip: resolved.row.device_ip,
+          pollOptions: args.pollOptions,
+          sleeper: args.sleeper,
+          now: args.now
+        });
+        if (preClaimPing.disposition !== 'succeeded') {
+          const outcome: EdgeRowOutcome = {
+            rowIndex,
+            proxy_id: resolved.row.proxy_id,
+            device_ip: resolved.row.device_ip,
+            disposition: 'ping-failed',
+            attempts: preClaimPing.attempts,
+            elapsedMs: preClaimPing.elapsedMs,
+            lastState: preClaimPing.lastState,
+            detail: preClaimPing.detail ?? `Pre-claim ping ${preClaimPing.disposition}.`,
+            response: preClaimPing.response,
+            preClaimPing
+          };
+          outcomes.push(outcome);
+          totals.pingFailed += 1;
+          appendReportLine(args.reportPath, { ...outcome, runId, mode });
+          appendResumeEntry(args.resumePath, {
+            rowIndex,
+            proxy_id: resolved.row.proxy_id,
+            device_ip: resolved.row.device_ip,
+            disposition: outcome.disposition
+          });
+          resumeMap.set(resumeIdentityKey(resolved.row.proxy_id, resolved.row.device_ip), {
+            rowIndex,
+            proxy_id: resolved.row.proxy_id,
+            device_ip: resolved.row.device_ip,
+            disposition: outcome.disposition
+          });
+          continue;
+        }
+      }
+
       const outcome = await runEdgeClaim({
         client: args.client,
         tenantId: args.tenantId,
-        row: validation.row,
+        row: resolved.row,
         pollOptions: args.pollOptions,
         sleeper: args.sleeper,
         now: args.now
       });
+      if (preClaimPing) {
+        outcome.preClaimPing = preClaimPing;
+      }
       outcomes.push(outcome);
       switch (outcome.disposition) {
         case 'succeeded':
@@ -561,20 +668,23 @@ export async function runEdgeClaimBatch(args: RunEdgeClaimBatchArgs): Promise<Ed
         case 'proxy-offline':
           totals.proxyOffline += 1;
           break;
+        case 'ping-failed':
+          totals.pingFailed += 1;
+          break;
         default:
           break;
       }
       appendReportLine(args.reportPath, { ...outcome, runId, mode });
       appendResumeEntry(args.resumePath, {
         rowIndex,
-        proxy_id: validation.row.proxy_id,
-        device_ip: validation.row.device_ip,
+        proxy_id: resolved.row.proxy_id,
+        device_ip: resolved.row.device_ip,
         disposition: outcome.disposition
       });
-      resumeMap.set(resumeIdentityKey(validation.row.proxy_id, validation.row.device_ip), {
+      resumeMap.set(resumeIdentityKey(resolved.row.proxy_id, resolved.row.device_ip), {
         rowIndex,
-        proxy_id: validation.row.proxy_id,
-        device_ip: validation.row.device_ip,
+        proxy_id: resolved.row.proxy_id,
+        device_ip: resolved.row.device_ip,
         disposition: outcome.disposition
       });
     } catch (error) {
@@ -620,8 +730,8 @@ export async function runEdgeClaimBatch(args: RunEdgeClaimBatchArgs): Promise<Ed
 
 export function batchExitedClean(result: EdgeBatchResult): boolean {
   if (result.stoppedEarly) return false;
-  const { failed, rejected, timeout, aborted, proxyOffline } = result.totals;
-  return failed === 0 && rejected === 0 && timeout === 0 && aborted === 0 && proxyOffline === 0;
+  const { failed, rejected, timeout, aborted, proxyOffline, pingFailed } = result.totals;
+  return failed === 0 && rejected === 0 && timeout === 0 && aborted === 0 && proxyOffline === 0 && pingFailed === 0;
 }
 
 export function requireNonEmptyTenantId(tenantId: string | undefined, context: string): string {

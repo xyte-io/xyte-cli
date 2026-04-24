@@ -40,6 +40,15 @@ export const FlowRunDecisionSchema = z.object({
   requiresWrite: z.boolean()
 });
 
+const FlowRunNextActionSchema = z.object({
+  kind: z.enum(['approve_gate', 'provide_input', 'fix_failure']),
+  stepId: z.string(),
+  title: z.string(),
+  requiresWrite: z.boolean(),
+  artifactPaths: z.array(z.string()),
+  command: z.string()
+});
+
 export const FlowRunErrorEntrySchema = z.object({
   timestamp: z.string(),
   stepId: z.string(),
@@ -68,6 +77,7 @@ export const FlowRunSummarySchema = z.object({
   outcome: z.enum(['completed', 'pending_gate', 'needs_input', 'failed']),
   nextResumeStepId: z.string().optional(),
   resumeCommand: z.string().optional(),
+  nextAction: FlowRunNextActionSchema.optional(),
   steps: z.array(FlowRunStepSchema),
   decisions: z.object({
     pending: z.number().int().nonnegative(),
@@ -85,6 +95,7 @@ export const FlowRunSummarySchema = z.object({
 });
 
 export type FlowRunClassification = z.infer<typeof FlowRunClassificationSchema>;
+export type FlowRunNextAction = z.infer<typeof FlowRunNextActionSchema>;
 export type FlowRunStep = z.infer<typeof FlowRunStepSchema>;
 export type FlowRunDecision = z.infer<typeof FlowRunDecisionSchema>;
 export type FlowRunErrorEntry = z.infer<typeof FlowRunErrorEntrySchema>;

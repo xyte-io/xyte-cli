@@ -100,6 +100,10 @@ describe('utility-action-profiles', () => {
       expect(joined).toContain('device_ip');
       expect(joined).toContain('device_model_id');
       expect(joined).toContain('space_id');
+      expect(joined).toContain('pre-claim ping');
+      expect(joined).toContain('true');
+      expect(joined).toContain('false');
+      expect(joined).toContain('blank');
       expect(joined).toMatch(/reject/i);
     });
   });

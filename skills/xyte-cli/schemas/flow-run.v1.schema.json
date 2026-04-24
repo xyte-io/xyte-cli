@@ -91,6 +91,25 @@
     "resumeCommand": {
       "type": "string"
     },
+    "nextAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "stepId", "title", "requiresWrite", "artifactPaths", "command"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["approve_gate", "provide_input", "fix_failure"]
+        },
+        "stepId": { "type": "string" },
+        "title": { "type": "string" },
+        "requiresWrite": { "type": "boolean" },
+        "artifactPaths": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "command": { "type": "string" }
+      }
+    },
     "steps": {
       "type": "array",
       "items": {

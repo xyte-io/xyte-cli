@@ -2,7 +2,12 @@ import { readFileSync } from 'node:fs';
 
 import type { Command } from 'commander';
 
-import { hasBuiltInFlowDefinition, listBuiltInFlowDefinitions } from '../../workflows/flow-catalog';
+import {
+  getBuiltInFlowDefinition,
+  hasBuiltInFlowDefinition,
+  listBuiltInFlowDefinitions,
+  type BuiltInFlowDefinition
+} from '../../workflows/flow-catalog';
 import { parseFlowVarOptions, runDeterministicFlow, type FlowRunMode } from '../../workflows/flow-runner';
 import {
   exportFlowDefinition,
@@ -12,7 +17,13 @@ import {
   updateFlowDefinition
 } from '../../workflows/flow-user-definitions';
 import { parseInspectProviderScope } from '../../utils/parse-domain';
-import { type CliContext, printJson, resolveStrictJson } from '../cli-context';
+import {
+  type CliContext,
+  getExplicitGlobalOutput,
+  printJson,
+  resolveStrictJson,
+  resolveTextJsonOutput
+} from '../cli-context';
 import { CliUserError } from '../../contracts/user-error';
 
 function parseFlowMode(options: { plan?: boolean; apply?: boolean }): FlowRunMode {
@@ -53,19 +64,71 @@ function parseFlowContextJson(value: string | undefined): Record<string, string>
   return result;
 }
 
+function collectRequiredContext(definition: BuiltInFlowDefinition, defaults: Record<string, string> = {}): string[] {
+  const provided = new Set([...Object.keys(definition.contextDefaults ?? {}), ...Object.keys(defaults)]);
+  const required = new Set<string>();
+  for (const step of definition.steps) {
+    if (step.kind !== 'task') {
+      continue;
+    }
+    for (const key of step.requiresContext ?? []) {
+      if (!provided.has(key)) {
+        required.add(key);
+      }
+    }
+  }
+  return [...required].sort();
+}
+
+function safeFirstCommand(flowId: string): string {
+  return `xyte-cli flow run ${flowId} --tenant <tenant-id> --plan`;
+}
+
+function formatFlowListText(items: Array<{
+  type: string;
+  id: string;
+  title: string;
+  intent?: string;
+  writeCapable?: boolean;
+  requiredContext: string[];
+  safeFirstCommand: string;
+}>): string {
+  if (!items.length) {
+    return 'No flows found.\n';
+  }
+  return items
+    .map((item) => [
+      `${item.id} | ${item.type} | ${item.writeCapable ? 'write-capable' : 'read-only'}`,
+      `  title: ${item.title}`,
+      ...(item.intent ? [`  intent: ${item.intent}`] : []),
+      `  required context: ${item.requiredContext.length ? item.requiredContext.join(', ') : 'none'}`,
+      `  start: ${item.safeFirstCommand}`
+    ].join('\n'))
+    .join('\n\n') + '\n';
+}
+
 export function registerFlowCommands(parent: Command, ctx: CliContext): void {
-  const flow = parent.command('flow').description('Deterministic flow orchestration (output is always JSON)');
+  const flow = parent.command('flow').description('Deterministic flow orchestration');
 
   flow
     .command('list')
     .description('List built-in and custom flow IDs')
-    .action(async () => {
+    .option('--format <format>', 'json|text', 'json')
+    .action(async function (options: { format?: string }) {
+      const settings = await ctx.resolveSettings();
+      const output = resolveTextJsonOutput({
+        output: options.format ?? getExplicitGlobalOutput(this),
+        stdoutIsTTY: ctx.stdoutIsTTY,
+        settings
+      });
       const builtIn = listBuiltInFlowDefinitions().map((item) => ({
         type: 'built-in' as const,
         id: item.id,
         title: item.title,
         intent: item.intent,
-        writeCapable: item.writeCapable
+        writeCapable: item.writeCapable,
+        requiredContext: collectRequiredContext(item),
+        safeFirstCommand: safeFirstCommand(item.id)
       }));
       const { defs: customDefs, skipped } = await listFlowDefinitions();
       for (const { path: p, reason } of skipped) {
@@ -75,19 +138,27 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
         type: 'custom' as const,
         id: item.id,
         title: item.title,
-        description: item.description,
+        intent: item.description,
+        writeCapable: getBuiltInFlowDefinition(item.basedOn).writeCapable,
+        requiredContext: collectRequiredContext(getBuiltInFlowDefinition(item.basedOn), item.defaults),
+        safeFirstCommand: safeFirstCommand(item.id),
         basedOn: item.basedOn,
         defaults: item.defaults,
         path: item.path,
         updatedAtUtc: item.updatedAtUtc
       }));
 
+      if (output === 'text') {
+        ctx.stdout.write(formatFlowListText([...builtIn, ...custom]));
+        return;
+      }
+
       printJson(ctx.stdout, {
         schemaVersion: 'xyte.flow.catalog.v1',
         generatedAtUtc: new Date().toISOString(),
         builtIn,
         custom
-      });
+      }, { strictJson: resolveStrictJson({ settings }) });
     });
 
   flow

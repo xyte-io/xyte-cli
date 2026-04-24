@@ -2,7 +2,11 @@ import type { Command } from 'commander';
 
 import { CliUserError } from '../../contracts/user-error';
 import type { UtilityInputFormat } from '../../utils/input-parser';
-import type { UtilityPreparePrimaryFormat } from '../../workflows/utility-action-profiles';
+import type {
+  UtilityExecutionSupport,
+  UtilityPrepareMode,
+  UtilityPreparePrimaryFormat
+} from '../../workflows/utility-action-profiles';
 import { runUtilityPrepare, listUtilityPrepareActions } from '../../workflows/utility-prepare';
 import { runSpaceImportTree } from '../../workflows/utility-commands';
 import { runDeviceMatch } from '../../workflows/device-match';
@@ -37,6 +41,29 @@ function parseUtilityInputFormat(value: string | undefined): UtilityInputFormat 
   return normalized as UtilityInputFormat;
 }
 
+function parseUtilityPrepareMode(value: string | undefined): UtilityPrepareMode | undefined {
+  if (!value || !value.trim()) {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized !== 'friendly' && normalized !== 'generic') {
+    throw new CliUserError({ summary: `Invalid mode: ${value}. Use friendly|generic.` });
+  }
+  return normalized as UtilityPrepareMode;
+}
+
+function parseUtilityExecutionSupport(value: string | undefined): UtilityExecutionSupport | undefined {
+  if (!value || !value.trim()) {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  const allowed: UtilityExecutionSupport[] = ['space.import-tree', 'device.move', 'edge.claim-batch', 'call-loop-only'];
+  if (!allowed.includes(normalized as UtilityExecutionSupport)) {
+    throw new CliUserError({ summary: `Invalid execution support: ${value}. Use ${allowed.join('|')}.` });
+  }
+  return normalized as UtilityExecutionSupport;
+}
+
 async function handleUtilPrepare(
   ctx: CliContext,
   options: {
@@ -68,6 +95,8 @@ async function handleUtilListActions(
     format?: string;
     entity?: string;
     includeGeneric?: boolean;
+    mode?: string;
+    executionSupport?: string;
     strictJson?: boolean;
   }
 ): Promise<void> {
@@ -79,7 +108,9 @@ async function handleUtilListActions(
   });
   const actions = listUtilityPrepareActions({
     entity: options.entity,
-    includeGeneric: options.includeGeneric !== false
+    includeGeneric: options.includeGeneric !== false,
+    mode: parseUtilityPrepareMode(options.mode),
+    executionSupport: parseUtilityExecutionSupport(options.executionSupport)
   });
   if (output === 'json') {
     printJson(ctx.stdout, actions, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
@@ -91,7 +122,7 @@ async function handleUtilListActions(
   }
   for (const action of actions) {
     ctx.stdout.write(
-      `${action.actionKey} | entity=${action.entity} | mode=${action.mode} | execution=${action.executionSupport}\n`
+      `${action.actionKey} | ${action.title} | entity=${action.entity} | mode=${action.mode} | execution=${action.executionSupport}\n`
     );
   }
 }
@@ -230,12 +261,16 @@ export function registerUtilCommands(parent: Command, ctx: CliContext): void {
     .command('list-actions')
     .description('List utility prepare action keys')
     .option('--entity <entity>', 'Filter by entity')
+    .option('--mode <mode>', 'friendly|generic')
+    .option('--execution-support <support>', 'space.import-tree|device.move|edge.claim-batch|call-loop-only')
     .option('--include-generic', 'Include generic profiles', true)
     .option('--no-include-generic', 'Exclude generic profiles')
     .option('--format <format>', 'json|text')
     .option('--strict-json', 'Fail on non-serializable output')
     .action(async function (options: {
       entity?: string;
+      mode?: string;
+      executionSupport?: string;
       includeGeneric?: boolean;
       format?: string;
       strictJson?: boolean;

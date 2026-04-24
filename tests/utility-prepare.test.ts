@@ -57,6 +57,11 @@ describe('utility prepare workflow', () => {
     expect(result.executionSupport).toBe('space.import-tree');
     expect(readFileSync(result.artifacts.primary, 'utf8')).toBe('path,space_type,config\n');
     expect(readFileSync(result.artifacts.rejected, 'utf8')).toBe('path,space_type,config,reject_reason\n');
+    const notes = readFileSync(result.artifacts.notes, 'utf8');
+    expect(notes).toContain('path: required');
+    expect(notes).toContain('## JSONL Example');
+    expect(notes).toContain('missing_path');
+    expect(notes).toContain('## Safe Next Commands');
   });
 
   it('builds device.move friendly contract and csv scaffold', () => {
@@ -85,6 +90,7 @@ describe('utility prepare workflow', () => {
     expect(readFileSync(result.artifacts.primary, 'utf8')).toBe(
       'device_id,target_space_id,device_name,current_space_id,target_space_name\n'
     );
+    expect(readFileSync(result.artifacts.notes, 'utf8')).toContain('target_space_id: required');
   });
 
   it('builds generic endpoint contract with path/query/body canonical fields', () => {
@@ -102,6 +108,7 @@ describe('utility prepare workflow', () => {
     expect(result.mode).toBe('generic');
     expect(result.canonical.headers).toEqual(['ticket_id', 'query_json', 'body_json']);
     expect(result.executionSupport).toBe('call-loop-only');
+    expect(readFileSync(result.artifacts.notes, 'utf8')).toContain('ticket_id: required');
   });
 
   it('adds send-command preflight guidance in suggested commands', () => {
@@ -157,13 +164,21 @@ describe('utility prepare workflow', () => {
     expect(result.artifacts.primary).toBe(join(outDir, 'organization-edge-startclaim.csv'));
     expect(result.artifacts.rejected).toBe(join(outDir, 'organization-edge-startclaim.rejected.csv'));
     expect(result.artifacts.notes).toBe(join(outDir, 'organization-edge-startclaim.notes.md'));
+    expect(result.canonical.headers).toContain('skip_connectivity_check');
+    expect(readFileSync(result.artifacts.primary, 'utf8')).toContain('skip_connectivity_check');
+    expect(result.decodeRules.join(' ')).toContain('pre-claim ping');
     expect(result.suggestedCommands.apply).toContain(result.artifacts.primary);
     expect(result.suggestedCommands.apply).toContain('--report');
     expect(result.suggestedCommands.apply).toContain('--resume-artifact');
     expect(result.suggestedCommands.apply).toContain(join(outDir, 'edge-claim.apply.ndjson'));
     expect(result.suggestedCommands.apply).toContain(join(outDir, 'edge-claim.resume.ndjson'));
+    expect(result.suggestedCommands.apply).not.toContain('--skip-connectivity-check');
     expect(result.suggestedCommands.next).toContain('--resume-artifact <path>');
     expect(result.suggestedCommands.next).not.toContain('--resume <run-id>');
+    const notes = readFileSync(result.artifacts.notes, 'utf8');
+    expect(notes).toContain('proxy_id: required');
+    expect(notes).toContain('skip_connectivity_check: optional');
+    expect(notes).toContain('invalid_custom_parameters');
   });
 
   it('fails on unknown action and on scaffold collision without force', () => {
@@ -205,9 +220,14 @@ describe('utility prepare workflow', () => {
 
   it('lists actions and validates prepare schema output', () => {
     const actions = listUtilityPrepareActions();
+    expect(actions[0]?.mode).toBe('friendly');
     expect(actions.some((item) => item.actionKey === 'organization.devices.claimDevice')).toBe(true);
     expect(actions.some((item) => item.actionKey === 'device.move')).toBe(true);
     expect(actions.some((item) => item.actionKey === 'space.import-tree')).toBe(true);
+    expect(listUtilityPrepareActions({ mode: 'friendly' }).every((item) => item.mode === 'friendly')).toBe(true);
+    expect(
+      listUtilityPrepareActions({ executionSupport: 'edge.claim-batch' }).map((item) => item.actionKey)
+    ).toEqual(['organization.edge.startClaim']);
 
     const root = makeTempRoot('xyte-prepare-schema-');
     const inputPath = join(root, 'source.md');

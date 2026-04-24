@@ -3,8 +3,7 @@ import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-const C2C_UNSUPPORTED_SENTENCE =
-  'Cloud-to-Cloud (C2C) claiming is not available via the public Xyte API today';
+const C2C_UNSUPPORTED_SENTENCE = 'Cloud-to-Cloud (C2C) claiming is not available via the public Xyte API today';
 const END_CUSTOMER_PORTAL = 'End Customer Portal';
 const NATIVE_KEY = 'organization.devices.claimDevice';
 const EDGE_KEY = 'organization.edge.startClaim';
@@ -38,6 +37,19 @@ describe('claim-guidance surfaces', () => {
       it('documents the mandatory disambiguation question', () => {
         expect(content).toMatch(/Native \/ direct/);
         expect(content).toMatch(/Edge/);
+      });
+
+      it('documents batch-owned edge connectivity checks', () => {
+        expect(content).toContain('pre-claim');
+        expect(content).toContain('ping-failed');
+      });
+
+      it('documents true, false, blank, conflict, and resume retry semantics', () => {
+        expect(content).toContain('skip_connectivity_check=true');
+        expect(content).toContain('skip_connectivity_check=false');
+        expect(content.toLowerCase()).toContain('blank');
+        expect(content.toLowerCase()).toContain('conflict');
+        expect(content.toLowerCase()).toContain('resume');
       });
     });
   }

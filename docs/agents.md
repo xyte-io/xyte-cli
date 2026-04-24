@@ -29,7 +29,7 @@ Use xyte-cli commands directly and keep outputs JSON-first.
 Prefer one deterministic command over multi-step ad-hoc orchestration:
 
 ```bash
-xyte-cli flow list
+xyte-cli flow list --format text
 xyte-cli flow run <flow-id> --tenant <tenant-id> --plan
 ```
 

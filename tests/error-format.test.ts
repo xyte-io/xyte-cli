@@ -17,6 +17,12 @@ describe('error format argv parsing', () => {
     expect(parseErrorFormatArg(['ops', 'inspect', 'fleet', '--error-format', 'text', '--output', 'json'])).toBe('text');
   });
 
+  it('rejects invalid explicit values', () => {
+    expect(() => parseErrorFormatArg(['--error-format', 'xml'])).toThrow('Invalid error format');
+    expect(() => parseErrorFormatArg(['--error-format=xml'])).toThrow('Invalid error format');
+    expect(() => parseErrorFormatArg(['--error-format'])).toThrow('Missing error format value');
+  });
+
   it('prefers explicit CLI value over environment fallback', () => {
     expect(resolveCliErrorFormat(['--error-format', 'text'], 'json')).toBe('text');
     expect(resolveCliErrorFormat(['--error-format=json'], 'text')).toBe('json');

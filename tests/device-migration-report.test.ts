@@ -12,7 +12,7 @@ const executionFixture = {
   tenantId: 'tenant-1',
   command: 'device.move' as const,
   mode: 'apply' as const,
-  totals: { rows: 3, succeeded: 2, failed: 1, skipped: 0 },
+  totals: { rows: 3, planned: 0, succeeded: 2, failed: 1, skipped: 0 },
   stoppedEarly: false
 };
 

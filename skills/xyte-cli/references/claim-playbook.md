@@ -52,6 +52,12 @@ Heartbeat model id: `5dc4ba6c-c323-4118-a4e4-504f074426f2`. `proxy_id` lives in 
 
 Lifecycle: `startClaim` returns 204, then poll `getClaimStatus` until `result` is `success` or `failed`.
 
+Connectivity check rule:
+- Single `edge claim` keeps the API default unless `--skip-connectivity-check` is passed.
+- Batch `edge claim-batch` runs `edge ping` internally before `startClaim` for blank or `skip_connectivity_check=false` rows.
+- Batch rows with `skip_connectivity_check=true` skip the internal ping and send `skip_connectivity_check: true`.
+- Standalone `edge ping` is diagnostic; do not treat a prior ping command as evidence consumed by batch claim.
+
 ### 2a. Single edge device
 
 ```bash
@@ -98,6 +104,8 @@ xyte-cli edge claim-batch \
   --apply
 ```
 
+To skip batch-owned pre-claim ping for blank rows, add `--skip-connectivity-check`. If any row explicitly says `skip_connectivity_check=false`, the batch rejects that row as a conflict instead of overriding it.
+
 Resume an interrupted run (ctrl-C, network blip, partial failure):
 
 ```bash
@@ -114,6 +122,8 @@ Replaying after all rows are terminal-success is a no-op (exit 0, zero API calls
 ### 2c. Edge ping (connectivity probe)
 
 ```bash
+xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --plan
+# after user approves:
 xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --apply
 xyte-cli edge ping-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip>
 ```
@@ -136,7 +146,7 @@ The public Xyte API does not expose C2C claiming today. Do not invent an endpoin
 | 4 | `startClaim` → 401 | `aborted` | Abort the whole flow; point user at `xyte-cli setup run` / `config key`. |
 | 5 | Device already claimed behind the same edge | `already-claimed` | Skip row; batch continues. |
 | 6 | Proxy offline (terminal-failed or 422 "edge offline") | `proxy-offline` | Group in summary for retry-after-fix; run `xyte-cli edge ping` to confirm before re-running. |
-| 7 | `skip_connectivity_check=false` and ping fails mid-claim | `failed` | Surface both claim id and ping reason. |
+| 7 | Batch pre-claim ping rejected/failed/timed out | `ping-failed` | Surface ping result; do not call `startClaim`; resume retries the row. |
 | 8 | N-of-M rows succeed | exit 1 | Per-row NDJSON report via `--report`; rerun with `--resume-artifact`. |
 | 9 | Resume after ctrl-C | — | `--resume-artifact` skips rows previously recorded as `succeeded` or `already-claimed` and re-runs all other rows. |
 | 10 | Malformed CSV/XLSX | — | `util prepare` routes bad rows to `organization-edge-startclaim.rejected.csv`; batch refuses to start on schema violations. |
@@ -147,7 +157,7 @@ The public Xyte API does not expose C2C claiming today. Do not invent an endpoin
 | 15 | Mixed `proxy_id` rows in one batch | — | Grouped per proxy for logging, not serialized across proxies. |
 | 16 | `--plan` over batch | — | Zero API calls; exits 0 only if plan is clean. |
 | 17 | Output format | — | All edge commands honor `--output json\|text`. |
-| 18 | Logs | — | Every mutating call lands in `xyte-cli logs list`; batch shares one logical run id. |
+| 18 | Logs | — | Every mutating call lands in `xyte-cli logs list`; use `logs show --entry <sessionId>:<seq>` or `logs show --request-id <id>` for exact lookup. |
 | 19 | Idempotent resume after full success | exit 0 | No API calls. |
 | 20 | Multi-tenant | — | Always pass `--tenant <tenant-id>`. |
 
@@ -160,5 +170,5 @@ The public Xyte API does not expose C2C claiming today. Do not invent an endpoin
 
 ## 6. Summary contracts
 
-- `xyte.edge.claim-batch.v1` — batch summary written to `--report` NDJSON and stdout JSON. Fields: `schemaVersion`, `generatedAtUtc`, `tenantId`, `mode`, `runId`, `reportPath?`, `resumePath?`, `totals` (per disposition), `stoppedEarly`, `abortDetail?`, `rows[]`.
+- `xyte.edge.claim-batch.v1` — batch summary written to `--report` NDJSON and stdout JSON. Fields: `schemaVersion`, `generatedAtUtc`, `tenantId`, `mode`, `runId`, `reportPath?`, `resumePath?`, `totals` (per disposition, including `pingFailed`), `stoppedEarly`, `abortDetail?`, `rows[]`. Rows may include `planned` in plan mode and `preClaimPing` when batch performed a pre-claim ping.
 - `xyte.edge.ping.v1` — single-probe result.

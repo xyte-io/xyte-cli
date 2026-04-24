@@ -167,10 +167,11 @@ xyte-cli api call organization.edge.getPingStatus \
 ```
 
 Ergonomic wrappers (recommended):
-- Single claim: `xyte-cli edge claim --plan|--apply`
-- Bulk claim: `xyte-cli edge claim-batch --input <primary-csv> --plan|--apply [--resume-artifact <path>]`
+- Single claim: `xyte-cli edge claim --plan`, then `--apply` after explicit approval.
+- Bulk claim: `xyte-cli edge claim-batch --input <primary-csv> --plan [--skip-connectivity-check]`, then `--apply --resume-artifact <path>` after explicit approval.
+- In bulk claim, blank or `skip_connectivity_check=false` rows run an internal pre-claim ping; standalone `edge ping` is diagnostic.
 - Status peek: `xyte-cli edge claim-status`, `xyte-cli edge ping-status`
-- Connectivity probe: `xyte-cli edge ping --plan|--apply`
+- Connectivity probe: `xyte-cli edge ping --plan`, then `--apply` after explicit approval.
 
 See `references/claim-playbook.md` for the full decision tree and `references/flow-recipes.md` for flow-level recipes.
 
@@ -178,15 +179,18 @@ See `references/claim-playbook.md` for the full decision tree and `references/fl
 
 ```bash
 # discover preprocess actions
-xyte-cli util list-actions --output text
+xyte-cli util list-actions --output text --mode friendly
 
 # scaffold canonical files for one action
 xyte-cli util prepare --action organization.devices.claimDevice --input ./raw-source.xlsx --output-dir ./prepared
 
-# scaffold and execute the dedicated import-tree utility
+# scaffold and execute dedicated utility workflows
 xyte-cli util prepare --action space.import-tree --input ./raw-tree.pdf --output-dir ./prepared
 xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv
 xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv --apply --report ./artifacts/space-import.ndjson
+
+xyte-cli util prepare --action organization.edge.startClaim --input ./edge-devices.xlsx --output-dir ./prepared
+xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --plan
 ```
 
 Supported prepare output formats:
