@@ -1325,11 +1325,42 @@ async function runSteps(state: RunState): Promise<ExecuteStepsResult> {
   return { outcome, nextStepIndex, decisions, errors, durationMs: Date.now() - runStartedAt };
 }
 
-function shellQuoteArg(value: string): string {
+function posixQuoteArg(value: string): string {
   if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(value)) {
     return value;
   }
   return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function windowsQuoteArg(value: string): string {
+  if (/^[A-Za-z0-9_@+=:,./\\-]+$/.test(value)) {
+    return value;
+  }
+
+  let quoted = '"';
+  let backslashes = 0;
+  for (const char of value) {
+    if (char === '\\') {
+      backslashes += 1;
+      continue;
+    }
+    if (char === '"') {
+      quoted += '\\'.repeat(backslashes * 2 + 1);
+      quoted += '"';
+      backslashes = 0;
+      continue;
+    }
+    quoted += '\\'.repeat(backslashes);
+    quoted += char;
+    backslashes = 0;
+  }
+  quoted += '\\'.repeat(backslashes * 2);
+  quoted += '"';
+  return quoted;
+}
+
+function commandQuoteArg(value: string): string {
+  return process.platform === 'win32' ? windowsQuoteArg(value) : posixQuoteArg(value);
 }
 
 function usesNonDefaultOutDir(outDir: string): boolean {
@@ -1353,7 +1384,7 @@ function buildResumeCommand(args: RunContextArgs, runId: string, outcome: FlowRu
     parts.push('--out-dir', args.outDir);
   }
   parts.push('--resume', runId);
-  return parts.map(shellQuoteArg).join(' ');
+  return parts.map(commandQuoteArg).join(' ');
 }
 
 function collectOutputArtifactPaths(output: unknown, paths: Set<string>): void {

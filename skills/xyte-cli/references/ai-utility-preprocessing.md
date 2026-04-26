@@ -13,7 +13,7 @@ This runbook defines utility preprocessing with `xyte-cli util prepare`.
 1. Run `xyte-cli util list-actions` to discover supported actions.
 2. Run `xyte-cli util prepare --action <action-key> --input <source>`.
 3. CLI emits `xyte.utility.prepare.v1` and scaffolds canonical files.
-4. Review the generated `.notes.md` file first; it is the human-facing column glossary, required/optional field guide, reject taxonomy, JSONL example, and safe-command checklist.
+4. Review the generated `.notes.md` file first; it is the human-facing column glossary, required/optional field guide, reject taxonomy, canonical JSON shape, and safe-command checklist.
 5. External AI fills primary/rejected/notes using the contract.
 6. Ask the user what to do next. Never auto-apply.
 7. For `space.import-tree` and `device.move`, run dry-run then apply with explicit user approval. Dry-run summaries count validated rows under `totals.planned`, not `totals.succeeded`.

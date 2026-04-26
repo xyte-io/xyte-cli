@@ -241,7 +241,7 @@ function buildNotes(
     '## Canonical Fields',
     ...profile.headers.map((header) => `- ${header}: ${requiredSet.has(header) ? 'required' : 'optional'}; example ${exampleForHeader(profile, header)}`),
     '',
-    '## JSONL Example',
+    '## Canonical JSON Shape',
     '```json',
     JSON.stringify(profile.jsonShape, null, 2),
     '```',

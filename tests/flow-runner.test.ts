@@ -1849,6 +1849,57 @@ describe('flow runner', () => {
     expect(calledUrls.every((url) => url.includes('/partner/'))).toBe(true);
   });
 
+  it('uses Windows argument quoting in generated resume commands on Windows', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform');
+    if (!platformDescriptor) {
+      throw new Error('process.platform descriptor missing');
+    }
+
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.setup-readiness-10m',
+      title: 'Windows Resume Command',
+      intent: 'resume command should be copy-pasteable on Windows',
+      writeCapable: true,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'gate',
+          id: 'gate_1',
+          title: 'Approval',
+          command: 'Human gate',
+          mutating: true,
+          detail: 'approve resume'
+        }
+      ]
+    };
+
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte flow runner ${Date.now()} windows resume`);
+    try {
+      Object.defineProperty(process, 'platform', { ...platformDescriptor, value: 'win32' });
+      const first = await runDeterministicFlow({
+        flowId: definition.id,
+        tenantId: 'acme',
+        mode: 'plan',
+        outDir,
+        context: {},
+        once: true,
+        strictJson: true,
+        profileStore,
+        secretStore,
+        client
+      });
+
+      expect(first.outcome).toBe('pending_gate');
+      expect(first.resumeCommand).toContain(`--out-dir "${outDir}"`);
+      expect(first.resumeCommand).not.toContain(`--out-dir '${outDir}'`);
+      expect(first.nextAction?.command).toBe(first.resumeCommand);
+    } finally {
+      Object.defineProperty(process, 'platform', platformDescriptor);
+    }
+  });
+
   it('fails closed when resume inputs metadata is malformed', async () => {
     const { profileStore, secretStore, client } = await makeClient();
     const definition: BuiltInFlowDefinition = {

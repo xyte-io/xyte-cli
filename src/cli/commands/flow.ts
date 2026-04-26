@@ -113,11 +113,11 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
   flow
     .command('list')
     .description('List built-in and custom flow IDs')
-    .option('--format <format>', 'json|text', 'json')
+    .option('--format <format>', 'json|text')
     .action(async function (options: { format?: string }) {
       const settings = await ctx.resolveSettings();
       const output = resolveTextJsonOutput({
-        output: options.format ?? getExplicitGlobalOutput(this),
+        output: options.format ?? getExplicitGlobalOutput(this) ?? 'json',
         stdoutIsTTY: ctx.stdoutIsTTY,
         settings
       });

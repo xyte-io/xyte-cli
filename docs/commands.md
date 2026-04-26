@@ -200,7 +200,7 @@ xyte-cli util move-devices --tenant <tenant-id> --input ./device-moves.csv \
 
 Utility notes:
 - dry-run summaries count rows under `totals.planned`; `totals.succeeded` is reserved for applied rows.
-- `util prepare` writes a `.notes.md` human review artifact with column glossary, reject taxonomy, JSONL example, and safe next commands.
+- `util prepare` writes a `.notes.md` human review artifact with column glossary, reject taxonomy, canonical JSON shape, and safe next commands.
 
 ## Edge Devices
 

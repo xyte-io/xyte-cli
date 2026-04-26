@@ -4294,6 +4294,17 @@ describe('cli integration', () => {
     expect(text).toContain('flow.device-migration');
     expect(text).toContain('required context: source_space_id, target_path_includes');
     expect(text).toContain('start: xyte-cli flow run flow.device-migration --tenant <tenant-id> --plan');
+
+    stdout.write.mockClear();
+    await program.parseAsync(['node', 'xyte-cli', '--output', 'text', 'flow', 'list']);
+    const globalText = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(globalText).toContain('flow.device-migration');
+    expect(globalText).toContain('required context: source_space_id, target_path_includes');
+
+    stdout.write.mockClear();
+    await program.parseAsync(['node', 'xyte-cli', '--output', 'text', 'flow', 'list', '--format', 'json']);
+    const explicitLocalJson = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(explicitLocalJson.builtIn.some((item: any) => item.id === 'flow.device-migration')).toBe(true);
   });
 
   it('skips custom flows with stale basedOn values in flow list', async () => {

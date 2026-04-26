@@ -59,7 +59,7 @@ describe('utility prepare workflow', () => {
     expect(readFileSync(result.artifacts.rejected, 'utf8')).toBe('path,space_type,config,reject_reason\n');
     const notes = readFileSync(result.artifacts.notes, 'utf8');
     expect(notes).toContain('path: required');
-    expect(notes).toContain('## JSONL Example');
+    expect(notes).toContain('## Canonical JSON Shape');
     expect(notes).toContain('missing_path');
     expect(notes).toContain('## Safe Next Commands');
   });

@@ -10,7 +10,7 @@ References:
 ## Safety Defaults
 
 1. Always run preprocessing first.
-2. Review the generated `.notes.md` file; it is the column glossary, required/optional guide, reject taxonomy, JSONL example, and safe-command checklist.
+2. Review the generated `.notes.md` file; it is the column glossary, required/optional guide, reject taxonomy, canonical JSON shape, and safe-command checklist.
 3. After files are generated, ask the user what to do next.
 4. Never auto-run `--apply`.
 
