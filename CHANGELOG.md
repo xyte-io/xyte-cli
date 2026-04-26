@@ -6,6 +6,28 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-04-26
+
+### Added
+- Added `edge claim-batch --skip-connectivity-check` for batches that intentionally skip batch-owned pre-claim connectivity checks on blank rows.
+- Added batch-owned pre-claim ping behavior for `edge claim-batch`: blank or `skip_connectivity_check=false` rows now run `edge ping` before `startClaim`; `skip_connectivity_check=true` rows skip the ping and send `true`.
+- Added `ping-failed`, `preClaimPing`, and `totals.pingFailed` reporting so batch claim failures clearly distinguish connectivity probe failures from claim failures.
+- Added `nextAction` hints to flow run summaries, `flow list --format text|json` discovery output, and non-interactive `logs show` lookup by entry or request id.
+
+### Changed
+- Updated `flow.edge-claim-batch`, docs, and the shipped `xyte-cli` skill guidance to describe plan-first batch claiming, resume artifacts, skip-connectivity precedence, and the row-result-only resume limitation.
+- Changed utility batch dry-run reporting to count validated rows under `totals.planned` instead of `totals.succeeded`.
+- Improved generated `util prepare` notes with a clearer column glossary, reject taxonomy, canonical JSON shape, and safe next commands.
+
+### Fixed
+- Fixed `edge claim-batch` so rows that require connectivity verification no longer call `startClaim` before the CLI has run and completed the corresponding Edge ping.
+- Fixed batch resume handling so previously `succeeded` or `already-claimed` rows are skipped before skip-connectivity conflict checks.
+- Fixed generated flow resume commands to include custom `--out-dir` values and use platform-appropriate argument quoting.
+- Fixed malformed or missing flow resume metadata to fail closed instead of silently falling back to invocation defaults.
+- Fixed global `--output` handling for `flow list` and `logs` commands when local `--format` was not explicitly provided.
+- Fixed exact `logs show` lookups so they are not limited to the recent log tail.
+- Added confirmation for `config tenant remove` and clarified removed profile/key-slot metadata in the command output.
+
 ## [0.10.1] - 2026-04-20
 
 ### Added
