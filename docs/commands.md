@@ -52,7 +52,7 @@ xyte-cli config path [--output json|text]
 xyte-cli config set <key> <value> [--scope user|workspace]
 xyte-cli config unset <key> [--scope user|workspace]
 xyte-cli config doctor --tenant <tenant-id> --output json
-xyte-cli doctor install [--output json|text]
+xyte-cli doctor install [--format json|text]
 xyte-cli upgrade --check --output json
 xyte-cli upgrade --yes --output json
 xyte-cli --log-actions [--log-actions-verbose] status --tenant <tenant-id>

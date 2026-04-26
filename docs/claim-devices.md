@@ -128,6 +128,11 @@ Batch connectivity behavior:
 - `--skip-connectivity-check` applies skip mode to blank rows; explicit row `false` values are rejected as conflicts.
 - Standalone `edge ping` is diagnostic. It is not a required evidence-producing prerequisite for a later batch claim.
 
+Batch artifacts:
+- stdout carries the `xyte.edge.claim-batch.v1` summary.
+- `--report` writes per-row audit NDJSON for review/debugging.
+- `--resume-artifact` writes row resume state; reuse the same path after interruption or partial failure.
+
 Exit codes:
 - `0` — every row ended in `succeeded` or `already-claimed`.
 - `1` — one or more rows ended in `failed`, `rejected`, `timeout`, `proxy-offline`, `ping-failed`, or `aborted`; fix them and resume.

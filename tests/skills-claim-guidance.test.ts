@@ -69,6 +69,20 @@ describe('claim-guidance surfaces', () => {
     expect(playbook).toContain('organization-edge-startclaim.rejected.csv');
   });
 
+  it('separates edge batch stdout summary, report, and resume artifacts', () => {
+    const docs = read('docs/claim-devices.md');
+    const playbook = read('skills/xyte-cli/references/claim-playbook.md');
+
+    for (const content of [docs, playbook]) {
+      expect(content).toContain('xyte.edge.claim-batch.v1');
+      expect(content).toContain('--report');
+      expect(content).toContain('per-row audit NDJSON');
+      expect(content).toContain('--resume-artifact');
+      expect(content).toContain('resume state');
+    }
+    expect(playbook).not.toContain('batch summary written to `--report`');
+  });
+
   it('uses the real batch-flow input context key in SKILL.md', () => {
     const skill = read('skills/xyte-cli/SKILL.md');
 

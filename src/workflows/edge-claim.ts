@@ -541,6 +541,23 @@ export async function runEdgeClaimBatch(args: RunEdgeClaimBatchArgs): Promise<Ed
       continue;
     }
 
+    const existing = resumeMap.get(resumeIdentityKey(validation.row.proxy_id, validation.row.device_ip));
+    if (existing && (existing.disposition === 'succeeded' || existing.disposition === 'already-claimed')) {
+      const outcome: EdgeRowOutcome = {
+        rowIndex,
+        proxy_id: validation.row.proxy_id,
+        device_ip: validation.row.device_ip,
+        disposition: 'skipped',
+        attempts: 0,
+        elapsedMs: 0,
+        detail: `Already ${existing.disposition} on prior run; skipped.`
+      };
+      outcomes.push(outcome);
+      totals.skipped += 1;
+      appendReportLine(args.reportPath, { ...outcome, runId, mode });
+      continue;
+    }
+
     const resolved = resolveBatchClaim(validation.row, args.skipConnectivityCheck === true);
     if ('rejectReason' in resolved) {
       const outcome: EdgeRowOutcome = {
@@ -556,23 +573,6 @@ export async function runEdgeClaimBatch(args: RunEdgeClaimBatchArgs): Promise<Ed
       outcomes.push(outcome);
       totals.rejected += 1;
       appendReportLine(args.reportPath, { ...outcome, input: raw, runId, mode });
-      continue;
-    }
-
-    const existing = resumeMap.get(resumeIdentityKey(resolved.row.proxy_id, resolved.row.device_ip));
-    if (existing && (existing.disposition === 'succeeded' || existing.disposition === 'already-claimed')) {
-      const outcome: EdgeRowOutcome = {
-        rowIndex,
-        proxy_id: resolved.row.proxy_id,
-        device_ip: resolved.row.device_ip,
-        disposition: 'skipped',
-        attempts: 0,
-        elapsedMs: 0,
-        detail: `Already ${existing.disposition} on prior run; skipped.`
-      };
-      outcomes.push(outcome);
-      totals.skipped += 1;
-      appendReportLine(args.reportPath, { ...outcome, runId, mode });
       continue;
     }
 

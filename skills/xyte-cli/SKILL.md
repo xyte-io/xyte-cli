@@ -103,7 +103,7 @@ Edge-claim terminal-state decision tree:
 - Status returns 422 "not initiated" → first poll tolerates a bounded race; real 422 thereafter is rejection.
 - 429 → exponential backoff with jitter; honor `Retry-After`.
 - Pre-claim ping rejected/failed/timeout in batch → row marked `ping-failed`; no `startClaim`; resume retries the row.
-- Partial batch failure or `proxy-offline` rows → exit code 1 with a per-row NDJSON report (`--report`); fix rejects, re-run with the NDJSON `--resume-artifact`.
+- Partial batch failure or `proxy-offline` rows → exit code 1 with a per-row audit NDJSON report (`--report`); fix rejects, re-run with the separate `--resume-artifact` path.
 - `--plan` over a batch → zero API calls; exit 0 only if every row would succeed.
 
 Full recipes and the 20-row edge-case matrix: `references/claim-playbook.md`.
@@ -131,7 +131,7 @@ Rules:
 - `xyte-cli setup status --tenant <tenant-id> --output json`
 - `xyte-cli config doctor --tenant <tenant-id> --output json`
 - `xyte-cli config show --scope resolved`
-- `xyte-cli doctor install --output json`
+- `xyte-cli doctor install --format json`
 
 2. Auth/tenant (if missing or incomplete):
 - human-guided setup: `xyte-cli setup run --tenant <tenant-id> [--provider <xyte-org|xyte-partner>]`
@@ -195,7 +195,7 @@ Provider/report behavior:
 | Edge claim status | `xyte-cli edge claim-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip>` |
 | Edge connectivity probe | `xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip> --plan` |
 | Edge ping status | `xyte-cli edge ping-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip>` |
-| Install diagnostics | `xyte-cli doctor install --output json` |
+| Install diagnostics | `xyte-cli doctor install --format json` |
 | Settings introspection | `xyte-cli config show --scope resolved` |
 | Interactive console | `xyte-cli ops console` |
 | Headless snapshot | `xyte-cli ops console --headless --screen <screen> --output json --once --tenant <tenant-id>` |
@@ -370,7 +370,7 @@ Canonical schemas:
   - for automation, use `--key-file <path>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`
   - for secret managers, use `--key-command "<cmd>"`, e.g. `--key-command "op read op://Employee/Xyte/credential"` — xyte-cli runs the command and uses its stdout as the key
 - Install wiring diagnostics:
-  - `xyte-cli doctor install --output json`
+  - `xyte-cli doctor install --format json`
 - Readiness/connectivity:
   - `xyte-cli setup status --tenant <tenant-id> --output json`
   - `xyte-cli setup status --tenant <tenant-id> --field tenantId`

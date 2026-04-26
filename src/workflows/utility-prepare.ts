@@ -212,6 +212,12 @@ function rejectTaxonomy(profile: UtilityActionProfile, requiredHeaders: string[]
   const reasons = requiredHeaders.map((header) => `missing_${header}`);
   const jsonHeaders = profile.headers.filter((header) => header.endsWith('_json') || header === 'config' || header === 'custom_parameters');
   reasons.push(...jsonHeaders.map((header) => `invalid_${header}`));
+  if (profile.actionKey === 'organization.edge.startClaim') {
+    reasons.push('invalid_device_ip', 'invalid_space_id', 'invalid_skip_connectivity_check');
+  }
+  if (profile.actionKey === 'device.move') {
+    reasons.push('invalid_target_space_id');
+  }
   reasons.push('ambiguous_row');
   return [...new Set(reasons)];
 }

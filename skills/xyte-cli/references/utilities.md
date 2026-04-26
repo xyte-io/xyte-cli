@@ -94,6 +94,11 @@ Decision gate:
 5. On partial batch failure (exit 1), re-run with `--resume-artifact`.
 6. Use row `skip_connectivity_check=true` or command `--skip-connectivity-check` only when the batch should skip its internal pre-claim ping.
 
+Artifact split:
+1. stdout carries the `xyte.edge.claim-batch.v1` summary.
+2. `--report` writes per-row audit NDJSON for review/debugging.
+3. `--resume-artifact` writes row resume state for partial-run continuation.
+
 Full edge-case matrix and terminal-state handling: `references/claim-playbook.md`.
 
 ## SOP B: Space Import Preprocessing + Execution (`space.import-tree`)

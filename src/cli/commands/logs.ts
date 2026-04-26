@@ -14,6 +14,7 @@ import { formatBytes } from '../format-bytes';
 import { CliUserError } from '../../contracts/user-error';
 import { parsePositiveIntegerOption, parsePositiveNumberOption } from '../parse-options';
 import {
+  type OutputFormat,
   type CliContext,
   getExplicitGlobalOutput,
   printJson,
@@ -59,6 +60,23 @@ function parseEntryRef(value: string): { sessionId: string; seq: number } {
   return { sessionId, seq };
 }
 
+function getExplicitLocalFormat(command: Command): string | undefined {
+  const source = command.getOptionValueSource('format');
+  if (!source || source === 'default') {
+    return undefined;
+  }
+  const options = command.opts() as { format?: string };
+  return options.format;
+}
+
+function resolveLogsOutput(ctx: CliContext, settings: Awaited<ReturnType<CliContext['resolveSettings']>>, command: Command, fallback: OutputFormat): OutputFormat {
+  return resolveTextJsonOutput({
+    output: getExplicitLocalFormat(command) ?? getExplicitGlobalOutput(command) ?? fallback,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
+}
+
 async function handleLogsList(
   ctx: CliContext,
   options: { path?: string; limit?: string; event?: string; command?: string; sessionId?: string; format?: string },
@@ -74,13 +92,7 @@ async function handleLogsList(
     sessionId: options.sessionId
   });
 
-  if (
-    resolveTextJsonOutput({
-      output: options.format ?? getExplicitGlobalOutput(command),
-      stdoutIsTTY: ctx.stdoutIsTTY,
-      settings
-    }) === 'json'
-  ) {
+  if (resolveLogsOutput(ctx, settings, command, 'text') === 'json') {
     printJson(
       ctx.stdout,
       {
@@ -123,7 +135,7 @@ async function handleLogsShow(
     });
   }
   const settings = await ctx.resolveSettings();
-  const result = readCliActionLog({ path: options.path, limit: 5000 });
+  const result = readCliActionLog({ path: options.path });
   let matches: CliActionLogEntry[];
   if (options.entry) {
     const ref = parseEntryRef(options.entry);
@@ -148,13 +160,7 @@ async function handleLogsShow(
     path: result.path,
     entry: matches[0]
   };
-  if (
-    resolveTextJsonOutput({
-      output: options.format ?? getExplicitGlobalOutput(command),
-      stdoutIsTTY: ctx.stdoutIsTTY,
-      settings
-    }) === 'json'
-  ) {
+  if (resolveLogsOutput(ctx, settings, command, 'text') === 'json') {
     printJson(ctx.stdout, payload, { strictJson: resolveStrictJson({ settings }) });
     return;
   }
@@ -173,13 +179,7 @@ async function handleLogsStats(
   const files = listCliActionLogFiles(logPath);
   const totalBytes = files.reduce((sum, item) => sum + item.sizeBytes, 0);
 
-  if (
-    resolveTextJsonOutput({
-      output: options.format ?? getExplicitGlobalOutput(command),
-      stdoutIsTTY: ctx.stdoutIsTTY,
-      settings
-    }) === 'json'
-  ) {
+  if (resolveLogsOutput(ctx, settings, command, 'text') === 'json') {
     printJson(
       ctx.stdout,
       {
@@ -232,13 +232,7 @@ async function handleLogsGc(
   });
   const removedBytes = result.removed.reduce((sum, item) => sum + (beforeMap.get(item)?.sizeBytes ?? 0), 0);
 
-  if (
-    resolveTextJsonOutput({
-      output: options.format ?? getExplicitGlobalOutput(command),
-      stdoutIsTTY: ctx.stdoutIsTTY,
-      settings
-    }) === 'json'
-  ) {
+  if (resolveLogsOutput(ctx, settings, command, 'text') === 'json') {
     printJson(
       ctx.stdout,
       {

@@ -90,7 +90,9 @@ describe('utility prepare workflow', () => {
     expect(readFileSync(result.artifacts.primary, 'utf8')).toBe(
       'device_id,target_space_id,device_name,current_space_id,target_space_name\n'
     );
-    expect(readFileSync(result.artifacts.notes, 'utf8')).toContain('target_space_id: required');
+    const notes = readFileSync(result.artifacts.notes, 'utf8');
+    expect(notes).toContain('target_space_id: required');
+    expect(notes).toContain('invalid_target_space_id');
   });
 
   it('builds generic endpoint contract with path/query/body canonical fields', () => {
@@ -108,7 +110,10 @@ describe('utility prepare workflow', () => {
     expect(result.mode).toBe('generic');
     expect(result.canonical.headers).toEqual(['ticket_id', 'query_json', 'body_json']);
     expect(result.executionSupport).toBe('call-loop-only');
-    expect(readFileSync(result.artifacts.notes, 'utf8')).toContain('ticket_id: required');
+    const notes = readFileSync(result.artifacts.notes, 'utf8');
+    expect(notes).toContain('ticket_id: required');
+    expect(notes).not.toContain('invalid_device_ip');
+    expect(notes).not.toContain('invalid_target_space_id');
   });
 
   it('adds send-command preflight guidance in suggested commands', () => {
@@ -179,6 +184,9 @@ describe('utility prepare workflow', () => {
     expect(notes).toContain('proxy_id: required');
     expect(notes).toContain('skip_connectivity_check: optional');
     expect(notes).toContain('invalid_custom_parameters');
+    expect(notes).toContain('invalid_device_ip');
+    expect(notes).toContain('invalid_space_id');
+    expect(notes).toContain('invalid_skip_connectivity_check');
   });
 
   it('fails on unknown action and on scaffold collision without force', () => {

@@ -300,8 +300,9 @@ Resume after interruption: re-run the `--apply` line with the same `--resume-art
 
 - Expected artifacts:
   - `./prepared/organization-edge-startclaim.csv`, `organization-edge-startclaim.rejected.csv`, `organization-edge-startclaim.notes.md`.
-  - `./artifacts/edge-claim-report.ndjson` — per-row NDJSON used for resume and audit.
-  - `xyte.edge.claim-batch.v1` summary on stdout.
+  - `./artifacts/edge-claim.report.ndjson` — per-row audit NDJSON from `--report`.
+  - `./artifacts/edge-claim.resume.ndjson` — row resume state from `--resume-artifact`.
+  - `xyte.edge.claim-batch.v1` summary on stdout and flow artifacts.
 - Stop/decision gates:
   - Human decision gate after `util prepare`: populate and review the prepared CSV before dry-run.
   - Human decision gate between dry-run and apply.

@@ -1069,6 +1069,55 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
     expect(calls[0]?.args?.body && (calls[0].args.body as Record<string, unknown>).device_ip).toBe('192.168.1.11');
   });
 
+  it('resume terminal-success skip happens before batch skip-connectivity conflict checks', async () => {
+    const tmp = makeTempDir();
+    const inputPath = writeCsv(
+      tmp,
+      [
+        `${CSV_HEADER},skip_connectivity_check`,
+        'proxy-1,192.168.1.10,model-1,99,false',
+        'proxy-1,192.168.1.11,model-1,99,true'
+      ].join('\n')
+    );
+    const resumePath = join(tmp, 'resume-conflict.ndjson');
+    writeFileSync(
+      resumePath,
+      `${JSON.stringify({
+        rowIndex: 1,
+        proxy_id: 'proxy-1',
+        device_ip: '192.168.1.10',
+        disposition: 'succeeded'
+      })}\n`,
+      'utf8'
+    );
+    const { client, calls } = buildClientFromScript({
+      'organization.edge.startClaim': [{ ok: true, data: null }],
+      'organization.edge.getClaimStatus': [{ ok: true, data: { result: 'success' } }]
+    });
+
+    const result = await runEdgeClaimBatch({
+      client,
+      tenantId: 'acme',
+      inputPath,
+      apply: true,
+      runId: 'run-resume-conflict',
+      resumePath,
+      skipConnectivityCheck: true,
+      pollOptions: { intervalMs: 1, timeoutMs: 1_000 },
+      sleeper: async () => undefined,
+      now: () => 0
+    });
+
+    expect(result.rows[0]?.disposition).toBe('skipped');
+    expect(result.rows[0]?.detail).toContain('Already succeeded');
+    expect(result.rows[1]?.disposition).toBe('succeeded');
+    expect(result.totals.rejected).toBe(0);
+    const startCalls = endpointCalls(calls, 'organization.edge.startClaim');
+    expect(startCalls).toHaveLength(1);
+    expect((startCalls[0]?.args?.body as Record<string, unknown>).device_ip).toBe('192.168.1.11');
+    expect((startCalls[0]?.args?.body as Record<string, unknown>).skip_connectivity_check).toBe(true);
+  });
+
   it('resume NDJSON skips rows already marked already-claimed', async () => {
     const tmp = makeTempDir();
     const inputPath = writeCsv(

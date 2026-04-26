@@ -115,7 +115,7 @@ Failure path (happens-once example): `startClaim` returns 422 (unknown device mo
 
 ## flow.edge-claim-batch
 
-North-star bulk-claim flow: `util prepare` → dry-run → gate → apply. Writes a per-row NDJSON report used for resume. Blank or `skip_connectivity_check=false` rows run a pre-claim ping inside the batch before `startClaim`.
+North-star bulk-claim flow: `util prepare` → dry-run → gate → apply. Writes a per-row audit NDJSON report and a separate resume artifact. Blank or `skip_connectivity_check=false` rows run a pre-claim ping inside the batch before `startClaim`.
 
 ```bash
 xyte-cli util prepare --action organization.edge.startClaim --tenant <tenant-id> --input ./devices.xlsx --output-dir ./prepared

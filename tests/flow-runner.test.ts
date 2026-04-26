@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -12,6 +12,7 @@ import {
 } from '../src/workflows/flow-catalog';
 import * as fleetInsights from '../src/workflows/fleet-insights';
 import { runDeterministicFlow } from '../src/workflows/flow-runner';
+import { UtilityBatchResultSchema } from '../src/workflows/utility-batch';
 import { MemorySecretStore } from '../src/secure/secret-store';
 import { MemoryProfileStore } from './support/memory-profile-store';
 
@@ -1800,7 +1801,7 @@ describe('flow runner', () => {
     };
 
     builtInDefinitionOverride = definition;
-    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-resume-inspect-scope`);
+    const outDir = join(tmpdir(), `xyte flow runner ${Date.now()} resume inspect scope`);
     const first = await runDeterministicFlow({
       flowId: definition.id,
       tenantId: 'acme',
@@ -1816,6 +1817,7 @@ describe('flow runner', () => {
     });
     expect(first.outcome).toBe('pending_gate');
     expect(first.resumeCommand).toContain('--inspect-provider-scope partner');
+    expect(first.resumeCommand).toContain(`--out-dir '${outDir}'`);
     expect(first.resumeCommand).toContain('--apply');
     expect(first.nextAction).toMatchObject({
       kind: 'approve_gate',
@@ -1904,6 +1906,74 @@ describe('flow runner', () => {
       secretStore,
       client
     })).rejects.toThrow('Resume inputs are invalid JSON');
+  });
+
+  it('fails closed when resume inputs metadata is missing', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const fetchMock = vi.fn(async () => {
+      throw new Error('resume should fail before task execution');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.setup-readiness-10m',
+      title: 'Missing resume inputs',
+      intent: 'reject missing stored inputs',
+      writeCapable: true,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'gate',
+          id: 'gate_1',
+          title: 'Approval',
+          command: 'Human gate',
+          mutating: false,
+          detail: 'approve resume'
+        },
+        {
+          kind: 'task',
+          id: 'inspect_fleet',
+          title: 'Inspect Fleet',
+          command: 'xyte-cli ops inspect fleet --tenant <tenant-id>',
+          task: 'inspect.fleet',
+          mutating: false,
+          inspect: {
+            mode: 'fleet'
+          }
+        }
+      ]
+    };
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-missing-resume-inputs`);
+
+    const first = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+    rmSync(first.inputsPath);
+
+    await expect(runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: first.runId,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    })).rejects.toThrow('Resume inputs metadata is missing');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('hydrates prior task outputs on resume so report.generate can use earlier deep-dive step', async () => {
@@ -2474,13 +2544,13 @@ describe('flow runner', () => {
     };
 
     builtInDefinitionOverride = definition;
-    runSpaceImportTreeOverride = async () => ({
+    runSpaceImportTreeOverride = async () => UtilityBatchResultSchema.parse({
       schemaVersion: 'xyte.utility.batch.v1',
       generatedAtUtc: new Date().toISOString(),
       tenantId: 'acme',
       command: 'space.import-tree',
       mode: 'dry-run',
-      totals: { rows: 1, succeeded: 1, failed: 0, skipped: 0 },
+      totals: { rows: 1, planned: 1, succeeded: 0, failed: 0, skipped: 0 },
       stoppedEarly: false
     });
 
@@ -2530,6 +2600,9 @@ describe('flow runner', () => {
     expect(plan.steps.find((item) => item.stepId === 'edge_claim_dry_run')?.status).toBe('pending');
     const plannedInputs = JSON.parse(readFileSync(plan.inputsPath, 'utf8'));
     expect(plannedInputs.context.edge_claim_prepare_csv).toContain('organization-edge-startclaim.csv');
+    expect(plan.nextAction?.artifactPaths.some((item) => item.endsWith('organization-edge-startclaim.csv'))).toBe(true);
+    expect(plan.nextAction?.artifactPaths.some((item) => item.endsWith('organization-edge-startclaim.rejected.csv'))).toBe(true);
+    expect(plan.nextAction?.artifactPaths.some((item) => item.endsWith('organization-edge-startclaim.notes.md'))).toBe(true);
   });
 
   it('pauses a fresh edge-claim-batch apply run at prepare review before the dry-run executes', async () => {

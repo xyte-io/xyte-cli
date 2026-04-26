@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -4294,6 +4294,46 @@ describe('cli integration', () => {
     expect(text).toContain('flow.device-migration');
     expect(text).toContain('required context: source_space_id, target_path_includes');
     expect(text).toContain('start: xyte-cli flow run flow.device-migration --tenant <tenant-id> --plan');
+  });
+
+  it('skips custom flows with stale basedOn values in flow list', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const tempConfig = mkdtempSync(join(tmpdir(), 'xyte-flow-list-stale-'));
+    const previousConfig = process.env.XYTE_CLI_CONFIG_DIR;
+    process.env.XYTE_CLI_CONFIG_DIR = tempConfig;
+    mkdirSync(join(tempConfig, 'flows'), { recursive: true });
+    writeFileSync(
+      join(tempConfig, 'flows', 'flow.stale.json'),
+      `${JSON.stringify({
+        schemaVersion: 'xyte.flow.definition.v1',
+        id: 'flow.stale',
+        title: 'Stale Flow',
+        basedOn: 'flow.removed',
+        defaults: {},
+        createdAtUtc: '2026-04-26T00:00:00.000Z',
+        updatedAtUtc: '2026-04-26T00:00:00.000Z'
+      })}\n`,
+      'utf8'
+    );
+
+    try {
+      const program = createCli({ profileStore, secretStore, stdout, stderr });
+      await program.parseAsync(['node', 'xyte-cli', 'flow', 'list', '--format', 'json']);
+      const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+      expect(parsed.custom).toEqual([]);
+      const warning = stderr.write.mock.calls.map((call) => String(call[0])).join('');
+      expect(warning).toContain('Warning: skipping invalid flow definition');
+      expect(warning).toContain('unknown basedOn flow.removed');
+    } finally {
+      if (previousConfig === undefined) {
+        delete process.env.XYTE_CLI_CONFIG_DIR;
+      } else {
+        process.env.XYTE_CLI_CONFIG_DIR = previousConfig;
+      }
+    }
   });
 
   it('returns needs_input when flow inspect scope is auto and both providers are configured', async () => {

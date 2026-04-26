@@ -126,6 +126,8 @@ interface RunDeterministicFlowArgs {
   client: XyteClient;
 }
 
+const DEFAULT_FLOW_RUN_OUT_DIR = './tmp/flow-runs';
+
 async function collectFlowSnapshot(ctx: RunContext): Promise<ReturnType<typeof collectFleetSnapshot>> {
   const tenantProfile = await ctx.args.profileStore.getTenant(ctx.args.tenantId);
   try {
@@ -910,7 +912,7 @@ function isInspectProviderScopeValue(value: unknown): value is InspectProviderSc
 async function readStoredInputs(bundleDir: string): Promise<FlowRunInputsPayload | undefined> {
   const inputsPath = path.join(bundleDir, 'inputs.json');
   if (!existsSync(inputsPath)) {
-    return undefined;
+    throw new CliUserError({ summary: `Resume inputs metadata is missing: ${inputsPath}.` });
   }
 
   let parsed: unknown;
@@ -1323,21 +1325,76 @@ async function runSteps(state: RunState): Promise<ExecuteStepsResult> {
   return { outcome, nextStepIndex, decisions, errors, durationMs: Date.now() - runStartedAt };
 }
 
-function buildResumeCommand(args: RunContextArgs, runId: string, outcome: FlowRunSummary['outcome']): string {
-  const mode = outcome === 'pending_gate' ? 'apply' : args.mode;
-  return `xyte-cli flow run ${args.flowId} --tenant ${args.tenantId} --${mode} --inspect-provider-scope ${args.inspectProviderScope} --resume ${runId}`;
+function shellQuoteArg(value: string): string {
+  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(value)) {
+    return value;
+  }
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-function collectCompletedArtifactPaths(steps: FlowRunStep[]): string[] {
-  return steps
-    .filter((step) => step.status === 'completed' && typeof step.artifactPath === 'string')
-    .map((step) => step.artifactPath as string);
+function usesNonDefaultOutDir(outDir: string): boolean {
+  return path.resolve(outDir) !== path.resolve(DEFAULT_FLOW_RUN_OUT_DIR);
+}
+
+function buildResumeCommand(args: RunContextArgs, runId: string, outcome: FlowRunSummary['outcome']): string {
+  const mode = outcome === 'pending_gate' ? 'apply' : args.mode;
+  const parts = [
+    'xyte-cli',
+    'flow',
+    'run',
+    args.flowId,
+    '--tenant',
+    args.tenantId,
+    `--${mode}`,
+    '--inspect-provider-scope',
+    args.inspectProviderScope
+  ];
+  if (usesNonDefaultOutDir(args.outDir)) {
+    parts.push('--out-dir', args.outDir);
+  }
+  parts.push('--resume', runId);
+  return parts.map(shellQuoteArg).join(' ');
+}
+
+function collectOutputArtifactPaths(output: unknown, paths: Set<string>): void {
+  if (!isRecord(output)) {
+    return;
+  }
+  const artifacts = output.artifacts;
+  if (isRecord(artifacts)) {
+    for (const value of Object.values(artifacts)) {
+      if (typeof value === 'string') {
+        paths.add(value);
+      }
+    }
+  }
+  for (const key of ['primaryOutputPath', 'reportPath', 'resumePath', 'outputPath', 'summaryPath']) {
+    const value = output[key];
+    if (typeof value === 'string') {
+      paths.add(value);
+    }
+  }
+}
+
+function collectCompletedArtifactPaths(steps: FlowRunStep[], taskOutputs: Map<string, unknown>): string[] {
+  const paths = new Set<string>();
+  for (const step of steps) {
+    if (step.status !== 'completed') {
+      continue;
+    }
+    if (typeof step.artifactPath === 'string') {
+      paths.add(step.artifactPath);
+    }
+    collectOutputArtifactPaths(taskOutputs.get(step.stepId), paths);
+  }
+  return [...paths];
 }
 
 function buildNextAction(args: {
   outcome: FlowRunSummary['outcome'];
   nextStep: BuiltInFlowDefinition['steps'][number];
   steps: FlowRunStep[];
+  taskOutputs: Map<string, unknown>;
   runArgs: RunContextArgs;
   runId: string;
 }): FlowRunNextAction | undefined {
@@ -1351,7 +1408,7 @@ function buildNextAction(args: {
     stepId: args.nextStep.id,
     title: args.nextStep.title,
     requiresWrite: args.nextStep.mutating,
-    artifactPaths: collectCompletedArtifactPaths(args.steps),
+    artifactPaths: collectCompletedArtifactPaths(args.steps, args.taskOutputs),
     command: buildResumeCommand(args.runArgs, args.runId, args.outcome)
   };
 }
@@ -1367,7 +1424,7 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
   const nextStep = nextStepIndex < definition.steps.length ? definition.steps[nextStepIndex] : undefined;
   const resumeCommand = nextStep ? buildResumeCommand(runArgs, runId, outcome) : undefined;
   const nextAction = nextStep
-    ? buildNextAction({ outcome, nextStep, steps, runArgs, runId })
+    ? buildNextAction({ outcome, nextStep, steps, taskOutputs: ctx.taskOutputs, runArgs, runId })
     : undefined;
 
   const summary = buildFlowRunSummary({

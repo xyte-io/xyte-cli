@@ -170,5 +170,7 @@ The public Xyte API does not expose C2C claiming today. Do not invent an endpoin
 
 ## 6. Summary contracts
 
-- `xyte.edge.claim-batch.v1` — batch summary written to `--report` NDJSON and stdout JSON. Fields: `schemaVersion`, `generatedAtUtc`, `tenantId`, `mode`, `runId`, `reportPath?`, `resumePath?`, `totals` (per disposition, including `pingFailed`), `stoppedEarly`, `abortDetail?`, `rows[]`. Rows may include `planned` in plan mode and `preClaimPing` when batch performed a pre-claim ping.
+- `xyte.edge.claim-batch.v1` — batch summary returned on stdout JSON and flow artifacts. Fields: `schemaVersion`, `generatedAtUtc`, `tenantId`, `mode`, `runId`, `reportPath?`, `resumePath?`, `totals` (per disposition, including `pingFailed`), `stoppedEarly`, `abortDetail?`, `rows[]`. Rows may include `planned` in plan mode and `preClaimPing` when batch performed a pre-claim ping.
+- `--report` — per-row audit NDJSON. Use it for review/debugging.
+- `--resume-artifact` — row resume state NDJSON. Reuse this path when resuming a partial batch.
 - `xyte.edge.ping.v1` — single-probe result.

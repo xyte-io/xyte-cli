@@ -134,19 +134,39 @@ export function registerFlowCommands(parent: Command, ctx: CliContext): void {
       for (const { path: p, reason } of skipped) {
         ctx.stderr.write(`Warning: skipping invalid flow definition at ${p}: ${reason}\n`);
       }
-      const custom = customDefs.map((item) => ({
-        type: 'custom' as const,
-        id: item.id,
-        title: item.title,
-        intent: item.description,
-        writeCapable: getBuiltInFlowDefinition(item.basedOn).writeCapable,
-        requiredContext: collectRequiredContext(getBuiltInFlowDefinition(item.basedOn), item.defaults),
-        safeFirstCommand: safeFirstCommand(item.id),
-        basedOn: item.basedOn,
-        defaults: item.defaults,
-        path: item.path,
-        updatedAtUtc: item.updatedAtUtc
-      }));
+      const custom: Array<{
+        type: 'custom';
+        id: string;
+        title: string;
+        intent?: string;
+        writeCapable: boolean;
+        requiredContext: string[];
+        safeFirstCommand: string;
+        basedOn: string;
+        defaults: Record<string, string>;
+        path: string;
+        updatedAtUtc: string;
+      }> = [];
+      for (const item of customDefs) {
+        if (!hasBuiltInFlowDefinition(item.basedOn)) {
+          ctx.stderr.write(`Warning: skipping invalid flow definition at ${item.path}: unknown basedOn ${item.basedOn}\n`);
+          continue;
+        }
+        const basedOn = getBuiltInFlowDefinition(item.basedOn);
+        custom.push({
+          type: 'custom',
+          id: item.id,
+          title: item.title,
+          intent: item.description,
+          writeCapable: basedOn.writeCapable,
+          requiredContext: collectRequiredContext(basedOn, item.defaults),
+          safeFirstCommand: safeFirstCommand(item.id),
+          basedOn: item.basedOn,
+          defaults: item.defaults,
+          path: item.path,
+          updatedAtUtc: item.updatedAtUtc
+        });
+      }
 
       if (output === 'text') {
         ctx.stdout.write(formatFlowListText([...builtIn, ...custom]));

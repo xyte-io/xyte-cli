@@ -159,7 +159,7 @@ xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip> 
 
 # Bulk edge (blank skip_connectivity_check rows ping before claim):
 xyte-cli util prepare --action organization.edge.startClaim --input ./edge-devices.xlsx --output-dir ./prepared
-xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --report ./artifacts/edge-claim-report.ndjson --resume-artifact ./artifacts/edge-claim.resume.ndjson --plan
+xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --report ./artifacts/edge-claim-report.ndjson --plan
 ```
 
 ## Skills-Less Operation

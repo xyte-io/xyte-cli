@@ -234,6 +234,107 @@ describe('cli action logging', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it('honors global --output json for logs list and show unless local --format is explicit', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-logs-output-'));
+    const logPath = join(dir, 'actions.ndjson');
+    const logger = createCliActionLogger({ enabled: true, path: logPath, sessionId: 'session-output' });
+    logger.log('api.call.complete', { commandPath: 'xyte-cli api call', requestId: 'req-output' });
+    logger.close();
+    const result = readCliActionLog({ path: logPath, event: 'api.call.complete', limit: 1 });
+    const entry = result.entries[0];
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+
+    let program = createCli({ profileStore, secretStore, stdout, stderr });
+    await program.parseAsync(['node', 'xyte-cli', 'logs', 'list', '--path', logPath, '--output', 'json']);
+    const listPayload = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(listPayload.schemaVersion).toBe('xyte.cli.action-log.v1');
+    expect(listPayload.entries.some((item: { event: string }) => item.event === 'api.call.complete')).toBe(true);
+
+    stdout.write.mockClear();
+    program = createCli({ profileStore, secretStore, stdout, stderr });
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'logs',
+      'show',
+      '--path',
+      logPath,
+      '--entry',
+      `${entry.sessionId}:${entry.seq}`,
+      '--output',
+      'json'
+    ]);
+    const showPayload = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(showPayload.schemaVersion).toBe('xyte.cli.action-log.entry.v1');
+    expect(showPayload.entry.event).toBe('api.call.complete');
+
+    stdout.write.mockClear();
+    program = createCli({ profileStore, secretStore, stdout, stderr });
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'logs',
+      'show',
+      '--path',
+      logPath,
+      '--entry',
+      `${entry.sessionId}:${entry.seq}`,
+      '--output',
+      'json',
+      '--format',
+      'text'
+    ]);
+    const text = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(text).toContain('api.call.complete');
+    expect(() => JSON.parse(text)).toThrow();
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('finds exact logs show entries older than the bounded list tail', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-show-old-log-'));
+    const logPath = join(dir, 'actions.ndjson');
+    const logger = createCliActionLogger({
+      enabled: true,
+      path: logPath,
+      sessionId: 'session-old',
+      maxFileBytes: 50 * 1024 * 1024
+    });
+    logger.log('api.call.complete', { commandPath: 'xyte-cli api call', requestId: 'req-old' });
+    for (let index = 0; index < 5_005; index += 1) {
+      logger.log('test.filler', { commandPath: 'xyte-cli filler', index });
+    }
+    logger.close();
+    const targetSeq = 2;
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'logs',
+      'show',
+      '--path',
+      logPath,
+      '--entry',
+      `session-old:${targetSeq}`,
+      '--output',
+      'json'
+    ]);
+
+    const payload = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(payload.entry.event).toBe('api.call.complete');
+    expect(payload.entry.data.requestId).toBe('req-old');
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it('fails logs show when request id lookup is missing or ambiguous', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-show-log-fail-'));
     const logPath = join(dir, 'actions.ndjson');
