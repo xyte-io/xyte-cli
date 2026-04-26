@@ -83,6 +83,18 @@ describe('claim-guidance surfaces', () => {
     expect(playbook).not.toContain('batch summary written to `--report`');
   });
 
+  it('documents resume limits and avoids stale mixed-proxy/timeout wording', () => {
+    const skill = read('skills/xyte-cli/SKILL.md');
+    const docs = read('docs/claim-devices.md');
+    const playbook = read('skills/xyte-cli/references/claim-playbook.md');
+
+    for (const content of [skill, docs, playbook]) {
+      expect(content).toContain('does not checkpoint in-flight claim IDs');
+      expect(content).not.toContain('claim_timeout');
+      expect(content).not.toContain('not serialized across proxies');
+    }
+  });
+
   it('uses the real batch-flow input context key in SKILL.md', () => {
     const skill = read('skills/xyte-cli/SKILL.md');
 

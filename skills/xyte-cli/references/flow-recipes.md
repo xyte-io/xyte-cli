@@ -123,7 +123,7 @@ xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-e
 xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --apply --report ./artifacts/edge-claim.report.ndjson --resume-artifact ./artifacts/edge-claim.resume.ndjson
 ```
 
-Resume after interruption: re-run the `--apply` line with the same `--resume-artifact` path. Never re-run a half-finished batch without it.
+Resume after interruption: re-run the `--apply` line with the same `--resume-artifact` path. Never re-run a half-finished batch without it. The resume artifact records completed row results, not in-flight claim IDs.
 
 Failure path: 2-of-3 rows succeed, 1 row rejected or `ping-failed` → exit 1 with a per-row NDJSON report (`--report`); fix the row or connectivity and re-run with `--resume-artifact`.
 

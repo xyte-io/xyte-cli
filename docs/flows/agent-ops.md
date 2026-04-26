@@ -296,12 +296,12 @@ xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-e
 
 Before `--plan`, populate `./prepared/organization-edge-startclaim.csv` from the source material and review the rejected/notes artifacts. Blank `skip_connectivity_check` means the batch will ping before claim; `true` skips that ping.
 
-Resume after interruption: re-run the `--apply` line with the same `--resume-artifact` path. Never re-run a half-finished batch without `--resume-artifact`.
+Resume after interruption: re-run the `--apply` line with the same `--resume-artifact` path. Never re-run a half-finished batch without `--resume-artifact`. The resume artifact records completed row results, not in-flight claim IDs.
 
 - Expected artifacts:
   - `./prepared/organization-edge-startclaim.csv`, `organization-edge-startclaim.rejected.csv`, `organization-edge-startclaim.notes.md`.
   - `./artifacts/edge-claim.report.ndjson` — per-row audit NDJSON from `--report`.
-  - `./artifacts/edge-claim.resume.ndjson` — row resume state from `--resume-artifact`.
+  - `./artifacts/edge-claim.resume.ndjson` — completed row resume state from `--resume-artifact`.
   - `xyte.edge.claim-batch.v1` summary on stdout and flow artifacts.
 - Stop/decision gates:
   - Human decision gate after `util prepare`: populate and review the prepared CSV before dry-run.

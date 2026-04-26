@@ -86,6 +86,8 @@ xyte-cli edge claim-batch \
   --apply
 ```
 
+Resume uses completed row dispositions from `--resume-artifact`; it does not checkpoint in-flight claim IDs. If the process dies after `startClaim` but before a row result is written, inspect `edge claim-status` / logs before rerunning that row.
+
 Decision gate:
 1. Populate `organization-edge-startclaim.csv` from the source material before running `--plan`.
 2. Review `organization-edge-startclaim.rejected.csv` before running `--plan`.
@@ -97,7 +99,7 @@ Decision gate:
 Artifact split:
 1. stdout carries the `xyte.edge.claim-batch.v1` summary.
 2. `--report` writes per-row audit NDJSON for review/debugging.
-3. `--resume-artifact` writes row resume state for partial-run continuation.
+3. `--resume-artifact` writes completed row resume state for partial-run continuation.
 
 Full edge-case matrix and terminal-state handling: `references/claim-playbook.md`.
 

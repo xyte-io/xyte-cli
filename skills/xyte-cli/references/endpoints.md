@@ -170,6 +170,7 @@ Ergonomic wrappers (recommended):
 - Single claim: `xyte-cli edge claim --plan`, then `--apply` after explicit approval.
 - Bulk claim: `xyte-cli edge claim-batch --input <primary-csv> --plan [--skip-connectivity-check]`, then `--apply --resume-artifact <path>` after explicit approval.
 - In bulk claim, blank or `skip_connectivity_check=false` rows run an internal pre-claim ping; standalone `edge ping` is diagnostic.
+- Batch resume skips completed rows from `--resume-artifact`; it does not store in-flight claim IDs.
 - Status peek: `xyte-cli edge claim-status`, `xyte-cli edge ping-status`
 - Connectivity probe: `xyte-cli edge ping --plan`, then `--apply` after explicit approval.
 

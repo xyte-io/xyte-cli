@@ -140,7 +140,7 @@ The public Xyte API does not expose C2C claiming today. Do not invent an endpoin
 
 | # | Scenario | Disposition | Agent action |
 |---|---|---|---|
-| 1 | `startClaim` → 204, `getClaimStatus` stays `pending` past timeout | `timeout` | Report `claim_timeout` + last payload; offer `--resume-artifact` to re-poll. |
+| 1 | `startClaim` → 204, `getClaimStatus` stays `pending` past timeout | `timeout` | Report timeout + last payload; increase `--poll-timeout-ms` for slow claims. Resume retries the row rather than checkpointing the in-flight claim. |
 | 2 | `getClaimStatus` → `failed` | `failed` | Surface server-side message; batch continues. |
 | 3 | `startClaim` → 422 (unknown model id, unreachable edge, bad IP) | `rejected` | Mark row rejected; do not poll. |
 | 4 | `startClaim` → 401 | `aborted` | Abort the whole flow; point user at `xyte-cli setup run` / `config key`. |
@@ -148,13 +148,13 @@ The public Xyte API does not expose C2C claiming today. Do not invent an endpoin
 | 6 | Proxy offline (terminal-failed or 422 "edge offline") | `proxy-offline` | Group in summary for retry-after-fix; run `xyte-cli edge ping` to confirm before re-running. |
 | 7 | Batch pre-claim ping rejected/failed/timed out | `ping-failed` | Surface ping result; do not call `startClaim`; resume retries the row. |
 | 8 | N-of-M rows succeed | exit 1 | Per-row NDJSON report via `--report`; rerun with `--resume-artifact`. |
-| 9 | Resume after ctrl-C | — | `--resume-artifact` skips rows previously recorded as `succeeded` or `already-claimed` and re-runs all other rows. |
+| 9 | Resume after ctrl-C | — | `--resume-artifact` skips rows previously recorded as `succeeded` or `already-claimed` and re-runs all other rows. It records row results, not in-flight claim IDs. |
 | 10 | Malformed CSV/XLSX | — | `util prepare` routes bad rows to `organization-edge-startclaim.rejected.csv`; batch refuses to start on schema violations. |
 | 11 | `startClaim` → 429 | — | Exponential backoff w/ jitter; honor `Retry-After`. |
 | 12 | `getClaimStatus` → 422 "not initiated" (race against 204) | — | Tolerate a bounded number of 422-not-initiated on first polls; real 422 thereafter is a hard reject. |
 | 13 | Long-running claim > default timeout | — | `--poll-timeout-ms` / `--poll-interval-ms` overrides. |
 | 14 | Ping analog of (1)-(3) | — | Same primitives, same dispositions. |
-| 15 | Mixed `proxy_id` rows in one batch | — | Grouped per proxy for logging, not serialized across proxies. |
+| 15 | Mixed `proxy_id` rows in one batch | — | Supported; rows keep CSV order. There is no per-proxy fan-out or in-flight claim queue. |
 | 16 | `--plan` over batch | — | Zero API calls; exits 0 only if plan is clean. |
 | 17 | Output format | — | All edge commands honor `--output json\|text`. |
 | 18 | Logs | — | Every mutating call lands in `xyte-cli logs list`; use `logs show --entry <sessionId>:<seq>` or `logs show --request-id <id>` for exact lookup. |
@@ -165,12 +165,12 @@ The public Xyte API does not expose C2C claiming today. Do not invent an endpoin
 
 - `edge claim`, `edge claim-batch`, `edge ping` → mutating; `--plan` first, `--apply` only after explicit user approval.
 - `edge claim-status`, `edge ping-status` → read-only.
-- Never run `edge claim-batch` again without `--resume-artifact` on a half-finished run — you'll double-initiate terminal-success rows (current server behavior: second claim for an already-claimed device returns `already-claimed`, but resume is faster and cleaner).
+- Never run `edge claim-batch` again without `--resume-artifact` on a half-finished run. Resume prevents re-sending rows already recorded as `succeeded` or `already-claimed`, but it does not protect a row whose `startClaim` was sent and then the process died before the result was written.
 - Poll defaults: 5 s interval, 10 min timeout.
 
 ## 6. Summary contracts
 
 - `xyte.edge.claim-batch.v1` — batch summary returned on stdout JSON and flow artifacts. Fields: `schemaVersion`, `generatedAtUtc`, `tenantId`, `mode`, `runId`, `reportPath?`, `resumePath?`, `totals` (per disposition, including `pingFailed`), `stoppedEarly`, `abortDetail?`, `rows[]`. Rows may include `planned` in plan mode and `preClaimPing` when batch performed a pre-claim ping.
 - `--report` — per-row audit NDJSON. Use it for review/debugging.
-- `--resume-artifact` — row resume state NDJSON. Reuse this path when resuming a partial batch.
+- `--resume-artifact` — completed row resume state NDJSON. Reuse this path when resuming a partial batch; it does not checkpoint in-flight claim IDs.
 - `xyte.edge.ping.v1` — single-probe result.

@@ -131,7 +131,7 @@ Batch connectivity behavior:
 Batch artifacts:
 - stdout carries the `xyte.edge.claim-batch.v1` summary.
 - `--report` writes per-row audit NDJSON for review/debugging.
-- `--resume-artifact` writes row resume state; reuse the same path after interruption or partial failure.
+- `--resume-artifact` writes completed row resume state; reuse the same path after interruption or partial failure. It does not checkpoint in-flight claim IDs.
 
 Exit codes:
 - `0` — every row ended in `succeeded` or `already-claimed`.
@@ -173,7 +173,7 @@ AI agents must use this exact phrasing:
 
 | Situation | Disposition | Do this |
 | --- | --- | --- |
-| `startClaim` 204, `getClaimStatus` stays `pending` past timeout | `timeout` | Re-run with a higher `--poll-timeout-ms`, or resume via `--resume-artifact`. |
+| `startClaim` 204, `getClaimStatus` stays `pending` past timeout | `timeout` | Re-run with a higher `--poll-timeout-ms`; resume retries the row rather than checkpointing the in-flight claim. |
 | `getClaimStatus` → `failed` | `failed` | Read the server detail; fix at source; resume. |
 | `startClaim` → 422 (unknown model id, unreachable edge, bad IP) | `rejected` | Fix the offending field in your primary CSV; resume. |
 | `startClaim` → 401 | `aborted` | Run `xyte-cli setup run` or `xyte-cli config key list`; resume. |
@@ -183,9 +183,9 @@ AI agents must use this exact phrasing:
 | `skip_connectivity_check=true` and claim later fails connectivity verification | `rejected` or `failed` | Inspect the row response; rerun without skip if the device must be verified first. |
 | `startClaim` → 429 | retried | CLI backs off automatically; no action. |
 | `getClaimStatus` → 422 "not initiated" race | tolerated | CLI tolerates a bounded number of first-poll 422s; no action. |
-| Half-finished batch | — | Always use `--resume-artifact` on the next run. |
+| Half-finished batch | — | Always use `--resume-artifact` on the next run; if the process died after `startClaim` but before row output, inspect `edge claim-status` / logs before rerunning that row. |
 | Malformed spreadsheet | — | Fix rejects in `./prepared/organization-edge-startclaim.rejected.csv` and re-run `util prepare`. |
-| Mixed proxies in one batch | — | Supported; rows are grouped per proxy for logging. |
+| Mixed proxies in one batch | — | Supported; rows keep CSV order. There is no per-proxy fan-out or in-flight claim queue. |
 | Multi-tenant | — | Always pass `--tenant <tenant-id>`. |
 
 ## 5. Logs and audit

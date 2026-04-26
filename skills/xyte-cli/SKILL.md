@@ -91,11 +91,12 @@ Edge-claim safety:
 - In `edge claim-batch`, blank or `skip_connectivity_check=false` rows run a pre-claim `edge ping` inside the batch before `startClaim`; `skip_connectivity_check=true` skips that ping.
 - `edge claim-batch --skip-connectivity-check` makes blank rows skip ping and send `skip_connectivity_check: true`; explicit row `false` conflicts and is rejected.
 - If a batch is interrupted (ctrl-C, network blip), resume with `xyte-cli edge claim-batch --input <primary-csv> --apply --resume-artifact <path>`; never re-run without `--resume-artifact` on a half-finished run.
+- The resume artifact records completed row dispositions only; it does not checkpoint in-flight claim IDs. If the CLI exits after `startClaim` but before the row result is written, check `edge claim-status` / logs before rerunning because resume may dispatch `startClaim` again for that row.
 - Heartbeat device model id: `5dc4ba6c-c323-4118-a4e4-504f074426f2`. `proxy_id` lives in the End Customer Portal.
 - Poll defaults: 5 s interval, 10 min timeout. Override with `--poll-interval-ms` / `--poll-timeout-ms`.
 
 Edge-claim terminal-state decision tree:
-- `pending` past timeout → report `claim_timeout` with the last-polled payload; offer resume.
+- `pending` past timeout → row disposition `timeout` with the last-polled payload; increase `--poll-timeout-ms` for slow claims. Resume retries non-terminal rows.
 - `failed` → surface server detail; continue the batch.
 - Start returns 422 → row rejected (`rejected` disposition); never poll.
 - Start returns 401 → abort the whole batch; remediation is `xyte-cli setup run` or `config key`.
