@@ -382,9 +382,28 @@ export function registerConfigCommands(parent: Command, ctx: CliContext): void {
   configTenant
     .command('remove')
     .argument('<tenantId>', 'Tenant id')
-    .action(async (tenantId: string) => {
+    .option('--confirm', 'Confirm removal')
+    .action(async (tenantId: string, options: { confirm?: boolean }) => {
+      if (!options.confirm) {
+        throw new CliUserError({
+          summary: 'Tenant removal is destructive.',
+          detail: 'Removing a tenant removes its profile metadata and clears secrets for known key slots.',
+          suggestedCommands: [`xyte-cli config tenant remove ${tenantId} --confirm`]
+        });
+      }
+      const tenant = await ctx.profileStore.getTenant(tenantId);
+      const slots = tenant?.keyRegistry.slots ?? [];
+      const secretStore = ctx.getSecretStore();
+      for (const slot of slots) {
+        await secretStore.clearSlotSecret(tenantId, slot.provider, slot.slotId);
+      }
       await ctx.profileStore.removeTenant(tenantId);
-      ctx.stdout.write(`Removed tenant ${tenantId}\n`);
+      printJson(ctx.stdout, {
+        tenantId,
+        removedTenant: Boolean(tenant),
+        removedKeySlots: slots.length,
+        clearedSecrets: slots.length
+      });
     });
 
   const configKey = config.command('key').description('Manage named key slots');

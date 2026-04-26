@@ -7,8 +7,8 @@ Primary setup, watch, inspect, and report commands below use the cross-platform 
 ## Shared Safety Rules
 
 1. Non-read endpoint calls execute directly once the operator chooses the write step.
-2. Destructive deletes execute directly; no extra confirm flag is required.
-3. `xyte-cli util import-tree` is dry-run by default unless `--apply` is provided.
+2. Destructive local profile commands that expose `--confirm` must include it explicitly.
+3. `xyte-cli util import-tree` and `xyte-cli util move-devices` are dry-run by default unless `--apply` is provided.
 4. Human decision gate is mandatory before any write/apply loop.
 
 ## Executable Flows
@@ -16,15 +16,17 @@ Primary setup, watch, inspect, and report commands below use the cross-platform 
 These recipes are first-class executable flows:
 
 ```bash
-xyte-cli flow list
+xyte-cli flow list --format text
 xyte-cli flow run <flow-id> --tenant <tenant-id> --plan
 xyte-cli flow run <flow-id> --tenant <tenant-id> --apply --resume <run-id-or-path>
 ```
 
 Runner behavior:
 - default mode is `--plan` (safe dry mode).
-- `--apply` advances one explicit human gate per invocation.
+- `--apply --resume <run-id-or-path>` advances one explicit human gate per invocation.
 - missing context still produces structured stop states (`pending_gate` or `needs_input`), not silent skips.
+- failed or paused summaries include `nextAction`; use it as the first operator hint.
+- malformed resume metadata fails closed; fix the run bundle or start a fresh run.
 - artifacts are persisted under `./tmp/flow-runs/<flow-id>/<timestamp>-<run-id>/`:
   - `manifest.json`, `inputs.json`
   - `decisions.ndjson`, `errors.ndjson`, `watch-frames.ndjson`
@@ -280,7 +282,7 @@ xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <devi
 ## flow.edge-claim-batch
 
 - Flow ID: `flow.edge-claim-batch`
-- Intent: bulk-claim a spreadsheet of edge devices — `util prepare` → dry-run → gate → apply → resume.
+- Intent: bulk-claim a spreadsheet of edge devices — `util prepare` → dry-run → gate → apply → resume. Non-skip rows run a pre-claim ping inside the batch before `startClaim`.
 - Prerequisites:
   - `<tenant-id>` is active and authorized.
   - A messy or clean spreadsheet/CSV is available for `util prepare`.
@@ -292,21 +294,23 @@ xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-e
 xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --apply --report ./artifacts/edge-claim.report.ndjson --resume-artifact ./artifacts/edge-claim.resume.ndjson
 ```
 
-Before `--plan`, populate `./prepared/organization-edge-startclaim.csv` from the source material and review the rejected/notes artifacts.
+Before `--plan`, populate `./prepared/organization-edge-startclaim.csv` from the source material and review the rejected/notes artifacts. Blank `skip_connectivity_check` means the batch will ping before claim; `true` skips that ping.
 
-Resume after interruption: re-run the `--apply` line with the same `--resume-artifact` path. Never re-run a half-finished batch without `--resume-artifact`.
+Resume after interruption: re-run the `--apply` line with the same `--resume-artifact` path. Never re-run a half-finished batch without `--resume-artifact`. The resume artifact records completed row results, not in-flight claim IDs.
 
 - Expected artifacts:
   - `./prepared/organization-edge-startclaim.csv`, `organization-edge-startclaim.rejected.csv`, `organization-edge-startclaim.notes.md`.
-  - `./artifacts/edge-claim-report.ndjson` — per-row NDJSON used for resume and audit.
-  - `xyte.edge.claim-batch.v1` summary on stdout.
+  - `./artifacts/edge-claim.report.ndjson` — per-row audit NDJSON from `--report`.
+  - `./artifacts/edge-claim.resume.ndjson` — completed row resume state from `--resume-artifact`.
+  - `xyte.edge.claim-batch.v1` summary on stdout and flow artifacts.
 - Stop/decision gates:
   - Human decision gate after `util prepare`: populate and review the prepared CSV before dry-run.
   - Human decision gate between dry-run and apply.
-  - Partial failure (any row `failed`, `rejected`, `timeout`, `proxy-offline`, or `aborted`) → exit 1; fix reject rows and re-run with `--resume-artifact`.
+  - Partial failure (any row `failed`, `rejected`, `timeout`, `proxy-offline`, `ping-failed`, or `aborted`) → exit 1; fix reject rows and re-run with `--resume-artifact`.
 - Failure handling:
   - 401 → abort; fix auth, then resume.
   - 429 → automatic exponential backoff with jitter, honors `Retry-After`.
+  - `ping-failed` → fix Edge-to-device connectivity; resume retries the row.
   - Never re-run a half-finished batch without `--resume-artifact`.
 
 ## flow.edge-ping

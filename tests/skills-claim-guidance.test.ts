@@ -3,8 +3,7 @@ import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-const C2C_UNSUPPORTED_SENTENCE =
-  'Cloud-to-Cloud (C2C) claiming is not available via the public Xyte API today';
+const C2C_UNSUPPORTED_SENTENCE = 'Cloud-to-Cloud (C2C) claiming is not available via the public Xyte API today';
 const END_CUSTOMER_PORTAL = 'End Customer Portal';
 const NATIVE_KEY = 'organization.devices.claimDevice';
 const EDGE_KEY = 'organization.edge.startClaim';
@@ -39,6 +38,19 @@ describe('claim-guidance surfaces', () => {
         expect(content).toMatch(/Native \/ direct/);
         expect(content).toMatch(/Edge/);
       });
+
+      it('documents batch-owned edge connectivity checks', () => {
+        expect(content).toContain('pre-claim');
+        expect(content).toContain('ping-failed');
+      });
+
+      it('documents true, false, blank, conflict, and resume retry semantics', () => {
+        expect(content).toContain('skip_connectivity_check=true');
+        expect(content).toContain('skip_connectivity_check=false');
+        expect(content.toLowerCase()).toContain('blank');
+        expect(content.toLowerCase()).toContain('conflict');
+        expect(content.toLowerCase()).toContain('resume');
+      });
     });
   }
 
@@ -55,6 +67,32 @@ describe('claim-guidance surfaces', () => {
     expect(docs).toContain('organization-edge-startclaim.rejected.csv');
     expect(playbook).toContain('organization-edge-startclaim.csv');
     expect(playbook).toContain('organization-edge-startclaim.rejected.csv');
+  });
+
+  it('separates edge batch stdout summary, report, and resume artifacts', () => {
+    const docs = read('docs/claim-devices.md');
+    const playbook = read('skills/xyte-cli/references/claim-playbook.md');
+
+    for (const content of [docs, playbook]) {
+      expect(content).toContain('xyte.edge.claim-batch.v1');
+      expect(content).toContain('--report');
+      expect(content).toContain('per-row audit NDJSON');
+      expect(content).toContain('--resume-artifact');
+      expect(content).toContain('resume state');
+    }
+    expect(playbook).not.toContain('batch summary written to `--report`');
+  });
+
+  it('documents resume limits and avoids stale mixed-proxy/timeout wording', () => {
+    const skill = read('skills/xyte-cli/SKILL.md');
+    const docs = read('docs/claim-devices.md');
+    const playbook = read('skills/xyte-cli/references/claim-playbook.md');
+
+    for (const content of [skill, docs, playbook]) {
+      expect(content).toContain('does not checkpoint in-flight claim IDs');
+      expect(content).not.toContain('claim_timeout');
+      expect(content).not.toContain('not serialized across proxies');
+    }
   });
 
   it('uses the real batch-flow input context key in SKILL.md', () => {

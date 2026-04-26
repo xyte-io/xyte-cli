@@ -42,6 +42,7 @@ interface EdgeClaimBatchOptions {
   plan?: boolean;
   resumeArtifact?: string;
   report?: string;
+  skipConnectivityCheck?: boolean;
   pollIntervalMs?: string;
   pollTimeoutMs?: string;
   strictJson?: boolean;
@@ -173,6 +174,7 @@ async function handleEdgeClaimBatch(ctx: CliContext, options: EdgeClaimBatchOpti
     apply,
     reportPath: options.report,
     resumePath: options.resumeArtifact,
+    skipConnectivityCheck: options.skipConnectivityCheck,
     pollOptions
   });
   if (output === 'text') {
@@ -180,8 +182,16 @@ async function handleEdgeClaimBatch(ctx: CliContext, options: EdgeClaimBatchOpti
   } else {
     printJson(ctx.stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
   }
-  const { failed, rejected, timeout, aborted, proxyOffline } = result.totals;
-  if (result.stoppedEarly || failed > 0 || rejected > 0 || timeout > 0 || aborted > 0 || proxyOffline > 0) {
+  const { failed, rejected, timeout, aborted, proxyOffline, pingFailed } = result.totals;
+  if (
+    result.stoppedEarly ||
+    failed > 0 ||
+    rejected > 0 ||
+    timeout > 0 ||
+    aborted > 0 ||
+    proxyOffline > 0 ||
+    pingFailed > 0
+  ) {
     process.exitCode = 1;
   }
 }
@@ -284,8 +294,11 @@ export function registerEdgeCommands(parent: Command, ctx: CliContext): void {
       '',
       'Examples:',
       '  xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 10.0.0.10 --device-model-id <model-id> --space-id 123 --plan',
+      '  xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --plan --report ./artifacts/edge-claim.plan.ndjson',
       '  xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --apply --report ./artifacts/edge-claim.report.ndjson --resume-artifact ./artifacts/edge-claim.resume.ndjson',
+      '  xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --plan --skip-connectivity-check',
       '  xyte-cli edge claim-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 10.0.0.10',
+      '  xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 10.0.0.10 --plan',
       '  xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 10.0.0.10 --apply',
       '  xyte-cli edge ping-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 10.0.0.10'
     ].join('\n')
@@ -323,6 +336,7 @@ export function registerEdgeCommands(parent: Command, ctx: CliContext): void {
     .option('--apply', 'Execute claims for every row')
     .option('--resume-artifact <path>', 'NDJSON resume artifact (skip rows already marked succeeded or already-claimed)')
     .option('--report <path>', 'Write NDJSON row report file')
+    .option('--skip-connectivity-check', 'Skip pre-claim ping for rows without skip_connectivity_check=false')
     .option('--poll-interval-ms <ms>', 'Status poll interval (ms)')
     .option('--poll-timeout-ms <ms>', 'Status poll timeout (ms)')
     .option('--strict-json', 'Fail on non-serializable output')

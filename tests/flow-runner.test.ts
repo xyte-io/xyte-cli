@@ -1,13 +1,18 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createXyteClient } from '../src/client/create-client';
-import { getBuiltInFlowDefinition, type BuiltInFlowDefinition, type BuiltInFlowId } from '../src/workflows/flow-catalog';
+import {
+  getBuiltInFlowDefinition,
+  type BuiltInFlowDefinition,
+  type BuiltInFlowId
+} from '../src/workflows/flow-catalog';
 import * as fleetInsights from '../src/workflows/fleet-insights';
 import { runDeterministicFlow } from '../src/workflows/flow-runner';
+import { UtilityBatchResultSchema } from '../src/workflows/utility-batch';
 import { MemorySecretStore } from '../src/secure/secret-store';
 import { MemoryProfileStore } from './support/memory-profile-store';
 
@@ -20,7 +25,8 @@ vi.mock('../src/workflows/flow-catalog', async (importOriginal) => {
   const original = await importOriginal<typeof import('../src/workflows/flow-catalog')>();
   return {
     ...original,
-    hasBuiltInFlowDefinition: (id: string) => builtInDefinitionOverride?.id === id || original.hasBuiltInFlowDefinition(id),
+    hasBuiltInFlowDefinition: (id: string) =>
+      builtInDefinitionOverride?.id === id || original.hasBuiltInFlowDefinition(id),
     getBuiltInFlowDefinition: (id: string) => builtInDefinitionOverride ?? original.getBuiltInFlowDefinition(id)
   };
 });
@@ -48,7 +54,6 @@ async function makeClient() {
   await profileStore.upsertTenant({ id: 'acme' });
   await profileStore.setActiveTenant('acme');
   const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
-    
     name: 'primary',
     fingerprint: 'sha256:test'
   });
@@ -76,7 +81,6 @@ async function makeClientWithProviders(providers: Array<'xyte-org' | 'xyte-partn
 
   if (providers.includes('xyte-org')) {
     const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
-      
       name: 'org-primary',
       fingerprint: 'sha256:org'
     });
@@ -86,7 +90,6 @@ async function makeClientWithProviders(providers: Array<'xyte-org' | 'xyte-partn
 
   if (providers.includes('xyte-partner')) {
     const slot = await profileStore.addKeySlot('acme', 'xyte-partner', {
-      
       name: 'partner-primary',
       fingerprint: 'sha256:partner'
     });
@@ -527,10 +530,7 @@ describe('flow runner', () => {
       if (url.includes('/organization/devices?') && url.includes('space_id=900')) {
         return new Response(
           JSON.stringify({
-            items:
-              currentSpaceId === 900
-                ? [{ id: 'dev-1', name: 'South Wing', space_id: 900 }]
-                : []
+            items: currentSpaceId === 900 ? [{ id: 'dev-1', name: 'South Wing', space_id: 900 }] : []
           }),
           {
             status: 200,
@@ -1357,10 +1357,7 @@ describe('flow runner', () => {
       if (url.includes('/organization/devices?') && url.includes('space_id=900')) {
         return new Response(
           JSON.stringify({
-            items:
-              currentSpaceId === 900
-                ? [{ id: 'dev-1', name: 'South Wing', space_id: 900 }]
-                : []
+            items: currentSpaceId === 900 ? [{ id: 'dev-1', name: 'South Wing', space_id: 900 }] : []
           }),
           {
             status: 200,
@@ -1503,6 +1500,117 @@ describe('flow runner', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(summary.steps.find((item) => item.stepId === 'gate_edge_ping')?.status).toBe('gate_pending');
     expect(summary.steps.find((item) => item.stepId === 'edge_ping_single')?.status).toBe('pending');
+  });
+
+  it('pauses flow.edge-claim in plan mode before the mutating claim step', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition = getBuiltInFlowDefinition('flow.edge-claim');
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-claim-plan`);
+
+    const fetchMock = vi.fn(async () => {
+      throw new Error('flow.edge-claim --plan must not call fetch');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const summary = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: {
+        proxy_id: 'proxy-1',
+        device_ip: '192.168.1.10',
+        device_model_id: 'model-1',
+        space_id: '99'
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('pending_gate');
+    expect(summary.cursor.nextStepId).toBe('gate_edge_claim');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(summary.steps.find((item) => item.stepId === 'gate_edge_claim')?.status).toBe('gate_pending');
+    expect(summary.steps.find((item) => item.stepId === 'edge_claim_single')?.status).toBe('pending');
+  });
+
+  it.each([
+    { label: 'absent', contextValue: undefined, expected: undefined },
+    { label: 'true', contextValue: 'true', expected: true },
+    { label: 'false', contextValue: 'false', expected: false }
+  ])('flow.edge-claim apply preserves skip_connectivity_check $label context', async ({ contextValue, expected }) => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.edge-claim',
+      title: 'Edge Claim Apply Test',
+      intent: 'test edge claim apply body',
+      writeCapable: true,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'task',
+          id: 'edge_claim_single',
+          title: 'Edge Claim Single',
+          task: 'edge.claim',
+          edgeClaim: {},
+          requiresContext: ['proxy_id', 'device_ip', 'device_model_id', 'space_id'],
+          mutating: true,
+          command:
+            'xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --apply'
+        }
+      ]
+    };
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-claim-apply`);
+    const bodies: Array<Record<string, unknown>> = [];
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/core/v1/organization/edge/devices/start_claim')) {
+        bodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+        return new Response(null, { status: 204 });
+      }
+      if (url.includes('/core/v1/organization/edge/devices/get_claim_status')) {
+        return new Response(JSON.stringify({ result: 'success' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in edge-claim flow test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const context: Record<string, string> = {
+      proxy_id: 'proxy-1',
+      device_ip: '192.168.1.10',
+      device_model_id: 'model-1',
+      space_id: '99'
+    };
+    if (contextValue !== undefined) {
+      context.skip_connectivity_check = contextValue;
+    }
+
+    const summary = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      context,
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('completed');
+    if (expected === undefined) {
+      expect(bodies[0]).not.toHaveProperty('skip_connectivity_check');
+    } else {
+      expect(bodies[0]?.skip_connectivity_check).toBe(expected);
+    }
   });
 
   it('reports the resolved custom poll key name when edge poll timing is invalid', async () => {
@@ -1693,7 +1801,7 @@ describe('flow runner', () => {
     };
 
     builtInDefinitionOverride = definition;
-    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-resume-inspect-scope`);
+    const outDir = join(tmpdir(), `xyte flow runner ${Date.now()} resume inspect scope`);
     const first = await runDeterministicFlow({
       flowId: definition.id,
       tenantId: 'acme',
@@ -1709,6 +1817,16 @@ describe('flow runner', () => {
     });
     expect(first.outcome).toBe('pending_gate');
     expect(first.resumeCommand).toContain('--inspect-provider-scope partner');
+    const expectedOutDirArg = process.platform === 'win32' ? `"${outDir}"` : `'${outDir}'`;
+    expect(first.resumeCommand).toContain(`--out-dir ${expectedOutDirArg}`);
+    expect(first.resumeCommand).toContain('--apply');
+    expect(first.nextAction).toMatchObject({
+      kind: 'approve_gate',
+      stepId: 'gate_1',
+      title: 'Approval',
+      requiresWrite: true,
+      command: first.resumeCommand
+    });
 
     const second = await runDeterministicFlow({
       flowId: definition.id,
@@ -1725,10 +1843,189 @@ describe('flow runner', () => {
     });
 
     expect(second.outcome).toBe('completed');
+    expect(second.nextAction).toBeUndefined();
     expect(second.steps.find((item) => item.stepId === 'inspect_deep_dive_daily')?.status).toBe('completed');
     const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
     expect(calledUrls.length).toBeGreaterThan(0);
     expect(calledUrls.every((url) => url.includes('/partner/'))).toBe(true);
+  });
+
+  it('uses Windows argument quoting in generated resume commands on Windows', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform');
+    if (!platformDescriptor) {
+      throw new Error('process.platform descriptor missing');
+    }
+
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.setup-readiness-10m',
+      title: 'Windows Resume Command',
+      intent: 'resume command should be copy-pasteable on Windows',
+      writeCapable: true,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'gate',
+          id: 'gate_1',
+          title: 'Approval',
+          command: 'Human gate',
+          mutating: true,
+          detail: 'approve resume'
+        }
+      ]
+    };
+
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte flow runner ${Date.now()} windows resume`);
+    try {
+      Object.defineProperty(process, 'platform', { ...platformDescriptor, value: 'win32' });
+      const first = await runDeterministicFlow({
+        flowId: definition.id,
+        tenantId: 'acme',
+        mode: 'plan',
+        outDir,
+        context: {},
+        once: true,
+        strictJson: true,
+        profileStore,
+        secretStore,
+        client
+      });
+
+      expect(first.outcome).toBe('pending_gate');
+      expect(first.resumeCommand).toContain(`--out-dir "${outDir}"`);
+      expect(first.resumeCommand).not.toContain(`--out-dir '${outDir}'`);
+      expect(first.nextAction?.command).toBe(first.resumeCommand);
+    } finally {
+      Object.defineProperty(process, 'platform', platformDescriptor);
+    }
+  });
+
+  it('fails closed when resume inputs metadata is malformed', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.setup-readiness-10m',
+      title: 'Malformed resume inputs',
+      intent: 'reject malformed stored inputs',
+      writeCapable: true,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'gate',
+          id: 'gate_1',
+          title: 'Approval',
+          command: 'Human gate',
+          mutating: false,
+          detail: 'approve resume'
+        },
+        {
+          kind: 'task',
+          id: 'status_fast',
+          title: 'Status Fast',
+          command: 'xyte-cli status',
+          task: 'status.fast',
+          mutating: false
+        }
+      ]
+    };
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-malformed-resume-inputs`);
+
+    const first = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+    writeFileSync(first.inputsPath, '{not-json', 'utf8');
+
+    await expect(runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: first.runId,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    })).rejects.toThrow('Resume inputs are invalid JSON');
+  });
+
+  it('fails closed when resume inputs metadata is missing', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const fetchMock = vi.fn(async () => {
+      throw new Error('resume should fail before task execution');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.setup-readiness-10m',
+      title: 'Missing resume inputs',
+      intent: 'reject missing stored inputs',
+      writeCapable: true,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'gate',
+          id: 'gate_1',
+          title: 'Approval',
+          command: 'Human gate',
+          mutating: false,
+          detail: 'approve resume'
+        },
+        {
+          kind: 'task',
+          id: 'inspect_fleet',
+          title: 'Inspect Fleet',
+          command: 'xyte-cli ops inspect fleet --tenant <tenant-id>',
+          task: 'inspect.fleet',
+          mutating: false,
+          inspect: {
+            mode: 'fleet'
+          }
+        }
+      ]
+    };
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-missing-resume-inputs`);
+
+    const first = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+    rmSync(first.inputsPath);
+
+    await expect(runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: first.runId,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    })).rejects.toThrow('Resume inputs metadata is missing');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('hydrates prior task outputs on resume so report.generate can use earlier deep-dive step', async () => {
@@ -2202,7 +2499,7 @@ describe('flow runner', () => {
     expect(calledUrls.every((url) => url.includes('/organization/'))).toBe(true);
   });
 
-  it('falls back to auto scope when persisted inspect scope payload is malformed', async () => {
+  it('fails closed when persisted inspect scope payload is malformed', async () => {
     const { profileStore, secretStore, client } = await makeClientWithProviders(['xyte-org', 'xyte-partner']);
 
     const definition: BuiltInFlowDefinition = {
@@ -2254,7 +2551,7 @@ describe('flow runner', () => {
 
     writeFileSync(first.inputsPath, '{malformed-json', 'utf8');
 
-    const second = await runDeterministicFlow({
+    await expect(runDeterministicFlow({
       flowId: definition.id,
       tenantId: 'acme',
       mode: 'apply',
@@ -2266,16 +2563,7 @@ describe('flow runner', () => {
       profileStore,
       secretStore,
       client
-    });
-
-    expect(second.outcome).toBe('needs_input');
-    expect(second.classifications.needs_data).toBe(1);
-    expect(second.classifications.bug).toBe(0);
-    const failedStep = second.steps.find((item) => item.stepId === 'inspect_deep_dive_daily');
-    expect(failedStep?.status).toBe('failed');
-    expect(String(failedStep?.error?.detail ?? '')).toContain(
-      'both organization and partner credentials are configured'
-    );
+    })).rejects.toThrow('Resume inputs are invalid JSON');
   });
 
   it('sets <stepId>_output in context after space.import-tree step', async () => {
@@ -2308,13 +2596,13 @@ describe('flow runner', () => {
     };
 
     builtInDefinitionOverride = definition;
-    runSpaceImportTreeOverride = async () => ({
+    runSpaceImportTreeOverride = async () => UtilityBatchResultSchema.parse({
       schemaVersion: 'xyte.utility.batch.v1',
       generatedAtUtc: new Date().toISOString(),
       tenantId: 'acme',
       command: 'space.import-tree',
       mode: 'dry-run',
-      totals: { rows: 1, succeeded: 1, failed: 0, skipped: 0 },
+      totals: { rows: 1, planned: 1, succeeded: 0, failed: 0, skipped: 0 },
       stoppedEarly: false
     });
 
@@ -2364,6 +2652,9 @@ describe('flow runner', () => {
     expect(plan.steps.find((item) => item.stepId === 'edge_claim_dry_run')?.status).toBe('pending');
     const plannedInputs = JSON.parse(readFileSync(plan.inputsPath, 'utf8'));
     expect(plannedInputs.context.edge_claim_prepare_csv).toContain('organization-edge-startclaim.csv');
+    expect(plan.nextAction?.artifactPaths.some((item) => item.endsWith('organization-edge-startclaim.csv'))).toBe(true);
+    expect(plan.nextAction?.artifactPaths.some((item) => item.endsWith('organization-edge-startclaim.rejected.csv'))).toBe(true);
+    expect(plan.nextAction?.artifactPaths.some((item) => item.endsWith('organization-edge-startclaim.notes.md'))).toBe(true);
   });
 
   it('pauses a fresh edge-claim-batch apply run at prepare review before the dry-run executes', async () => {
@@ -2437,5 +2728,200 @@ describe('flow runner', () => {
       'gate_approved'
     );
     expect(resumedApply.steps.find((item) => item.stepId === 'edge_claim_dry_run')?.status).toBe('completed');
+  });
+
+  it('runs populated edge-claim-batch through dry-run and apply gates', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-claim-batch-complete`);
+    const sourcePath = join(tmpdir(), `edge-claim-source-${Date.now()}-complete.csv`);
+    writeFileSync(sourcePath, 'source\nplaceholder\n');
+    const requests: Array<{ url: string; body?: Record<string, unknown> }> = [];
+
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      requests.push({
+        url,
+        body: typeof init?.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : undefined
+      });
+      if (url.includes('/core/v1/organization/edge/devices/start_ping')) {
+        return new Response(null, { status: 204 });
+      }
+      if (url.includes('/core/v1/organization/edge/devices/get_ping_status')) {
+        return new Response(JSON.stringify({ status: 'success' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/core/v1/organization/edge/devices/start_claim')) {
+        return new Response(null, { status: 204 });
+      }
+      if (url.includes('/core/v1/organization/edge/devices/get_claim_status')) {
+        return new Response(JSON.stringify({ result: 'success' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in edge-claim-batch flow test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const firstApply = await runDeterministicFlow({
+      flowId: 'flow.edge-claim-batch',
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      context: {
+        edge_claim_input_path: sourcePath
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+    const preparedInputs = JSON.parse(readFileSync(firstApply.inputsPath, 'utf8')) as {
+      context: Record<string, string>;
+    };
+    writeFileSync(
+      preparedInputs.context.edge_claim_prepare_csv,
+      [
+        'proxy_id,device_ip,device_model_id,space_id,skip_connectivity_check',
+        'proxy-1,192.168.1.10,model-1,99,true',
+        'proxy-1,192.168.1.11,model-1,99,false',
+        'proxy-1,192.168.1.12,model-1,99,'
+      ].join('\n'),
+      'utf8'
+    );
+
+    const dryRunApproved = await runDeterministicFlow({
+      flowId: 'flow.edge-claim-batch',
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: firstApply.runId,
+      context: {
+        edge_claim_input_path: sourcePath
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+    expect(dryRunApproved.outcome).toBe('pending_gate');
+    expect(dryRunApproved.cursor.nextStepId).toBe('gate_edge_claim_batch_apply');
+
+    const completed = await runDeterministicFlow({
+      flowId: 'flow.edge-claim-batch',
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: dryRunApproved.runId,
+      context: {
+        edge_claim_input_path: sourcePath
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(completed.outcome).toBe('completed');
+    expect(completed.steps.find((item) => item.stepId === 'edge_claim_apply')?.status).toBe('completed');
+    const completedInputs = JSON.parse(readFileSync(completed.inputsPath, 'utf8')) as {
+      context: Record<string, string>;
+    };
+    expect(existsSync(completedInputs.context.edge_claim_apply_report_path)).toBe(true);
+    expect(existsSync(join(completed.bundleDir, 'outputs', 'edge-claim.resume.ndjson'))).toBe(true);
+    expect(requests.filter((request) => request.url.includes('/start_ping'))).toHaveLength(2);
+    const claimBodies = requests
+      .filter((request) => request.url.includes('/start_claim'))
+      .map((request) => request.body);
+    expect(claimBodies).toHaveLength(3);
+    expect(claimBodies[0]?.skip_connectivity_check).toBe(true);
+    expect(claimBodies[1]?.skip_connectivity_check).toBe(false);
+    expect(claimBodies[2]).not.toHaveProperty('skip_connectivity_check');
+  });
+
+  it('fails flow.edge-claim-batch apply with ping-failed detail', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-claim-batch-ping-failed`);
+    const sourcePath = join(tmpdir(), `edge-claim-source-${Date.now()}-ping-failed.csv`);
+    writeFileSync(sourcePath, 'source\nplaceholder\n');
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/edge/devices/start_ping')) {
+        return new Response(null, { status: 204 });
+      }
+      if (url.includes('/core/v1/organization/edge/devices/get_ping_status')) {
+        return new Response(JSON.stringify({ status: 'failed' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in edge-claim-batch ping-failed flow test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const firstApply = await runDeterministicFlow({
+      flowId: 'flow.edge-claim-batch',
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      context: {
+        edge_claim_input_path: sourcePath
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+    const preparedInputs = JSON.parse(readFileSync(firstApply.inputsPath, 'utf8')) as {
+      context: Record<string, string>;
+    };
+    writeFileSync(
+      preparedInputs.context.edge_claim_prepare_csv,
+      'proxy_id,device_ip,device_model_id,space_id,skip_connectivity_check\nproxy-1,192.168.1.10,model-1,99,\n',
+      'utf8'
+    );
+
+    const dryRunApproved = await runDeterministicFlow({
+      flowId: 'flow.edge-claim-batch',
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: firstApply.runId,
+      context: {
+        edge_claim_input_path: sourcePath
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    const failed = await runDeterministicFlow({
+      flowId: 'flow.edge-claim-batch',
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: dryRunApproved.runId,
+      context: {
+        edge_claim_input_path: sourcePath
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(failed.outcome).toBe('failed');
+    const failedStep = failed.steps.find((item) => item.stepId === 'edge_claim_apply');
+    expect(failedStep?.status).toBe('failed');
+    expect(String(failedStep?.error?.detail ?? '')).toContain('1 ping-failed');
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/start_claim'))).toBe(false);
   });
 });

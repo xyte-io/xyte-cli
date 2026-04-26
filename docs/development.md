@@ -64,6 +64,8 @@ See [`release.md`](release.md) for publish and release-asset workflows.
 
 ```bash
 xyte-cli --log-actions --log-actions-path ./logs/xyte-cli.actions.ndjson status --tenant acme
+xyte-cli logs list --path ./logs/xyte-cli.actions.ndjson --output text
+xyte-cli logs show --path ./logs/xyte-cli.actions.ndjson --entry <sessionId>:<seq> --output json
 xyte-cli logs view --path ./logs/xyte-cli.actions.ndjson
 ```
 

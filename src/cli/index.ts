@@ -28,7 +28,7 @@ import {
 import { applyUpgrade, checkForUpgrade, type UpgradeDependencies } from './upgrade';
 import { runTuiApp } from '../tui/app';
 import { CliUserError } from '../contracts/user-error';
-import { errorMessage } from '../utils/error-format';
+import { errorMessage, parseCliErrorFormat } from '../utils/error-format';
 import { registerLogsCommands } from './commands/logs';
 import { registerConfigCommands } from './commands/config';
 import { registerFlowCommands } from './commands/flow';
@@ -46,6 +46,7 @@ import { formatReadinessText } from './format-readiness';
 import { resolveKeyValue } from './resolve-key';
 import {
   getExplicitGlobalOutput,
+  parseCliOutputMode,
   printJson,
   resolveStrictJson,
   resolveTextJsonOutput,
@@ -692,6 +693,11 @@ export function createCli(runtime: CliRuntime = {}): Command {
       '  xyte-cli util prepare --action organization.devices.claimDevice --tenant <tenant-id> --input ./claims.csv'
     ].join('\n')
   );
+  program.hook('preAction', (_rootCommand, actionCommand) => {
+    const globals = actionCommand.optsWithGlobals() as { output?: string; errorFormat?: string };
+    parseCliOutputMode(globals.output);
+    parseCliErrorFormat(globals.errorFormat);
+  });
 
   const cliContext: CliContext = {
     stdout,

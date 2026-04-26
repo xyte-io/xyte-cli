@@ -58,7 +58,7 @@ Credential storage:
 - Advanced override: `auth.secretStoreBackend=auto|native|file`.
 - Require native secure storage: `xyte-cli config set auth.secretStoreBackend native`
 - Use file storage intentionally: `xyte-cli config set auth.secretStoreBackend file`
-- `xyte-cli config path --format json` reports `secretStoreBackend`, `secretStore`, and `legacySecretStore`. `secretStore` is the effective location for the selected backend: a filesystem path when `secretStoreBackend` is `file`, and the service name used in the OS keychain (e.g. `xyte-cli`) when it is `keychain`, `dpapi`, or `secret-service`.
+- `xyte-cli config path --output json` reports `secretStoreBackend`, `secretStore`, and `legacySecretStore`. `secretStore` is the effective location for the selected backend: a filesystem path when `secretStoreBackend` is `file`, and the service name used in the OS keychain (e.g. `xyte-cli`) when it is `keychain`, `dpapi`, or `secret-service`.
 
 Shell-specific non-interactive examples:
 
@@ -155,11 +155,11 @@ One-liners:
 xyte-cli api call organization.devices.claimDevice --tenant <tenant-id> --body-json '{"name":"<name>","space_id":<space-id>,"sn":"<sn>","mac":"<mac>","cloud_id":"<cloud-id>"}'
 
 # Edge (behind an Xyte Edge proxy):
-xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip> --device-model-id <model-id> --space-id <space-id> --apply
+xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip> --device-model-id <model-id> --space-id <space-id> --plan
 
-# Bulk edge:
+# Bulk edge (blank skip_connectivity_check rows ping before claim):
 xyte-cli util prepare --action organization.edge.startClaim --input ./edge-devices.xlsx --output-dir ./prepared
-xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --report ./artifacts/edge-claim-report.ndjson --apply
+xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --report ./artifacts/edge-claim-report.ndjson --plan
 ```
 
 ## Skills-Less Operation

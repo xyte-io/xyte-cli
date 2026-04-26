@@ -166,10 +166,10 @@ Key params:
 - `--once` snapshot mode
 - `--follow` stream mode
 
-### 9) Utility preprocessing + import-tree
+### 9) Utility preprocessing + executable workflows
 
 ```bash
-xyte-cli util list-actions --output text
+xyte-cli util list-actions --output text --mode friendly
 
 xyte-cli util prepare \
   --action space.import-tree \
@@ -183,7 +183,8 @@ xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-t
 Key params:
 - `util prepare --action ... --input ... --output-dir ...`
 - `util import-tree` is dry-run unless `--apply`
-- `--report` writes apply NDJSON report
+- dry-runs count validated rows under `totals.planned`; `totals.succeeded` is for apply mode
+- `--report` writes an NDJSON row report
 
 ### 10) Upgrade flow
 
@@ -201,12 +202,14 @@ Key params:
 ```bash
 xyte-cli --log-actions --log-actions-path ./logs/xyte-cli.actions.ndjson status --tenant <tenant-id>
 xyte-cli logs list --path ./logs/xyte-cli.actions.ndjson --limit 200
+xyte-cli logs show --path ./logs/xyte-cli.actions.ndjson --entry <sessionId>:<seq> --output json
+xyte-cli logs show --path ./logs/xyte-cli.actions.ndjson --request-id <request-id> --output json
 xyte-cli logs stats --path ./logs/xyte-cli.actions.ndjson
 ```
 
 Key params:
 - `--log-actions` lifecycle NDJSON
-- `logs list|stats|gc|view` for operations logs
+- `logs list|show|stats|gc|view` for operations logs
 
 ---
 

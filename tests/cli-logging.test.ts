@@ -179,6 +179,187 @@ describe('cli action logging', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it('filters action log entries by session id', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-session-log-'));
+    const logPath = join(dir, 'actions.ndjson');
+    const first = createCliActionLogger({ enabled: true, path: logPath, sessionId: 'session-a' });
+    first.log('test.session', { commandPath: 'xyte-cli a' });
+    first.close();
+    const second = createCliActionLogger({ enabled: true, path: logPath, sessionId: 'session-b' });
+    second.log('test.session', { commandPath: 'xyte-cli b' });
+    second.close();
+
+    const result = readCliActionLog({ path: logPath, sessionId: 'session-b' });
+    expect(result.entries.every((entry) => entry.sessionId === 'session-b')).toBe(true);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('shows one action log entry by exact entry ref and request id', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-show-log-'));
+    const logPath = join(dir, 'actions.ndjson');
+    const logger = createCliActionLogger({ enabled: true, path: logPath, sessionId: 'session-a' });
+    logger.log('api.call.complete', { commandPath: 'xyte-cli api call', requestId: 'req-1' });
+    logger.close();
+    const result = readCliActionLog({ path: logPath, event: 'api.call.complete', limit: 1 });
+    const entry = result.entries[0];
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+
+    let program = createCli({ profileStore, secretStore, stdout, stderr });
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'logs',
+      'show',
+      '--path',
+      logPath,
+      '--entry',
+      `${entry.sessionId}:${entry.seq}`,
+      '--format',
+      'json'
+    ]);
+    let parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(parsed.entry.event).toBe('api.call.complete');
+
+    stdout.write.mockClear();
+    program = createCli({ profileStore, secretStore, stdout, stderr });
+    await program.parseAsync(['node', 'xyte-cli', 'logs', 'show', '--path', logPath, '--request-id', 'req-1']);
+    const text = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(text).toContain('api.call.complete');
+    expect(text).toContain('"requestId": "req-1"');
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('honors global --output json for logs list and show unless local --format is explicit', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-logs-output-'));
+    const logPath = join(dir, 'actions.ndjson');
+    const logger = createCliActionLogger({ enabled: true, path: logPath, sessionId: 'session-output' });
+    logger.log('api.call.complete', { commandPath: 'xyte-cli api call', requestId: 'req-output' });
+    logger.close();
+    const result = readCliActionLog({ path: logPath, event: 'api.call.complete', limit: 1 });
+    const entry = result.entries[0];
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+
+    let program = createCli({ profileStore, secretStore, stdout, stderr });
+    await program.parseAsync(['node', 'xyte-cli', 'logs', 'list', '--path', logPath, '--output', 'json']);
+    const listPayload = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(listPayload.schemaVersion).toBe('xyte.cli.action-log.v1');
+    expect(listPayload.entries.some((item: { event: string }) => item.event === 'api.call.complete')).toBe(true);
+
+    stdout.write.mockClear();
+    program = createCli({ profileStore, secretStore, stdout, stderr });
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'logs',
+      'show',
+      '--path',
+      logPath,
+      '--entry',
+      `${entry.sessionId}:${entry.seq}`,
+      '--output',
+      'json'
+    ]);
+    const showPayload = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(showPayload.schemaVersion).toBe('xyte.cli.action-log.entry.v1');
+    expect(showPayload.entry.event).toBe('api.call.complete');
+
+    stdout.write.mockClear();
+    program = createCli({ profileStore, secretStore, stdout, stderr });
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'logs',
+      'show',
+      '--path',
+      logPath,
+      '--entry',
+      `${entry.sessionId}:${entry.seq}`,
+      '--output',
+      'json',
+      '--format',
+      'text'
+    ]);
+    const text = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(text).toContain('api.call.complete');
+    expect(() => JSON.parse(text)).toThrow();
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('finds exact logs show entries older than the bounded list tail', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-show-old-log-'));
+    const logPath = join(dir, 'actions.ndjson');
+    const logger = createCliActionLogger({
+      enabled: true,
+      path: logPath,
+      sessionId: 'session-old',
+      maxFileBytes: 50 * 1024 * 1024
+    });
+    logger.log('api.call.complete', { commandPath: 'xyte-cli api call', requestId: 'req-old' });
+    for (let index = 0; index < 5_005; index += 1) {
+      logger.log('test.filler', { commandPath: 'xyte-cli filler', index });
+    }
+    logger.close();
+    const targetSeq = 2;
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'logs',
+      'show',
+      '--path',
+      logPath,
+      '--entry',
+      `session-old:${targetSeq}`,
+      '--output',
+      'json'
+    ]);
+
+    const payload = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(payload.entry.event).toBe('api.call.complete');
+    expect(payload.entry.data.requestId).toBe('req-old');
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('fails logs show when request id lookup is missing or ambiguous', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-show-log-fail-'));
+    const logPath = join(dir, 'actions.ndjson');
+    const logger = createCliActionLogger({ enabled: true, path: logPath });
+    logger.log('api.call.start', { requestId: 'req-1' });
+    logger.log('api.call.complete', { requestId: 'req-1' });
+    logger.close();
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+
+    const missingProgram = createCli({ profileStore, secretStore, stdout, stderr });
+    await expect(
+      missingProgram.parseAsync(['node', 'xyte-cli', 'logs', 'show', '--path', logPath, '--request-id', 'missing'])
+    ).rejects.toThrow('No matching action log entry found');
+
+    const ambiguousProgram = createCli({ profileStore, secretStore, stdout, stderr });
+    await expect(
+      ambiguousProgram.parseAsync(['node', 'xyte-cli', 'logs', 'show', '--path', logPath, '--request-id', 'req-1'])
+    ).rejects.toThrow('Multiple action log entries matched');
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it('records command lifecycle events when enabled globally', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'xyte-cli-lifecycle-log-'));
     const logPath = join(dir, 'lifecycle.ndjson');

@@ -7,6 +7,7 @@ interface ReadCliActionLogOptions {
   limit?: number;
   event?: string;
   command?: string;
+  sessionId?: string;
 }
 
 interface ReadCliActionLogResult {
@@ -51,8 +52,12 @@ function parseEntry(line: string): CliActionLogEntry | undefined {
 function entryMatchesFilters(
   entry: CliActionLogEntry,
   eventFilter: string | undefined,
-  commandFilter: string | undefined
+  commandFilter: string | undefined,
+  sessionIdFilter: string | undefined
 ): boolean {
+  if (sessionIdFilter && entry.sessionId !== sessionIdFilter) {
+    return false;
+  }
   if (eventFilter && entry.event !== eventFilter) {
     return false;
   }
@@ -121,6 +126,7 @@ export function readCliActionLog(options: ReadCliActionLogOptions = {}): ReadCli
   const maxEntries = normalizeLimit(options.limit);
   const eventFilter = options.event?.trim();
   const commandFilter = options.command?.trim().toLowerCase();
+  const sessionIdFilter = options.sessionId?.trim();
 
   const entries: CliActionLogEntry[] = [];
   let parseErrors = 0;
@@ -133,7 +139,7 @@ export function readCliActionLog(options: ReadCliActionLogOptions = {}): ReadCli
         parseErrors += 1;
         return;
       }
-      if (!entryMatchesFilters(parsed, eventFilter, commandFilter)) {
+      if (!entryMatchesFilters(parsed, eventFilter, commandFilter, sessionIdFilter)) {
         return;
       }
 

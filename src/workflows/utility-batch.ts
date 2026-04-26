@@ -38,6 +38,7 @@ export const UtilityBatchResultSchema = z.object({
   mode: z.enum(['dry-run', 'apply']),
   totals: z.object({
     rows: z.number(),
+    planned: z.number(),
     succeeded: z.number(),
     failed: z.number(),
     skipped: z.number()
@@ -54,7 +55,7 @@ export const UtilityBatchResultSchema = z.object({
 
 export type UtilityBatchResult = z.infer<typeof UtilityBatchResultSchema>;
 
-type UtilityRowStatus = 'dry-run' | 'succeeded' | 'failed' | 'skipped';
+type UtilityRowStatus = 'planned' | 'succeeded' | 'failed' | 'skipped';
 
 function writeReportLine(reportPath: string | undefined, payload: Record<string, unknown>): void {
   if (!reportPath) {
@@ -92,6 +93,7 @@ export async function runUtilityBatch(args: {
   const mode: UtilityBatchResult['mode'] = args.apply ? 'apply' : 'dry-run';
   const totals = {
     rows: args.operations.length,
+    planned: 0,
     succeeded: 0,
     failed: 0,
     skipped: 0
@@ -129,8 +131,8 @@ export async function runUtilityBatch(args: {
           })
         );
       } else {
-        totals.succeeded += 1;
-        writeReportLine(args.reportPath, reportLine(operation, 'dry-run'));
+        totals.planned += 1;
+        writeReportLine(args.reportPath, reportLine(operation, 'planned'));
       }
     } catch (error) {
       totals.failed += 1;

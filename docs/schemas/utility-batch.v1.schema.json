@@ -42,12 +42,17 @@
       "additionalProperties": false,
       "required": [
         "rows",
+        "planned",
         "succeeded",
         "failed",
         "skipped"
       ],
       "properties": {
         "rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "planned": {
           "type": "integer",
           "minimum": 0
         },

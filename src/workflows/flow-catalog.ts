@@ -645,7 +645,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         task: 'inspect.fleet',
         inspect: { mode: 'fleet' },
         mutating: false,
-        command: 'xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/xyte-fleet.device-migration.json'
+        command:
+          'xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/xyte-fleet.device-migration.json'
       },
       {
         kind: 'task',
@@ -702,14 +703,16 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         edgeClaim: {},
         requiresContext: ['proxy_id', 'device_ip', 'device_model_id', 'space_id'],
         mutating: true,
-        command: 'xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --apply'
+        command:
+          'xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --apply'
       }
     ]
   },
   'flow.edge-claim-batch': {
     id: 'flow.edge-claim-batch',
     title: 'Edge Claim Batch',
-    intent: 'Claim many devices behind one or more Edge proxies from a prepared CSV.',
+    intent:
+      'Claim many devices behind one or more Edge proxies from a prepared CSV; rows that do not skip connectivity checks run a pre-claim ping inside the batch.',
     writeCapable: true,
     recipeCommands: [
       'xyte-cli util prepare --action organization.edge.startClaim --tenant <tenant-id> --input ./devices.xlsx --output-dir ./prepared',
@@ -729,7 +732,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         },
         requiresContext: ['edge_claim_input_path'],
         mutating: false,
-        command: 'xyte-cli util prepare --action organization.edge.startClaim --tenant <tenant-id> --input ./devices.xlsx --output-dir ./artifacts/edge-claim'
+        command:
+          'xyte-cli util prepare --action organization.edge.startClaim --tenant <tenant-id> --input ./devices.xlsx --output-dir ./artifacts/edge-claim'
       },
       {
         kind: 'gate',
@@ -737,7 +741,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         title: 'Review Prepared Edge Claim CSV',
         mutating: false,
         pauseOnFirstApply: true,
-        detail: 'Populate and review the prepared edge-claim CSV before running the batch dry run.',
+        detail:
+          'Populate and review the prepared edge-claim CSV before running the batch dry run; blank skip_connectivity_check means the batch will ping before claim.',
         command: 'Human decision gate after reviewing organization-edge-startclaim.csv'
       },
       {
@@ -752,14 +757,15 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
           resumePath: 'edge-claim.resume.ndjson'
         },
         mutating: false,
-        command: 'xyte-cli edge claim-batch --tenant <tenant-id> --input ./artifacts/edge-claim/organization-edge-startclaim.csv --plan'
+        command:
+          'xyte-cli edge claim-batch --tenant <tenant-id> --input ./artifacts/edge-claim/organization-edge-startclaim.csv --plan'
       },
       {
         kind: 'gate',
         id: 'gate_edge_claim_batch_apply',
         title: 'Approve Edge Claim Batch',
         mutating: true,
-        detail: 'Human approval required before applying edge claim batch.',
+        detail: 'Human approval required before applying edge claim batch; non-skip rows will ping before startClaim.',
         command: 'Human decision gate before edge claim batch apply'
       },
       {
@@ -774,7 +780,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
           resumePath: 'edge-claim.resume.ndjson'
         },
         mutating: true,
-        command: 'xyte-cli edge claim-batch --tenant <tenant-id> --input ./artifacts/edge-claim/organization-edge-startclaim.csv --apply --report ./artifacts/edge-claim.apply.ndjson --resume-artifact ./artifacts/edge-claim.resume.ndjson'
+        command:
+          'xyte-cli edge claim-batch --tenant <tenant-id> --input ./artifacts/edge-claim/organization-edge-startclaim.csv --apply --report ./artifacts/edge-claim.apply.ndjson --resume-artifact ./artifacts/edge-claim.resume.ndjson'
       }
     ]
   },

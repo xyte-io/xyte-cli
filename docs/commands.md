@@ -18,14 +18,17 @@ Use it as a unified map for flow runner execution, utility pipelines, and endpoi
 ## Flow Commands
 
 ```bash
-xyte-cli flow list
+xyte-cli flow list [--format json|text]
 xyte-cli flow run <flow-id> --tenant <tenant-id> [--plan|--apply] [--resume <run-id-or-path>] [--out-dir <path>] [--inspect-provider-scope organization|partner|auto] [--context-json <path>] [--var key=value ...] [--once] [--strict-json]
 ```
 
 Notes:
 - `--plan` is the default mode; `--plan` and `--apply` are mutually exclusive.
-- `--apply` advances one human gate per invocation and should be paired with `--resume`.
+- `flow list --format text` shows required context keys and the safe first `flow run ... --plan` command.
+- `--apply --resume <run-id-or-path>` advances one human gate per invocation.
 - run bundles are written to `./tmp/flow-runs` by default and return `xyte.flow.run.v1` summary JSON on stdout.
+- non-completed run summaries include `nextAction`; use it as the primary operator hint before inspecting raw step data.
+- malformed resume metadata fails closed; fix the run bundle or start a fresh run.
 - full authoring walkthrough: [`flows/custom-workflows.md`](flows/custom-workflows.md).
 
 Custom flow lifecycle:
@@ -44,8 +47,8 @@ xyte-cli init [--target <path>] [--scope project|user|both] [--agents all|claude
 xyte-cli status [--tenant <tenant-id>] [--mode fast|full] [--output json|text]
 xyte-cli setup status [--tenant <tenant-id>] [--output json] [--field tenantId]
 xyte-cli setup run [--non-interactive] [--advanced] [--tenant <tenant-id>] [--name <display-name>] [--provider xyte-org|xyte-partner] [--key <value>|--key-file <path>|--key-stdin|--key-command <cmd>] [--connectivity auto|always|never]
-xyte-cli config show [--scope user|workspace|resolved] [--format json|text]
-xyte-cli config path [--format json|text]
+xyte-cli config show [--scope user|workspace|resolved] [--output json|text]
+xyte-cli config path [--output json|text]
 xyte-cli config set <key> <value> [--scope user|workspace]
 xyte-cli config unset <key> [--scope user|workspace]
 xyte-cli config doctor --tenant <tenant-id> --output json
@@ -53,11 +56,17 @@ xyte-cli doctor install [--format json|text]
 xyte-cli upgrade --check --output json
 xyte-cli upgrade --yes --output json
 xyte-cli --log-actions [--log-actions-verbose] status --tenant <tenant-id>
-xyte-cli logs list [--path <path>] [--limit <n>] [--output text|json]
+xyte-cli logs list [--path <path>] [--limit <n>] [--event <event>] [--command <text>] [--session-id <id>] [--output text|json]
+xyte-cli logs show [--path <path>] (--entry <sessionId:seq>|--request-id <id>) [--output text|json]
 xyte-cli logs stats [--path <path>] [--output text|json]
 xyte-cli logs gc [--path <path>] [--max-files <n>] [--max-age-days <days>] [--dry-run] [--output text|json]
 xyte-cli logs view [--path <path>] [--limit <n>]
 ```
+
+Log lookup notes:
+- Use `logs list --session-id <id>` to narrow a run.
+- Use `logs show --entry <sessionId>:<seq>` when you have an exact row id.
+- Use `logs show --request-id <id>` to correlate API request logs; the command fails if the request id is missing or matches more than one entry.
 
 Setup notes:
 - Interactive `xyte-cli setup run` is the primary human onboarding path.
@@ -82,7 +91,7 @@ Setup notes:
 xyte-cli config tenant add <tenant-id> --name "Acme"
 xyte-cli config tenant use <tenant-id>
 xyte-cli config tenant list
-xyte-cli config tenant remove <tenant-id>
+xyte-cli config tenant remove <tenant-id> --confirm
 
 xyte-cli config key add --tenant <tenant-id> --name primary --key "<value>" --set-active
 xyte-cli config key add --tenant <tenant-id> --name primary --key-file ~/.config/xyte/acme.key --set-active
@@ -101,6 +110,7 @@ xyte-cli config key remove --tenant <tenant-id> --provider xyte-org --slot prod-
 Auth note:
 - Inline `--key "<value>"` examples are shell-sensitive. Prefer `--key-file` or `setup run --key-stdin` for automation.
 - `config key add` accepts `--provider` when you want a deterministic route; if omitted, it probes `xyte-org` first and then `xyte-partner`.
+- `config tenant remove --confirm` removes tenant profile metadata and clears secrets for known key slots.
 
 ## Endpoint Operations
 
@@ -163,7 +173,7 @@ xyte-cli api call organization.commands.cancelCommand \
 ## Utility Pipelines, Space Import, And Device Migration
 
 ```bash
-xyte-cli util list-actions --output text
+xyte-cli util list-actions --output text [--mode friendly|generic] [--execution-support space.import-tree|device.move|edge.claim-batch|call-loop-only]
 
 xyte-cli util prepare \
   --action organization.devices.claimDevice \
@@ -188,6 +198,10 @@ xyte-cli util move-devices --tenant <tenant-id> --input ./device-moves.csv \
   [--input-format auto|csv|json|jsonl] [--apply] [--continue-on-error] [--report <path>]
 ```
 
+Utility notes:
+- dry-run summaries count rows under `totals.planned`; `totals.succeeded` is reserved for applied rows.
+- `util prepare` writes a `.notes.md` human review artifact with column glossary, reject taxonomy, canonical JSON shape, and safe next commands.
+
 ## Edge Devices
 
 Edge devices sit behind an Xyte Edge proxy. Claim and ping are asynchronous: a start call returns 204, then the CLI polls the matching status endpoint until terminal. Prefer the `xyte-cli edge` command group over raw `api call` — it handles polling, backoff, and resume.
@@ -209,6 +223,7 @@ xyte-cli edge claim-batch \
   --tenant <tenant-id> \
   --input ./prepared/organization-edge-startclaim.csv \
   [--report <path>] [--resume-artifact <path>] \
+  [--skip-connectivity-check] \
   [--poll-interval-ms 5000] [--poll-timeout-ms 600000] \
   [--plan|--apply] [--output json|text]
 
@@ -228,20 +243,24 @@ Notes:
 - `edge claim`, `edge claim-batch`, and `edge ping` are mutating. `--plan` is the safe default; `--apply` only after explicit user approval.
 - `edge claim-status` and `edge ping-status` are read-only.
 - Poll defaults: 5 s interval, 10 min timeout.
-- `edge claim-batch` on a half-finished run requires `--resume-artifact <ndjson-artifact>`; it skips rows previously recorded as `succeeded` or `already-claimed` and re-runs all other rows from the prior artifact.
-- `edge claim-batch` exits with code 1 if any row ends in `failed`, `rejected`, `timeout`, `proxy-offline`, or `aborted`; per-row dispositions are written to `--report`.
+- `edge claim-batch` runs `edge ping` internally before `startClaim` for blank or `skip_connectivity_check=false` rows. Rows with `skip_connectivity_check=true` skip that ping and send `skip_connectivity_check: true`.
+- `edge claim-batch --skip-connectivity-check` makes blank rows skip ping and send `skip_connectivity_check: true`; rows that explicitly set `skip_connectivity_check=false` are rejected as conflicts.
+- `edge claim-batch` on a half-finished run requires `--resume-artifact <ndjson-artifact>`; it skips rows previously recorded as `succeeded` or `already-claimed` and re-runs all other rows from the prior artifact. The resume artifact records completed row results, not in-flight claim IDs.
+- `edge claim-batch` exits with code 1 if any row ends in `failed`, `rejected`, `timeout`, `proxy-offline`, `ping-failed`, or `aborted`; per-row dispositions are written to `--report`.
+- `edge ping` remains a standalone diagnostic command; batch does not rely on ping evidence from a separate command.
 - Raw endpoints remain available for advanced cases: `organization.edge.startClaim`, `organization.edge.getClaimStatus`, `organization.edge.startPing`, `organization.edge.getPingStatus`.
 - Raw route mapping: `startClaim` -> `POST /core/v1/organization/edge/devices/start_claim`, `getClaimStatus` -> `GET /core/v1/organization/edge/devices/get_claim_status`, `startPing` -> `POST /core/v1/organization/edge/devices/start_ping`, `getPingStatus` -> `GET /core/v1/organization/edge/devices/get_ping_status`.
 
 ## Insights And Reports
 
 ```bash
-xyte-cli ops inspect fleet --tenant <tenant-id> --provider-scope auto --render json|ascii [--out <path>] [--strict-json]
-xyte-cli ops inspect deep-dive --tenant <tenant-id> --provider-scope auto --window 24 --render json|ascii|markdown [--out <path>] [--strict-json]
+xyte-cli ops inspect fleet --tenant <tenant-id> --provider-scope auto --output json [--out <path>] [--strict-json]
+xyte-cli ops inspect deep-dive --tenant <tenant-id> --provider-scope auto --window 24 --output json [--out <path>] [--strict-json]
 xyte-cli ops report generate --tenant <tenant-id> --input <path> --out <path> [--render markdown|pdf] [--include-sensitive] [--strict-json]
 ```
 
 Provider scope behavior:
+- Use global `--output text|json` for stdout selection. Keep `--render` for report/artifact rendering or explicit inspect ASCII/markdown output.
 - `--provider-scope auto` selects the only configured credential scope.
 - If both `xyte-org` and `xyte-partner` are configured, `auto` fails and requires explicit `organization` or `partner`.
 - Inspect pipelines are scope-strict: organization mode does not call partner endpoints, and partner mode does not call organization endpoints.

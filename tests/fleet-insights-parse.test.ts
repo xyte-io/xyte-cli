@@ -41,7 +41,7 @@ const DEVICE_MOVE_BASE = {
   tenantId: 'acme',
   command: 'device.move',
   mode: 'apply',
-  totals: { rows: 1, succeeded: 1, failed: 0, skipped: 0 },
+  totals: { rows: 1, planned: 0, succeeded: 1, failed: 0, skipped: 0 },
   stoppedEarly: false
 };
 

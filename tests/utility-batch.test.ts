@@ -68,7 +68,8 @@ describe('space import workflow', () => {
     expect(result.mode).toBe('dry-run');
     expect(result.command).toBe('space.import-tree');
     expect(result.totals.rows).toBe(1);
-    expect(result.totals.succeeded).toBe(1);
+    expect(result.totals.planned).toBe(1);
+    expect(result.totals.succeeded).toBe(0);
     expect(result.totals.skipped).toBe(0);
   });
 
@@ -248,7 +249,8 @@ describe('device move workflow', () => {
     expect(result.mode).toBe('dry-run');
     expect(result.totals.rows).toBe(1);
     expect(result.totals.failed).toBe(0);
-    expect(result.totals.succeeded).toBe(1);
+    expect(result.totals.planned).toBe(1);
+    expect(result.totals.succeeded).toBe(0);
     expect(result.totals.skipped).toBe(0);
     expect(client.callWithMeta).not.toHaveBeenCalledWith('organization.devices.moveDevice', expect.anything());
   });

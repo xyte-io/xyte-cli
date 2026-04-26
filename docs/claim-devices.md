@@ -122,9 +122,20 @@ xyte-cli edge claim-batch \
   --apply
 ```
 
+Batch connectivity behavior:
+- Blank or `skip_connectivity_check=false` rows run an internal `edge ping` before `startClaim`.
+- `skip_connectivity_check=true` rows skip that ping and send `skip_connectivity_check: true` to `startClaim`.
+- `--skip-connectivity-check` applies skip mode to blank rows; explicit row `false` values are rejected as conflicts.
+- Standalone `edge ping` is diagnostic. It is not a required evidence-producing prerequisite for a later batch claim.
+
+Batch artifacts:
+- stdout carries the `xyte.edge.claim-batch.v1` summary.
+- `--report` writes per-row audit NDJSON for review/debugging.
+- `--resume-artifact` writes completed row resume state; reuse the same path after interruption or partial failure. It does not checkpoint in-flight claim IDs.
+
 Exit codes:
 - `0` — every row ended in `succeeded` or `already-claimed`.
-- `1` — one or more rows ended in `failed`, `rejected`, `timeout`, `proxy-offline`, or `aborted`; fix them and resume.
+- `1` — one or more rows ended in `failed`, `rejected`, `timeout`, `proxy-offline`, `ping-failed`, or `aborted`; fix them and resume.
 
 Resume after interruption (ctrl-C, network blip, partial failure):
 
@@ -144,6 +155,8 @@ Replaying after all rows are terminal-success is a no-op (exit 0, zero API calls
 Same async pattern as claim:
 
 ```bash
+xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 192.168.1.100 --plan
+# Apply only after explicit approval:
 xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 192.168.1.100 --apply
 xyte-cli edge ping-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 192.168.1.100
 ```
@@ -160,20 +173,27 @@ AI agents must use this exact phrasing:
 
 | Situation | Disposition | Do this |
 | --- | --- | --- |
-| `startClaim` 204, `getClaimStatus` stays `pending` past timeout | `timeout` | Re-run with a higher `--poll-timeout-ms`, or resume via `--resume-artifact`. |
+| `startClaim` 204, `getClaimStatus` stays `pending` past timeout | `timeout` | Re-run with a higher `--poll-timeout-ms`; resume retries the row rather than checkpointing the in-flight claim. |
 | `getClaimStatus` → `failed` | `failed` | Read the server detail; fix at source; resume. |
 | `startClaim` → 422 (unknown model id, unreachable edge, bad IP) | `rejected` | Fix the offending field in your primary CSV; resume. |
 | `startClaim` → 401 | `aborted` | Run `xyte-cli setup run` or `xyte-cli config key list`; resume. |
 | Already claimed | `already-claimed` | No action — batch exits clean if every row is success or already-claimed. |
 | Proxy offline | `proxy-offline` | Bring the proxy online; re-run with `--resume-artifact`. |
-| `skip_connectivity_check=false` and ping fails mid-claim | `failed` | Check network/firewall; retry. |
+| Batch pre-claim ping fails or times out | `ping-failed` | Check network/firewall; resume after fixing connectivity. |
+| `skip_connectivity_check=true` and claim later fails connectivity verification | `rejected` or `failed` | Inspect the row response; rerun without skip if the device must be verified first. |
 | `startClaim` → 429 | retried | CLI backs off automatically; no action. |
 | `getClaimStatus` → 422 "not initiated" race | tolerated | CLI tolerates a bounded number of first-poll 422s; no action. |
-| Half-finished batch | — | Always use `--resume-artifact` on the next run. |
+| Half-finished batch | — | Always use `--resume-artifact` on the next run; if the process died after `startClaim` but before row output, inspect `edge claim-status` / logs before rerunning that row. |
 | Malformed spreadsheet | — | Fix rejects in `./prepared/organization-edge-startclaim.rejected.csv` and re-run `util prepare`. |
-| Mixed proxies in one batch | — | Supported; rows are grouped per proxy for logging. |
+| Mixed proxies in one batch | — | Supported; rows keep CSV order. There is no per-proxy fan-out or in-flight claim queue. |
 | Multi-tenant | — | Always pass `--tenant <tenant-id>`. |
 
 ## 5. Logs and audit
 
 Every mutating `edge claim` / `edge claim-batch` / `edge ping` command lands in `xyte-cli logs list`. A batch shares one logical run id so you can trace every row back to a single operator invocation.
+
+```bash
+xyte-cli logs list --session-id <session-id> --output text
+xyte-cli logs show --entry <session-id>:<seq> --output json
+xyte-cli logs show --request-id <request-id> --output json
+```
