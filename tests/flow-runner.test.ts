@@ -1817,7 +1817,8 @@ describe('flow runner', () => {
     });
     expect(first.outcome).toBe('pending_gate');
     expect(first.resumeCommand).toContain('--inspect-provider-scope partner');
-    expect(first.resumeCommand).toContain(`--out-dir '${outDir}'`);
+    const expectedOutDirArg = process.platform === 'win32' ? `"${outDir}"` : `'${outDir}'`;
+    expect(first.resumeCommand).toContain(`--out-dir ${expectedOutDirArg}`);
     expect(first.resumeCommand).toContain('--apply');
     expect(first.nextAction).toMatchObject({
       kind: 'approve_gate',
