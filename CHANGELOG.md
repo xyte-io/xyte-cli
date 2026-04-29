@@ -6,6 +6,16 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.10.3] - 2026-04-29
+
+### Added
+- Added prepare-only `util prepare` normalization utilities for connector setup and team access groups, user invites, and memberships.
+- Added shipped skill and docs guidance for using the new connector and team access normalization utilities without attaching nonexistent API execution paths.
+- Added schema, CLI, and packaged-install smoke coverage for prepare-only utility actions.
+
+### Fixed
+- Corrected AI utility preprocessing docs and skill guidance for the generated `device.move` prepare headers.
+
 ## [0.10.2] - 2026-04-26
 
 ### Added
