@@ -465,6 +465,57 @@ describe('cli integration', () => {
     expect(existsSync(join(outputDir, 'space-import-tree.notes.md'))).toBe(true);
   });
 
+  it('builds utility prepare for connector setup and team access normalization', async () => {
+    const profileStore = new MemoryProfileStore();
+    const secretStore = new MemorySecretStore();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const tmpRoot = mkdtempSync(join(tmpdir(), 'xyte-cli-utility-prepare-normalize-'));
+    const inputPath = join(tmpRoot, 'source.csv');
+    const outputDir = join(tmpRoot, 'out');
+    writeFileSync(inputPath, 'raw', 'utf8');
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'util',
+      'prepare',
+      '--input',
+      inputPath,
+      '--action',
+      'organization.connectors.prepareSetup',
+      '--output-dir',
+      outputDir
+    ]);
+
+    let parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(parsed.actionKey).toBe('organization.connectors.prepareSetup');
+    expect(parsed.executionSupport).toBe('prepare-only');
+    expect(existsSync(join(outputDir, 'organization-connectors-preparesetup.csv'))).toBe(true);
+    expect(existsSync(join(outputDir, 'organization-connectors-preparesetup.rejected.csv'))).toBe(true);
+
+    stdout.write.mockClear();
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'util',
+      'prepare',
+      '--input',
+      inputPath,
+      '--action',
+      'organization.teamAccess.users',
+      '--output-dir',
+      outputDir
+    ]);
+
+    parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(parsed.actionKey).toBe('organization.teamAccess.users');
+    expect(parsed.executionSupport).toBe('prepare-only');
+    expect(existsSync(join(outputDir, 'organization-teamaccess-users.csv'))).toBe(true);
+    expect(existsSync(join(outputDir, 'organization-teamaccess-users.rejected.csv'))).toBe(true);
+  });
+
   it('lists utility actions', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();
@@ -478,6 +529,10 @@ describe('cli integration', () => {
     const parsed = JSON.parse(output);
     expect(Array.isArray(parsed)).toBe(true);
     expect(parsed.some((item: any) => item.actionKey === 'device.move')).toBe(true);
+    expect(parsed.some((item: any) => item.actionKey === 'organization.connectors.prepareSetup')).toBe(true);
+    expect(parsed.some((item: any) => item.actionKey === 'organization.teamAccess.groups')).toBe(true);
+    expect(parsed.some((item: any) => item.actionKey === 'organization.teamAccess.users')).toBe(true);
+    expect(parsed.some((item: any) => item.actionKey === 'organization.teamAccess.memberships')).toBe(true);
     expect(parsed.some((item: any) => item.actionKey === 'organization.devices.claimDevice')).toBe(true);
     expect(parsed.some((item: any) => item.actionKey === 'space.import-tree')).toBe(true);
     expect(parsed[0].mode).toBe('friendly');
@@ -503,6 +558,27 @@ describe('cli integration', () => {
     const text = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     expect(text).toContain('organization.edge.startClaim |');
     expect(text).toContain('execution=edge.claim-batch');
+
+    stdout.write.mockClear();
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'util',
+      'list-actions',
+      '--format',
+      'json',
+      '--mode',
+      'friendly',
+      '--execution-support',
+      'prepare-only'
+    ]);
+    const prepareOnly = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(prepareOnly.map((item: any) => item.actionKey)).toEqual([
+      'organization.connectors.prepareSetup',
+      'organization.teamAccess.groups',
+      'organization.teamAccess.memberships',
+      'organization.teamAccess.users'
+    ]);
   });
 
   it('fails utility prepare when action is missing', async () => {

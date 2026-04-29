@@ -4,7 +4,7 @@ This runbook defines utility preprocessing with `xyte-cli util prepare`.
 
 ## Scope
 
-1. Preprocess write-capable endpoint actions into canonical files.
+1. Preprocess supported utility actions into canonical files.
 2. Execute only the CLI-supported utility workflows from their dedicated commands: `util import-tree`, `util move-devices`, and `edge claim-batch`.
 3. Keep `xyte-cli` AI-free: no OCR/model calls inside the CLI.
 
@@ -18,7 +18,7 @@ This runbook defines utility preprocessing with `xyte-cli util prepare`.
 6. Ask the user what to do next. Never auto-apply.
 7. For `space.import-tree` and `device.move`, run dry-run then apply with explicit user approval. Dry-run summaries count validated rows under `totals.planned`, not `totals.succeeded`.
 8. For `organization.edge.startClaim`, run `edge claim-batch --plan`, then `--apply` after explicit approval and use `--resume-artifact` for partial runs.
-9. For other actions, use controlled `xyte-cli api call` loops outside utility execution.
+9. For generic endpoint actions, use controlled `xyte-cli api call` loops outside utility execution.
 
 ## Canonical outputs
 
@@ -36,8 +36,24 @@ Friendly profiles:
 - `proxy_id,device_ip,device_model_id,space_id,display_name,custom_parameters,custom_partner_name,custom_model_name,skip_connectivity_check`
 - downstream execution command: `xyte-cli edge claim-batch`
 4. `device.move`:
-- `device_id,target_space_id`
+- `device_id,target_space_id,device_name,current_space_id,target_space_name`
 - downstream execution command: `xyte-cli util move-devices`
+5. `organization.connectors.prepareSetup`:
+- `label,platform,connectorName,targetSpace,targetSpaceId,authorizationOwner,deviceNameSource,sourceRow,notes`
+- outputs: `./prepared/organization-connectors-preparesetup.csv`, `./prepared/organization-connectors-preparesetup.rejected.csv`, `./prepared/organization-connectors-preparesetup.notes.md`
+- prepare-only: no CLI execution command or public API endpoint is attached.
+6. `organization.teamAccess.groups`:
+- `label,groupName,iconName,sourceRow,notes`
+- outputs: `./prepared/organization-teamaccess-groups.csv`, `./prepared/organization-teamaccess-groups.rejected.csv`, `./prepared/organization-teamaccess-groups.notes.md`
+- prepare-only: no CLI execution command or public API endpoint is attached.
+7. `organization.teamAccess.users`:
+- `label,email,name,groupName,assignSupportSeat,sourceRow,notes`
+- outputs: `./prepared/organization-teamaccess-users.csv`, `./prepared/organization-teamaccess-users.rejected.csv`, `./prepared/organization-teamaccess-users.notes.md`
+- prepare-only: no CLI execution command or public API endpoint is attached.
+8. `organization.teamAccess.memberships`:
+- `label,email,groupName,sourceRow,notes`
+- outputs: `./prepared/organization-teamaccess-memberships.csv`, `./prepared/organization-teamaccess-memberships.rejected.csv`, `./prepared/organization-teamaccess-memberships.notes.md`
+- prepare-only: no CLI execution command or public API endpoint is attached.
 
 Generic profiles:
 1. `<path params...>,query_json,body_json`
@@ -95,6 +111,40 @@ xyte-cli util prepare \
 ```
 
 Then drive the batch through `xyte-cli edge claim-batch --plan`, explicit approval, and `--apply --resume-artifact`.
+
+Prepare connector setup rows:
+
+```bash
+xyte-cli util prepare \
+  --action organization.connectors.prepareSetup \
+  --input ./input/connectors-rough.csv \
+  --tenant <tenant-id> \
+  --output-dir ./prepared
+```
+
+Prepare team access rows:
+
+```bash
+xyte-cli util prepare \
+  --action organization.teamAccess.groups \
+  --input ./input/team-rough.csv \
+  --tenant <tenant-id> \
+  --output-dir ./prepared
+
+xyte-cli util prepare \
+  --action organization.teamAccess.users \
+  --input ./input/team-rough.csv \
+  --tenant <tenant-id> \
+  --output-dir ./prepared
+
+xyte-cli util prepare \
+  --action organization.teamAccess.memberships \
+  --input ./input/team-rough.csv \
+  --tenant <tenant-id> \
+  --output-dir ./prepared
+```
+
+The team access utilities intentionally emit separate files so each prepared CSV has one primary artifact and one rejected artifact.
 
 Execute prepared space import (dry-run then apply):
 

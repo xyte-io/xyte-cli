@@ -44,7 +44,7 @@ const UtilityPrepareResultSchema = z.object({
     apply: z.string(),
     verify: z.string()
   }),
-  executionSupport: z.enum(['space.import-tree', 'device.move', 'edge.claim-batch', 'call-loop-only'])
+  executionSupport: z.enum(['space.import-tree', 'device.move', 'edge.claim-batch', 'prepare-only', 'call-loop-only'])
 });
 
 type UtilityPrepareResult = z.infer<typeof UtilityPrepareResultSchema>;
@@ -163,6 +163,14 @@ function buildSuggestedCommands(
     };
   }
 
+  if (profile.executionSupport === 'prepare-only') {
+    return {
+      next: `Review ${primaryPath}, fill the prepared and rejected files from the source input, then consume the prepared CSV in the calling workflow.`,
+      apply: 'No CLI execution is available for this prepare-only utility.',
+      verify: `Review ${primaryPath} and the rejected artifact for unresolved rows.`
+    };
+  }
+
   const samplePathObject = profile.headers
     .filter((header) => header !== 'query_json' && header !== 'body_json')
     .reduce<Record<string, string>>((accumulator, header) => {
@@ -186,6 +194,18 @@ function requiredHeadersForProfile(profile: UtilityActionProfile): string[] {
   }
   if (profile.actionKey === 'device.move') {
     return ['device_id', 'target_space_id'];
+  }
+  if (profile.actionKey === 'organization.connectors.prepareSetup') {
+    return ['connectorName', 'targetSpace', 'authorizationOwner'];
+  }
+  if (profile.actionKey === 'organization.teamAccess.groups') {
+    return ['groupName'];
+  }
+  if (profile.actionKey === 'organization.teamAccess.users') {
+    return ['email'];
+  }
+  if (profile.actionKey === 'organization.teamAccess.memberships') {
+    return ['email', 'groupName'];
   }
   if (profile.mode === 'generic') {
     return profile.headers.filter((header) => header !== 'query_json' && header !== 'body_json');
@@ -217,6 +237,12 @@ function rejectTaxonomy(profile: UtilityActionProfile, requiredHeaders: string[]
   }
   if (profile.actionKey === 'device.move') {
     reasons.push('invalid_target_space_id');
+  }
+  if (profile.actionKey === 'organization.connectors.prepareSetup') {
+    reasons.push('unsupported_connector');
+  }
+  if (profile.actionKey === 'organization.teamAccess.users' || profile.actionKey === 'organization.teamAccess.memberships') {
+    reasons.push('invalid_email');
   }
   reasons.push('ambiguous_row');
   return [...new Set(reasons)];

@@ -116,6 +116,81 @@ describe('utility prepare workflow', () => {
     expect(notes).not.toContain('invalid_target_space_id');
   });
 
+  it('builds connector setup prepare-only scaffold', () => {
+    const root = makeTempRoot('xyte-prepare-connectors-');
+    const inputPath = join(root, 'connectors.csv');
+    const outDir = join(root, 'out');
+    writeFileSync(inputPath, 'raw', 'utf8');
+
+    const result = runUtilityPrepare({
+      inputPath,
+      actionKey: 'organization.connectors.prepareSetup',
+      outputDir: outDir
+    });
+
+    expect(result.executionSupport).toBe('prepare-only');
+    expect(result.entity).toBe('connectors');
+    expect(result.artifacts.primary).toBe(join(outDir, 'organization-connectors-preparesetup.csv'));
+    expect(result.artifacts.rejected).toBe(join(outDir, 'organization-connectors-preparesetup.rejected.csv'));
+    expect(result.artifacts.notes).toBe(join(outDir, 'organization-connectors-preparesetup.notes.md'));
+    expect(readFileSync(result.artifacts.primary, 'utf8')).toBe(
+      'label,platform,connectorName,targetSpace,targetSpaceId,authorizationOwner,deviceNameSource,sourceRow,notes\n'
+    );
+    expect(readFileSync(result.artifacts.rejected, 'utf8')).toBe(
+      'label,platform,connectorName,targetSpace,targetSpaceId,authorizationOwner,deviceNameSource,sourceRow,notes,reject_reason\n'
+    );
+    expect(result.suggestedCommands.apply).toBe('No CLI execution is available for this prepare-only utility.');
+    const notes = readFileSync(result.artifacts.notes, 'utf8');
+    expect(notes).toContain('connectorName: required');
+    expect(notes).toContain('targetSpace: required');
+    expect(notes).toContain('authorizationOwner: required');
+    expect(notes).toContain('unsupported_connector');
+  });
+
+  it('builds split team access prepare-only scaffolds', () => {
+    const root = makeTempRoot('xyte-prepare-teamaccess-');
+    const inputPath = join(root, 'team.csv');
+    const outDir = join(root, 'out');
+    writeFileSync(inputPath, 'raw', 'utf8');
+
+    const groups = runUtilityPrepare({
+      inputPath,
+      actionKey: 'organization.teamAccess.groups',
+      outputDir: outDir
+    });
+    const users = runUtilityPrepare({
+      inputPath,
+      actionKey: 'organization.teamAccess.users',
+      outputDir: outDir
+    });
+    const memberships = runUtilityPrepare({
+      inputPath,
+      actionKey: 'organization.teamAccess.memberships',
+      outputDir: outDir
+    });
+
+    expect(groups.executionSupport).toBe('prepare-only');
+    expect(users.executionSupport).toBe('prepare-only');
+    expect(memberships.executionSupport).toBe('prepare-only');
+    expect(readFileSync(groups.artifacts.primary, 'utf8')).toBe('label,groupName,iconName,sourceRow,notes\n');
+    expect(readFileSync(groups.artifacts.rejected, 'utf8')).toBe('label,groupName,iconName,sourceRow,notes,reject_reason\n');
+    expect(readFileSync(users.artifacts.primary, 'utf8')).toBe(
+      'label,email,name,groupName,assignSupportSeat,sourceRow,notes\n'
+    );
+    expect(readFileSync(users.artifacts.rejected, 'utf8')).toBe(
+      'label,email,name,groupName,assignSupportSeat,sourceRow,notes,reject_reason\n'
+    );
+    expect(readFileSync(memberships.artifacts.primary, 'utf8')).toBe('label,email,groupName,sourceRow,notes\n');
+    expect(readFileSync(memberships.artifacts.rejected, 'utf8')).toBe(
+      'label,email,groupName,sourceRow,notes,reject_reason\n'
+    );
+    expect(groups.artifacts.primary).toBe(join(outDir, 'organization-teamaccess-groups.csv'));
+    expect(users.artifacts.primary).toBe(join(outDir, 'organization-teamaccess-users.csv'));
+    expect(memberships.artifacts.primary).toBe(join(outDir, 'organization-teamaccess-memberships.csv'));
+    expect(readFileSync(users.artifacts.notes, 'utf8')).toContain('invalid_email');
+    expect(readFileSync(memberships.artifacts.notes, 'utf8')).toContain('missing_groupName');
+  });
+
   it('adds send-command preflight guidance in suggested commands', () => {
     const root = makeTempRoot('xyte-prepare-send-command-');
     const inputPath = join(root, 'source.csv');
@@ -230,21 +305,38 @@ describe('utility prepare workflow', () => {
     const actions = listUtilityPrepareActions();
     expect(actions[0]?.mode).toBe('friendly');
     expect(actions.some((item) => item.actionKey === 'organization.devices.claimDevice')).toBe(true);
+    expect(actions.some((item) => item.actionKey === 'organization.connectors.prepareSetup')).toBe(true);
+    expect(actions.some((item) => item.actionKey === 'organization.teamAccess.groups')).toBe(true);
+    expect(actions.some((item) => item.actionKey === 'organization.teamAccess.users')).toBe(true);
+    expect(actions.some((item) => item.actionKey === 'organization.teamAccess.memberships')).toBe(true);
     expect(actions.some((item) => item.actionKey === 'device.move')).toBe(true);
     expect(actions.some((item) => item.actionKey === 'space.import-tree')).toBe(true);
     expect(listUtilityPrepareActions({ mode: 'friendly' }).every((item) => item.mode === 'friendly')).toBe(true);
     expect(
       listUtilityPrepareActions({ executionSupport: 'edge.claim-batch' }).map((item) => item.actionKey)
     ).toEqual(['organization.edge.startClaim']);
+    expect(listUtilityPrepareActions({ executionSupport: 'prepare-only' }).map((item) => item.actionKey)).toEqual([
+      'organization.connectors.prepareSetup',
+      'organization.teamAccess.groups',
+      'organization.teamAccess.memberships',
+      'organization.teamAccess.users'
+    ]);
 
     const root = makeTempRoot('xyte-prepare-schema-');
     const inputPath = join(root, 'source.md');
     const outDir = join(root, 'out');
     writeFileSync(inputPath, '# source', 'utf8');
 
+    const schemaPath = join(process.cwd(), 'docs/schemas/utility-prepare.v1.schema.json');
+    const skillSchemaPath = join(process.cwd(), 'skills/xyte-cli/schemas/utility-prepare.v1.schema.json');
     const schema = JSON.parse(
-      readFileSync(join(process.cwd(), 'docs/schemas/utility-prepare.v1.schema.json'), 'utf8')
+      readFileSync(schemaPath, 'utf8')
     ) as Record<string, unknown>;
+    const skillSchema = JSON.parse(
+      readFileSync(skillSchemaPath, 'utf8')
+    ) as Record<string, unknown>;
+    expect(skillSchema).toEqual(schema);
+
     const ajv = new Ajv2020({ strict: false });
     const validate = ajv.compile(schema);
 
@@ -255,6 +347,16 @@ describe('utility prepare workflow', () => {
     });
 
     expect(validate(result)).toBe(true);
+    expect(validate.errors).toBeNull();
+
+    const prepareOnlyResult = runUtilityPrepare({
+      inputPath,
+      actionKey: 'organization.connectors.prepareSetup',
+      outputDir: outDir,
+      force: true
+    });
+
+    expect(validate(prepareOnlyResult)).toBe(true);
     expect(validate.errors).toBeNull();
   });
 });

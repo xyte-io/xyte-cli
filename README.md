@@ -196,6 +196,26 @@ xyte-cli util prepare \
   --input ./raw-hierarchy.xlsx \
   --output-dir ./prepared
 
+xyte-cli util prepare \
+  --action organization.connectors.prepareSetup \
+  --input ./raw-connectors.csv \
+  --output-dir ./prepared
+
+xyte-cli util prepare \
+  --action organization.teamAccess.groups \
+  --input ./raw-team.csv \
+  --output-dir ./prepared
+
+xyte-cli util prepare \
+  --action organization.teamAccess.users \
+  --input ./raw-team.csv \
+  --output-dir ./prepared
+
+xyte-cli util prepare \
+  --action organization.teamAccess.memberships \
+  --input ./raw-team.csv \
+  --output-dir ./prepared
+
 xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv
 xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv --apply --report ./reports/space-import.apply.ndjson
 
@@ -213,6 +233,7 @@ Key params:
 - `util import-tree` and `util move-devices` are dry-run unless `--apply`
 - dry-runs count validated rows under `totals.planned`; `totals.succeeded` is for apply mode
 - generated `.notes.md` files are the human review artifact for prepared data
+- connector and team-access prepare actions are prepare-only normalization utilities
 - `--report` writes an NDJSON row report
 
 ### 11) Claim devices

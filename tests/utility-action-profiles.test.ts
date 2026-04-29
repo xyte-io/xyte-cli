@@ -3,8 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   buildFriendlySpaceImportProfile,
   buildFriendlyClaimDeviceProfile,
+  buildFriendlyConnectorSetupProfile,
   buildFriendlyEdgeClaimProfile,
   buildFriendlyMoveDeviceProfile,
+  buildFriendlyTeamAccessGroupsProfile,
+  buildFriendlyTeamAccessMembershipsProfile,
+  buildFriendlyTeamAccessUsersProfile,
   buildGenericEndpointProfile
 } from '../src/workflows/utility-action-profiles';
 import type { PublicEndpointSpec } from '../src/types/endpoints';
@@ -119,6 +123,57 @@ describe('utility-action-profiles', () => {
       const profile = buildFriendlyMoveDeviceProfile(makeEndpoint());
       expect(profile.headers).toContain('device_id');
       expect(profile.headers).toContain('target_space_id');
+    });
+  });
+
+  describe('prepare-only normalization profiles', () => {
+    it('builds connector setup profile with exact headers', () => {
+      const profile = buildFriendlyConnectorSetupProfile();
+      expect(profile.actionKey).toBe('organization.connectors.prepareSetup');
+      expect(profile.entity).toBe('connectors');
+      expect(profile.executionSupport).toBe('prepare-only');
+      expect(profile.headers).toEqual([
+        'label',
+        'platform',
+        'connectorName',
+        'targetSpace',
+        'targetSpaceId',
+        'authorizationOwner',
+        'deviceNameSource',
+        'sourceRow',
+        'notes'
+      ]);
+      expect(profile.decodeRules.join(' ')).toContain('zoom_v2');
+      expect(profile.decodeRules.join(' ')).toContain('authorizationOwner');
+    });
+
+    it('builds team access split profiles with exact headers', () => {
+      expect(buildFriendlyTeamAccessGroupsProfile().headers).toEqual([
+        'label',
+        'groupName',
+        'iconName',
+        'sourceRow',
+        'notes'
+      ]);
+      expect(buildFriendlyTeamAccessUsersProfile().headers).toEqual([
+        'label',
+        'email',
+        'name',
+        'groupName',
+        'assignSupportSeat',
+        'sourceRow',
+        'notes'
+      ]);
+      expect(buildFriendlyTeamAccessMembershipsProfile().headers).toEqual([
+        'label',
+        'email',
+        'groupName',
+        'sourceRow',
+        'notes'
+      ]);
+      expect(buildFriendlyTeamAccessGroupsProfile().executionSupport).toBe('prepare-only');
+      expect(buildFriendlyTeamAccessUsersProfile().executionSupport).toBe('prepare-only');
+      expect(buildFriendlyTeamAccessMembershipsProfile().executionSupport).toBe('prepare-only');
     });
   });
 
