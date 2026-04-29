@@ -156,6 +156,7 @@
         "space.import-tree",
         "device.move",
         "edge.claim-batch",
+        "prepare-only",
         "call-loop-only"
       ]
     }

@@ -146,6 +146,89 @@ xyte-cli api call organization.spaces.getSpaces \
   --query-json '{"path_includes":"HQ/Floor 1/Office 1"}'
 ```
 
+## SOP B2: Connector Setup Normalization (`organization.connectors.prepareSetup`)
+
+Prepare:
+
+```bash
+xyte-cli util prepare \
+  --action organization.connectors.prepareSetup \
+  --input /path/to/connectors-rough.csv \
+  --tenant <tenant-id> \
+  --output-dir ./prepared
+```
+
+Expected files:
+1. `./prepared/organization-connectors-preparesetup.csv`
+2. `./prepared/organization-connectors-preparesetup.rejected.csv`
+3. `./prepared/organization-connectors-preparesetup.notes.md`
+
+Primary headers:
+`label,platform,connectorName,targetSpace,targetSpaceId,authorizationOwner,deviceNameSource,sourceRow,notes`
+
+Rules:
+1. `connectorName` must be supported by the generated notes.
+2. `targetSpace` is required.
+3. `authorizationOwner` is required.
+4. `targetSpaceId` stays blank unless the source explicitly contains a real id.
+5. `deviceNameSource` defaults to `xyte_managed` when absent.
+6. This is prepare-only; do not run an API call from this utility output.
+
+## SOP B3: Team Access Normalization (`organization.teamAccess.*`)
+
+Run one prepare action per artifact:
+
+```bash
+xyte-cli util prepare \
+  --action organization.teamAccess.groups \
+  --input /path/to/team-rough.csv \
+  --tenant <tenant-id> \
+  --output-dir ./prepared
+
+xyte-cli util prepare \
+  --action organization.teamAccess.users \
+  --input /path/to/team-rough.csv \
+  --tenant <tenant-id> \
+  --output-dir ./prepared
+
+xyte-cli util prepare \
+  --action organization.teamAccess.memberships \
+  --input /path/to/team-rough.csv \
+  --tenant <tenant-id> \
+  --output-dir ./prepared
+```
+
+Expected group files:
+1. `./prepared/organization-teamaccess-groups.csv`
+2. `./prepared/organization-teamaccess-groups.rejected.csv`
+3. `./prepared/organization-teamaccess-groups.notes.md`
+
+Group headers:
+`label,groupName,iconName,sourceRow,notes`
+
+Expected user files:
+1. `./prepared/organization-teamaccess-users.csv`
+2. `./prepared/organization-teamaccess-users.rejected.csv`
+3. `./prepared/organization-teamaccess-users.notes.md`
+
+User headers:
+`label,email,name,groupName,assignSupportSeat,sourceRow,notes`
+
+Expected membership files:
+1. `./prepared/organization-teamaccess-memberships.csv`
+2. `./prepared/organization-teamaccess-memberships.rejected.csv`
+3. `./prepared/organization-teamaccess-memberships.notes.md`
+
+Membership headers:
+`label,email,groupName,sourceRow,notes`
+
+Rules:
+1. Groups require `groupName`; `iconName` defaults to `users`.
+2. Users require `email`; do not invent emails.
+3. Memberships require `email` and `groupName`.
+4. If one source row creates a user and assigns a group, prepare both users and memberships outputs through their separate utilities.
+5. These are prepare-only; do not run API calls from these utility outputs.
+
 ## SOP C: Device-to-Space Matching (`util match`)
 
 ```bash

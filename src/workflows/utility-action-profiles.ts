@@ -6,6 +6,7 @@ export type UtilityExecutionSupport =
   | 'space.import-tree'
   | 'device.move'
   | 'edge.claim-batch'
+  | 'prepare-only'
   | 'call-loop-only';
 
 export interface UtilityActionProfile {
@@ -25,10 +26,163 @@ export interface UtilityActionProfile {
   executionSupport: UtilityExecutionSupport;
 }
 
+const SUPPORTED_CONNECTOR_NAMES = [
+  'zoom_v2',
+  'mtr',
+  'biamp_workplace',
+  'bright_sign_v2',
+  'xio_v2',
+  'domotz',
+  'neat',
+  'q_sys_v2',
+  'sony_c2c',
+  'logitech_sync',
+  'poly_lens',
+  'cisco_control_hub',
+  'app_space',
+  'shure',
+  'netgear',
+  'yealink'
+];
+
 const GENERIC_PROMPT_TEMPLATE_PATH = 'skills/xyte-cli/templates/ai-utility-prepare-generic.prompt.md';
 const SPACE_IMPORT_PROMPT_TEMPLATE_PATH = 'skills/xyte-cli/templates/ai-space-import.prompt.md';
 const UTILITIES_SKILL_NODE_PATH = 'skills/xyte-cli/references/utilities.md';
 const SPACE_IMPORT_SKILL_NODE_PATH = 'skills/xyte-cli/references/utility-ai-space-import-tree.md';
+
+export function buildFriendlyConnectorSetupProfile(): UtilityActionProfile {
+  return {
+    actionKey: 'organization.connectors.prepareSetup',
+    title: 'Connector Setup Prepare',
+    entity: 'connectors',
+    mode: 'friendly',
+    primaryFormat: 'csv',
+    headers: [
+      'label',
+      'platform',
+      'connectorName',
+      'targetSpace',
+      'targetSpaceId',
+      'authorizationOwner',
+      'deviceNameSource',
+      'sourceRow',
+      'notes'
+    ],
+    jsonShape: {
+      label: 'Zoom Rooms',
+      platform: 'Zoom Rooms',
+      connectorName: 'zoom_v2',
+      targetSpace: 'Milan HQ/Lobby',
+      targetSpaceId: '',
+      authorizationOwner: 'AV operations team',
+      deviceNameSource: 'xyte_managed',
+      sourceRow: '2',
+      notes: ''
+    },
+    decodeRules: [
+      'Map source rows into label,platform,connectorName,targetSpace,targetSpaceId,authorizationOwner,deviceNameSource,sourceRow,notes columns.',
+      `connectorName must be one of: ${SUPPORTED_CONNECTOR_NAMES.join(', ')}.`,
+      'targetSpace is required and must be non-empty.',
+      'authorizationOwner is required and must be non-empty.',
+      'targetSpaceId is optional; leave blank unless the source explicitly has a real id.',
+      'deviceNameSource defaults to xyte_managed when absent.',
+      'Reject rows when connector/platform cannot map to a supported connectorName.',
+      'Write unresolved rows to rejected output with reject_reason.'
+    ],
+    promptTemplatePath: GENERIC_PROMPT_TEMPLATE_PATH,
+    skillNodePath: UTILITIES_SKILL_NODE_PATH,
+    executionSupport: 'prepare-only'
+  };
+}
+
+export function buildFriendlyTeamAccessGroupsProfile(): UtilityActionProfile {
+  return {
+    actionKey: 'organization.teamAccess.groups',
+    title: 'Team Access Groups Prepare',
+    entity: 'teamAccess',
+    mode: 'friendly',
+    primaryFormat: 'csv',
+    headers: ['label', 'groupName', 'iconName', 'sourceRow', 'notes'],
+    jsonShape: {
+      label: 'AV operations',
+      groupName: 'AV operations',
+      iconName: 'users',
+      sourceRow: '2',
+      notes: ''
+    },
+    decodeRules: [
+      'Map source rows into label,groupName,iconName,sourceRow,notes columns.',
+      'groupName is required and must be non-empty.',
+      'iconName defaults to users when absent.',
+      'Deduplicate groups by normalized groupName.',
+      'Write unresolved rows to rejected output with reject_reason.'
+    ],
+    promptTemplatePath: GENERIC_PROMPT_TEMPLATE_PATH,
+    skillNodePath: UTILITIES_SKILL_NODE_PATH,
+    executionSupport: 'prepare-only'
+  };
+}
+
+export function buildFriendlyTeamAccessUsersProfile(): UtilityActionProfile {
+  return {
+    actionKey: 'organization.teamAccess.users',
+    title: 'Team Access User Invites Prepare',
+    entity: 'teamAccess',
+    mode: 'friendly',
+    primaryFormat: 'csv',
+    headers: ['label', 'email', 'name', 'groupName', 'assignSupportSeat', 'sourceRow', 'notes'],
+    jsonShape: {
+      label: 'Dana Cohen',
+      email: 'dana@example.com',
+      name: 'Dana Cohen',
+      groupName: 'AV operations',
+      assignSupportSeat: '',
+      sourceRow: '2',
+      notes: ''
+    },
+    decodeRules: [
+      'Map source rows into label,email,name,groupName,assignSupportSeat,sourceRow,notes columns.',
+      'email is required and must be non-empty.',
+      'name is optional.',
+      'groupName is required when the source row assigns the user to a group.',
+      'Do not invent emails.',
+      'Reject rows with email but unclear group when the intended output requires group context.',
+      'Write unresolved rows to rejected output with reject_reason.'
+    ],
+    promptTemplatePath: GENERIC_PROMPT_TEMPLATE_PATH,
+    skillNodePath: UTILITIES_SKILL_NODE_PATH,
+    executionSupport: 'prepare-only'
+  };
+}
+
+export function buildFriendlyTeamAccessMembershipsProfile(): UtilityActionProfile {
+  return {
+    actionKey: 'organization.teamAccess.memberships',
+    title: 'Team Access Memberships Prepare',
+    entity: 'teamAccess',
+    mode: 'friendly',
+    primaryFormat: 'csv',
+    headers: ['label', 'email', 'groupName', 'sourceRow', 'notes'],
+    jsonShape: {
+      label: 'Dana Cohen in AV operations',
+      email: 'dana@example.com',
+      groupName: 'AV operations',
+      sourceRow: '2',
+      notes: ''
+    },
+    decodeRules: [
+      'Map source rows into label,email,groupName,sourceRow,notes columns.',
+      'email is required and must be non-empty.',
+      'groupName is required and must be non-empty.',
+      'Emit membership rows for users assigned to groups.',
+      'If the same source row creates the user and assigns them, prepare both a users row and a memberships row through the separate utilities.',
+      'Write unresolved rows to rejected output with reject_reason.'
+    ],
+    promptTemplatePath: GENERIC_PROMPT_TEMPLATE_PATH,
+    skillNodePath: UTILITIES_SKILL_NODE_PATH,
+    executionSupport: 'prepare-only'
+  };
+}
 
 export function buildFriendlySpaceImportProfile(): UtilityActionProfile {
   return {

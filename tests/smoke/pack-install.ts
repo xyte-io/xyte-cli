@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, rm, unlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path, { delimiter } from 'node:path';
@@ -36,6 +36,7 @@ export interface PackInstallSmokeOptions {
   ) => Promise<{ code: number; stdout: string; stderr: string }>;
   pathExistsFn?: typeof pathExists;
   readFileFn?: (path: string, encoding: BufferEncoding) => Promise<string>;
+  writeFileFn?: (path: string, data: string, encoding: BufferEncoding) => Promise<void>;
   mkdtempFn?: (prefix: string) => Promise<string>;
   mkdirFn?: (path: string, options?: { recursive?: boolean }) => Promise<unknown>;
   rmFn?: (path: string, options?: { recursive?: boolean; force?: boolean }) => Promise<unknown>;
@@ -177,9 +178,10 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
   const run = options.run ?? runCommand;
   const pathExistsFn = options.pathExistsFn ?? pathExists;
   const readFileFn = options.readFileFn ?? readFile;
+  const writeFileFn = options.writeFileFn ?? writeFile;
   const startMockServerFn = options.startMockServerFn ?? startMockServer;
 
-  const stepTotal = 13;
+  const stepTotal = 14;
   let tarballPath: string | undefined;
   let mockServer: MockServerHandle | undefined;
   const tempRoot = await (options.mkdtempFn ?? mkdtemp)(path.join(tmpdir(), 'xyte-cli-pack-install-'));
@@ -291,7 +293,65 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
       }
     }
 
-    printStep(logger, 7, stepTotal, 'Running shell-neutral setup via stdin');
+    printStep(logger, 7, stepTotal, 'Checking prepare-only utility actions from installed CLI');
+    const prepareInputPath = path.join(dirs.workspaceDir, 'connectors.csv');
+    const prepareOutputDir = path.join(dirs.workspaceDir, 'prepared');
+    await (options.mkdirFn ?? mkdir)(prepareOutputDir, { recursive: true });
+    await writeFileFn(prepareInputPath, 'platform,targetSpace,authorizationOwner\nZoom Rooms,Milan HQ,AV operations\n', 'utf8');
+    const prepareResult = await run(
+      XYTE_COMMAND,
+      [
+        'util',
+        'prepare',
+        '--action',
+        'organization.connectors.prepareSetup',
+        '--input',
+        prepareInputPath,
+        '--output-dir',
+        prepareOutputDir,
+        '--force'
+      ],
+      { cwd: runtimeCwd, env: runtimeEnv }
+    );
+    assertSuccess(prepareResult, 'xyte-cli util prepare organization.connectors.prepareSetup', XYTE_COMMAND, [
+      'util',
+      'prepare',
+      '--action',
+      'organization.connectors.prepareSetup',
+      '--input',
+      prepareInputPath,
+      '--output-dir',
+      prepareOutputDir,
+      '--force'
+    ]);
+    const preparePayload = normalizeJsonOutput(prepareResult.stdout) as Record<string, unknown>;
+    if (
+      preparePayload.actionKey !== 'organization.connectors.prepareSetup' ||
+      preparePayload.executionSupport !== 'prepare-only'
+    ) {
+      throw new Error(`Prepare-only utility did not return the expected payload: ${JSON.stringify(preparePayload)}`);
+    }
+    const prepareOnlyListResult = await run(
+      XYTE_COMMAND,
+      ['util', 'list-actions', '--format', 'json', '--mode', 'friendly', '--execution-support', 'prepare-only'],
+      { cwd: runtimeCwd, env: runtimeEnv }
+    );
+    assertSuccess(prepareOnlyListResult, 'xyte-cli util list-actions prepare-only', XYTE_COMMAND, [
+      'util',
+      'list-actions',
+      '--format',
+      'json',
+      '--mode',
+      'friendly',
+      '--execution-support',
+      'prepare-only'
+    ]);
+    const prepareOnlyActions = normalizeJsonOutput(prepareOnlyListResult.stdout) as Array<Record<string, unknown>>;
+    if (!prepareOnlyActions.some((action) => action.actionKey === 'organization.connectors.prepareSetup')) {
+      throw new Error(`Prepare-only action list did not include connector setup: ${JSON.stringify(prepareOnlyActions)}`);
+    }
+
+    printStep(logger, 8, stepTotal, 'Running shell-neutral setup via stdin');
     const setupResult = await run(
       XYTE_COMMAND,
       [
@@ -334,7 +394,7 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
       throw new Error(`Setup run did not return the expected tenant payload: ${JSON.stringify(setupPayload)}`);
     }
 
-    printStep(logger, 8, stepTotal, 'Checking setup field extraction');
+    printStep(logger, 9, stepTotal, 'Checking setup field extraction');
     const fieldResult = await run(XYTE_COMMAND, ['setup', 'status', '--tenant', 'acme', '--field', 'tenantId'], {
       cwd: runtimeCwd,
       env: runtimeEnv
@@ -351,7 +411,7 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
       throw new Error(`Field extraction returned an unexpected value: ${fieldResult.stdout}`);
     }
 
-    printStep(logger, 9, stepTotal, 'Pointing the configured tenant at a local mock backend');
+    printStep(logger, 10, stepTotal, 'Pointing the configured tenant at a local mock backend');
     mockServer = await startMockServerFn({
       cwd,
       env: runtimeEnv,
@@ -386,7 +446,7 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
       mockServer.baseUrl
     ]);
 
-    printStep(logger, 10, stepTotal, 'Checking watch --out with nested NDJSON output');
+    printStep(logger, 11, stepTotal, 'Checking watch --out with nested NDJSON output');
     const watchPath = path.join(dirs.workspaceDir, 'artifacts', 'xyte-watch.incidents.ndjson');
     const watchResult = await run(
       XYTE_COMMAND,
@@ -438,7 +498,7 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
       throw new Error(`Watch command wrote an unexpected payload: ${JSON.stringify(watchPayload)}`);
     }
 
-    printStep(logger, 11, stepTotal, 'Checking inspect fleet --out with nested JSON output');
+    printStep(logger, 12, stepTotal, 'Checking inspect fleet --out with nested JSON output');
     const fleetPath = path.join(dirs.workspaceDir, 'artifacts', 'xyte-fleet.json');
     const fleetResult = await run(
       XYTE_COMMAND,
@@ -467,7 +527,7 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
       throw new Error(`Fleet inspect wrote an unexpected payload: ${JSON.stringify(fleetPayload)}`);
     }
 
-    printStep(logger, 12, stepTotal, 'Checking inspect deep-dive --out with nested JSON output');
+    printStep(logger, 13, stepTotal, 'Checking inspect deep-dive --out with nested JSON output');
     const deepDivePath = path.join(dirs.workspaceDir, 'artifacts', 'xyte-deep-dive.json');
     const deepDiveResult = await run(
       XYTE_COMMAND,
@@ -495,7 +555,7 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
       throw new Error(`Deep-dive inspect wrote an unexpected payload: ${JSON.stringify(deepDivePayload)}`);
     }
 
-    printStep(logger, 13, stepTotal, 'Checking report generation from inspect --out artifacts');
+    printStep(logger, 14, stepTotal, 'Checking report generation from inspect --out artifacts');
     const reportPath = path.join(dirs.workspaceDir, 'reports', 'fleet-report.md');
     const reportResult = await run(
       XYTE_COMMAND,

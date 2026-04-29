@@ -3,9 +3,13 @@ import type { PublicEndpointSpec } from '../types/endpoints';
 import { CliUserError } from '../contracts/user-error';
 import {
   buildFriendlyClaimDeviceProfile,
+  buildFriendlyConnectorSetupProfile,
   buildFriendlyEdgeClaimProfile,
   buildFriendlyMoveDeviceProfile,
   buildFriendlySpaceImportProfile,
+  buildFriendlyTeamAccessGroupsProfile,
+  buildFriendlyTeamAccessMembershipsProfile,
+  buildFriendlyTeamAccessUsersProfile,
   buildGenericEndpointProfile,
   type UtilityActionProfile
 } from './utility-action-profiles';
@@ -24,6 +28,10 @@ function buildProfiles(): UtilityActionProfile[] {
   const profiles = new Map<string, UtilityActionProfile>();
 
   profiles.set('space.import-tree', buildFriendlySpaceImportProfile());
+  profiles.set('organization.connectors.prepareSetup', buildFriendlyConnectorSetupProfile());
+  profiles.set('organization.teamAccess.groups', buildFriendlyTeamAccessGroupsProfile());
+  profiles.set('organization.teamAccess.users', buildFriendlyTeamAccessUsersProfile());
+  profiles.set('organization.teamAccess.memberships', buildFriendlyTeamAccessMembershipsProfile());
 
   const writeEndpoints = loadWriteEndpoints().sort(endpointKeyComparator);
   for (const endpoint of writeEndpoints) {

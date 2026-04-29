@@ -173,7 +173,7 @@ xyte-cli api call organization.commands.cancelCommand \
 ## Utility Pipelines, Space Import, And Device Migration
 
 ```bash
-xyte-cli util list-actions --output text [--mode friendly|generic] [--execution-support space.import-tree|device.move|edge.claim-batch|call-loop-only]
+xyte-cli util list-actions --output text [--mode friendly|generic] [--execution-support space.import-tree|device.move|edge.claim-batch|prepare-only|call-loop-only]
 
 xyte-cli util prepare \
   --action organization.devices.claimDevice \
@@ -183,6 +183,26 @@ xyte-cli util prepare \
 xyte-cli util prepare \
   --action space.import-tree \
   --input ./raw-hierarchy.pdf \
+  --output-dir ./prepared
+
+xyte-cli util prepare \
+  --action organization.connectors.prepareSetup \
+  --input ./raw-connectors.csv \
+  --output-dir ./prepared
+
+xyte-cli util prepare \
+  --action organization.teamAccess.groups \
+  --input ./raw-team.csv \
+  --output-dir ./prepared
+
+xyte-cli util prepare \
+  --action organization.teamAccess.users \
+  --input ./raw-team.csv \
+  --output-dir ./prepared
+
+xyte-cli util prepare \
+  --action organization.teamAccess.memberships \
+  --input ./raw-team.csv \
   --output-dir ./prepared
 
 xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv \

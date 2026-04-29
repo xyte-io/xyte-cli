@@ -158,7 +158,7 @@ Provider/report behavior:
 - partner deep-dive/report enrichment is best-effort; optional enrichment failures should not block report generation
 
 5. Util preprocessing and execution:
-- `xyte-cli util list-actions [--output text|json] [--mode friendly|generic] [--execution-support space.import-tree|device.move|edge.claim-batch|call-loop-only]`
+- `xyte-cli util list-actions [--output text|json] [--mode friendly|generic] [--execution-support space.import-tree|device.move|edge.claim-batch|prepare-only|call-loop-only]`
 - `xyte-cli util prepare --action <action-key> --input <file> [--tenant <tenant-id>] [--output-dir <dir>] [--force]`
 - stop and ask for a user decision before any execution command
 - `xyte-cli util import-tree --tenant <tenant-id> --input <file> [--input-format auto|csv|json|jsonl] [--apply] [--continue-on-error] [--report <path>]`
@@ -188,6 +188,10 @@ Provider/report behavior:
 | PDF report generation | `xyte-cli ops report generate --tenant <tenant-id> --input <deep-dive.json> --out <path>.pdf` |
 | Util action catalog | `xyte-cli util list-actions --output text --mode friendly` |
 | Util prepare scaffold | `xyte-cli util prepare --action <action-key> --input <file> --output-dir ./prepared` |
+| Connector setup normalization | `xyte-cli util prepare --action organization.connectors.prepareSetup --input <file> --output-dir ./prepared` |
+| Team access group normalization | `xyte-cli util prepare --action organization.teamAccess.groups --input <file> --output-dir ./prepared` |
+| Team access user normalization | `xyte-cli util prepare --action organization.teamAccess.users --input <file> --output-dir ./prepared` |
+| Team access membership normalization | `xyte-cli util prepare --action organization.teamAccess.memberships --input <file> --output-dir ./prepared` |
 | Space tree import | `xyte-cli util import-tree --tenant <tenant-id> --input <file> [--apply]` |
 | Device-to-space matching | `xyte-cli util match --source <path> --target <path> --source-field <name> --target-field <name> --out <path>` |
 | Batch device move | `xyte-cli util move-devices --tenant <tenant-id> --input <file> [--apply]` |
