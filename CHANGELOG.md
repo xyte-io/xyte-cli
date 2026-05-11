@@ -6,6 +6,11 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.10.4] - 2026-05-11
+
+### Fixed
+- Added `User-Agent: CLI` to Xyte API requests sent by the CLI.
+
 ## [0.10.3] - 2026-04-29
 
 ### Added
