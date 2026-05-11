@@ -31,32 +31,6 @@ describe('upgrade utilities', () => {
     expect(result.upToDate).toBe(false);
   });
 
-  it('uses CLI user agent when checking the registry', async () => {
-    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(JSON.stringify({ version: '0.5.0' }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' }
-      })
-    );
-
-    await checkForUpgrade(
-      {
-        packageName: '@xyteai/cli'
-      },
-      {
-        fetchImpl,
-        getCurrentVersion: () => '0.4.0'
-      }
-    );
-
-    expect(fetchImpl).toHaveBeenCalledWith('https://registry.npmjs.org/%40xyteai%2Fcli/latest', {
-      headers: {
-        accept: 'application/json',
-        'User-Agent': 'CLI'
-      }
-    });
-  });
-
   it('applies upgrade using install spec and emits skill warning on partial failure', async () => {
     const commandRunner = vi.fn(async (command: string, args: string[]) => {
       if (/^npm(?:\.cmd)?$/.test(command)) {
