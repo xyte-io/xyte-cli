@@ -32,6 +32,7 @@ describe('client auth behavior', () => {
 
     expect(transport.request).toHaveBeenCalledTimes(1);
     expect(transport.request.mock.calls[0][0].headers.Authorization).toBe('org-key-123');
+    expect(transport.request.mock.calls[0][0].headers['User-Agent']).toBe('CLI');
   });
 
   it('throws auth error when scoped key is missing', async () => {

@@ -8,6 +8,7 @@ import { UPGRADE_RESULT_SCHEMA_VERSION } from '../contracts/versions';
 
 const DEFAULT_CLI_PACKAGE = '@xyteai/cli';
 const DEFAULT_SKILL_AGENTS: SkillAgent[] = ['claude', 'copilot', 'codex'];
+const CLI_USER_AGENT = 'CLI';
 
 interface CommandResult {
   code: number;
@@ -47,7 +48,8 @@ async function fetchLatestVersion(packageName: string, fetchImpl: typeof fetch):
   const encodedName = encodeURIComponent(packageName);
   const response = await fetchImpl(`https://registry.npmjs.org/${encodedName}/latest`, {
     headers: {
-      accept: 'application/json'
+      accept: 'application/json',
+      'User-Agent': CLI_USER_AGENT
     }
   });
 
