@@ -6,6 +6,8 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.10.5] - 2026-05-12
+
 ### Fixed
 - Corrected read endpoint metadata so organization command/ticket reads do not advertise request bodies and partner ticket reads use the callable ticket path without the docs copy suffix.
 
