@@ -42,14 +42,15 @@
       "per_page"
     ],
     "authScope": "organization",
-    "bodyType": "json",
-    "hasBody": true,
+    "bodyType": "none",
+    "hasBody": false,
     "sourceFile": "https://docs.xyte.io/reference/get-commands",
     "notes": [
       "Docs page: https://docs.xyte.io/reference/get-commands",
       "Docs category: /branches/2.0/categories/reference/API Access",
       "Docs parent: /branches/2.0/reference/commands",
-      "Docs raw path params: device_id"
+      "Docs raw path params: device_id",
+      "Docs OpenAPI requestBody repeats device_id, but the verified route uses device_id as a path parameter and this GET request must not send a body."
     ]
   },
   {
@@ -588,15 +589,15 @@
     ],
     "queryParams": [],
     "authScope": "organization",
-    "bodyType": "json",
-    "hasBody": true,
+    "bodyType": "none",
+    "hasBody": false,
     "sourceFile": "https://docs.xyte.io/reference/get-ticket",
-    "bodyExample": "{\n  \"id\": \"022a67f7-00e2-41b....\",\n  \"title\": \"Temperature won't go down\",\n  \"description\": \"Overheating, Help!\",\n  \"status\": \"resolved\",\n  \"created_at\": \"2024-07-21T11:15:02Z\",\n  \"device_id\": \"47560fbb-d998-4e2f-.....\",\n  \"user_name\": \"S. James\",\n  \"user_email\": \"james@abcde.io\",\n  \"comments\": [\n    {\n      \"id\": \"11111\",\n      \"text\": \"Hi - my device is overheating and it won't cool off. Help!\",\n      \"created_at\": \"2024-07-21T11:15:26.830Z\",\n      \"system\": false,\n      \"user\": \"S. James\",\n      \"owner\": \"Green Energy Corp\",\n      \"owner_type\": \"organization\"\n    }\n  ]\n}",
     "notes": [
       "Docs page: https://docs.xyte.io/reference/get-ticket",
       "Docs category: /branches/2.0/categories/reference/API Access",
       "Docs parent: /branches/2.0/reference/tickets-2",
-      "Docs raw path params: ticket_id"
+      "Docs raw path params: ticket_id",
+      "Docs OpenAPI requestBody is a response-shaped sample, but this GET request is path-parameter only and must not send a body."
     ]
   },
   {
@@ -953,7 +954,7 @@
     "title": "Get Ticket",
     "method": "GET",
     "base": "hub",
-    "pathTemplate": "/core/v1/partner/tickets/:ticket_id (COPY)",
+    "pathTemplate": "/core/v1/partner/tickets/:ticket_id",
     "pathParams": [
       "ticket_id"
     ],
@@ -966,7 +967,8 @@
       "Docs page: https://dev.xyte.io/reference/partner-tickets-get",
       "Docs category: /branches/1/categories/reference/Partner Core API",
       "Docs parent: /branches/1/reference/ticket",
-      "Docs raw path params: ticket_id"
+      "Docs raw path params: ticket_id",
+      "Docs OpenAPI path currently includes a ReadMe '(COPY)' suffix; the callable ticket route is /core/v1/partner/tickets/:ticket_id."
     ]
   },
   {

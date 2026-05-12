@@ -13,6 +13,8 @@ describe('public endpoint catalog', () => {
   it('contains route drift overrides', () => {
     const commandList = endpoints.find((endpoint) => endpoint.key === 'organization.commands.getCommands');
     expect(commandList?.pathTemplate).toBe('/core/v1/organization/devices/:device_id/commands');
+    expect(commandList?.bodyType).toBe('none');
+    expect(commandList?.hasBody).toBe(false);
 
     const orgInfo = endpoints.find((endpoint) => endpoint.key === 'organization.getOrganizationInfo');
     expect(orgInfo?.method).toBe('GET');
@@ -20,6 +22,15 @@ describe('public endpoint catalog', () => {
 
     const cancelCommand = endpoints.find((endpoint) => endpoint.key === 'organization.commands.cancelCommand');
     expect(cancelCommand?.hasBody).toBe(false);
+
+    const orgTicket = endpoints.find((endpoint) => endpoint.key === 'organization.tickets.getTicket');
+    expect(orgTicket?.method).toBe('GET');
+    expect(orgTicket?.bodyType).toBe('none');
+    expect(orgTicket?.hasBody).toBe(false);
+
+    const partnerTicket = endpoints.find((endpoint) => endpoint.key === 'partner.tickets.getTicket');
+    expect(partnerTicket?.pathTemplate).toBe('/core/v1/partner/tickets/:ticket_id');
+    expect(partnerTicket?.pathParams).toEqual(['ticket_id']);
   });
 
   it('contains no device namespace or device auth scope endpoints', () => {
