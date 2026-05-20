@@ -9,6 +9,7 @@ export interface PartnerNamespace {
   getStateHistory: NamespaceCall;
   getStateHistoryMultiDevices: NamespaceCall;
   getTelemetries: NamespaceCall;
+  createOrganization: NamespaceCall;
   addComment: NamespaceCall;
   closeTicket: NamespaceCall;
   getTicket: NamespaceCall;
@@ -26,6 +27,7 @@ export function createPartnerNamespace(call: (endpointKey: string, args?: XyteCa
     getStateHistory: (args) => call('partner.devices.getStateHistory', args),
     getStateHistoryMultiDevices: (args) => call('partner.devices.getStateHistoryMultiDevices', args),
     getTelemetries: (args) => call('partner.devices.getTelemetries', args),
+    createOrganization: (args) => call('partner.organizations.createOrganization', args),
     addComment: (args) => call('partner.tickets.addComment', args),
     closeTicket: (args) => call('partner.tickets.closeTicket', args),
     getTicket: (args) => call('partner.tickets.getTicket', args),

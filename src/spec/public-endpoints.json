@@ -683,6 +683,67 @@
     "sourceFile": "Organization API/Devices/Get Histories.bru"
   },
   {
+    "key": "organization.devices.moveDevice",
+    "namespace": "organization",
+    "group": "devices",
+    "action": "moveDevice",
+    "title": "Move Device",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/:device_id/move",
+    "pathParams": [
+      "device_id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "Organization API/Devices/Move Device.bru",
+    "bodyExample": "{\n  \"space_id\": 99592\n}"
+  },
+  {
+    "key": "organization.devices.resumeIncidents",
+    "namespace": "organization",
+    "group": "devices",
+    "action": "resumeIncidents",
+    "title": "Resume Incidents",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/:device_id/resume_incidents",
+    "pathParams": [
+      "device_id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "app/controllers/core/v1/organization/devices_controller.rb#resume_incidents",
+    "notes": [
+      "Not yet documented in Bruno or public docs as of 2026-05-20."
+    ]
+  },
+  {
+    "key": "organization.devices.suspendIncidents",
+    "namespace": "organization",
+    "group": "devices",
+    "action": "suspendIncidents",
+    "title": "Suspend Incidents",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/:device_id/suspend_incidents",
+    "pathParams": [
+      "device_id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "app/controllers/core/v1/organization/devices_controller.rb#suspend_incidents",
+    "notes": [
+      "Not yet documented in Bruno or public docs as of 2026-05-20."
+    ]
+  },
+  {
     "key": "organization.devices.updateDevice",
     "namespace": "organization",
     "group": "devices",
@@ -702,6 +763,98 @@
     "bodyExample": "{\n      \"configuration\": {\n          \"a\": 1"
   },
   {
+    "key": "organization.edges.getClaimStatus",
+    "namespace": "organization",
+    "group": "edges",
+    "action": "getClaimStatus",
+    "title": "Get Claim Status",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/edges/devices/get_claim_status",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "Organization API/Edges/Devices/Get Claim Status.bru",
+    "notes": [
+      "Async status endpoint; pair with organization.edges.startClaim."
+    ]
+  },
+  {
+    "key": "organization.edges.getPingStatus",
+    "namespace": "organization",
+    "group": "edges",
+    "action": "getPingStatus",
+    "title": "Get Ping Status",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/edges/devices/get_ping_status",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "Organization API/Edges/Devices/Get Ping Status.bru",
+    "notes": [
+      "Async status endpoint; pair with organization.edges.startPing."
+    ]
+  },
+  {
+    "key": "organization.edges.listEdges",
+    "namespace": "organization",
+    "group": "edges",
+    "action": "listEdges",
+    "title": "Get Edges",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/edges",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "Organization API/Edges/Get Edges.bru"
+  },
+  {
+    "key": "organization.edges.startClaim",
+    "namespace": "organization",
+    "group": "edges",
+    "action": "startClaim",
+    "title": "Start Claim",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/edges/devices/start_claim",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "Organization API/Edges/Devices/Start Claim.bru",
+    "notes": [
+      "Async: pair with organization.edges.getClaimStatus to poll for completion."
+    ]
+  },
+  {
+    "key": "organization.edges.startPing",
+    "namespace": "organization",
+    "group": "edges",
+    "action": "startPing",
+    "title": "Start Ping",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/edges/devices/start_ping",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "Organization API/Edges/Devices/Start Ping.bru",
+    "notes": [
+      "Async: pair with organization.edges.getPingStatus to poll for completion."
+    ]
+  },
+  {
     "key": "organization.getOrganizationInfo",
     "namespace": "organization",
     "group": "general",
@@ -719,6 +872,167 @@
     "bodyExample": "{\n     \"device_id\": \"xxxxx\"",
     "notes": [
       "Organization info endpoint is GET without request body."
+    ]
+  },
+  {
+    "key": "organization.groups.addExternalUser",
+    "namespace": "organization",
+    "group": "groups",
+    "action": "addExternalUser",
+    "title": "Add External User to Group",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/groups/:id/add_external_user",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "Organization API/Groups/Add External User to Group.bru"
+  },
+  {
+    "key": "organization.groups.addUsers",
+    "namespace": "organization",
+    "group": "groups",
+    "action": "addUsers",
+    "title": "Add Users to Group",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/groups/:id/add_users",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "Organization API/Groups/Add Users to Group.bru"
+  },
+  {
+    "key": "organization.groups.createGroup",
+    "namespace": "organization",
+    "group": "groups",
+    "action": "createGroup",
+    "title": "Create Group",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/groups",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "Organization API/Groups/Create Group.bru"
+  },
+  {
+    "key": "organization.groups.deleteGroup",
+    "namespace": "organization",
+    "group": "groups",
+    "action": "deleteGroup",
+    "title": "Delete Group",
+    "method": "DELETE",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/groups/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "Organization API/Groups/Delete Group.bru"
+  },
+  {
+    "key": "organization.groups.getGroup",
+    "namespace": "organization",
+    "group": "groups",
+    "action": "getGroup",
+    "title": "Get Group",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/groups/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "Organization API/Groups/Get Group.bru"
+  },
+  {
+    "key": "organization.groups.listGroups",
+    "namespace": "organization",
+    "group": "groups",
+    "action": "listGroups",
+    "title": "Get Groups",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/groups",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "Organization API/Groups/Get Groups.bru"
+  },
+  {
+    "key": "organization.groups.removeUsers",
+    "namespace": "organization",
+    "group": "groups",
+    "action": "removeUsers",
+    "title": "Remove Users from Group",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/groups/:id/remove_users",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "Organization API/Groups/Remove Users from Group.bru"
+  },
+  {
+    "key": "organization.groups.updateGroup",
+    "namespace": "organization",
+    "group": "groups",
+    "action": "updateGroup",
+    "title": "Update Group",
+    "method": "PUT",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/groups/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "Organization API/Groups/Update Group.bru"
+  },
+  {
+    "key": "organization.incidents.deleteIncident",
+    "namespace": "organization",
+    "group": "incidents",
+    "action": "deleteIncident",
+    "title": "Delete Incident",
+    "method": "DELETE",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/incidents/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "app/controllers/core/v1/organization/incidents_controller.rb#destroy",
+    "notes": [
+      "Documented in customer-docs xyte-api.json but not in Bruno as of 2026-05-20."
     ]
   },
   {
@@ -943,6 +1257,92 @@
     "bodyExample": "{\n      \"title\": \"New title\",\n      \"description\": \"New description\""
   },
   {
+    "key": "organization.users.createUser",
+    "namespace": "organization",
+    "group": "users",
+    "action": "createUser",
+    "title": "Create User",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/users",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "Organization API/Users/Create User.bru"
+  },
+  {
+    "key": "organization.users.deactivateUser",
+    "namespace": "organization",
+    "group": "users",
+    "action": "deactivateUser",
+    "title": "Deactivate User",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/users/:id/deactivate",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "Organization API/Users/Deactivate User.bru"
+  },
+  {
+    "key": "organization.users.getUser",
+    "namespace": "organization",
+    "group": "users",
+    "action": "getUser",
+    "title": "Get User",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/users/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "Organization API/Users/Get User.bru"
+  },
+  {
+    "key": "organization.users.listUsers",
+    "namespace": "organization",
+    "group": "users",
+    "action": "listUsers",
+    "title": "Get Users",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/users",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "Organization API/Users/Get Users.bru"
+  },
+  {
+    "key": "organization.users.resendWelcome",
+    "namespace": "organization",
+    "group": "users",
+    "action": "resendWelcome",
+    "title": "Resend Welcome Email",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/users/:id/resend_welcome",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "Organization API/Users/Resend Welcome Email.bru"
+  },
+  {
     "key": "partner.devices.deleteDevice",
     "namespace": "partner",
     "group": "devices",
@@ -1081,6 +1481,22 @@
     "bodyType": "none",
     "hasBody": false,
     "sourceFile": "Partner API/Devices/Get Telemetries.bru"
+  },
+  {
+    "key": "partner.organizations.createOrganization",
+    "namespace": "partner",
+    "group": "organizations",
+    "action": "createOrganization",
+    "title": "Create Organization",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/organizations",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "Partner API/Organizations/Create Organization.bru"
   },
   {
     "key": "partner.tickets.addComment",

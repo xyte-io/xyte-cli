@@ -9,7 +9,24 @@ export interface OrganizationNamespace {
   getDevice: NamespaceCall;
   getDevices: NamespaceCall;
   getHistories: NamespaceCall;
+  moveDevice: NamespaceCall;
+  resumeIncidents: NamespaceCall;
+  suspendIncidents: NamespaceCall;
   updateDevice: NamespaceCall;
+  getClaimStatus: NamespaceCall;
+  getPingStatus: NamespaceCall;
+  listEdges: NamespaceCall;
+  startClaim: NamespaceCall;
+  startPing: NamespaceCall;
+  addExternalUserToGroup: NamespaceCall;
+  addUsersToGroup: NamespaceCall;
+  createGroup: NamespaceCall;
+  deleteGroup: NamespaceCall;
+  getGroup: NamespaceCall;
+  listGroups: NamespaceCall;
+  removeUsersFromGroup: NamespaceCall;
+  updateGroup: NamespaceCall;
+  deleteIncident: NamespaceCall;
   getOrganizationInfo: NamespaceCall;
   getIncidents: NamespaceCall;
   createSpace: NamespaceCall;
@@ -23,6 +40,11 @@ export interface OrganizationNamespace {
   markResolved: NamespaceCall;
   sendMessage: NamespaceCall;
   updateTicket: NamespaceCall;
+  createUser: NamespaceCall;
+  deactivateUser: NamespaceCall;
+  getUser: NamespaceCall;
+  listUsers: NamespaceCall;
+  resendWelcome: NamespaceCall;
 }
 
 export function createOrganizationNamespace(call: (endpointKey: string, args?: XyteCallArgs) => Promise<unknown>): OrganizationNamespace {
@@ -35,7 +57,24 @@ export function createOrganizationNamespace(call: (endpointKey: string, args?: X
     getDevice: (args) => call('organization.devices.getDevice', args),
     getDevices: (args) => call('organization.devices.getDevices', args),
     getHistories: (args) => call('organization.devices.getHistories', args),
+    moveDevice: (args) => call('organization.devices.moveDevice', args),
+    resumeIncidents: (args) => call('organization.devices.resumeIncidents', args),
+    suspendIncidents: (args) => call('organization.devices.suspendIncidents', args),
     updateDevice: (args) => call('organization.devices.updateDevice', args),
+    getClaimStatus: (args) => call('organization.edges.getClaimStatus', args),
+    getPingStatus: (args) => call('organization.edges.getPingStatus', args),
+    listEdges: (args) => call('organization.edges.listEdges', args),
+    startClaim: (args) => call('organization.edges.startClaim', args),
+    startPing: (args) => call('organization.edges.startPing', args),
+    addExternalUserToGroup: (args) => call('organization.groups.addExternalUser', args),
+    addUsersToGroup: (args) => call('organization.groups.addUsers', args),
+    createGroup: (args) => call('organization.groups.createGroup', args),
+    deleteGroup: (args) => call('organization.groups.deleteGroup', args),
+    getGroup: (args) => call('organization.groups.getGroup', args),
+    listGroups: (args) => call('organization.groups.listGroups', args),
+    removeUsersFromGroup: (args) => call('organization.groups.removeUsers', args),
+    updateGroup: (args) => call('organization.groups.updateGroup', args),
+    deleteIncident: (args) => call('organization.incidents.deleteIncident', args),
     getOrganizationInfo: (args) => call('organization.getOrganizationInfo', args),
     getIncidents: (args) => call('organization.incidents.getIncidents', args),
     createSpace: (args) => call('organization.spaces.createSpace', args),
@@ -48,6 +87,11 @@ export function createOrganizationNamespace(call: (endpointKey: string, args?: X
     getTickets: (args) => call('organization.tickets.getTickets', args),
     markResolved: (args) => call('organization.tickets.markResolved', args),
     sendMessage: (args) => call('organization.tickets.sendMessage', args),
-    updateTicket: (args) => call('organization.tickets.updateTicket', args)
+    updateTicket: (args) => call('organization.tickets.updateTicket', args),
+    createUser: (args) => call('organization.users.createUser', args),
+    deactivateUser: (args) => call('organization.users.deactivateUser', args),
+    getUser: (args) => call('organization.users.getUser', args),
+    listUsers: (args) => call('organization.users.listUsers', args),
+    resendWelcome: (args) => call('organization.users.resendWelcome', args)
   };
 }
