@@ -1,8 +1,8 @@
-export type EndpointNamespace = 'device' | 'organization' | 'partner';
+export type EndpointNamespace = 'organization' | 'partner';
 
 export type EndpointBase = 'hub' | 'entry';
 
-export type EndpointAuthScope = 'none' | 'device' | 'organization' | 'partner';
+export type EndpointAuthScope = 'none' | 'organization' | 'partner';
 
 export type EndpointBodyType = 'none' | 'json' | 'multipart-form' | 'unknown';
 
@@ -23,11 +23,4 @@ export interface PublicEndpointSpec {
   sourceFile: string;
   bodyExample?: string;
   notes?: string[];
-}
-
-export interface EndpointCallArgs {
-  path?: Record<string, string | number>;
-  query?: Record<string, string | number | boolean | null | undefined>;
-  body?: unknown;
-  headers?: Record<string, string>;
 }

@@ -2,7 +2,7 @@ import blessed from 'blessed';
 
 import {
   clampIndex,
-  movePaneWithBoundary,
+  handleHorizontalArrow,
   moveTableSelection,
   scrollBox,
   setListTableData,
@@ -10,22 +10,17 @@ import {
   type SelectionSyncState
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
-import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
+import type { TuiArrowKey, TuiContext, NavigableScreen } from '../types';
 import type { SecretProvider } from '../../types/profile';
-import { sceneFromSetupState } from '../scene';
+import { PROVIDER_ORG } from '../../types/profile';
+import { parseProvider } from '../../utils/parse-domain';
+import { sceneFromSetupState, toSetupProviderRows } from '../scene';
 import { runKeyCreateWizard } from '../key-wizard';
+import { createRenderErrorTracker } from '../render-error-tracker';
+import { createScreenRenderLogger } from '../screen-render-logger';
+import { errorMessage } from '../../utils/error-format';
 
-const PROVIDERS: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device'];
-
-function parseProvider(value: string): SecretProvider {
-  const normalized = value.trim() as SecretProvider;
-  if (!PROVIDERS.includes(normalized)) {
-    throw new Error(`Invalid provider: ${value}`);
-  }
-  return normalized;
-}
-
-export function createSetupScreen(): TuiScreen {
+export function createSetupScreen(): NavigableScreen {
   let root: blessed.Widgets.BoxElement | undefined;
   let statsBox: blessed.Widgets.BoxElement | undefined;
   let providerTable: blessed.Widgets.ListTableElement | undefined;
@@ -40,6 +35,8 @@ export function createSetupScreen(): TuiScreen {
   const paneConfig = SCREEN_PANE_CONFIG.setup;
   let activePane = paneConfig.defaultPane;
   let isMounted = false;
+  const renderErrors = createRenderErrorTracker();
+  const renderLog = createScreenRenderLogger('setup', () => context.debugLog, renderErrors);
 
   const focusPane = () => {
     if (activePane === 'providers-table') {
@@ -57,33 +54,52 @@ export function createSetupScreen(): TuiScreen {
     if (!isMounted) {
       return;
     }
-    const panels = sceneFromSetupState({
-      tenantId: readiness.tenantId,
-      readinessState: readiness.state,
-      connectionState: readiness.connectionState,
-      missingItems: readiness.missingItems,
-      recommendedActions: readiness.recommendedActions,
-      providerRows: readiness.providers.map((provider) => ({
-        provider: provider.provider,
-        slotCount: provider.slotCount,
-        activeSlot: provider.activeSlotId ?? 'none',
-        hasSecret: provider.hasActiveSecret ? 'yes' : 'no'
-      }))
-    });
     providerRowsState = readiness.providers.map((provider) => provider.provider);
-
-    const overview = panels.find((panel) => panel.id === 'setup-overview');
-    const providers = panels.find((panel) => panel.id === 'setup-providers');
-    const checklist = panels.find((panel) => panel.id === 'setup-checklist');
-
-    statsBox?.setContent((overview?.stats ?? []).map((stat) => `${stat.label}: ${stat.value}`).join('\n'));
-    setListTableData(providerTable, [
-      (providers?.table?.columns ?? ['Provider', 'Slots', 'Active Slot', 'Has Secret']) as [string, string, string, string],
-      ...((providers?.table?.rows ?? []) as Array<[string, string, string, string]>)
-    ], providerSelectionSync);
     selectedProviderIndex = clampIndex(selectedProviderIndex, readiness.providers.length);
-    syncListSelection(providerTable, selectedProviderIndex, providerSelectionSync);
-    checklistBox?.setContent((checklist?.text?.lines ?? []).join('\n'));
+
+    renderLog.onRenderStart();
+    try {
+      const panels = sceneFromSetupState({
+        tenantId: readiness.tenantId,
+        readinessState: readiness.state,
+        connectionState: readiness.connectionState,
+        missingItems: readiness.missingItems,
+        recommendedActions: readiness.recommendedActions,
+        providerRows: toSetupProviderRows(readiness.providers)
+      });
+
+      const overview = panels.find((panel) => panel.id === 'setup-overview');
+      const providers = panels.find((panel) => panel.id === 'setup-providers');
+      const checklist = panels.find((panel) => panel.id === 'setup-checklist');
+
+      statsBox?.setContent((overview?.stats ?? []).map((stat) => `${stat.label}: ${stat.value}`).join('\n'));
+      setListTableData(
+        providerTable,
+        [
+          (providers?.table?.columns ?? ['Provider', 'Slots', 'Active Slot', 'Has Secret']) as [
+            string,
+            string,
+            string,
+            string
+          ],
+          ...((providers?.table?.rows ?? []) as Array<[string, string, string, string]>)
+        ],
+        providerSelectionSync
+      );
+      syncListSelection(providerTable, selectedProviderIndex, providerSelectionSync);
+      checklistBox?.setContent((checklist?.text?.lines ?? []).join('\n'));
+      renderErrors.recordSuccess();
+      renderLog.onRenderComplete();
+    } catch (error) {
+      const message = errorMessage(error);
+      renderErrors.recordError(message);
+      renderLog.onRenderError(message);
+      checklistBox?.setContent([
+        'Unable to render setup safely.',
+        `Reason: ${message}`,
+        'Try refreshing (r).'
+      ].join('\n'));
+    }
     focusPane();
     context.screen.render();
   };
@@ -170,16 +186,12 @@ export function createSetupScreen(): TuiScreen {
       return paneConfig.panes;
     },
     async handleArrow(key: TuiArrowKey) {
-      if (key === 'left' || key === 'right') {
-        const next = movePaneWithBoundary(paneConfig.panes, activePane, key);
-        if (next.boundary) {
-          return 'boundary';
-        }
-        activePane = next.pane;
+      const h = handleHorizontalArrow(key, paneConfig.panes, activePane, (newPane) => {
+        activePane = newPane;
         focusPane();
         context.setStatus(`Pane: ${activePane}`);
-        return 'handled';
-      }
+      });
+      if (h !== null) return h;
 
       const delta = key === 'up' ? -1 : key === 'down' ? 1 : 0;
       if (!delta) {
@@ -265,7 +277,8 @@ export function createSetupScreen(): TuiScreen {
             context.setStatus('Set an active tenant first (a/u).');
             return true;
           }
-          const selectedProvider = providerRowsState[clampIndex(selectedProviderIndex, providerRowsState.length)] ?? 'xyte-org';
+          const selectedProvider =
+            providerRowsState[clampIndex(selectedProviderIndex, providerRowsState.length)] ?? PROVIDER_ORG;
           const result = await runKeyCreateWizard({
             context,
             tenantId,
@@ -291,7 +304,7 @@ export function createSetupScreen(): TuiScreen {
             context.setStatus('Set an active tenant first.');
             return true;
           }
-          const providerText = (await context.prompt('Provider:', 'xyte-org'))?.trim();
+          const providerText = (await context.prompt('Provider:', PROVIDER_ORG))?.trim();
           if (!isMounted) {
             return true;
           }

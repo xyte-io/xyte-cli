@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "xyte.inspect.fleet.v1",
+  "generatedAtUtc": "2026-02-25T00:00:00.000Z",
+  "tenantId": "acme",
+  "totals": {
+    "devices": 2,
+    "spaces": 1,
+    "incidents": 1,
+    "tickets": 1
+  },
+  "status": {
+    "devices": {
+      "offline": 1,
+      "online": 1
+    },
+    "incidents": {
+      "active": 1
+    },
+    "tickets": {
+      "open": 1
+    },
+    "spaces": {
+      "room": 1
+    }
+  },
+  "highlights": {
+    "offlineDevices": 1,
+    "offlinePct": 50,
+    "activeIncidents": 1,
+    "activeIncidentPct": 100,
+    "openTickets": 1
+  }
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { MemoryKeychain } from '../../src/secure/keychain';
+import { MemorySecretStore } from '../../src/secure/secret-store';
 import { runKeyCreateWizard, runKeyUpdateWizard } from '../../src/tui/key-wizard';
 import { MemoryProfileStore } from '../support/memory-profile-store';
 
@@ -12,7 +12,7 @@ function makePromptQueue(values: Array<string | undefined>) {
 describe('key wizard', () => {
   it('creates a slot through guided flow', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
 
@@ -28,7 +28,7 @@ describe('key wizard', () => {
         confirmWrite,
         setStatus,
         profileStore,
-        keychain
+        secretStore
       },
       tenantId: 'acme',
       defaultProvider: 'xyte-org'
@@ -38,7 +38,7 @@ describe('key wizard', () => {
     expect(result.provider).toBe('xyte-org');
     const slots = await profileStore.listKeySlots('acme', 'xyte-org');
     expect(slots).toHaveLength(1);
-    const secret = await keychain.getSlotSecret('acme', 'xyte-org', slots[0].slotId);
+    const secret = await secretStore.getSlotSecret('acme', 'xyte-org', slots[0].slotId);
     expect(secret).toBe('super-secret');
     const active = await profileStore.getActiveKeySlot('acme', 'xyte-org');
     expect(active?.slotId).toBe(slots[0].slotId);
@@ -46,7 +46,7 @@ describe('key wizard', () => {
 
   it('re-prompts invalid provider selection and supports cancellation', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     await profileStore.upsertTenant({ id: 'acme' });
 
     const prompt = makePromptQueue(['not-a-provider', '2', '']);
@@ -60,7 +60,7 @@ describe('key wizard', () => {
         confirmWrite: vi.fn(async () => true),
         setStatus,
         profileStore,
-        keychain
+        secretStore
       },
       tenantId: 'acme'
     });
@@ -73,10 +73,10 @@ describe('key wizard', () => {
 
   it('updates selected slot through guided flow', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     await profileStore.upsertTenant({ id: 'acme' });
-    const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'primary',
       fingerprint: 'sha256:old'
     });
@@ -92,7 +92,7 @@ describe('key wizard', () => {
         confirmWrite,
         setStatus: vi.fn(),
         profileStore,
-        keychain
+        secretStore
       },
       tenantId: 'acme',
       provider: 'xyte-org',
@@ -103,8 +103,7 @@ describe('key wizard', () => {
     expect(result.canceled).toBe(false);
     const updated = await profileStore.getActiveKeySlot('acme', 'xyte-org');
     expect(updated?.name).toBe('primary-prod');
-    const secret = await keychain.getSlotSecret('acme', 'xyte-org', slot.slotId);
+    const secret = await secretStore.getSlotSecret('acme', 'xyte-org', slot.slotId);
     expect(secret).toBe('new-secret');
   });
 });
-

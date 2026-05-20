@@ -2,7 +2,7 @@ import blessed from 'blessed';
 
 import {
   clampIndex,
-  movePaneWithBoundary,
+  handleHorizontalArrow,
   moveTableSelection,
   scrollBox,
   setListTableData,
@@ -11,37 +11,158 @@ import {
   type SelectionSyncState
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
-import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
-import {
-  getSpaceId,
-  getSpaceName,
-  loadDevicesData,
-  loadSpaceDrilldownData,
-  loadSpacesData
-} from '../data-loaders';
+import type { TuiArrowKey, TuiContext, NavigableScreen } from '../types';
+import { getSpaceId, getSpaceName, loadDevicesData, loadSpaceDrilldownData, loadSpacesData } from '../data-loaders';
 import { sceneFromSpacesState } from '../scene';
 import { safeSearchText } from '../serialize';
+import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, runGuardedAction } from '../actions';
+import { createStaleSafeSelectionLoader } from '../runtime';
+import { createRenderErrorTracker } from '../render-error-tracker';
+import { createScreenRenderLogger, logScreenDataFetch } from '../screen-render-logger';
+import { errorMessage } from '../../utils/error-format';
 
 const SPINNER_FRAMES = ['|', '/', '-', '\\'];
 
-export function createStaleSafeSelectionLoader<TInput, TResult>(args: {
-  load: (input: TInput) => Promise<TResult>;
-  apply: (result: TResult) => void;
-}): (input: TInput) => Promise<boolean> {
-  let token = 0;
-
-  return async (input: TInput): Promise<boolean> => {
-    const current = ++token;
-    const result = await args.load(input);
-    if (current !== token) {
-      return false;
-    }
-    args.apply(result);
-    return true;
-  };
+interface ClaimDeviceWithGuardArgs {
+  spaceId: string;
+  name: string;
+  sn?: string;
+  mac?: string;
+  cloudId?: string;
+  context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;
 }
 
-export function createSpacesScreen(): TuiScreen {
+export async function claimDeviceWithGuard(args: ClaimDeviceWithGuardArgs): Promise<boolean> {
+  const spaceId = args.spaceId.trim();
+  const name = args.name.trim();
+  const sn = (args.sn ?? '').trim();
+  const mac = (args.mac ?? '').trim();
+  const cloudId = (args.cloudId ?? '').trim();
+
+  if (!spaceId) {
+    args.context.setStatus('Space ID is required for claim.');
+    return false;
+  }
+  if (!name) {
+    args.context.setStatus('Device name is required for claim.');
+    return false;
+  }
+  if (!sn && !mac && !cloudId) {
+    args.context.setStatus('Provide at least one identifier: sn, mac, or cloud_id.');
+    return false;
+  }
+
+  const ok = await confirmWriteWithToken({
+    context: args.context,
+    actionLabel: 'Claim device',
+    token: 'claim',
+    cancelStatus: 'Claim action canceled.'
+  });
+  if (!ok) {
+    return false;
+  }
+
+  return runGuardedAction(args.context, 'Claiming device...', async (tenantId) => {
+    await args.context.client.organization.claimDevice({
+      tenantId,
+      body: {
+        name,
+        space_id: spaceId,
+        ...(sn ? { sn } : {}),
+        ...(mac ? { mac } : {}),
+        ...(cloudId ? { cloud_id: cloudId } : {})
+      }
+    });
+    args.context.setStatus('Device claimed successfully.');
+  });
+}
+
+interface CreateChildSpaceWithGuardArgs {
+  parentSpaceId: string;
+  name: string;
+  spaceType?: string;
+  config?: Record<string, unknown>;
+  context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;
+}
+
+export async function createChildSpaceWithGuard(args: CreateChildSpaceWithGuardArgs): Promise<boolean> {
+  const parentSpaceId = args.parentSpaceId.trim();
+  const name = args.name.trim();
+  const spaceType = (args.spaceType ?? '').trim();
+
+  if (!parentSpaceId) {
+    args.context.setStatus('Parent space ID is required.');
+    return false;
+  }
+  if (!name) {
+    args.context.setStatus('Child space name is required.');
+    return false;
+  }
+
+  const ok = await confirmWriteWithToken({
+    context: args.context,
+    actionLabel: 'Create child space',
+    token: 'create',
+    cancelStatus: 'Create child space canceled.'
+  });
+  if (!ok) {
+    return false;
+  }
+
+  return runGuardedAction(args.context, 'Creating child space...', async (tenantId) => {
+    await args.context.client.organization.createSpace({
+      tenantId,
+      body: {
+        name,
+        parent_id: parentSpaceId,
+        ...(spaceType ? { space_type: spaceType } : {}),
+        ...(args.config ? { config: args.config } : {})
+      }
+    });
+    args.context.setStatus('Child space created.');
+  });
+}
+
+interface RenameSpaceWithGuardArgs {
+  spaceId: string;
+  name: string;
+  context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;
+}
+
+export async function renameSpaceWithGuard(args: RenameSpaceWithGuardArgs): Promise<boolean> {
+  const spaceId = args.spaceId.trim();
+  const name = args.name.trim();
+
+  if (!spaceId) {
+    args.context.setStatus('Space ID is required.');
+    return false;
+  }
+  if (!name) {
+    args.context.setStatus('Space name is required.');
+    return false;
+  }
+
+  const ok = await confirmWriteWithToken({
+    context: args.context,
+    actionLabel: 'Rename space',
+    token: 'rename',
+    cancelStatus: 'Rename space canceled.'
+  });
+  if (!ok) {
+    return false;
+  }
+
+  return runGuardedAction(args.context, 'Renaming space...', async (tenantId) => {
+    await args.context.client.organization.updateSpace({
+      tenantId,
+      path: { space_id: spaceId },
+      body: { name }
+    });
+    args.context.setStatus('Space renamed.');
+  });
+}
+
+export function createSpacesScreen(): NavigableScreen {
   let root: blessed.Widgets.BoxElement | undefined;
   let spaceTable: blessed.Widgets.ListTableElement | undefined;
   let detailBox: blessed.Widgets.BoxElement | undefined;
@@ -49,20 +170,20 @@ export function createSpacesScreen(): TuiScreen {
   let statusBox: blessed.Widgets.BoxElement | undefined;
   let context: TuiContext;
 
-  let spaces: any[] = [];
-  let filtered: any[] = [];
+  let spaces: unknown[] = [];
+  let filtered: unknown[] = [];
   let searchText = '';
   let selectedIndex = 0;
   let selectedSpaceId: string | undefined;
   let selectedSpaceDetail: unknown;
-  let devicesInSpace: any[] = [];
+  let devicesInSpace: unknown[] = [];
   let selectedDeviceIndex = 0;
   let paneStatus = 'No space selected.';
   let loading = false;
   let spinnerPhase = 0;
   let spinnerTimer: NodeJS.Timeout | undefined;
   let selectionDebounceTimer: NodeJS.Timeout | undefined;
-  let allDevicesCache: any[] = [];
+  let allDevicesCache: unknown[] = [];
   let activeTenantId: string | undefined;
   let spaceSelectionSync: SelectionSyncState = {
     syncing: false,
@@ -71,6 +192,15 @@ export function createSpacesScreen(): TuiScreen {
   const paneConfig = SCREEN_PANE_CONFIG.spaces;
   let activePane = paneConfig.defaultPane;
   let isMounted = false;
+  const renderErrors = createRenderErrorTracker();
+  const renderLog = createScreenRenderLogger('spaces', () => context.debugLog, renderErrors);
+  let idFilter = '';
+  let nameFilter = '';
+  let parentIdFilter = '';
+  let spaceTypeFilter = '';
+  let pathIncludesFilter = '';
+  let createdAfterFilter = '';
+  let createdBeforeFilter = '';
 
   const focusPane = () => {
     if (activePane === 'spaces-table') {
@@ -111,6 +241,12 @@ export function createSpacesScreen(): TuiScreen {
     }, 140);
   };
 
+  const promptOrAbort = async (label: string, current: string): Promise<string | undefined> => {
+    const value = await context.prompt(label, current);
+    if (value === undefined || !isMounted) return undefined;
+    return value;
+  };
+
   const renderState = () => {
     if (!isMounted) {
       return;
@@ -119,48 +255,88 @@ export function createSpacesScreen(): TuiScreen {
       return;
     }
 
-    const panels = sceneFromSpacesState({
-      tenantId: activeTenantId,
-      searchText,
-      selectedIndex,
-      loading,
-      paneStatus,
-      spaces: filtered,
-      spaceDetail: selectedSpaceDetail,
-      devicesInSpace
-    });
+    renderLog.onRenderStart();
+    try {
+      if (renderErrors.frozen) {
+        spaceTable.setContent('Render fallback mode enabled. Refresh (r) to retry.');
+        detailBox.setContent('Previous render errors were repeated. Reduce payload complexity and refresh.');
+      } else {
+        const actionsHint = 'actions: a claim/create/rename, f endpoint filters';
+        const endpointFilterSummary = [
+          idFilter ? `id=${idFilter}` : '',
+          nameFilter ? `name=${nameFilter}` : '',
+          parentIdFilter ? `parent=${parentIdFilter}` : '',
+          spaceTypeFilter ? `type=${spaceTypeFilter}` : '',
+          pathIncludesFilter ? `path~${pathIncludesFilter}` : ''
+        ]
+          .filter(Boolean)
+          .join(' ');
 
-    const listPanel = panels.find((panel) => panel.id === 'spaces-list');
-    const detailPanel = panels.find((panel) => panel.id === 'spaces-detail');
-    const devicesPanel = panels.find((panel) => panel.id === 'spaces-devices');
+        const panels = sceneFromSpacesState({
+          tenantId: activeTenantId,
+          searchText,
+          selectedIndex,
+          loading,
+          paneStatus,
+          spaces: filtered,
+          spaceDetail: selectedSpaceDetail,
+          devicesInSpace,
+          actionsHint,
+          endpointFilterSummary
+        });
 
-    setListTableData(spaceTable, [
-      (listPanel?.table?.columns ?? ['ID', 'Name', 'Type', 'Path']) as [string, string, string, string],
-      ...((listPanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
-    ], spaceSelectionSync);
-    syncListSelection(spaceTable, selectedIndex, spaceSelectionSync);
+        const listPanel = panels.find((panel) => panel.id === 'spaces-list');
+        const detailPanel = panels.find((panel) => panel.id === 'spaces-detail');
+        const devicesPanel = panels.find((panel) => panel.id === 'spaces-devices');
 
-    detailBox.setContent((detailPanel?.text?.lines ?? ['No space selected.']).join('\n'));
+        setListTableData(
+          spaceTable,
+          [
+            (listPanel?.table?.columns ?? ['ID', 'Name', 'Type', 'Path']) as [string, string, string, string],
+            ...((listPanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
+          ],
+          spaceSelectionSync
+        );
+        syncListSelection(spaceTable, selectedIndex, spaceSelectionSync);
 
-    setListTableData(devicesTable, [
-      (devicesPanel?.table?.columns ?? ['ID', 'Name', 'Status']) as [string, string, string],
-      ...((devicesPanel?.table?.rows ?? []) as Array<[string, string, string]>)
-    ]);
-    devicesTable.select(clampIndex(selectedDeviceIndex, devicesInSpace.length) + 1);
+        detailBox.setContent((detailPanel?.text?.lines ?? ['No space selected.']).join('\n'));
 
-    const statusPrefix = loading ? `${SPINNER_FRAMES[spinnerPhase % SPINNER_FRAMES.length]} ` : '';
-    statusBox.setContent(` ${statusPrefix}${paneStatus}`);
+        setListTableData(devicesTable, [
+          (devicesPanel?.table?.columns ?? ['ID', 'Name', 'Status']) as [string, string, string],
+          ...((devicesPanel?.table?.rows ?? []) as Array<[string, string, string]>)
+        ]);
+        devicesTable.select(clampIndex(selectedDeviceIndex, devicesInSpace.length) + 1);
+      }
+
+      const statusPrefix = loading ? `${SPINNER_FRAMES[spinnerPhase % SPINNER_FRAMES.length]} ` : '';
+      statusBox.setContent(` ${statusPrefix}${paneStatus}`);
+      renderErrors.recordSuccess();
+      renderLog.onRenderComplete();
+    } catch (error) {
+      const message = errorMessage(error);
+      renderErrors.recordError(message);
+      renderLog.onRenderError(message);
+      detailBox.setContent([
+        'Unable to render space detail safely.',
+        `Reason: ${message}`,
+        'Try narrowing search/filter and refresh.'
+      ].join('\n'));
+    }
+
     focusPane();
     context.screen.render();
   };
 
-  const staleSafeDrilldown = createStaleSafeSelectionLoader<{ index: number; tenantId?: string }, {
-    selectedSpaceId: string;
-    selectedSpaceDetail: unknown;
-    devicesInSpace: any[];
-    paneStatus: string;
-    index: number;
-  }>({
+  const staleSafeDrilldown = createStaleSafeSelectionLoader<
+    { index: number; tenantId?: string },
+    {
+      selectedSpaceId: string;
+      selectedSpaceDetail: unknown;
+      devicesInSpace: unknown[];
+      paneStatus: string;
+      index: number;
+    }
+  >({
     async load(input) {
       const selected = filtered[input.index];
       if (!selected) {
@@ -174,12 +350,16 @@ export function createSpacesScreen(): TuiScreen {
       }
 
       const id = getSpaceId(selected);
-      const drilldown = await loadSpaceDrilldownData(context.client, input.tenantId, id, allDevicesCache);
+      const drilldown = await loadSpaceDrilldownData(context.client, input.tenantId, {
+        spaceId: id,
+        allDevicesCache,
+        profileStore: context.profileStore
+      });
       return {
         selectedSpaceId: id,
         selectedSpaceDetail: drilldown.data.spaceDetail,
         devicesInSpace: drilldown.data.devicesInSpace,
-        paneStatus: `${drilldown.data.paneStatus}${drilldown.error ? ` | ${drilldown.error.message}` : ''} (${getSpaceName(selected)})`,
+        paneStatus: `${drilldown.error ? `${drilldown.error.message} | ` : ''}(${getSpaceName(selected)})`,
         index: input.index
       };
     },
@@ -210,10 +390,7 @@ export function createSpacesScreen(): TuiScreen {
     startSpinner();
     renderState();
 
-    const applied = await staleSafeDrilldown({ index: selectedIndex, tenantId });
-    if (!applied) {
-      return;
-    }
+    await staleSafeDrilldown({ index: selectedIndex, tenantId });
   };
 
   const scheduleSelectionLoad = (index: number) => {
@@ -257,6 +434,54 @@ export function createSpacesScreen(): TuiScreen {
     }
 
     renderState();
+  };
+
+  const selectedSpace = () => filtered[selectedIndex];
+
+  const refreshSpaces = async () => {
+    if (!context || !isMounted) {
+      return;
+    }
+
+    const tenantId = await context.getActiveTenantId();
+    if (!isMounted) {
+      return;
+    }
+    activeTenantId = tenantId;
+    logScreenDataFetch(context.debugLog, 'spaces', 'start', { tenantId });
+    const [nextSpacesOutcome, devicesCacheOutcome] = await Promise.all([
+      loadSpacesData(context.client, tenantId, {
+        query: {
+          id: idFilter || undefined,
+          name: nameFilter || undefined,
+          parent_id: parentIdFilter || undefined,
+          space_type: spaceTypeFilter || undefined,
+          path_includes: pathIncludesFilter || undefined,
+          created_after: createdAfterFilter || undefined,
+          created_before: createdBeforeFilter || undefined
+        }
+      }),
+      loadDevicesData(context.client, tenantId, {
+        profileStore: context.profileStore
+      })
+    ]);
+
+    spaces = nextSpacesOutcome.data;
+    allDevicesCache = devicesCacheOutcome.data;
+    logScreenDataFetch(context.debugLog, 'spaces', 'complete', { tenantId, spaceCount: spaces.length, deviceCount: allDevicesCache.length });
+    if (!isMounted) {
+      return;
+    }
+    applyFilter();
+
+    if (nextSpacesOutcome.error) {
+      context.setStatus(`Spaces ${nextSpacesOutcome.connectionState}: ${nextSpacesOutcome.error.message}`);
+    }
+
+    if (filtered.length) {
+      clearSelectionDebounce();
+      await loadSelection(selectedIndex);
+    }
   };
 
   return {
@@ -345,7 +570,7 @@ export function createSpacesScreen(): TuiScreen {
         }
       });
 
-      spaceTable.on('select item', (_item, index) => {
+      spaceTable.on('select item', (_item: unknown, index: number) => {
         if (shouldIgnoreSelectEvent(spaceSelectionSync)) {
           return;
         }
@@ -361,35 +586,7 @@ export function createSpacesScreen(): TuiScreen {
       root = undefined;
     },
     async refresh() {
-      if (!context || !isMounted) {
-        return;
-      }
-
-      const tenantId = await context.getActiveTenantId();
-      if (!isMounted) {
-        return;
-      }
-      activeTenantId = tenantId;
-      const [nextSpacesOutcome, devicesCacheOutcome] = await Promise.all([
-        loadSpacesData(context.client, tenantId),
-        loadDevicesData(context.client, tenantId)
-      ]);
-
-      spaces = nextSpacesOutcome.data;
-      allDevicesCache = devicesCacheOutcome.data;
-      if (!isMounted) {
-        return;
-      }
-      applyFilter();
-
-      if (nextSpacesOutcome.error) {
-        context.setStatus(`Spaces ${nextSpacesOutcome.connectionState}: ${nextSpacesOutcome.error.message}`);
-      }
-
-      if (filtered.length) {
-        clearSelectionDebounce();
-        await loadSelection(selectedIndex);
-      }
+      await refreshSpaces();
     },
     focus() {
       focusPane();
@@ -401,16 +598,12 @@ export function createSpacesScreen(): TuiScreen {
       return paneConfig.panes;
     },
     async handleArrow(key: TuiArrowKey) {
-      if (key === 'left' || key === 'right') {
-        const next = movePaneWithBoundary(paneConfig.panes, activePane, key);
-        if (next.boundary) {
-          return 'boundary';
-        }
-        activePane = next.pane;
+      const h = handleHorizontalArrow(key, paneConfig.panes, activePane, (newPane) => {
+        activePane = newPane;
         focusPane();
         context.setStatus(`Pane: ${activePane}`);
-        return 'handled';
-      }
+      });
+      if (h !== null) return h;
 
       const delta = key === 'up' ? -1 : key === 'down' ? 1 : 0;
       if (!delta) {
@@ -463,6 +656,155 @@ export function createSpacesScreen(): TuiScreen {
             await loadSelection(selectedIndex);
           }
         }
+        return true;
+      }
+
+      if (ch === 'f') {
+        const nextId = await promptOrAbort('Filter id (empty clears):', idFilter);
+        if (nextId === undefined) return true;
+        const nextName = await promptOrAbort('Filter name (empty clears):', nameFilter);
+        if (nextName === undefined) return true;
+        const nextParentId = await promptOrAbort('Filter parent_id (empty clears):', parentIdFilter);
+        if (nextParentId === undefined) return true;
+        const nextType = await promptOrAbort('Filter space_type (empty clears):', spaceTypeFilter);
+        if (nextType === undefined) return true;
+        const nextPath = await promptOrAbort('Filter path_includes (empty clears):', pathIncludesFilter);
+        if (nextPath === undefined) return true;
+        const nextCreatedAfter = await promptOrAbort('Filter created_after (empty clears):', createdAfterFilter);
+        if (nextCreatedAfter === undefined) return true;
+        const nextCreatedBefore = await promptOrAbort('Filter created_before (empty clears):', createdBeforeFilter);
+        if (nextCreatedBefore === undefined) return true;
+
+        idFilter = nextId.trim();
+        nameFilter = nextName.trim();
+        parentIdFilter = nextParentId.trim();
+        spaceTypeFilter = nextType.trim();
+        pathIncludesFilter = nextPath.trim();
+        createdAfterFilter = nextCreatedAfter.trim();
+        createdBeforeFilter = nextCreatedBefore.trim();
+        await refreshSpaces();
+        return true;
+      }
+
+      if (ch === 'a') {
+        await openActionPalette({
+          context,
+          title: 'Space actions',
+          actions: [
+            {
+              label: 'Claim device to selected space',
+              run: async () => {
+                const space = selectedSpace();
+                if (!space) {
+                  context.setStatus('No space selected.');
+                  return;
+                }
+                const spaceId = getSpaceId(space);
+                const name = await context.prompt('Device name:', '');
+                if (name === undefined || !isMounted) {
+                  context.setStatus('Claim action canceled.');
+                  return;
+                }
+                const sn = await context.prompt('SN (optional):', '');
+                if (sn === undefined || !isMounted) {
+                  context.setStatus('Claim action canceled.');
+                  return;
+                }
+                const mac = await context.prompt('MAC (optional):', '');
+                if (mac === undefined || !isMounted) {
+                  context.setStatus('Claim action canceled.');
+                  return;
+                }
+                const cloudId = await context.prompt('Cloud ID (optional):', '');
+                if (cloudId === undefined || !isMounted) {
+                  context.setStatus('Claim action canceled.');
+                  return;
+                }
+                const claimed = await claimDeviceWithGuard({
+                  spaceId,
+                  name,
+                  sn,
+                  mac,
+                  cloudId,
+                  context
+                });
+                if (claimed && isMounted) {
+                  await refreshSpaces();
+                }
+              }
+            },
+            {
+              label: 'Create child space under selected space',
+              run: async () => {
+                const space = selectedSpace();
+                if (!space) {
+                  context.setStatus('No space selected.');
+                  return;
+                }
+                const parentSpaceId = getSpaceId(space);
+                const name = await context.prompt('Child space name:', '');
+                if (name === undefined || !isMounted) {
+                  context.setStatus('Create child space canceled.');
+                  return;
+                }
+                const spaceType = await context.prompt('space_type (optional):', '');
+                if (spaceType === undefined || !isMounted) {
+                  context.setStatus('Create child space canceled.');
+                  return;
+                }
+                const configInput = await context.prompt('config JSON object (optional):', '');
+                if (configInput === undefined || !isMounted) {
+                  context.setStatus('Create child space canceled.');
+                  return;
+                }
+                let config: Record<string, unknown> | undefined;
+                if (configInput.trim()) {
+                  const parsed = parseJsonObjectInput(configInput);
+                  if (!parsed.ok) {
+                    context.setStatus(`Invalid config JSON: ${parsed.error}`);
+                    return;
+                  }
+                  config = parsed.value;
+                }
+                const created = await createChildSpaceWithGuard({
+                  parentSpaceId,
+                  name,
+                  spaceType,
+                  config,
+                  context
+                });
+                if (created && isMounted) {
+                  await refreshSpaces();
+                }
+              }
+            },
+            {
+              label: 'Rename selected space',
+              run: async () => {
+                const space = selectedSpace();
+                if (!space) {
+                  context.setStatus('No space selected.');
+                  return;
+                }
+                const spaceId = getSpaceId(space);
+                const currentName = getSpaceName(space);
+                const nextName = await context.prompt('New space name:', currentName);
+                if (nextName === undefined || !isMounted) {
+                  context.setStatus('Rename space canceled.');
+                  return;
+                }
+                const renamed = await renameSpaceWithGuard({
+                  spaceId,
+                  name: nextName,
+                  context
+                });
+                if (renamed && isMounted) {
+                  await refreshSpaces();
+                }
+              }
+            }
+          ]
+        });
         return true;
       }
 

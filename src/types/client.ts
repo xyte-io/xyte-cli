@@ -1,10 +1,22 @@
 import type { PublicEndpointSpec } from './endpoints';
 import type { HttpTransport } from '../http/transport';
-import type { KeychainStore } from '../secure/keychain';
-import type { ProfileStore } from '../secure/profile-store';
-import type { DeviceNamespace } from '../namespaces/device';
-import type { OrganizationNamespace } from '../namespaces/organization';
-import type { PartnerNamespace } from '../namespaces/partner';
+import type { SecretStore, ProfileStore } from './stores';
+
+export interface XyteClientOptions {
+  tenantId?: string;
+  hubBaseUrl?: string;
+  entryBaseUrl?: string;
+  timeoutMs?: number;
+  retryAttempts?: number;
+  retryBackoffMs?: number;
+  auth?: {
+    organization?: string;
+    partner?: string;
+  };
+  profileStore?: ProfileStore;
+  secretStore?: SecretStore;
+  transport?: HttpTransport;
+}
 
 export interface XyteCallArgs {
   requestId?: string;
@@ -26,29 +38,71 @@ export interface XyteCallResult<T = unknown> {
 
 export type NamespaceCall = (args?: XyteCallArgs) => Promise<unknown>;
 
-export interface XyteNamespace {
-  [method: string]: NamespaceCall;
+export interface OrganizationNamespace {
+  closeIncident: NamespaceCall;
+  cancelCommand: NamespaceCall;
+  getCommands: NamespaceCall;
+  sendCommand: NamespaceCall;
+  claimDevice: NamespaceCall;
+  moveDevice: NamespaceCall;
+  suspendIncidents: NamespaceCall;
+  resumeIncidents: NamespaceCall;
+  updateDevice: NamespaceCall;
+  deleteDevice: NamespaceCall;
+  getDevice: NamespaceCall;
+  getDevices: NamespaceCall;
+  getHistories: NamespaceCall;
+  listEdges: NamespaceCall;
+  getOrganizationInfo: NamespaceCall;
+  addExternalUserToGroup: NamespaceCall;
+  addUsersToGroup: NamespaceCall;
+  createGroup: NamespaceCall;
+  deleteGroup: NamespaceCall;
+  getGroup: NamespaceCall;
+  listGroups: NamespaceCall;
+  removeUsersFromGroup: NamespaceCall;
+  updateGroup: NamespaceCall;
+  getIncidents: NamespaceCall;
+  createSpace: NamespaceCall;
+  deleteSpace: NamespaceCall;
+  findOrCreateSpace: NamespaceCall;
+  getSpace: NamespaceCall;
+  getSpaces: NamespaceCall;
+  updateSpace: NamespaceCall;
+  getTicket: NamespaceCall;
+  getTickets: NamespaceCall;
+  markResolved: NamespaceCall;
+  sendMessage: NamespaceCall;
+  updateTicket: NamespaceCall;
+  startEdgeClaim: NamespaceCall;
+  getEdgeClaimStatus: NamespaceCall;
+  startEdgePing: NamespaceCall;
+  getEdgePingStatus: NamespaceCall;
+  createUser: NamespaceCall;
+  deactivateUser: NamespaceCall;
+  getUser: NamespaceCall;
+  listUsers: NamespaceCall;
+  resendWelcome: NamespaceCall;
 }
 
-export interface XyteClientOptions {
-  tenantId?: string;
-  hubBaseUrl?: string;
-  entryBaseUrl?: string;
-  timeoutMs?: number;
-  retryAttempts?: number;
-  retryBackoffMs?: number;
-  auth?: {
-    organization?: string;
-    partner?: string;
-    device?: string;
-  };
-  profileStore?: ProfileStore;
-  keychain?: KeychainStore;
-  transport?: HttpTransport;
+export interface PartnerNamespace {
+  deleteDevice: NamespaceCall;
+  getCommands: NamespaceCall;
+  getConfiguration: NamespaceCall;
+  getDeviceInfo: NamespaceCall;
+  getDevices: NamespaceCall;
+  getStateHistory: NamespaceCall;
+  getStateHistoryMultiDevices: NamespaceCall;
+  getTelemetries: NamespaceCall;
+  createOrganization: NamespaceCall;
+  addComment: NamespaceCall;
+  closeTicket: NamespaceCall;
+  getTicket: NamespaceCall;
+  getTickets: NamespaceCall;
+  updateTicket: NamespaceCall;
 }
 
 export interface XyteClient {
-  device: DeviceNamespace;
   organization: OrganizationNamespace;
   partner: PartnerNamespace;
   call<T = unknown>(endpointKey: string, args?: XyteCallArgs): Promise<T>;

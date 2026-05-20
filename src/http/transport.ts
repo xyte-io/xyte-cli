@@ -3,14 +3,15 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { XyteHttpError } from './errors';
 import { getLogger } from '../observability/logger';
 import { withSpan } from '../observability/tracing';
+import { errorMessage } from '../utils/error-format';
 
-export interface TransportOptions {
+interface TransportOptions {
   timeoutMs?: number;
   retryAttempts?: number;
   retryBackoffMs?: number;
 }
 
-export interface TransportRequest {
+interface TransportRequest {
   requestId?: string;
   endpointKey?: string;
   method: string;
@@ -21,13 +22,13 @@ export interface TransportRequest {
   timeoutMs?: number;
 }
 
-export interface TransportMeta {
+interface TransportMeta {
   durationMs: number;
   attempts: number;
   retryCount: number;
 }
 
-export interface TransportResponse<T = unknown> {
+interface TransportResponse<T = unknown> {
   status: number;
   headers: Record<string, string>;
   data: T;
@@ -42,13 +43,58 @@ function toLowerCaseMap(headers: Headers): Record<string, string> {
   return out;
 }
 
+function summarizeHttpErrorDetails(details: unknown): string | undefined {
+  if (typeof details === 'string') {
+    const value = details.trim();
+    return value || undefined;
+  }
+
+  if (!details || typeof details !== 'object') {
+    return undefined;
+  }
+
+  const record = details as Record<string, unknown>;
+  const directKeys = ['error_description', 'error', 'message', 'detail', 'title'];
+  for (const key of directKeys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  for (const key of directKeys) {
+    const value = record[key];
+    if (Array.isArray(value)) {
+      const first = value.find((entry) => typeof entry === 'string' && entry.trim());
+      if (typeof first === 'string' && first.trim()) {
+        return first.trim();
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function buildHttpErrorMessage(status: number, statusText: string, details: unknown): string {
+  const base = `HTTP ${status} ${statusText}`;
+  const summary = summarizeHttpErrorDetails(details);
+  if (!summary) {
+    return base;
+  }
+  return `${base}: ${summary}`;
+}
+
 async function parseResponseBody(response: Response): Promise<unknown> {
+  if (response.status === 204) {
+    return undefined;
+  }
+
   const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
   if (contentType.includes('application/json')) {
     try {
       return await response.json();
-    } catch {
-      return undefined;
+    } catch (error) {
+      throw new Error('Failed to parse JSON response body', { cause: error });
     }
   }
 
@@ -70,7 +116,7 @@ export class HttpTransport {
   private readonly timeoutMs: number;
   private readonly retryAttempts: number;
   private readonly retryBackoffMs: number;
-  private readonly logger = getLogger();
+  private get logger() { return getLogger(); }
 
   constructor(options: TransportOptions = {}) {
     this.timeoutMs = options.timeoutMs ?? 15_000;
@@ -79,7 +125,8 @@ export class HttpTransport {
   }
 
   async request<T = unknown>(request: TransportRequest): Promise<TransportResponse<T>> {
-    const idempotent = request.idempotent ?? ['GET', 'HEAD', 'PUT', 'DELETE', 'OPTIONS'].includes(request.method.toUpperCase());
+    const idempotent =
+      request.idempotent ?? ['GET', 'HEAD', 'PUT', 'DELETE', 'OPTIONS'].includes(request.method.toUpperCase());
     const maxAttempts = idempotent ? this.retryAttempts + 1 : 1;
     const started = Date.now();
     const requestId = request.requestId ?? 'none';
@@ -111,11 +158,12 @@ export class HttpTransport {
             const parsed = await parseResponseBody(response);
             if (!response.ok) {
               throw new XyteHttpError({
-                message: `HTTP ${response.status} ${response.statusText}`,
+                message: buildHttpErrorMessage(response.status, response.statusText, parsed),
                 status: response.status,
                 statusText: response.statusText,
                 endpointKey: request.endpointKey,
-                details: parsed
+                details: parsed,
+                headers: toLowerCaseMap(response.headers)
               });
             }
 
@@ -160,7 +208,7 @@ export class HttpTransport {
                 url: request.url,
                 attempt,
                 retryable,
-                error: error instanceof Error ? error.message : String(error)
+                error: errorMessage(error)
               },
               'HTTP request failed'
             );

@@ -1,7 +1,7 @@
 {
-  "name": "@xyte/cli",
-  "version": "0.1.1",
-  "description": "Xyte CLI, TUI, skills, and MCP bridge for zero-friction AI operations",
+  "name": "@xyteai/cli",
+  "version": "0.11.0",
+  "description": "Xyte CLI, TUI, skills, and headless contracts for zero-friction AI operations",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -15,13 +15,12 @@
     "xyte",
     "cli",
     "tui",
-    "mcp",
     "agent",
     "operations"
   ],
   "type": "commonjs",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "publishConfig": {
     "access": "public",
@@ -38,38 +37,59 @@
     "docs/schemas"
   ],
   "scripts": {
-    "clean": "rm -rf dist coverage",
-    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "clean": "node scripts/clean.mjs",
+    "skills:sync": "node scripts/sync_skills_data.mjs",
+    "build": "npm run clean && npm run skills:sync && tsc -p tsconfig.build.json",
+    "lint": "eslint src/ tests/",
+    "lint:fix": "eslint src/ tests/ --fix",
+    "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts'",
+    "format:check": "prettier --check 'src/**/*.ts' 'tests/**/*.ts'",
     "prepare": "npm run build",
-    "prepublishOnly": "npm run typecheck && npm test && npm run build",
+    "prepublishOnly": "npm run skills:sync && npm run typecheck && npm test && npm run build && npm run smoke:pack-install",
     "install:global": "npm run build && npm link",
-    "uninstall:global": "npm unlink -g @xyte/cli || true",
+    "uninstall:global": "node scripts/uninstall_global.mjs",
     "reinstall:global": "npm run uninstall:global && npm run install:global",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "mock:xyte:local": "node scripts/mock_xyte_local.mjs",
+    "smoke:local:utilities": "node scripts/smoke_local_utilities.mjs",
+    "smoke:local:flow-pack": "tsx tests/smoke/flow-pack-local.ts",
+    "smoke:linux:native-secret-store": "tsx tests/smoke/linux-native-secret-store.ts",
+    "smoke:pack-install": "tsx tests/smoke/pack-install.ts",
+    "smoke:windows:native-secret-store": "tsx tests/smoke/windows-native-secret-store.ts",
+    "smoke:external-live": "tsx tests/smoke/external-user-live.ts",
+    "smoke:upgrade:controlled": "node scripts/smoke_upgrade_controlled.mjs",
+    "test:commit": "npm run typecheck && npm test && npm run smoke:pack-install",
+    "release:check": "node scripts/release_check.mjs",
     "tui": "tsx src/bin/xyte-cli.ts tui",
-    "release:publish": "bash scripts/publish.sh all",
-    "release:publish:cli": "bash scripts/publish.sh cli",
-    "release:publish:pages": "bash scripts/publish.sh pages"
+    "release:publish": "node scripts/publish.mjs all",
+    "release:publish:cli": "node scripts/publish.mjs cli",
+    "release:publish:pages": "node scripts/publish.mjs pages"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.26.0",
     "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/sdk-node": "^0.211.0",
-    "@types/pdfkit": "^0.17.4",
-    "ajv": "^8.17.1",
     "blessed": "^0.1.81",
     "commander": "^14.0.3",
+    "cross-spawn": "^7.0.6",
+    "fuse.js": "^7.3.0",
     "pdfkit": "^0.17.2",
     "pino": "^10.3.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/blessed": "^0.1.25",
+    "@types/cross-spawn": "^6.0.6",
     "@types/node": "^22.13.4",
+    "@types/pdfkit": "^0.17.4",
+    "ajv": "^8.18.0",
+    "eslint": "^10.1.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.1",
     "tsx": "^4.19.3",
     "typescript": "^5.7.3",
-    "vitest": "^2.1.8"
+    "typescript-eslint": "^8.57.1",
+    "vitest": "^4.1.4"
   }
 }

@@ -3,7 +3,7 @@ import type { TuiArrowHandleResult, TuiArrowKey } from './types';
 
 const ARROW_KEYS: TuiArrowKey[] = ['up', 'down', 'left', 'right'];
 
-export interface KeyDispatchArgs {
+interface KeyDispatchArgs {
   ch: string | undefined;
   key: blessed.Widgets.Events.IKeyEventArg;
   handleScreen?: (ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg) => Promise<boolean>;
@@ -14,7 +14,9 @@ export interface KeyDispatchArgs {
   handleGlobal: (ch: string | undefined, key: blessed.Widgets.Events.IKeyEventArg) => Promise<void>;
 }
 
-export async function dispatchKeypress(args: KeyDispatchArgs): Promise<'screen' | 'arrow' | 'global' | 'modal' | 'blocked'> {
+export async function dispatchKeypress(
+  args: KeyDispatchArgs
+): Promise<'screen' | 'arrow' | 'global' | 'modal' | 'blocked'> {
   if (args.isModalActive) {
     const handledByModal = await args.handleModal?.(args.ch, args.key);
     if (handledByModal) {

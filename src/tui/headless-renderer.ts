@@ -1,15 +1,16 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { randomUUID } from 'node:crypto';
 
+import type { ConnectionState } from '../contracts/status';
+import type { RetryState } from '../config/retry-policy';
 import { evaluateReadiness, type ReadinessCheck } from '../config/readiness';
-import type { KeychainStore } from '../secure/keychain';
-import type { ProfileStore } from '../secure/profile-store';
-import type { SecretProvider } from '../types/profile';
+import type { ProfileStore, SecretStore } from '../types/stores';
 import type { XyteClient } from '../types/client';
 import { startupFrames } from './animation';
 import { XYTE_LOGO_COMPACT } from './assets/logo';
 import {
   getSpaceId,
+  readConfigData,
   loadDashboardData,
   loadDevicesData,
   loadIncidentsData,
@@ -26,6 +27,7 @@ import {
   sceneFromSetupState,
   sceneFromSpacesState,
   sceneFromTicketsState,
+  toSetupProviderRows,
   type HeadlessFrame,
   type ScenePanel
 } from './scene';
@@ -33,10 +35,10 @@ import type { TuiScreenId } from './types';
 import { SCREEN_PANE_CONFIG } from './panes';
 import { TAB_ORDER } from './tabs';
 
-export interface HeadlessRenderOptions {
+interface HeadlessRenderOptions {
   client: XyteClient;
   profileStore: ProfileStore;
-  keychain: KeychainStore;
+  secretStore: SecretStore;
   screen: TuiScreenId;
   format: 'json';
   motionEnabled: boolean;
@@ -48,9 +50,14 @@ export interface HeadlessRenderOptions {
 
 type SafeWrite = (text: string) => boolean;
 
-const PROVIDERS: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device'];
+function isRetryState(value: unknown): value is RetryState {
+  return typeof value === 'object' && value !== null && 'retried' in value;
+}
 
-function getRefreshState(args: { connectionState: ReadinessCheck['connectionState']; retried?: boolean }): 'idle' | 'retrying' | 'error' {
+function getRefreshState(args: {
+  connectionState: ReadinessCheck['connectionState'];
+  retried?: boolean;
+}): 'idle' | 'retrying' | 'error' {
   if (args.connectionState === 'connected' || args.connectionState === 'not_checked') {
     return 'idle';
   }
@@ -68,6 +75,8 @@ function withNavigationMeta(screen: TuiScreenId, meta: Record<string, unknown> =
     tabOrder: TAB_ORDER,
     tabNavBoundary: null,
     renderSafety: 'ok' as const,
+    headlessWrite: false,
+    writePolicy: 'organization-only',
     activePane: paneConfig.defaultPane,
     availablePanes: paneConfig.panes,
     navigationMode: 'pane-focus' as const,
@@ -77,7 +86,9 @@ function withNavigationMeta(screen: TuiScreenId, meta: Record<string, unknown> =
 
 function inferRenderSafety(panels: ScenePanel[]): 'ok' | 'truncated' {
   const truncated = panels.some((panel) =>
-    (panel.text?.lines ?? []).some((line) => line.includes('Preview truncated for stability.') || line.includes('[Truncated]'))
+    (panel.text?.lines ?? []).some(
+      (line) => line.includes('Preview truncated for stability.') || line.includes('[Truncated]')
+    )
   );
   return truncated ? 'truncated' : 'ok';
 }
@@ -137,26 +148,21 @@ async function resolveTenantId(profileStore: ProfileStore, explicitTenantId?: st
   return (await profileStore.getData()).activeTenantId;
 }
 
-async function buildSetupFrame(args: {
+function buildSetupFrame(args: {
   sessionId: string;
   sequence: number;
   readiness: ReadinessCheck;
   motionEnabled: boolean;
   motionPhase: number;
   redirectedFrom?: TuiScreenId;
-}): Promise<HeadlessFrame> {
+}): HeadlessFrame {
   const panels = sceneFromSetupState({
     tenantId: args.readiness.tenantId,
     readinessState: args.readiness.state,
     connectionState: args.readiness.connectionState,
     missingItems: args.readiness.missingItems,
     recommendedActions: args.readiness.recommendedActions,
-    providerRows: args.readiness.providers.map((provider) => ({
-      provider: provider.provider,
-      slotCount: provider.slotCount,
-      activeSlot: provider.activeSlotId ?? 'none',
-      hasSecret: provider.hasActiveSecret ? 'yes' : 'no'
-    }))
+    providerRows: toSetupProviderRows(args.readiness.providers)
   });
   return createHeadlessFrame({
     sessionId: args.sessionId,
@@ -185,51 +191,20 @@ async function buildSetupFrame(args: {
   });
 }
 
-async function buildConfigFrame(args: {
+async function loadConfigFrame(args: {
   sessionId: string;
   sequence: number;
   profileStore: ProfileStore;
-  keychain: KeychainStore;
+  secretStore: SecretStore;
   readiness: ReadinessCheck;
   motionEnabled: boolean;
   motionPhase: number;
   doctorStatus?: string;
 }): Promise<HeadlessFrame> {
-  const tenantId = args.readiness.tenantId;
-  const allSlots = tenantId ? await args.profileStore.listKeySlots(tenantId) : [];
-
-  const providerRows = await Promise.all(
-    PROVIDERS.map(async (provider) => {
-      const providerSlots = allSlots.filter((slot) => slot.provider === provider);
-      const activeSlot = tenantId ? await args.profileStore.getActiveKeySlot(tenantId, provider) : undefined;
-      const hasActiveSecret =
-        tenantId && activeSlot ? Boolean(await args.keychain.getSlotSecret(tenantId, provider, activeSlot.slotId)) : false;
-      return {
-        provider,
-        slotCount: providerSlots.length,
-        activeSlot: activeSlot?.slotId ?? 'none',
-        hasSecret: hasActiveSecret ? 'yes' : 'no',
-        lastValidatedAt: activeSlot?.lastValidatedAt
-      };
-    })
-  );
-
-  const selectedProvider = providerRows.find((row) => row.slotCount > 0)?.provider ?? 'xyte-org';
-  const slotRows = await Promise.all(
-    allSlots
-      .filter((slot) => slot.provider === selectedProvider)
-      .map(async (slot) => {
-        const active = tenantId ? await args.profileStore.getActiveKeySlot(tenantId, slot.provider) : undefined;
-        const hasSecret = tenantId ? Boolean(await args.keychain.getSlotSecret(tenantId, slot.provider, slot.slotId)) : false;
-        return {
-          provider: slot.provider,
-          slotId: slot.slotId,
-          name: slot.name,
-          active: active?.slotId === slot.slotId ? 'yes' : 'no',
-          hasSecret: hasSecret ? 'yes' : 'no',
-          fingerprint: slot.fingerprint
-        };
-      })
+  const { providerRows, selectedProvider, slotRows } = await readConfigData(
+    args.profileStore,
+    args.secretStore,
+    args.readiness.tenantId
   );
 
   const panels = sceneFromConfigState({
@@ -267,10 +242,117 @@ async function buildConfigFrame(args: {
   });
 }
 
-async function buildOperationalFrame(options: {
+interface ScreenLoadResult {
+  panels: ScenePanel[];
+  connectionState: ConnectionState;
+  error?: { message: string };
+  retry: RetryState | Record<string, RetryState | undefined> | undefined;
+  extraMeta?: Record<string, unknown>;
+}
+
+function buildFrameFromLoad(
+  options: {
+    sessionId: string;
+    sequence: number;
+    tenantId?: string;
+    motionEnabled: boolean;
+    motionPhase: number;
+    readiness: ReadinessCheck;
+  },
+  screen: TuiScreenId,
+  title: string,
+  load: ScreenLoadResult
+): HeadlessFrame {
+  return createHeadlessFrame({
+    sessionId: options.sessionId,
+    sequence: options.sequence,
+    screen,
+    title,
+    status: load.error ? `${title} ${load.connectionState}: ${load.error.message}` : `${title} snapshot`,
+    tenantId: options.tenantId,
+    motionEnabled: options.motionEnabled,
+    motionPhase: options.motionPhase,
+    logo: XYTE_LOGO_COMPACT,
+    panels: load.panels,
+    meta: {
+      ...withNavigationMeta(screen, {
+        renderSafety: inferRenderSafety(load.panels),
+        readiness: options.readiness.state,
+        connection: {
+          state: load.connectionState,
+          error: load.error?.message
+        },
+        actionsHint: 'interactive-only writes (organization-only)',
+        writePolicy: 'organization-only',
+        headlessWrite: false,
+        retry: load.retry,
+        refreshState: getRefreshState({
+          connectionState: load.connectionState,
+          retried: isRetryState(load.retry) ? load.retry.retried : undefined
+        }),
+        ...load.extraMeta
+      })
+    }
+  });
+}
+
+async function loadSpacesFrame(options: {
   sessionId: string;
   sequence: number;
   client: XyteClient;
+  profileStore: ProfileStore;
+  tenantId?: string;
+  motionEnabled: boolean;
+  motionPhase: number;
+  readiness: ReadinessCheck;
+}): Promise<HeadlessFrame> {
+  const spaces = await loadSpacesData(options.client, options.tenantId);
+  const selected = spaces.data[0];
+  const selectedSpaceId = selected ? getSpaceId(selected) : '';
+  let detail: unknown;
+  let devicesInSpace: unknown[] = [];
+  let paneStatus = selected ? 'Loading selected space...' : 'No spaces found for tenant.';
+  let drilldownError: string | undefined;
+  let drilldownRetry: RetryState | undefined;
+
+  if (selected && selectedSpaceId) {
+    const drilldown = await loadSpaceDrilldownData(options.client, options.tenantId, {
+      spaceId: selectedSpaceId,
+      profileStore: options.profileStore
+    });
+    detail = drilldown.data.spaceDetail;
+    devicesInSpace = drilldown.data.devicesInSpace;
+    paneStatus = drilldown.error?.message ?? 'Space details loaded.';
+    drilldownError = drilldown.error?.message;
+    drilldownRetry = drilldown.retry;
+  }
+
+  const panels = sceneFromSpacesState({
+    tenantId: options.tenantId,
+    searchText: '',
+    selectedIndex: 0,
+    loading: false,
+    paneStatus,
+    spaces: spaces.data,
+    spaceDetail: detail,
+    devicesInSpace,
+    endpointFilterSummary: '',
+    actionsHint: 'interactive-only: a claim/create/rename, f endpoint filters'
+  });
+  return buildFrameFromLoad(options, 'spaces', 'Spaces', {
+    panels,
+    connectionState: spaces.connectionState,
+    error: spaces.error,
+    retry: spaces.retry,
+    extraMeta: { connection: { state: spaces.connectionState, error: spaces.error?.message, drilldownError, drilldownRetry } }
+  });
+}
+
+async function loadOperationalFrame(options: {
+  sessionId: string;
+  sequence: number;
+  client: XyteClient;
+  profileStore: ProfileStore;
   screen: Exclude<TuiScreenId, 'setup' | 'config'>;
   tenantId?: string;
   motionEnabled: boolean;
@@ -279,76 +361,40 @@ async function buildOperationalFrame(options: {
 }): Promise<HeadlessFrame> {
   switch (options.screen) {
     case 'dashboard': {
-      const data = await loadDashboardData(options.client, options.tenantId);
+      const data = await loadDashboardData(options.client, options.tenantId, {
+        profileStore: options.profileStore
+      });
       const panels = sceneFromDashboardState({
         tenantId: options.tenantId,
         devices: data.data.devices,
         incidents: data.data.incidents,
         tickets: data.data.tickets
       });
-      return createHeadlessFrame({
-        sessionId: options.sessionId,
-        sequence: options.sequence,
-        screen: 'dashboard',
-        title: 'Dashboard',
-        status: data.error ? `Dashboard ${data.connectionState}: ${data.error.message}` : 'Dashboard snapshot',
-        tenantId: options.tenantId,
-        motionEnabled: options.motionEnabled,
-        motionPhase: options.motionPhase,
-        logo: XYTE_LOGO_COMPACT,
+      return buildFrameFromLoad(options, 'dashboard', 'Dashboard', {
         panels,
-        meta: {
-          ...withNavigationMeta('dashboard', {
-            renderSafety: inferRenderSafety(panels),
-            readiness: options.readiness.state,
-            connection: {
-              state: data.connectionState,
-              error: data.error?.message
-            },
-            retry: data.retry,
-            refreshState: getRefreshState({
-              connectionState: data.connectionState,
-              retried: data.retry.retried
-            })
-          })
-        }
+        connectionState: data.connectionState,
+        error: data.error,
+        retry: data.retry
       });
     }
 
     case 'devices': {
-      const devices = await loadDevicesData(options.client, options.tenantId);
+      const devices = await loadDevicesData(options.client, options.tenantId, {
+        profileStore: options.profileStore
+      });
       const panels = sceneFromDevicesState({
         tenantId: options.tenantId,
         searchText: '',
         selectedIndex: 0,
-        devices: devices.data
+        devices: devices.data,
+        spaceFilter: '',
+        actionsHint: 'interactive-only: a send-command, f space_id filter'
       });
-      return createHeadlessFrame({
-        sessionId: options.sessionId,
-        sequence: options.sequence,
-        screen: 'devices',
-        title: 'Devices',
-        status: devices.error ? `Devices ${devices.connectionState}: ${devices.error.message}` : 'Devices snapshot',
-        tenantId: options.tenantId,
-        motionEnabled: options.motionEnabled,
-        motionPhase: options.motionPhase,
-        logo: XYTE_LOGO_COMPACT,
+      return buildFrameFromLoad(options, 'devices', 'Devices', {
         panels,
-        meta: {
-          ...withNavigationMeta('devices', {
-            renderSafety: inferRenderSafety(panels),
-            readiness: options.readiness.state,
-            connection: {
-              state: devices.connectionState,
-              error: devices.error?.message
-            },
-            retry: devices.retry,
-            refreshState: getRefreshState({
-              connectionState: devices.connectionState,
-              retried: devices.retry.retried
-            })
-          })
-        }
+        connectionState: devices.connectionState,
+        error: devices.error,
+        retry: devices.retry
       });
     }
 
@@ -358,34 +404,17 @@ async function buildOperationalFrame(options: {
         tenantId: options.tenantId,
         incidents: incidents.data,
         selectedIndex: 0,
-        severityFilter: ''
+        severityFilter: '',
+        statusFilter: 'active',
+        page: 1,
+        perPage: 100,
+        actionsHint: 'interactive-only: a close-incident, f filters, [ ] pages, p per-page'
       });
-      return createHeadlessFrame({
-        sessionId: options.sessionId,
-        sequence: options.sequence,
-        screen: 'incidents',
-        title: 'Incidents',
-        status: incidents.error ? `Incidents ${incidents.connectionState}: ${incidents.error.message}` : 'Incidents snapshot',
-        tenantId: options.tenantId,
-        motionEnabled: options.motionEnabled,
-        motionPhase: options.motionPhase,
-        logo: XYTE_LOGO_COMPACT,
+      return buildFrameFromLoad(options, 'incidents', 'Incidents', {
         panels,
-        meta: {
-          ...withNavigationMeta('incidents', {
-            renderSafety: inferRenderSafety(panels),
-            readiness: options.readiness.state,
-            connection: {
-              state: incidents.connectionState,
-              error: incidents.error?.message
-            },
-            retry: incidents.retry,
-            refreshState: getRefreshState({
-              connectionState: incidents.connectionState,
-              retried: incidents.retry.retried
-            })
-          })
-        }
+        connectionState: incidents.connectionState,
+        error: incidents.error,
+        retry: incidents.retry
       });
     }
 
@@ -396,99 +425,26 @@ async function buildOperationalFrame(options: {
         mode: tickets.data.mode,
         searchText: '',
         selectedIndex: 0,
-        tickets: tickets.data.tickets
+        tickets: tickets.data.tickets,
+        page: 1,
+        perPage: 25,
+        totalFiltered: tickets.data.tickets.length,
+        actionsHint:
+          tickets.data.mode === 'organization'
+            ? 'interactive-only: a resolve/message, f local filters, [ ] pages, p per-page'
+            : 'interactive-only: ticket writes disabled in partner mode'
       });
-      return createHeadlessFrame({
-        sessionId: options.sessionId,
-        sequence: options.sequence,
-        screen: 'tickets',
-        title: 'Tickets',
-        status: tickets.error ? `Tickets ${tickets.connectionState}: ${tickets.error.message}` : 'Tickets snapshot',
-        tenantId: options.tenantId,
-        motionEnabled: options.motionEnabled,
-        motionPhase: options.motionPhase,
-        logo: XYTE_LOGO_COMPACT,
+      return buildFrameFromLoad(options, 'tickets', 'Tickets', {
         panels,
-        meta: {
-          ...withNavigationMeta('tickets', {
-            renderSafety: inferRenderSafety(panels),
-            readiness: options.readiness.state,
-            connection: {
-              state: tickets.connectionState,
-              error: tickets.error?.message
-            },
-            retry: tickets.retry,
-            refreshState: getRefreshState({
-              connectionState: tickets.connectionState,
-              retried: tickets.retry.retried
-            })
-          })
-        }
+        connectionState: tickets.connectionState,
+        error: tickets.error,
+        retry: tickets.retry
       });
     }
 
     case 'spaces': {
-      const spaces = await loadSpacesData(options.client, options.tenantId);
-      const selected = spaces.data[0];
-      const selectedSpaceId = selected ? getSpaceId(selected) : '';
-      let detail: unknown;
-      let devicesInSpace: any[] = [];
-      let paneStatus = selected ? 'Loading selected space...' : 'No spaces found for tenant.';
-      let drilldownError: string | undefined;
-      let drilldownRetry: unknown;
-
-      if (selected && selectedSpaceId) {
-        const drilldown = await loadSpaceDrilldownData(options.client, options.tenantId, selectedSpaceId, []);
-        detail = drilldown.data.spaceDetail;
-        devicesInSpace = drilldown.data.devicesInSpace;
-        paneStatus = drilldown.data.paneStatus;
-        drilldownError = drilldown.error?.message;
-        drilldownRetry = drilldown.retry;
-      }
-
-      const panels = sceneFromSpacesState({
-        tenantId: options.tenantId,
-        searchText: '',
-        selectedIndex: 0,
-        loading: false,
-        paneStatus,
-        spaces: spaces.data,
-        spaceDetail: detail,
-        devicesInSpace
-      });
-      return createHeadlessFrame({
-        sessionId: options.sessionId,
-        sequence: options.sequence,
-        screen: 'spaces',
-        title: 'Spaces',
-        status: spaces.error ? `Spaces ${spaces.connectionState}: ${spaces.error.message}` : 'Spaces snapshot',
-        tenantId: options.tenantId,
-        motionEnabled: options.motionEnabled,
-        motionPhase: options.motionPhase,
-        logo: XYTE_LOGO_COMPACT,
-        panels,
-        meta: {
-          ...withNavigationMeta('spaces', {
-            renderSafety: inferRenderSafety(panels),
-            readiness: options.readiness.state,
-            connection: {
-              state: spaces.connectionState,
-              error: spaces.error?.message,
-              drilldownError
-            },
-            retry: {
-              spaces: spaces.retry,
-              drilldown: drilldownRetry
-            },
-            refreshState: getRefreshState({
-              connectionState: spaces.connectionState,
-              retried: spaces.retry.retried
-            })
-          })
-        }
-      });
+      return loadSpacesFrame(options);
     }
-
   }
 }
 
@@ -574,10 +530,6 @@ export async function runHeadlessRenderer(options: HeadlessRenderOptions): Promi
     stream.on?.('error', onStreamError);
   }
 
-  if (options.format !== 'json') {
-    throw new Error('Headless renderer only supports json format.');
-  }
-
   writeStartup(write, options.format, options.motionEnabled, sessionId, nextSequence);
 
   let phase = 0;
@@ -602,7 +554,7 @@ export async function runHeadlessRenderer(options: HeadlessRenderOptions): Promi
       const tenantId = await resolveTenantId(options.profileStore, options.tenantId);
       const readiness = await evaluateReadiness({
         profileStore: options.profileStore,
-        keychain: options.keychain,
+        secretStore: options.secretStore,
         tenantId,
         client: options.client,
         checkConnectivity: true
@@ -614,7 +566,7 @@ export async function runHeadlessRenderer(options: HeadlessRenderOptions): Promi
 
       let frame: HeadlessFrame;
       if (actualScreen === 'setup') {
-        frame = await buildSetupFrame({
+        frame = buildSetupFrame({
           sessionId,
           sequence: nextSequence(),
           readiness,
@@ -623,21 +575,22 @@ export async function runHeadlessRenderer(options: HeadlessRenderOptions): Promi
           redirectedFrom: blocked ? requestedScreen : undefined
         });
       } else if (actualScreen === 'config') {
-        frame = await buildConfigFrame({
+        frame = await loadConfigFrame({
           sessionId,
           sequence: nextSequence(),
           profileStore: options.profileStore,
-          keychain: options.keychain,
+          secretStore: options.secretStore,
           readiness,
           motionEnabled: options.motionEnabled,
           motionPhase: phase,
           doctorStatus: `${readiness.connectionState}: ${readiness.connectivity.message}`
         });
       } else {
-        frame = await buildOperationalFrame({
+        frame = await loadOperationalFrame({
           sessionId,
           sequence: nextSequence(),
           client: options.client,
+          profileStore: options.profileStore,
           screen: actualScreen as Exclude<TuiScreenId, 'setup' | 'config'>,
           tenantId,
           motionEnabled: options.motionEnabled,
@@ -674,12 +627,7 @@ export async function runHeadlessRenderer(options: HeadlessRenderOptions): Promi
             connectionState: readiness.connectionState,
             missingItems: readiness.missingItems,
             recommendedActions: readiness.recommendedActions,
-            providerRows: readiness.providers.map((provider) => ({
-              provider: provider.provider,
-              slotCount: provider.slotCount,
-              activeSlot: provider.activeSlotId ?? 'none',
-              hasSecret: provider.hasActiveSecret ? 'yes' : 'no'
-            }))
+            providerRows: toSetupProviderRows(readiness.providers)
           }),
           meta: {
             ...withNavigationMeta('setup', {

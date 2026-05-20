@@ -1,4 +1,4 @@
-import type { ConnectionErrorClass } from './connectivity';
+import type { ConnectionErrorClass } from '../contracts/status';
 
 export interface RetryPolicyOptions {
   maxAttempts?: number;

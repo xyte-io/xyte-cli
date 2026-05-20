@@ -1,39 +1,22 @@
-import type { KeychainStore } from '../secure/keychain';
-import type { ProfileStore } from '../secure/profile-store';
-import type { SecretProvider, TenantProfile } from '../types/profile';
+import type { ProfileStore, SecretStore } from '../types/stores';
+import type { SecretProvider } from '../types/profile';
+import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
 import type { XyteClient } from '../types/client';
-import { probeConnectivity, type ConnectivityResult } from './connectivity';
+import { probeConnectivity } from './connectivity';
+import type { ConnectivityResult } from '../contracts/status';
+import type { ReadinessState, ProviderReadiness, ReadinessCheck } from '../contracts/status';
 
-export type ReadinessState = 'ready' | 'needs_setup' | 'degraded';
+export type { ReadinessState, ProviderReadiness, ReadinessCheck };
 
-export interface ProviderReadiness {
-  provider: SecretProvider;
-  slotCount: number;
-  activeSlotId?: string;
-  activeSlotName?: string;
-  hasActiveSecret: boolean;
-}
-
-export interface ReadinessCheck {
-  state: ReadinessState;
-  activeTenant?: TenantProfile;
-  tenantId?: string;
-  missingItems: string[];
-  recommendedActions: string[];
-  providers: ProviderReadiness[];
-  connectionState: ConnectivityResult['state'];
-  connectivity: ConnectivityResult;
-}
-
-export interface ReadinessOptions {
+interface ReadinessOptions {
   profileStore: ProfileStore;
-  keychain: KeychainStore;
+  secretStore: SecretStore;
   tenantId?: string;
   client?: XyteClient;
   checkConnectivity?: boolean;
 }
 
-const XYTE_PROVIDERS: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device'];
+const XYTE_PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
 
 function defaultConnectivity(): ConnectivityResult {
   return {
@@ -62,7 +45,7 @@ export async function evaluateReadiness(options: ReadinessOptions): Promise<Read
 
   if (!tenantId) {
     missingItems.push('No active tenant is configured.');
-    recommendedActions.push('Run "xyte-cli" for guided first-run setup, or "xyte-cli setup run --non-interactive --tenant default --key <value>".');
+    recommendedActions.push('Run "xyte-cli" for guided first-run setup, or "xyte-cli setup run --tenant default".');
     return {
       state: 'needs_setup',
       missingItems,
@@ -94,7 +77,9 @@ export async function evaluateReadiness(options: ReadinessOptions): Promise<Read
       options.profileStore.getActiveKeySlot(tenant.id, provider)
     ]);
 
-    const hasActiveSecret = active ? Boolean(await options.keychain.getSlotSecret(tenant.id, provider, active.slotId)) : false;
+    const hasActiveSecret = active
+      ? Boolean(await options.secretStore.getSlotSecret(tenant.id, provider, active.slotId))
+      : false;
 
     providers.push({
       provider,
@@ -105,10 +90,10 @@ export async function evaluateReadiness(options: ReadinessOptions): Promise<Read
     });
   }
 
-  const hasXyteCredential = providers.some((provider) => XYTE_PROVIDERS.includes(provider.provider) && provider.hasActiveSecret);
+  const hasXyteCredential = providers.some((provider) => provider.hasActiveSecret);
   if (!hasXyteCredential) {
-    missingItems.push('No active Xyte API key slot is configured (xyte-org / xyte-partner / xyte-device).');
-    recommendedActions.push('Run "xyte-cli" for guided setup, or "xyte-cli setup run --tenant <tenant-id> --key <value>".');
+    missingItems.push('No active Xyte API key slot is configured (xyte-org / xyte-partner).');
+    recommendedActions.push('Run "xyte-cli setup run --tenant <tenant-id>" or review "xyte-cli config doctor".');
   }
 
   let connectivity = defaultConnectivity();
@@ -116,7 +101,7 @@ export async function evaluateReadiness(options: ReadinessOptions): Promise<Read
     connectivity = await probeConnectivity({ client: options.client, tenantId: tenant.id });
     if (connectivity.state === 'auth_required' || connectivity.state === 'missing_key') {
       missingItems.push(`Connectivity check requires updated credentials: ${connectivity.message}`);
-      recommendedActions.push('Use "xyte-cli auth key list/use/update" to select or update the active slot.');
+      recommendedActions.push('Use "xyte-cli config key list/use/update" to select or update the active slot.');
     } else if (connectivity.state !== 'connected') {
       recommendedActions.push('Use retry/reconnect actions in TUI or run "xyte-cli config doctor".');
     }

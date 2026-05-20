@@ -1,25 +1,25 @@
 import type blessed from 'blessed';
 
-export interface InputEvent {
+interface InputEvent {
   ch: string | undefined;
   key: blessed.Widgets.Events.IKeyEventArg;
   timestamp: number;
 }
 
-export interface InputDispatchResult {
+interface InputDispatchResult {
   accepted: boolean;
   bypassed: boolean;
   queueDepth: number;
   droppedEvents: number;
 }
 
-export interface InputControllerState {
+interface InputControllerState {
   queueDepth: number;
   droppedEvents: number;
   inFlight: boolean;
 }
 
-export interface InputControllerOptions {
+interface InputControllerOptions {
   handle: (event: InputEvent) => Promise<void>;
   isCritical?: (event: InputEvent) => boolean;
   maxQueueSize?: number;
@@ -32,7 +32,13 @@ function defaultIsCritical(event: InputEvent): boolean {
   return event.ch === 'q' || event.key.name === 'q' || event.key.full === 'C-c';
 }
 
-export function createInputController(options: InputControllerOptions) {
+interface InputController {
+  dispatch: (event: InputEvent) => InputDispatchResult;
+  getState: () => InputControllerState;
+  clear: () => void;
+}
+
+export function createInputController(options: InputControllerOptions): InputController {
   const maxQueueSize = Math.max(1, options.maxQueueSize ?? DEFAULT_MAX_QUEUE_SIZE);
   const isCritical = options.isCritical ?? defaultIsCritical;
   const queue: InputEvent[] = [];
@@ -45,7 +51,7 @@ export function createInputController(options: InputControllerOptions) {
     inFlight
   });
 
-  const processQueue = async (): Promise<void> => {
+  const drainQueue = async (): Promise<void> => {
     if (inFlight) {
       return;
     }
@@ -86,7 +92,7 @@ export function createInputController(options: InputControllerOptions) {
     }
 
     queue.push(event);
-    void processQueue();
+    void drainQueue();
     return {
       accepted: true,
       bypassed: false,

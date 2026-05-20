@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "xyte.status.v1",
+  "generatedAtUtc": "<ISO_TIMESTAMP>",
+  "mode": "fast",
+  "checkConnectivity": false,
+  "readiness": {
+    "state": "needs_setup",
+    "missingItems": [
+      "No active tenant is configured."
+    ],
+    "recommendedActions": [
+      "Run \"xyte-cli setup run --non-interactive --tenant default --key <value>\"."
+    ],
+    "providers": [],
+    "connectionState": "not_checked",
+    "connectivity": {
+      "state": "not_checked",
+      "message": "Connectivity not checked.",
+      "retriable": false
+    }
+  }
+}
