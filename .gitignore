@@ -6,5 +6,48 @@ coverage/
 *.log
 .DS_Store
 .idea/
+.env
 
 *.tgz
+# Generated artifacts
+tmp/
+tmp/flow-runs/
+tmp/poc-incident-watch/
+tmp/poc-incident-watch-recordings/
+artifacts/
+**/artifacts/
+reports/
+**/reports/
+output/
+**/output/
+demo/
+marketing/
+.desloppify/
+
+# Local tooling scratch files
+AGENTS.md
+.agents/skills/*
+!.agents/skills/commit/
+!.agents/skills/commit/**
+!.agents/skills/debug/
+!.agents/skills/debug/**
+!.agents/skills/land/
+!.agents/skills/land/**
+!.agents/skills/linear/
+!.agents/skills/linear/**
+!.agents/skills/pull/
+!.agents/skills/pull/**
+!.agents/skills/push/
+!.agents/skills/push/**
+.claude/skills/
+.github/skills/
+apply
+approve
+review
+scorecard.png
+video/
+
+# POC / Remotion generated artifacts
+demo/remotion/src/timeline.generated.json
+demo/remotion/src/captions.json
+demo/remotion/src/*.generated.json

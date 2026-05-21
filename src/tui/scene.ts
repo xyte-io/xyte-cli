@@ -1,11 +1,29 @@
 import type { TuiScreenId } from './types';
+import type { EndpointNamespace } from '../types/endpoints';
 import { safePreviewLines } from './serialize';
 import { fitCell, formatBoolTag, sanitizePrintable, shortId } from './table-format';
 import { HEADLESS_FRAME_SCHEMA_VERSION } from '../contracts/versions';
+import type { ProviderReadiness } from '../contracts/status';
 
-export type FrameInputState = 'idle' | 'modal' | 'busy';
-export type FrameTransitionState = 'idle' | 'switching';
-export type FrameRefreshState = 'idle' | 'loading' | 'retrying' | 'error';
+interface SetupProviderRow {
+  provider: string;
+  slotCount: number;
+  activeSlot: string;
+  hasSecret: 'yes' | 'no';
+}
+
+export function toSetupProviderRows(providers: ProviderReadiness[]): SetupProviderRow[] {
+  return providers.map((provider) => ({
+    provider: provider.provider,
+    slotCount: provider.slotCount,
+    activeSlot: provider.activeSlotId ?? 'none',
+    hasSecret: provider.hasActiveSecret ? 'yes' : 'no'
+  }));
+}
+
+type FrameInputState = 'idle' | 'modal' | 'busy';
+type FrameTransitionState = 'idle' | 'switching';
+type FrameRefreshState = 'idle' | 'loading' | 'retrying' | 'error';
 
 export interface HeadlessFrameMeta {
   inputState: FrameInputState;
@@ -70,83 +88,128 @@ export interface HeadlessFrame {
   meta?: HeadlessFrameMeta;
 }
 
-export interface DashboardSceneState {
+type ApiRecord = Record<string, unknown>;
+
+interface DashboardSceneState {
   tenantId?: string;
-  devices: any[];
-  incidents: any[];
-  tickets: any[];
+  devices: unknown[];
+  incidents: unknown[];
+  tickets: unknown[];
 }
 
-export interface DevicesSceneState {
+interface DevicesSceneState {
   tenantId?: string;
   searchText: string;
   selectedIndex: number;
-  devices: any[];
+  devices: unknown[];
+  spaceFilter?: string;
+  actionsHint?: string;
 }
 
-export interface IncidentsSceneState {
+interface IncidentsSceneState {
   tenantId?: string;
   severityFilter: string;
   selectedIndex: number;
-  incidents: any[];
+  incidents: unknown[];
+  statusFilter?: string;
+  priorityFilter?: string;
+  page?: number;
+  perPage?: number;
+  actionsHint?: string;
 }
 
-export interface TicketsSceneState {
+interface TicketsSceneState {
   tenantId?: string;
-  mode: 'organization' | 'partner';
+  mode: EndpointNamespace;
   searchText: string;
   selectedIndex: number;
-  tickets: any[];
+  tickets: unknown[];
   detailText?: string;
+  statusFilter?: string;
+  priorityFilter?: string;
+  page?: number;
+  perPage?: number;
+  totalFiltered?: number;
+  actionsHint?: string;
 }
 
-export interface SpacesSceneState {
+interface SpacesSceneState {
   tenantId?: string;
   searchText: string;
   selectedIndex: number;
   loading: boolean;
   paneStatus: string;
-  spaces: any[];
+  spaces: unknown[];
   spaceDetail?: unknown;
-  devicesInSpace: any[];
+  devicesInSpace: unknown[];
+  endpointFilterSummary?: string;
+  actionsHint?: string;
 }
 
-export interface SetupSceneState {
+interface SetupSceneState {
   tenantId?: string;
   readinessState: 'ready' | 'needs_setup' | 'degraded';
   connectionState: string;
   missingItems: string[];
   recommendedActions: string[];
-  providerRows: Array<{ provider: string; slotCount: number; activeSlot: string; hasSecret: string }>;
+  providerRows: Array<{ provider: string; slotCount: number; activeSlot: string; hasSecret: 'yes' | 'no' }>;
 }
 
-export interface ConfigSceneState {
+interface ConfigSceneState {
   tenantId?: string;
-  providerRows: Array<{ provider: string; slotCount: number; activeSlot: string; hasSecret: string; lastValidatedAt?: string }>;
+  providerRows: Array<{
+    provider: string;
+    slotCount: number;
+    activeSlot: string;
+    hasSecret: 'yes' | 'no';
+    lastValidatedAt?: string;
+  }>;
   selectedProvider?: string;
-  slotRows: Array<{ provider: string; slotId: string; name: string; active: string; hasSecret: string; fingerprint: string }>;
-  selectedSlot?: { provider: string; slotId: string; name: string; active: string; hasSecret: string; fingerprint: string };
+  slotRows: Array<{
+    provider: string;
+    slotId: string;
+    name: string;
+    active: 'yes' | 'no';
+    hasSecret: 'yes' | 'no';
+    fingerprint: string;
+  }>;
+  selectedSlot?: {
+    provider: string;
+    slotId: string;
+    name: string;
+    active: 'yes' | 'no';
+    hasSecret: 'yes' | 'no';
+    fingerprint: string;
+  };
   doctorStatus?: string;
 }
 
-function sampleRows(items: any[], count = 6): any[] {
+function asRec(item: unknown): ApiRecord {
+  return item && typeof item === 'object' ? (item as ApiRecord) : {};
+}
+
+function sampleRows(items: unknown[], count = 6): unknown[] {
   return items.slice(0, count);
 }
 
-function safeId(item: any, index: number): string {
-  return String(item?.id ?? item?._id ?? item?.uuid ?? item?.device_id ?? `row-${index + 1}`);
+function safeId(item: unknown, index: number): string {
+  const rec = asRec(item);
+  return String(rec.id ?? rec._id ?? rec.uuid ?? rec.device_id ?? `row-${index + 1}`);
 }
 
-function safeName(item: any): string {
-  return String(item?.name ?? item?.title ?? item?.subject ?? item?.status ?? 'n/a');
+function safeName(item: unknown): string {
+  const rec = asRec(item);
+  return String(rec.name ?? rec.title ?? rec.subject ?? rec.status ?? 'n/a');
 }
 
-function safeStatus(item: any): string {
-  return String(item?.status ?? item?.state ?? item?.online_status ?? 'unknown');
+function safeStatus(item: unknown): string {
+  const rec = asRec(item);
+  return String(rec.status ?? rec.state ?? rec.online_status ?? 'unknown');
 }
 
-function safeSpaceId(item: any, index: number): string {
-  return String(item?.id ?? item?.space_id ?? item?._id ?? item?.uuid ?? `space-${index + 1}`);
+function safeSpaceId(item: unknown, index: number): string {
+  const rec = asRec(item);
+  return String(rec.id ?? rec.space_id ?? rec._id ?? rec.uuid ?? `space-${index + 1}`);
 }
 
 function detailBlock(lines: string[], preview?: { lines: string[] }): string[] {
@@ -219,14 +282,15 @@ export function sceneFromDashboardState(state: DashboardSceneState): ScenePanel[
 export function sceneFromDevicesState(state: DevicesSceneState): ScenePanel[] {
   const selectedIndex = clampSelection(state.selectedIndex, state.devices.length);
   const selected = state.devices[selectedIndex];
+  const sel = asRec(selected);
   const preview = selected ? safePreviewLines(selected) : undefined;
   const detailLines = selected
     ? detailBlock(
         [
-          `ID: ${sanitizePrintable(selected?.id ?? selected?._id ?? selected?.uuid ?? 'n/a')}`,
-          `Name: ${sanitizePrintable(selected?.name ?? selected?.title ?? 'n/a')}`,
-          `State: ${sanitizePrintable(selected?.status ?? selected?.state ?? selected?.online_status ?? 'unknown')}`,
-          `Space: ${sanitizePrintable(selected?.space_name ?? selected?.space_id ?? 'n/a')}`
+          `ID: ${sanitizePrintable(sel.id ?? sel._id ?? sel.uuid ?? 'n/a')}`,
+          `Name: ${sanitizePrintable(sel.name ?? sel.title ?? 'n/a')}`,
+          `State: ${sanitizePrintable(sel.status ?? sel.state ?? sel.online_status ?? 'unknown')}`,
+          `Space: ${sanitizePrintable(sel.space_name ?? sel.space_id ?? 'n/a')}`
         ],
         preview
       )
@@ -239,14 +303,21 @@ export function sceneFromDevicesState(state: DevicesSceneState): ScenePanel[] {
       kind: 'table',
       table: {
         columns: ['ID', 'Name', 'State', 'Space'],
-        rows: state.devices.map((item, index) => [
-          shortId(safeId(item, index)),
-          fitCell(safeName(item), 24, 'end'),
-          fitCell(safeStatus(item), 10, 'end'),
-          fitCell(item?.space_name ?? item?.space_id ?? 'n/a', 20, 'end')
-        ])
+        rows: state.devices.map((item, index) => {
+          const r = asRec(item);
+          return [
+            shortId(safeId(item, index)),
+            fitCell(safeName(item), 24, 'end'),
+            fitCell(safeStatus(item), 10, 'end'),
+            fitCell(r.space_name ?? r.space_id ?? 'n/a', 20, 'end')
+          ];
+        })
       },
-      status: state.searchText ? `filter=${state.searchText}` : 'filter=none'
+      status: [
+        state.searchText ? `search=${state.searchText}` : 'search=none',
+        state.spaceFilter ? `space_id=${state.spaceFilter}` : 'space_id=all',
+        state.actionsHint ?? 'actions=a'
+      ].join(' | ')
     },
     {
       id: 'devices-detail',
@@ -262,14 +333,16 @@ export function sceneFromDevicesState(state: DevicesSceneState): ScenePanel[] {
 export function sceneFromIncidentsState(state: IncidentsSceneState): ScenePanel[] {
   const selectedIndex = clampSelection(state.selectedIndex, state.incidents.length);
   const selected = state.incidents[selectedIndex];
+  const sel = asRec(selected);
   const preview = selected ? safePreviewLines(selected) : undefined;
+  const selDevice = sel.device && typeof sel.device === 'object' ? (sel.device as ApiRecord) : undefined;
   const detailLines = selected
     ? detailBlock(
         [
-          `ID: ${sanitizePrintable(selected?.id ?? selected?._id ?? selected?.uuid ?? 'n/a')}`,
-          `Sev: ${sanitizePrintable(selected?.severity ?? selected?.priority ?? 'unknown')}`,
-          `State: ${sanitizePrintable(selected?.status ?? selected?.state ?? 'unknown')}`,
-          `Device: ${sanitizePrintable(selected?.device_id ?? selected?.device?.id ?? 'n/a')}`
+          `ID: ${sanitizePrintable(sel.id ?? sel._id ?? sel.uuid ?? 'n/a')}`,
+          `Sev: ${sanitizePrintable(sel.severity ?? sel.priority ?? 'unknown')}`,
+          `State: ${sanitizePrintable(sel.status ?? sel.state ?? 'unknown')}`,
+          `Device: ${sanitizePrintable(sel.device_id ?? selDevice?.id ?? 'n/a')}`
         ],
         preview
       )
@@ -282,14 +355,25 @@ export function sceneFromIncidentsState(state: IncidentsSceneState): ScenePanel[
       kind: 'table',
       table: {
         columns: ['ID', 'Sev', 'State', 'Device'],
-        rows: state.incidents.map((item, index) => [
-          shortId(safeId(item, index)),
-          fitCell(item?.severity ?? item?.priority ?? 'unknown', 7, 'end'),
-          fitCell(safeStatus(item), 10, 'end'),
-          shortId(item?.device_id ?? item?.device?.id ?? 'n/a')
-        ])
+        rows: state.incidents.map((item, index) => {
+          const r = asRec(item);
+          const rDevice = r.device && typeof r.device === 'object' ? (r.device as ApiRecord) : undefined;
+          return [
+            shortId(safeId(item, index)),
+            fitCell(r.severity ?? r.priority ?? 'unknown', 7, 'end'),
+            fitCell(safeStatus(item), 10, 'end'),
+            shortId(r.device_id ?? rDevice?.id ?? 'n/a')
+          ];
+        })
       },
-      status: state.severityFilter ? `severity=${state.severityFilter}` : 'severity=all'
+      status: [
+        state.severityFilter ? `severity=${state.severityFilter}` : 'severity=all',
+        state.statusFilter ? `status=${state.statusFilter}` : 'status=all',
+        state.priorityFilter ? `priority=${state.priorityFilter}` : 'priority=all',
+        `page=${state.page ?? 1}`,
+        `per=${state.perPage ?? 100}`,
+        state.actionsHint ?? 'actions=a'
+      ].join(' | ')
     },
     {
       id: 'incidents-detail',
@@ -298,20 +382,21 @@ export function sceneFromIncidentsState(state: IncidentsSceneState): ScenePanel[
       text: {
         lines: detailLines
       }
-    },
+    }
   ];
 }
 
 export function sceneFromTicketsState(state: TicketsSceneState): ScenePanel[] {
   const selectedIndex = clampSelection(state.selectedIndex, state.tickets.length);
   const selected = state.tickets[selectedIndex];
+  const sel = asRec(selected);
   const preview = selected ? safePreviewLines(selected) : undefined;
   const selectedSummary = selected
     ? [
-        `ID: ${sanitizePrintable(selected?.id ?? selected?._id ?? 'n/a')}`,
-        `State: ${sanitizePrintable(selected?.status ?? selected?.state ?? 'unknown')}`,
-        `Pri: ${sanitizePrintable(selected?.priority ?? 'n/a')}`,
-        `Subject: ${sanitizePrintable(selected?.subject ?? selected?.title ?? 'n/a')}`,
+        `ID: ${sanitizePrintable(sel.id ?? sel._id ?? 'n/a')}`,
+        `State: ${sanitizePrintable(sel.status ?? sel.state ?? 'unknown')}`,
+        `Pri: ${sanitizePrintable(sel.priority ?? 'n/a')}`,
+        `Subject: ${sanitizePrintable(sel.subject ?? sel.title ?? 'n/a')}`,
         ''
       ]
     : [];
@@ -328,14 +413,26 @@ export function sceneFromTicketsState(state: TicketsSceneState): ScenePanel[] {
       kind: 'table',
       table: {
         columns: ['ID', 'State', 'Pri', 'Subject'],
-        rows: state.tickets.map((item, index) => [
-          shortId(safeId(item, index)),
-          fitCell(safeStatus(item), 10, 'end'),
-          fitCell(item?.priority ?? 'n/a', 6, 'end'),
-          fitCell(item?.subject ?? item?.title ?? 'n/a', 28, 'end')
-        ])
+        rows: state.tickets.map((item, index) => {
+          const r = asRec(item);
+          return [
+            shortId(safeId(item, index)),
+            fitCell(safeStatus(item), 10, 'end'),
+            fitCell(r.priority ?? 'n/a', 6, 'end'),
+            fitCell(r.subject ?? r.title ?? 'n/a', 28, 'end')
+          ];
+        })
       },
-      status: `mode=${state.mode}${state.searchText ? ` filter=${state.searchText}` : ''}`
+      status: [
+        `mode=${state.mode}`,
+        state.searchText ? `search=${state.searchText}` : 'search=none',
+        state.statusFilter ? `status=${state.statusFilter}` : 'status=all',
+        state.priorityFilter ? `priority=${state.priorityFilter}` : 'priority=all',
+        `page=${state.page ?? 1}`,
+        `per=${state.perPage ?? 25}`,
+        `rows=${state.totalFiltered ?? state.tickets.length}`,
+        state.actionsHint ?? 'actions=a'
+      ].join(' | ')
     },
     {
       id: 'tickets-detail',
@@ -351,14 +448,19 @@ export function sceneFromTicketsState(state: TicketsSceneState): ScenePanel[] {
 export function sceneFromSpacesState(state: SpacesSceneState): ScenePanel[] {
   const selectedIndex = clampSelection(state.selectedIndex, state.spaces.length);
   const selected = state.spaces[selectedIndex];
-  const detailPreview = state.spaceDetail ? safePreviewLines(state.spaceDetail) : selected ? safePreviewLines(selected) : undefined;
+  const sel = asRec(selected);
+  const detailPreview = state.spaceDetail
+    ? safePreviewLines(state.spaceDetail)
+    : selected
+      ? safePreviewLines(selected)
+      : undefined;
   const detailLines = selected
     ? detailBlock(
         [
           `ID: ${sanitizePrintable(safeSpaceId(selected, selectedIndex))}`,
-          `Name: ${sanitizePrintable(selected?.name ?? selected?.title ?? 'n/a')}`,
-          `Type: ${sanitizePrintable(selected?.space_type ?? selected?.type ?? 'n/a')}`,
-          `Path: ${sanitizePrintable(selected?.path ?? selected?.full_path ?? 'n/a')}`
+          `Name: ${sanitizePrintable(sel.name ?? sel.title ?? 'n/a')}`,
+          `Type: ${sanitizePrintable(sel.space_type ?? sel.type ?? 'n/a')}`,
+          `Path: ${sanitizePrintable(sel.path ?? sel.full_path ?? 'n/a')}`
         ],
         detailPreview
       )
@@ -371,14 +473,21 @@ export function sceneFromSpacesState(state: SpacesSceneState): ScenePanel[] {
       kind: 'table',
       table: {
         columns: ['ID', 'Name', 'Type', 'Path'],
-        rows: state.spaces.map((item, index) => [
-          shortId(safeId(item, index)),
-          fitCell(safeName(item), 22, 'end'),
-          fitCell(item?.space_type ?? item?.type ?? 'n/a', 10, 'end'),
-          fitCell(item?.path ?? item?.full_path ?? 'n/a', 28, 'end')
-        ])
+        rows: state.spaces.map((item, index) => {
+          const r = asRec(item);
+          return [
+            shortId(safeId(item, index)),
+            fitCell(safeName(item), 22, 'end'),
+            fitCell(r.space_type ?? r.type ?? 'n/a', 10, 'end'),
+            fitCell(r.path ?? r.full_path ?? 'n/a', 28, 'end')
+          ];
+        })
       },
-      status: state.searchText ? `filter=${state.searchText}` : 'filter=none'
+      status: [
+        state.searchText ? `search=${state.searchText}` : 'search=none',
+        state.endpointFilterSummary ? `endpoint=${state.endpointFilterSummary}` : 'endpoint=none',
+        state.actionsHint ?? 'actions=a'
+      ].join(' | ')
     },
     {
       id: 'spaces-detail',

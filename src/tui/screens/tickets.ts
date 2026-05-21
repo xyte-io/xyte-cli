@@ -2,7 +2,7 @@ import blessed from 'blessed';
 
 import {
   clampIndex,
-  movePaneWithBoundary,
+  handleHorizontalArrow,
   moveTableSelection,
   setListTableData,
   scrollBox,
@@ -11,56 +11,155 @@ import {
   type SelectionSyncState
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
-import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
+import { createRenderErrorTracker } from '../render-error-tracker';
+import { createScreenRenderLogger, logScreenDataFetch } from '../screen-render-logger';
+import type { TuiArrowKey, TuiContext, NavigableScreen, TuiPaneId } from '../types';
+import type { EndpointNamespace } from '../../types/endpoints';
 import { loadTicketsData } from '../data-loaders';
 import { sceneFromTicketsState } from '../scene';
 import { payloadSummary, safePreviewLines, safeSearchText } from '../serialize';
+import { confirmWriteWithToken, openActionPalette, runGuardedAction } from '../actions';
+import { asRecord } from '../../utils/json';
+import { errorMessage } from '../../utils/error-format';
 
-export interface ResolveTicketWithGuardArgs {
-  ticket: any;
-  mode: 'organization' | 'partner';
+function renderTicketFallbackTable(
+  list: blessed.Widgets.ListTableElement | undefined,
+  filtered: unknown[],
+  selectionSync: SelectionSyncState
+): void {
+  if (!list) return;
+  setListTableData(
+    list,
+    [
+      ['ID', 'Status', 'Priority', 'Subject'],
+      ...filtered.map((ticket, index) => {
+        const r = asRecord(ticket);
+        return [
+          String(r.id ?? r._id ?? `row-${index + 1}`),
+          String(r.status ?? r.state ?? 'unknown'),
+          String(r.priority ?? 'n/a'),
+          String(r.subject ?? r.title ?? 'n/a')
+        ];
+      })
+    ],
+    selectionSync
+  );
+}
+
+function ticketIdOf(ticket: unknown): string {
+  const r = asRecord(ticket);
+  return String(r.id ?? r._id ?? '');
+}
+
+function ticketStatusOf(ticket: unknown): string {
+  const r = asRecord(ticket);
+  return String(r.status ?? r.state ?? '')
+    .trim()
+    .toLowerCase();
+}
+
+function ticketPriorityOf(ticket: unknown): string {
+  const r = asRecord(ticket);
+  return String(r.priority ?? '')
+    .trim()
+    .toLowerCase();
+}
+
+interface ResolveTicketWithGuardArgs {
+  ticket: unknown;
+  mode: EndpointNamespace;
   context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;
 }
 
-export async function resolveTicketWithGuard(args: ResolveTicketWithGuardArgs): Promise<boolean> {
+export async function markTicketResolvedWithGuard(args: ResolveTicketWithGuardArgs): Promise<boolean> {
   const { ticket, mode, context } = args;
-  const ok = await context.confirmWrite('Resolve ticket', 'resolve');
-  if (!ok) {
-    context.setStatus('Resolve action canceled.');
+  if (mode !== 'organization') {
+    context.setStatus('Ticket write actions are disabled in partner mode (organization-only policy).');
     return false;
   }
 
-  const ticketId = String(ticket?.id ?? ticket?._id ?? '');
+  const ticketId = ticketIdOf(ticket);
   if (!ticketId) {
     context.setStatus('Selected ticket has no id.');
     return false;
   }
 
-  context.setStatus('Resolving ticket...');
-  try {
-    const tenantId = await context.getActiveTenantId();
-    if (mode === 'organization') {
-      await context.client.organization.markResolved({ tenantId, path: { ticket_id: ticketId } });
-    } else {
-      await context.client.partner.closeTicket({ tenantId, path: { ticket_id: ticketId } });
-    }
-    context.setStatus(`Ticket ${ticketId} resolved.`);
-    return true;
-  } catch (error) {
-    context.showError(error);
+  const ok = await confirmWriteWithToken({
+    context,
+    actionLabel: 'Resolve ticket',
+    token: 'resolve',
+    cancelStatus: 'Resolve action canceled.'
+  });
+  if (!ok) {
     return false;
   }
+
+  return runGuardedAction(context, 'Resolving ticket...', async (tenantId) => {
+    await context.client.organization.markResolved({ tenantId, path: { ticket_id: ticketId } });
+    context.setStatus(`Ticket ${ticketId} resolved.`);
+  });
 }
 
-export function createTicketsScreen(): TuiScreen {
+interface SendTicketMessageWithGuardArgs {
+  ticket: unknown;
+  mode: EndpointNamespace;
+  context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;
+  message: string;
+}
+
+export async function sendTicketMessageWithGuard(args: SendTicketMessageWithGuardArgs): Promise<boolean> {
+  const { ticket, mode, context } = args;
+  if (mode !== 'organization') {
+    context.setStatus('Ticket write actions are disabled in partner mode (organization-only policy).');
+    return false;
+  }
+
+  const ticketId = ticketIdOf(ticket);
+  if (!ticketId) {
+    context.setStatus('Selected ticket has no id.');
+    return false;
+  }
+
+  const message = args.message.trim();
+  if (!message) {
+    context.setStatus('Message is required.');
+    return false;
+  }
+
+  const ok = await confirmWriteWithToken({
+    context,
+    actionLabel: 'Send ticket message',
+    token: 'message',
+    cancelStatus: 'Send message canceled.'
+  });
+  if (!ok) {
+    return false;
+  }
+
+  return runGuardedAction(context, 'Sending ticket message...', async (tenantId) => {
+    await context.client.organization.sendMessage({
+      tenantId,
+      path: { ticket_id: ticketId },
+      query: { message }
+    });
+    context.setStatus(`Message sent for ticket ${ticketId}.`);
+  });
+}
+
+export function createTicketsScreen(): NavigableScreen {
   let root: blessed.Widgets.BoxElement | undefined;
   let list: blessed.Widgets.ListTableElement | undefined;
   let detail: blessed.Widgets.BoxElement | undefined;
   let context: TuiContext;
-  let tickets: any[] = [];
-  let filtered: any[] = [];
-  let mode: 'organization' | 'partner' = 'organization';
+  let tickets: unknown[] = [];
+  let filteredAll: unknown[] = [];
+  let filtered: unknown[] = [];
+  let mode: EndpointNamespace = 'organization';
   let searchText = '';
+  let statusFilter = '';
+  let priorityFilter = '';
+  let page = 1;
+  let perPage = 25;
   let selectedIndex = 0;
   let detailText = '';
   let lastResolveTapAt = 0;
@@ -72,10 +171,8 @@ export function createTicketsScreen(): TuiScreen {
   const paneConfig = SCREEN_PANE_CONFIG.tickets;
   let activePane: TuiPaneId = paneConfig.defaultPane;
   let isMounted = false;
-  let renderErrorMessage = '';
-  let renderErrorCount = 0;
-  let renderErrorWindowStart = 0;
-  let renderFrozen = false;
+  const renderErrors = createRenderErrorTracker();
+  const renderLog = createScreenRenderLogger('tickets', () => context.debugLog, renderErrors);
   const detailCacheByTicket = new Map<string, string>();
 
   const focusPane = () => {
@@ -87,31 +184,53 @@ export function createTicketsScreen(): TuiScreen {
   };
 
   const selectedTicket = () => filtered[selectedIndex];
+  const ticketWritesEnabled = () => mode === 'organization';
 
-  const renderRows = () => {
+  const rebuildFiltered = (restoreTicketId?: string) => {
+    let next = tickets;
+    if (searchText) {
+      const needle = searchText.toLowerCase();
+      next = next.filter((ticket) => safeSearchText(ticket).includes(needle));
+    }
+    if (statusFilter) {
+      next = next.filter((ticket) => ticketStatusOf(ticket).includes(statusFilter));
+    }
+    if (priorityFilter) {
+      next = next.filter((ticket) => ticketPriorityOf(ticket).includes(priorityFilter));
+    }
+    filteredAll = next;
+
+    const totalPages = Math.max(1, Math.ceil(Math.max(filteredAll.length, 1) / Math.max(1, perPage)));
+    if (restoreTicketId) {
+      const globalIndex = filteredAll.findIndex((ticket) => ticketIdOf(ticket) === restoreTicketId);
+      if (globalIndex >= 0) {
+        page = Math.floor(globalIndex / Math.max(1, perPage)) + 1;
+      }
+    }
+    page = Math.max(1, Math.min(page, totalPages));
+    const start = (page - 1) * Math.max(1, perPage);
+    filtered = filteredAll.slice(start, start + Math.max(1, perPage));
+
+    const pageIndex = restoreTicketId
+      ? filtered.findIndex((ticket) => ticketIdOf(ticket) === restoreTicketId)
+      : -1;
+    selectedIndex = pageIndex >= 0 ? pageIndex : clampIndex(selectedIndex, filtered.length);
+  };
+
+  const renderRows = (restoreTicketId?: string) => {
     if (!isMounted) {
       return;
     }
-    context.debugLog?.('screen.render.start', {
-      screen: 'tickets',
-      frozen: renderFrozen
-    });
-    filtered = searchText
-      ? tickets.filter((ticket) => safeSearchText(ticket).includes(searchText.toLowerCase()))
-      : tickets;
-    selectedIndex = clampIndex(selectedIndex, filtered.length);
+    renderLog.onRenderStart();
+    rebuildFiltered(restoreTicketId);
+
+    const actionsHint = ticketWritesEnabled()
+      ? 'actions: a open action palette'
+      : 'actions: writes disabled in partner mode';
 
     try {
-      if (renderFrozen) {
-        setListTableData(list, [
-          ['ID', 'Status', 'Priority', 'Subject'],
-          ...filtered.map((ticket, index) => [
-            String(ticket?.id ?? ticket?._id ?? `row-${index + 1}`),
-            String(ticket?.status ?? ticket?.state ?? 'unknown'),
-            String(ticket?.priority ?? 'n/a'),
-            String(ticket?.subject ?? ticket?.title ?? 'n/a')
-          ])
-        ], selectionSync);
+      if (renderErrors.frozen) {
+        renderTicketFallbackTable(list, filtered, selectionSync);
         detail?.setContent('Render fallback mode enabled for ticket details.');
       } else {
         const panels = sceneFromTicketsState({
@@ -119,56 +238,35 @@ export function createTicketsScreen(): TuiScreen {
           searchText,
           selectedIndex,
           tickets: filtered,
-          detailText
+          detailText,
+          statusFilter,
+          priorityFilter,
+          page,
+          perPage,
+          totalFiltered: filteredAll.length,
+          actionsHint
         });
 
         const tablePanel = panels.find((panel) => panel.id === 'tickets-table');
         const detailPanel = panels.find((panel) => panel.id === 'tickets-detail');
 
-        setListTableData(list, [
-          (tablePanel?.table?.columns ?? ['ID', 'Status', 'Priority', 'Subject']) as [string, string, string, string],
-          ...((tablePanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
-        ], selectionSync);
+        setListTableData(
+          list,
+          [
+            (tablePanel?.table?.columns ?? ['ID', 'Status', 'Priority', 'Subject']) as [string, string, string, string],
+            ...((tablePanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
+          ],
+          selectionSync
+        );
         detail?.setContent((detailPanel?.text?.lines ?? ['No tickets.']).join('\n'));
       }
-      renderErrorMessage = '';
-      renderErrorCount = 0;
-      renderErrorWindowStart = 0;
-      context.debugLog?.('screen.render.complete', {
-        screen: 'tickets',
-        frozen: renderFrozen
-      });
+      renderErrors.recordSuccess();
+      renderLog.onRenderComplete();
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const now = Date.now();
-      if (message === renderErrorMessage && now - renderErrorWindowStart <= 2_000) {
-        renderErrorCount += 1;
-      } else {
-        renderErrorMessage = message;
-        renderErrorCount = 1;
-        renderErrorWindowStart = now;
-      }
-      if (renderErrorCount >= 3) {
-        renderFrozen = true;
-      }
-      context.debugLog?.('screen.render.error', {
-        screen: 'tickets',
-        message,
-        count: renderErrorCount,
-        frozen: renderFrozen
-      });
-      context.debugLog?.('screen.render.fallback.applied', {
-        screen: 'tickets'
-      });
-      setListTableData(list, [
-        ['ID', 'Status', 'Priority', 'Subject'],
-        ...filtered.map((ticket, index) => [
-          String(ticket?.id ?? ticket?._id ?? `row-${index + 1}`),
-          String(ticket?.status ?? ticket?.state ?? 'unknown'),
-          String(ticket?.priority ?? 'n/a'),
-          String(ticket?.subject ?? ticket?.title ?? 'n/a')
-        ])
-      ], selectionSync);
+      const message = errorMessage(error);
+      renderErrors.recordError(message);
+      renderLog.onRenderError(message);
+      renderTicketFallbackTable(list, filtered, selectionSync);
       detail?.setContent(`Unable to render ticket detail safely.\nReason: ${message}`);
     }
     syncListSelection(list, selectedIndex, selectionSync);
@@ -188,7 +286,7 @@ export function createTicketsScreen(): TuiScreen {
       return;
     }
 
-    const ticketId = String(ticket?.id ?? ticket?._id ?? '');
+    const ticketId = ticketIdOf(ticket);
     const fallbackPreview = safePreviewLines(ticket).lines.join('\n');
     detailText = ticketId && detailCacheByTicket.has(ticketId) ? detailCacheByTicket.get(ticketId)! : fallbackPreview;
     renderRows();
@@ -201,15 +299,16 @@ export function createTicketsScreen(): TuiScreen {
     void (async () => {
       try {
         const tenantId = await context.getActiveTenantId();
-        const full = mode === 'organization'
-          ? await context.client.organization.getTicket({ tenantId, path: { ticket_id: ticketId } })
-          : await context.client.partner.getTicket({ tenantId, path: { ticket_id: ticketId } });
+        const full =
+          mode === 'organization'
+            ? await context.client.organization.getTicket({ tenantId, path: { ticket_id: ticketId } })
+            : await context.client.partner.getTicket({ tenantId, path: { ticket_id: ticketId } });
         if (!isMounted || requestToken !== detailRequestToken || selectedIndex !== index) {
           return;
         }
         detailText = safePreviewLines(full).lines.join('\n');
         detailCacheByTicket.set(ticketId, detailText);
-        renderRows();
+        renderRows(ticketId);
         context.screen.render();
       } catch {
         if (!isMounted || requestToken !== detailRequestToken || selectedIndex !== index) {
@@ -219,7 +318,7 @@ export function createTicketsScreen(): TuiScreen {
         detailText = cached
           ? `${cached}\n\n[warning] Unable to refresh full ticket details; showing last successful preview.`
           : `${fallbackPreview}\n\n[warning] Unable to refresh full ticket details.`;
-        renderRows();
+        renderRows(ticketId);
         context.screen.render();
       }
     })();
@@ -280,7 +379,7 @@ export function createTicketsScreen(): TuiScreen {
         widgets: ['tickets-table', 'detail-box']
       });
 
-      list.on('select item', (_item, index) => {
+      list.on('select item', (_item: unknown, index: number) => {
         if (shouldIgnoreSelectEvent(selectionSync)) {
           return;
         }
@@ -297,10 +396,8 @@ export function createTicketsScreen(): TuiScreen {
         return;
       }
       const tenantId = await context.getActiveTenantId();
-      context.debugLog?.('screen.data.fetch.start', {
-        screen: 'tickets',
-        tenantId
-      });
+      const restoreTicketId = ticketIdOf(selectedTicket());
+      logScreenDataFetch(context.debugLog, 'tickets', 'start', { tenantId });
       const loaded = await loadTicketsData(context.client, tenantId);
       if (!isMounted) {
         return;
@@ -308,12 +405,10 @@ export function createTicketsScreen(): TuiScreen {
 
       mode = loaded.data.mode;
       tickets = loaded.data.tickets;
-      selectedIndex = 0;
-      detailText = '';
       detailRequestToken += 1;
       detailCacheByTicket.clear();
-      context.debugLog?.('screen.data.fetch.complete', {
-        screen: 'tickets',
+      detailText = '';
+      logScreenDataFetch(context.debugLog, 'tickets', 'complete', {
         tenantId,
         count: tickets.length,
         mode,
@@ -323,15 +418,11 @@ export function createTicketsScreen(): TuiScreen {
       });
       if (loaded.error) {
         context.setStatus(`Tickets ${loaded.connectionState}: ${loaded.error.message}`);
-        context.debugLog?.('screen.data.fetch.error', {
-          screen: 'tickets',
-          message: loaded.error.message,
-          state: loaded.connectionState
-        });
+        logScreenDataFetch(context.debugLog, 'tickets', 'error', { message: loaded.error.message, state: loaded.connectionState });
       }
-      renderRows();
+      renderRows(restoreTicketId);
       if (filtered.length) {
-        queueTicketDetailFetch(0);
+        queueTicketDetailFetch(selectedIndex);
       }
       context.screen.render();
     },
@@ -345,16 +436,12 @@ export function createTicketsScreen(): TuiScreen {
       return paneConfig.panes;
     },
     async handleArrow(key: TuiArrowKey) {
-      if (key === 'left' || key === 'right') {
-        const next = movePaneWithBoundary(paneConfig.panes, activePane, key);
-        if (next.boundary) {
-          return 'boundary';
-        }
-        activePane = next.pane;
+      const h = handleHorizontalArrow(key, paneConfig.panes, activePane, (newPane) => {
+        activePane = newPane;
         focusPane();
         context.setStatus(`Pane: ${activePane}`);
-        return 'handled';
-      }
+      });
+      if (h !== null) return h;
 
       const delta = key === 'up' ? -1 : key === 'down' ? 1 : 0;
       if (!delta) {
@@ -389,22 +476,40 @@ export function createTicketsScreen(): TuiScreen {
       return 'unhandled';
     },
     async handleKey(ch, key) {
-      const resolveSelectedTicket = async () => {
+      const resolveSelected = async () => {
         const ticket = selectedTicket();
         if (!ticket) {
           context.setStatus('No ticket selected.');
           return true;
         }
-
-        const resolved = await resolveTicketWithGuard({
-          ticket,
-          mode,
-          context
-        });
+        const resolved = await markTicketResolvedWithGuard({ ticket, mode, context });
         if (!isMounted) {
           return true;
         }
         if (resolved) {
+          await this.refresh();
+        }
+        return true;
+      };
+
+      const sendMessage = async () => {
+        const ticket = selectedTicket();
+        if (!ticket) {
+          context.setStatus('No ticket selected.');
+          return true;
+        }
+        const message = await context.prompt('Ticket message:', '');
+        if (message === undefined) {
+          context.setStatus('Send message canceled.');
+          return true;
+        }
+        const sent = await sendTicketMessageWithGuard({
+          ticket,
+          mode,
+          context,
+          message
+        });
+        if (sent && isMounted) {
           await this.refresh();
         }
         return true;
@@ -417,15 +522,110 @@ export function createTicketsScreen(): TuiScreen {
         }
         if (value !== undefined) {
           searchText = value.trim();
+          page = 1;
           selectedIndex = 0;
           renderRows();
+          if (filtered.length) {
+            queueTicketDetailFetch(selectedIndex);
+          } else {
+            context.screen.render();
+          }
+        }
+        return true;
+      }
+
+      if (ch === 'f') {
+        const status = await context.prompt('Status filter (empty clears):', statusFilter);
+        if (status === undefined || !isMounted) {
+          return true;
+        }
+        const priority = await context.prompt('Priority filter (empty clears):', priorityFilter);
+        if (priority === undefined || !isMounted) {
+          return true;
+        }
+        statusFilter = status.trim().toLowerCase();
+        priorityFilter = priority.trim().toLowerCase();
+        page = 1;
+        selectedIndex = 0;
+        renderRows();
+        if (filtered.length) {
+          queueTicketDetailFetch(selectedIndex);
+        } else {
           context.screen.render();
         }
         return true;
       }
 
+      if (ch === '[') {
+        page = Math.max(1, page - 1);
+        selectedIndex = 0;
+        renderRows();
+        if (filtered.length) {
+          queueTicketDetailFetch(0);
+        } else {
+          context.screen.render();
+        }
+        return true;
+      }
+
+      if (ch === ']') {
+        page += 1;
+        selectedIndex = 0;
+        renderRows();
+        if (filtered.length) {
+          queueTicketDetailFetch(0);
+        } else {
+          context.screen.render();
+        }
+        return true;
+      }
+
+      if (ch === 'p') {
+        const value = await context.prompt('Tickets per page (10|25|50|100):', String(perPage));
+        if (value === undefined || !isMounted) {
+          return true;
+        }
+        const parsed = Number.parseInt(value.trim(), 10);
+        if (![10, 25, 50, 100].includes(parsed)) {
+          context.setStatus('Invalid per-page value. Use 10, 25, 50, or 100.');
+          return true;
+        }
+        perPage = parsed;
+        page = 1;
+        selectedIndex = 0;
+        renderRows();
+        if (filtered.length) {
+          queueTicketDetailFetch(0);
+        } else {
+          context.screen.render();
+        }
+        return true;
+      }
+
+      if (ch === 'a') {
+        await openActionPalette({
+          context,
+          title: `Ticket actions (${mode} mode)`,
+          actions: [
+            {
+              label: 'Resolve ticket',
+              enabled: ticketWritesEnabled(),
+              disabledReason: 'Ticket writes are disabled in partner mode.',
+              run: async () => resolveSelected()
+            },
+            {
+              label: 'Send message',
+              enabled: ticketWritesEnabled(),
+              disabledReason: 'Ticket writes are disabled in partner mode.',
+              run: async () => sendMessage()
+            }
+          ]
+        });
+        return true;
+      }
+
       if (ch === 'R') {
-        return resolveSelectedTicket();
+        return resolveSelected();
       }
 
       if (ch === 'r') {
@@ -433,7 +633,7 @@ export function createTicketsScreen(): TuiScreen {
         const tappedTwiceQuickly = now - lastResolveTapAt <= 650;
         lastResolveTapAt = now;
         if (tappedTwiceQuickly) {
-          return resolveSelectedTicket();
+          return resolveSelected();
         }
         return false;
       }

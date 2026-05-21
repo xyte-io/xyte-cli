@@ -13,8 +13,16 @@ export {
   formatDeepDiveMarkdown,
   generateFleetReport
 } from './workflows/fleet-insights';
+export { generateOpsReport } from './workflows/ops-report';
 
-export { FileProfileStore } from './secure/profile-store';
-export { createKeychainStore, MemoryKeychain } from './secure/keychain';
+export { FileProfileStore, createProfileStore } from './secure/profile-store';
+export { createSecretStore, MemorySecretStore, FileSecretStore } from './secure/secret-store';
+export type { SecretStore } from './secure/secret-store';
 export type { ProfileStore } from './secure/profile-store';
-export type { SecretProvider, TenantProfile, ProfileStoreData, ApiKeySlotMeta, TenantKeyRegistry } from './types/profile';
+export type {
+  SecretProvider,
+  TenantProfile,
+  ProfileStoreData,
+  ApiKeySlotMeta,
+  TenantKeyRegistry
+} from './types/profile';

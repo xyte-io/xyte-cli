@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xyte.dev/schemas/inspect-fleet.v1.schema.json",
+  "title": "Xyte Fleet Inspect V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generatedAtUtc",
+    "tenantId",
+    "totals",
+    "status",
+    "highlights"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "xyte.inspect.fleet.v1"
+    },
+    "generatedAtUtc": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string"
+    },
+    "totals": {
+      "type": "object",
+      "required": [
+        "devices",
+        "spaces",
+        "incidents",
+        "tickets"
+      ],
+      "properties": {
+        "devices": {
+          "type": "integer"
+        },
+        "spaces": {
+          "type": "integer"
+        },
+        "incidents": {
+          "type": "integer"
+        },
+        "tickets": {
+          "type": "integer"
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "required": [
+        "devices",
+        "incidents",
+        "tickets",
+        "spaces"
+      ],
+      "properties": {
+        "devices": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        },
+        "incidents": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        },
+        "tickets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        },
+        "spaces": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "highlights": {
+      "type": "object",
+      "required": [
+        "offlineDevices",
+        "offlinePct",
+        "activeIncidents",
+        "activeIncidentPct",
+        "openTickets"
+      ],
+      "properties": {
+        "offlineDevices": {
+          "type": "integer"
+        },
+        "offlinePct": {
+          "type": "number"
+        },
+        "activeIncidents": {
+          "type": "integer"
+        },
+        "activeIncidentPct": {
+          "type": "number"
+        },
+        "openTickets": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

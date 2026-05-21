@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "xyte.call.envelope.v1",
+  "timestamp": "<ISO_TIMESTAMP>",
+  "requestId": "req-1",
+  "tenantId": "acme",
+  "endpointKey": "organization.devices.getDevices",
+  "method": "GET",
+  "guard": {
+    "allowWrite": false
+  },
+  "request": {
+    "path": {},
+    "query": {}
+  },
+  "response": {
+    "status": 200,
+    "durationMs": 12,
+    "retryCount": 0,
+    "data": {
+      "items": [
+        {
+          "id": "dev-1"
+        }
+      ]
+    }
+  }
+}

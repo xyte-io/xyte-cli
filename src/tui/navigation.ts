@@ -1,6 +1,6 @@
 import type blessed from 'blessed';
 
-import type { TuiArrowKey, TuiPaneId } from './types';
+import type { TuiArrowHandleResult, TuiArrowKey, TuiPaneId } from './types';
 
 export interface SelectionSyncState {
   syncing: boolean;
@@ -8,7 +8,7 @@ export interface SelectionSyncState {
   onLog?: (event: string, data?: Record<string, unknown>) => void;
 }
 
-export function withSelectionSyncGuard(state: SelectionSyncState | undefined, fn: () => void): void {
+function withSelectionSyncGuard(state: SelectionSyncState | undefined, fn: () => void): void {
   if (!state) {
     fn();
     return;
@@ -158,4 +158,26 @@ export function clampIndex(index: number, totalRows: number): number {
     return 0;
   }
   return Math.max(0, Math.min(index, totalRows - 1));
+}
+
+/**
+ * Handles left/right pane navigation shared across all TUI screens.
+ * Returns 'handled' or 'boundary' when the key is left/right, null otherwise.
+ * The onNavigate callback is responsible for updating activePane and calling focusPane().
+ */
+export function handleHorizontalArrow(
+  key: TuiArrowKey,
+  panes: TuiPaneId[],
+  activePane: TuiPaneId,
+  onNavigate: (newPane: TuiPaneId) => void
+): TuiArrowHandleResult | null {
+  if (key !== 'left' && key !== 'right') {
+    return null;
+  }
+  const next = movePaneWithBoundary(panes, activePane, key);
+  if (next.boundary) {
+    return 'boundary';
+  }
+  onNavigate(next.pane);
+  return 'handled';
 }

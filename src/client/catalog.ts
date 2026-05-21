@@ -1,5 +1,8 @@
-import rawEndpoints from '../spec/public-endpoints.json';
+import rawEndpoints from '../api-catalog/public-endpoints.json';
 import type { EndpointNamespace, PublicEndpointSpec } from '../types/endpoints';
+import { CliUserError } from '../contracts/user-error';
+
+export { isMutatingMethod } from '../http/http';
 
 const endpoints = rawEndpoints as PublicEndpointSpec[];
 const endpointMap = new Map(endpoints.map((endpoint) => [endpoint.key, endpoint]));
@@ -14,13 +17,9 @@ export function listEndpoints(namespace?: EndpointNamespace): PublicEndpointSpec
 export function getEndpoint(key: string): PublicEndpointSpec {
   const endpoint = endpointMap.get(key);
   if (!endpoint) {
-    throw new Error(`Unknown endpoint key: ${key}`);
+    throw new CliUserError({ summary: `Unknown endpoint key: ${key}` });
   }
   return endpoint;
-}
-
-export function hasEndpoint(key: string): boolean {
-  return endpointMap.has(key);
 }
 
 export function listEndpointKeys(): string[] {
