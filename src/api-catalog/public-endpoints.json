@@ -142,8 +142,7 @@
     "notes": [
       "Docs page: https://docs.xyte.io/reference/suspend-incidents",
       "Customer docs PR xyte-io/customer-docs-portal#9 documents POST /core/v1/organization/devices/:device_id/suspend_incidents.",
-      "Server route evidence: xyte-io/server#8769 links devices_controller#suspend_incidents; endpoint takes no request body and returns { \"success\": true }.",
-      "Not yet deployed to production as of 2026-05-20."
+      "Server route evidence: xyte-io/server#8769 links devices_controller#suspend_incidents; endpoint takes no request body and returns { \"success\": true }."
     ]
   },
   {
@@ -166,8 +165,7 @@
     "notes": [
       "Docs page: https://docs.xyte.io/reference/resume-incidents",
       "Customer docs PR xyte-io/customer-docs-portal#9 documents POST /core/v1/organization/devices/:device_id/resume_incidents.",
-      "Server route evidence: xyte-io/server#8769 links devices_controller#resume_incidents; endpoint takes no request body and returns { \"success\": true }.",
-      "Not yet deployed to production as of 2026-05-20."
+      "Server route evidence: xyte-io/server#8769 links devices_controller#resume_incidents; endpoint takes no request body and returns { \"success\": true }."
     ]
   },
   {
