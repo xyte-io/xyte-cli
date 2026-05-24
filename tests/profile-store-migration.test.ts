@@ -7,16 +7,6 @@ import { describe, expect, it } from 'vitest';
 
 import { FileProfileStore } from '../src/secure/profile-store';
 
-interface PersistedProfileFixture {
-  tenants: Array<{
-    apiProvider?: string;
-    keyRegistry: {
-      slots: Array<{ provider: string }>;
-      activeSlotByProvider: Record<string, string>;
-    };
-  }>;
-}
-
 describe('profile store migration', () => {
   it('auto-purges unsupported provider slots and active pointers', async () => {
     const root = mkdtempSync(join(tmpdir(), 'xyte-profile-store-legacy-'));
@@ -56,7 +46,7 @@ describe('profile store migration', () => {
           updatedAt: '2026-02-01T00:00:00.000Z'
         }
       ]
-    };
+    } as any;
     writeFileSync(filePath, `${JSON.stringify(legacyProfile, null, 2)}\n`, 'utf8');
 
     const store = new FileProfileStore(filePath);
@@ -68,7 +58,7 @@ describe('profile store migration', () => {
     expect((tenant.keyRegistry.activeSlotByProvider as Record<string, string>)['xyte-device']).toBeUndefined();
 
     await store.migrateIfNeeded();
-    const persisted = JSON.parse(await readFile(filePath, 'utf8')) as PersistedProfileFixture;
+    const persisted = JSON.parse(await readFile(filePath, 'utf8')) as any;
     const providers = persisted.tenants[0].keyRegistry.slots.map((slot: { provider: string }) => slot.provider);
     expect(providers).toEqual(['xyte-org']);
     expect(persisted.tenants[0].keyRegistry.activeSlotByProvider['xyte-device']).toBeUndefined();
@@ -118,7 +108,7 @@ describe('profile store migration', () => {
     expect(tenant?.apiProvider).toBe('xyte-partner');
 
     await store.migrateIfNeeded();
-    const persisted = JSON.parse(await readFile(filePath, 'utf8')) as PersistedProfileFixture;
+    const persisted = JSON.parse(await readFile(filePath, 'utf8')) as any;
     expect(persisted.tenants[0].apiProvider).toBe('xyte-partner');
   });
 

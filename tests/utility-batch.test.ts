@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { loadInputRows } from '../src/utils/input-parser';
 import { runSpaceImportTree } from '../src/workflows/utility-commands';
 import { runMoveDevices } from '../src/workflows/move-devices';
-import type { XyteCallArgs, XyteClient } from '../src/types/client';
+import type { XyteClient } from '../src/types/client';
 
 function tempPath(filename: string): string {
   const root = mkdtempSync(join(tmpdir(), 'xyte-utility-test-'));
@@ -79,13 +79,12 @@ describe('space import workflow', () => {
       'path,space_type,config\nHQ/Floor-1,building,"{""zone"":""north""}"\n'
     );
 
-    const calls: Array<{ endpointKey: string; args: XyteCallArgs }> = [];
+    const calls: Array<{ endpointKey: string; args: any }> = [];
     const client = {
-      callWithMeta: vi.fn(async (endpointKey: string, args: XyteCallArgs = {}) => {
+      callWithMeta: vi.fn(async (endpointKey: string, args: any) => {
         calls.push({ endpointKey, args });
         if (endpointKey === 'organization.spaces.getSpaces') {
-          const query = args.query as { space_type?: string } | undefined;
-          if (query?.space_type === 'root') {
+          if (args?.query?.space_type === 'root') {
             return {
               status: 200,
               durationMs: 1,
@@ -105,13 +104,12 @@ describe('space import workflow', () => {
           };
         }
         if (endpointKey === 'organization.spaces.findOrCreateSpace') {
-          const body = args.body as { name?: string; parent_id?: number } | undefined;
-          const id = body?.name === 'HQ' ? 101 : 102;
+          const id = args?.body?.name === 'HQ' ? 101 : 102;
           return {
             status: 200,
             durationMs: 1,
             retryCount: 0,
-            data: { id, name: body?.name, parent_id: body?.parent_id },
+            data: { id, name: args?.body?.name, parent_id: args?.body?.parent_id },
             headers: {},
             attempts: 1
           };
@@ -214,14 +212,13 @@ describe('device move workflow', () => {
     );
 
     const client = {
-      callWithMeta: vi.fn(async (endpointKey: string, args: XyteCallArgs = {}) => {
+      callWithMeta: vi.fn(async (endpointKey: string, args: any) => {
         if (endpointKey === 'organization.devices.getDevice') {
-          const path = args.path as { device_id: string };
           return {
             status: 200,
             durationMs: 1,
             retryCount: 0,
-            data: { id: path.device_id, name: 'South-Wing-Display', space_id: 55123 },
+            data: { id: args.path.device_id, name: 'South-Wing-Display', space_id: 55123 },
             headers: {},
             attempts: 1
           };
@@ -300,17 +297,16 @@ describe('device move workflow', () => {
       ['device_id,target_space_id', 'dev-1,99592', 'dev-2,99592'].join('\n') + '\n'
     );
 
-    const moveCalls: XyteCallArgs[] = [];
+    const moveCalls: any[] = [];
     const client = {
-      callWithMeta: vi.fn(async (endpointKey: string, args: XyteCallArgs = {}) => {
+      callWithMeta: vi.fn(async (endpointKey: string, args: any) => {
         if (endpointKey === 'organization.devices.getDevice') {
-          const path = args.path as { device_id: string };
-          const currentSpaceId = path.device_id === 'dev-1' ? 55123 : 99592;
+          const currentSpaceId = args.path.device_id === 'dev-1' ? 55123 : 99592;
           return {
             status: 200,
             durationMs: 1,
             retryCount: 0,
-            data: { id: path.device_id, name: path.device_id, space_id: currentSpaceId },
+            data: { id: args.path.device_id, name: args.path.device_id, space_id: currentSpaceId },
             headers: {},
             attempts: 1
           };
@@ -383,10 +379,9 @@ describe('device move workflow', () => {
     const reportPath = tempPath('device-moves.ndjson');
 
     const client = {
-      callWithMeta: vi.fn(async (endpointKey: string, args: XyteCallArgs = {}) => {
+      callWithMeta: vi.fn(async (endpointKey: string, args: any) => {
         if (endpointKey === 'organization.devices.getDevice') {
-          const path = args.path as { device_id: string };
-          if (path.device_id === 'dev-1') {
+          if (args.path.device_id === 'dev-1') {
             throw new Error('Device dev-1 not found.');
           }
           return {

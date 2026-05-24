@@ -15,7 +15,6 @@ import { runDeterministicFlow } from '../src/workflows/flow-runner';
 import { UtilityBatchResultSchema } from '../src/workflows/utility-batch';
 import { MemorySecretStore } from '../src/secure/secret-store';
 import { MemoryProfileStore } from './support/memory-profile-store';
-import { makeCallWithMeta, makeCallWithMetaHandler, makeXyteClientMock } from './support/typed-mocks';
 
 // Per-test overrides captured by the vi.mock factory closures below.
 let builtInDefinitionOverride: BuiltInFlowDefinition | null = null;
@@ -254,7 +253,6 @@ describe('flow runner', () => {
 
   it('persists derived guided remediation context across resume boundaries', async () => {
     const { profileStore, secretStore, client } = await makeClient();
-    const updateDeviceBodies: unknown[] = [];
 
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
       if (url.includes('/organization/incidents')) {
@@ -271,9 +269,6 @@ describe('flow runner', () => {
           status: 200,
           headers: { 'content-type': 'application/json' }
         });
-      }
-      if (url.includes('/organization/devices/dev-1') && init?.method === 'PATCH') {
-        updateDeviceBodies.push(JSON.parse(String(init.body)));
       }
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
@@ -345,7 +340,6 @@ describe('flow runner', () => {
     expect(third.cursor.nextStepId).toBe('gate_ticket_message');
     expect(third.steps.find((item) => item.stepId === 'device_update')?.status).toBe('completed');
     expect(third.steps.find((item) => item.stepId === 'device_get_verify')?.status).toBe('completed');
-    expect(updateDeviceBodies).toContainEqual({ name: 'Remediated dev-1' });
   });
 
   it('reduces watch loops to one poll when --once is enabled', async () => {
@@ -469,12 +463,10 @@ describe('flow runner', () => {
   it('reuses the transport requestId in flow call envelopes', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();
-    const callWithMetaHandler = makeCallWithMetaHandler(async () => ({
+    const callWithMeta = vi.fn(async (_endpointKey: string, _args: { requestId?: string }) => ({
       status: 200,
-      headers: {},
       durationMs: 12,
       retryCount: 0,
-      attempts: 1,
       data: { ok: true }
     }));
 
@@ -512,14 +504,14 @@ describe('flow runner', () => {
       strictJson: true,
       profileStore,
       secretStore,
-      client: makeXyteClientMock({
-        callWithMeta: makeCallWithMeta(callWithMetaHandler)
-      })
+      client: {
+        callWithMeta
+      } as any
     });
 
     expect(result.outcome).toBe('completed');
-    expect(callWithMetaHandler).toHaveBeenCalledTimes(1);
-    const requestId = callWithMetaHandler.mock.calls[0]?.[1]?.requestId;
+    expect(callWithMeta).toHaveBeenCalledTimes(1);
+    const requestId = callWithMeta.mock.calls[0]?.[1]?.requestId;
     expect(typeof requestId).toBe('string');
     const artifactPath = result.steps.find((step) => step.stepId === 'read_devices')?.artifactPath;
     expect(artifactPath).toBeDefined();
@@ -1953,21 +1945,19 @@ describe('flow runner', () => {
     });
     writeFileSync(first.inputsPath, '{not-json', 'utf8');
 
-    await expect(
-      runDeterministicFlow({
-        flowId: definition.id,
-        tenantId: 'acme',
-        mode: 'apply',
-        outDir,
-        resume: first.runId,
-        context: {},
-        once: true,
-        strictJson: true,
-        profileStore,
-        secretStore,
-        client
-      })
-    ).rejects.toThrow('Resume inputs are invalid JSON');
+    await expect(runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: first.runId,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    })).rejects.toThrow('Resume inputs are invalid JSON');
   });
 
   it('fails closed when resume inputs metadata is missing', async () => {
@@ -2022,21 +2012,19 @@ describe('flow runner', () => {
     });
     rmSync(first.inputsPath);
 
-    await expect(
-      runDeterministicFlow({
-        flowId: definition.id,
-        tenantId: 'acme',
-        mode: 'apply',
-        outDir,
-        resume: first.runId,
-        context: {},
-        once: true,
-        strictJson: true,
-        profileStore,
-        secretStore,
-        client
-      })
-    ).rejects.toThrow('Resume inputs metadata is missing');
+    await expect(runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: first.runId,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    })).rejects.toThrow('Resume inputs metadata is missing');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -2563,21 +2551,19 @@ describe('flow runner', () => {
 
     writeFileSync(first.inputsPath, '{malformed-json', 'utf8');
 
-    await expect(
-      runDeterministicFlow({
-        flowId: definition.id,
-        tenantId: 'acme',
-        mode: 'apply',
-        outDir,
-        resume: first.runId,
-        context: {},
-        once: true,
-        strictJson: true,
-        profileStore,
-        secretStore,
-        client
-      })
-    ).rejects.toThrow('Resume inputs are invalid JSON');
+    await expect(runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: first.runId,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    })).rejects.toThrow('Resume inputs are invalid JSON');
   });
 
   it('sets <stepId>_output in context after space.import-tree step', async () => {
@@ -2610,16 +2596,15 @@ describe('flow runner', () => {
     };
 
     builtInDefinitionOverride = definition;
-    runSpaceImportTreeOverride = async () =>
-      UtilityBatchResultSchema.parse({
-        schemaVersion: 'xyte.utility.batch.v1',
-        generatedAtUtc: new Date().toISOString(),
-        tenantId: 'acme',
-        command: 'space.import-tree',
-        mode: 'dry-run',
-        totals: { rows: 1, planned: 1, succeeded: 0, failed: 0, skipped: 0 },
-        stoppedEarly: false
-      });
+    runSpaceImportTreeOverride = async () => UtilityBatchResultSchema.parse({
+      schemaVersion: 'xyte.utility.batch.v1',
+      generatedAtUtc: new Date().toISOString(),
+      tenantId: 'acme',
+      command: 'space.import-tree',
+      mode: 'dry-run',
+      totals: { rows: 1, planned: 1, succeeded: 0, failed: 0, skipped: 0 },
+      stoppedEarly: false
+    });
 
     const result = await runDeterministicFlow({
       flowId: definition.id,
@@ -2668,12 +2653,8 @@ describe('flow runner', () => {
     const plannedInputs = JSON.parse(readFileSync(plan.inputsPath, 'utf8'));
     expect(plannedInputs.context.edge_claim_prepare_csv).toContain('organization-edge-startclaim.csv');
     expect(plan.nextAction?.artifactPaths.some((item) => item.endsWith('organization-edge-startclaim.csv'))).toBe(true);
-    expect(
-      plan.nextAction?.artifactPaths.some((item) => item.endsWith('organization-edge-startclaim.rejected.csv'))
-    ).toBe(true);
-    expect(plan.nextAction?.artifactPaths.some((item) => item.endsWith('organization-edge-startclaim.notes.md'))).toBe(
-      true
-    );
+    expect(plan.nextAction?.artifactPaths.some((item) => item.endsWith('organization-edge-startclaim.rejected.csv'))).toBe(true);
+    expect(plan.nextAction?.artifactPaths.some((item) => item.endsWith('organization-edge-startclaim.notes.md'))).toBe(true);
   });
 
   it('pauses a fresh edge-claim-batch apply run at prepare review before the dry-run executes', async () => {

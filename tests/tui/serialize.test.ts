@@ -4,7 +4,7 @@ import { safeInspect, safePreviewLines, safeSearchText } from '../../src/tui/ser
 
 describe('safe serializer', () => {
   it('handles circular structures without throwing', () => {
-    const value: Record<string, unknown> = { id: 'a' };
+    const value: any = { id: 'a' };
     value.self = value;
 
     const inspected = safeInspect(value);
@@ -12,11 +12,11 @@ describe('safe serializer', () => {
   });
 
   it('truncates deep and large payloads deterministically', () => {
-    const deep: Record<string, unknown> = { level: 0 };
+    const deep: any = { level: 0 };
     let cursor = deep;
     for (let index = 1; index <= 20; index += 1) {
       cursor.next = { level: index };
-      cursor = cursor.next as Record<string, unknown>;
+      cursor = cursor.next;
     }
     deep.items = Array.from({ length: 300 }, (_, index) => ({ index, value: `value-${index}` }));
 
@@ -27,7 +27,7 @@ describe('safe serializer', () => {
   });
 
   it('produces safe lowercase search text for cyclic payloads', () => {
-    const value: Record<string, unknown> = { name: 'Panel-Alpha' };
+    const value: any = { name: 'Panel-Alpha' };
     value.loop = value;
 
     const text = safeSearchText(value);

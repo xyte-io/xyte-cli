@@ -8,21 +8,6 @@ import { MemorySecretStore } from '../src/secure/secret-store';
 import { MemoryProfileStore } from './support/memory-profile-store';
 import { buildDeepDive } from '../src/workflows/fleet-insights';
 
-type ActionItem = { actionKey: string };
-type CliSection = { title: string };
-type ConnectivityStep = { key: string; status: string };
-type FlowStep = {
-  stepId: string;
-  status: string;
-  error?: { detail?: string };
-  artifactPath?: string;
-};
-type FlowListItem = {
-  id: string;
-  requiredContext?: string[];
-  safeFirstCommand?: string;
-};
-
 function nodeEvalCommand(script: string): string {
   return `"${process.execPath}" -e ${JSON.stringify(script)}`;
 }
@@ -543,13 +528,13 @@ describe('cli integration', () => {
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     const parsed = JSON.parse(output);
     expect(Array.isArray(parsed)).toBe(true);
-    expect(parsed.some((item: ActionItem) => item.actionKey === 'device.move')).toBe(true);
-    expect(parsed.some((item: ActionItem) => item.actionKey === 'organization.connectors.prepareSetup')).toBe(true);
-    expect(parsed.some((item: ActionItem) => item.actionKey === 'organization.teamAccess.groups')).toBe(true);
-    expect(parsed.some((item: ActionItem) => item.actionKey === 'organization.teamAccess.users')).toBe(true);
-    expect(parsed.some((item: ActionItem) => item.actionKey === 'organization.teamAccess.memberships')).toBe(true);
-    expect(parsed.some((item: ActionItem) => item.actionKey === 'organization.devices.claimDevice')).toBe(true);
-    expect(parsed.some((item: ActionItem) => item.actionKey === 'space.import-tree')).toBe(true);
+    expect(parsed.some((item: any) => item.actionKey === 'device.move')).toBe(true);
+    expect(parsed.some((item: any) => item.actionKey === 'organization.connectors.prepareSetup')).toBe(true);
+    expect(parsed.some((item: any) => item.actionKey === 'organization.teamAccess.groups')).toBe(true);
+    expect(parsed.some((item: any) => item.actionKey === 'organization.teamAccess.users')).toBe(true);
+    expect(parsed.some((item: any) => item.actionKey === 'organization.teamAccess.memberships')).toBe(true);
+    expect(parsed.some((item: any) => item.actionKey === 'organization.devices.claimDevice')).toBe(true);
+    expect(parsed.some((item: any) => item.actionKey === 'space.import-tree')).toBe(true);
     expect(parsed[0].mode).toBe('friendly');
 
     stdout.write.mockClear();
@@ -566,7 +551,7 @@ describe('cli integration', () => {
       'edge.claim-batch'
     ]);
     const filtered = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
-    expect(filtered.map((item: ActionItem) => item.actionKey)).toEqual(['organization.edge.startClaim']);
+    expect(filtered.map((item: any) => item.actionKey)).toEqual(['organization.edge.startClaim']);
 
     stdout.write.mockClear();
     await program.parseAsync(['node', 'xyte-cli', 'util', 'list-actions', '--format', 'text', '--mode', 'friendly']);
@@ -588,7 +573,7 @@ describe('cli integration', () => {
       'prepare-only'
     ]);
     const prepareOnly = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
-    expect(prepareOnly.map((item: ActionItem) => item.actionKey)).toEqual([
+    expect(prepareOnly.map((item: any) => item.actionKey)).toEqual([
       'organization.connectors.prepareSetup',
       'organization.teamAccess.groups',
       'organization.teamAccess.memberships',
@@ -865,7 +850,7 @@ describe('cli integration', () => {
     const parsed = JSON.parse(output);
     expect(parsed.schemaVersion).toBe('xyte.root.launcher.v1');
     expect(parsed.configured).toBe(false);
-    expect(parsed.sections.map((section: CliSection) => section.title)).toEqual([
+    expect(parsed.sections.map((section: any) => section.title)).toEqual([
       'Setup',
       'Everyday Ops',
       'Raw API',
@@ -3618,7 +3603,7 @@ describe('cli integration', () => {
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     const parsed = JSON.parse(output);
     expect(parsed.connectivityMode).toBe('never');
-    const step = parsed.steps.find((item: ConnectivityStep) => item.key === 'connectivity_checked');
+    const step = parsed.steps.find((item: any) => item.key === 'connectivity_checked');
     expect(step.status).toBe('skipped');
     expect(parsed.readiness.connectionState).toBe('not_checked');
     expect(fetchMock).not.toHaveBeenCalled();
@@ -3691,7 +3676,7 @@ describe('cli integration', () => {
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     const parsed = JSON.parse(output);
     expect(parsed.connectivityMode).toBe('always');
-    const step = parsed.steps.find((item: ConnectivityStep) => item.key === 'connectivity_checked');
+    const step = parsed.steps.find((item: any) => item.key === 'connectivity_checked');
     expect(step.status).toBe('ok');
     expect(parsed.readiness.connectionState).toBe('connected');
   });
@@ -4100,7 +4085,7 @@ describe('cli integration', () => {
       stdout,
       stderr,
       upgradeDependencies: {
-        fetchImpl: fetchImpl as typeof fetch,
+        fetchImpl: fetchImpl as any,
         commandRunner,
         installSkillsImpl,
         getCurrentVersion: () => '0.4.0'
@@ -4206,13 +4191,13 @@ describe('cli integration', () => {
     expect(parsed.schemaVersion).toBe('xyte.flow.run.v1');
     expect(parsed.mode).toBe('plan');
     expect(parsed.outcome).toBe('completed');
-    expect(parsed.steps.map((item: FlowStep) => item.stepId)).toEqual([
+    expect(parsed.steps.map((item: any) => item.stepId)).toEqual([
       'setup_status',
       'config_doctor',
       'status_fast',
       'inspect_fleet_setup'
     ]);
-    expect(parsed.steps.every((item: FlowStep) => item.status === 'completed')).toBe(true);
+    expect(parsed.steps.every((item: any) => item.status === 'completed')).toBe(true);
     expect(parsed.cursor.nextStepIndex).toBe(parsed.steps.length);
     expect(parsed.resumeCommand).toBeUndefined();
     expect(existsSync(parsed.manifestPath)).toBe(true);
@@ -4296,9 +4281,9 @@ describe('cli integration', () => {
     const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
     expect(parsed.outcome).toBe('pending_gate');
     expect(parsed.resumeCommand).toContain('--inspect-provider-scope partner');
-    expect(parsed.steps.find((item: FlowStep) => item.stepId === 'inspect_deep_dive_daily')?.status).toBe('completed');
-    expect(parsed.steps.find((item: FlowStep) => item.stepId === 'report_daily')?.status).toBe('completed');
-    expect(parsed.steps.find((item: FlowStep) => item.stepId === 'inspect_fleet_daily')?.status).toBe('completed');
+    expect(parsed.steps.find((item: any) => item.stepId === 'inspect_deep_dive_daily')?.status).toBe('completed');
+    expect(parsed.steps.find((item: any) => item.stepId === 'report_daily')?.status).toBe('completed');
+    expect(parsed.steps.find((item: any) => item.stepId === 'inspect_fleet_daily')?.status).toBe('completed');
     expect(parsed.classifications.needs_data).toBe(0);
     expect(parsed.classifications.bug).toBe(0);
     const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
@@ -4362,8 +4347,8 @@ describe('cli integration', () => {
     });
     expect(parsed.nextAction.command).toBe(parsed.resumeCommand);
     expect(parsed.nextAction.artifactPaths.length).toBeGreaterThan(0);
-    expect(parsed.steps.find((item: FlowStep) => item.stepId === 'match_devices')?.status).toBe('completed');
-    expect(parsed.steps.find((item: FlowStep) => item.stepId === 'pre_migration_report')?.status).toBe('completed');
+    expect(parsed.steps.find((item: any) => item.stepId === 'match_devices')?.status).toBe('completed');
+    expect(parsed.steps.find((item: any) => item.stepId === 'pre_migration_report')?.status).toBe('completed');
   });
 
   it('lists flows with required context and safe first commands', async () => {
@@ -4375,7 +4360,7 @@ describe('cli integration', () => {
 
     await program.parseAsync(['node', 'xyte-cli', 'flow', 'list', '--format', 'json']);
     const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
-    const migration = parsed.builtIn.find((item: FlowListItem) => item.id === 'flow.device-migration');
+    const migration = parsed.builtIn.find((item: any) => item.id === 'flow.device-migration');
     expect(migration.requiredContext).toEqual(['source_space_id', 'target_path_includes']);
     expect(migration.safeFirstCommand).toBe('xyte-cli flow run flow.device-migration --tenant <tenant-id> --plan');
 
@@ -4395,7 +4380,7 @@ describe('cli integration', () => {
     stdout.write.mockClear();
     await program.parseAsync(['node', 'xyte-cli', '--output', 'text', 'flow', 'list', '--format', 'json']);
     const explicitLocalJson = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
-    expect(explicitLocalJson.builtIn.some((item: FlowListItem) => item.id === 'flow.device-migration')).toBe(true);
+    expect(explicitLocalJson.builtIn.some((item: any) => item.id === 'flow.device-migration')).toBe(true);
   });
 
   it('skips custom flows with stale basedOn values in flow list', async () => {
@@ -4489,7 +4474,7 @@ describe('cli integration', () => {
     expect(parsed.outcome).toBe('needs_input');
     expect(parsed.classifications.needs_data).toBe(1);
     expect(parsed.classifications.bug).toBe(0);
-    const inspectStep = parsed.steps.find((item: FlowStep) => item.stepId === 'inspect_deep_dive_daily');
+    const inspectStep = parsed.steps.find((item: any) => item.stepId === 'inspect_deep_dive_daily');
     expect(inspectStep?.status).toBe('failed');
     expect(String(inspectStep?.error?.detail ?? '')).toContain(
       'both organization and partner credentials are configured'
@@ -4561,9 +4546,9 @@ describe('cli integration', () => {
     expect(parsed.outcome).toBe('pending_gate');
     expect(parsed.classifications.needs_data).toBe(0);
     expect(parsed.classifications.bug).toBe(0);
-    expect(parsed.steps.find((item: FlowStep) => item.stepId === 'inspect_deep_dive_daily')?.status).toBe('completed');
-    expect(parsed.steps.find((item: FlowStep) => item.stepId === 'report_daily')?.status).toBe('completed');
-    expect(parsed.steps.find((item: FlowStep) => item.stepId === 'inspect_fleet_daily')?.status).toBe('completed');
+    expect(parsed.steps.find((item: any) => item.stepId === 'inspect_deep_dive_daily')?.status).toBe('completed');
+    expect(parsed.steps.find((item: any) => item.stepId === 'report_daily')?.status).toBe('completed');
+    expect(parsed.steps.find((item: any) => item.stepId === 'inspect_fleet_daily')?.status).toBe('completed');
   });
 
   it('stops write-capable flow at gate in --plan and advances one gate in --apply --resume', async () => {
@@ -4652,7 +4637,7 @@ describe('cli integration', () => {
     const second = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
     expect(second.outcome).toBe('pending_gate');
     expect(second.nextResumeStepId).toBe('gate_update_device');
-    const secondStepStatus = new Map<string, string>(second.steps.map((item: FlowStep) => [item.stepId, item.status]));
+    const secondStepStatus = new Map<string, string>(second.steps.map((item: any) => [item.stepId, item.status]));
     expect(secondStepStatus.get('gate_send_command')).toBe('gate_approved');
     expect(secondStepStatus.get('commands_send')).toBe('completed');
 
@@ -4678,7 +4663,7 @@ describe('cli integration', () => {
     const third = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
     expect(third.outcome).toBe('pending_gate');
     expect(third.nextResumeStepId).toBe('gate_ticket_message');
-    const thirdStepStatus = new Map<string, string>(third.steps.map((item: FlowStep) => [item.stepId, item.status]));
+    const thirdStepStatus = new Map<string, string>(third.steps.map((item: any) => [item.stepId, item.status]));
     expect(thirdStepStatus.get('watch_before')).toBe('completed');
     expect(thirdStepStatus.get('commands_get')).toBe('completed');
     expect(thirdStepStatus.get('gate_send_command')).toBe('gate_approved');
@@ -4834,7 +4819,7 @@ describe('cli integration', () => {
       stdout.write.mockClear();
       await program.parseAsync(['node', 'xyte-cli', 'flow', 'list']);
       const listed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
-      expect(listed.custom.some((item: FlowListItem) => item.id === 'flow.custom-daily')).toBe(true);
+      expect(listed.custom.some((item: any) => item.id === 'flow.custom-daily')).toBe(true);
 
       stdout.write.mockClear();
       await program.parseAsync([
@@ -4876,14 +4861,14 @@ describe('cli integration', () => {
       const runOutput = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
       expect(runOutput.resolvedFlowId).toBe('flow.daily-deep-dive-report');
       expect(runOutput.outcome).toBe('pending_gate');
-      const runStepStatus = new Map<string, string>(runOutput.steps.map((item: FlowStep) => [item.stepId, item.status]));
+      const runStepStatus = new Map<string, string>(runOutput.steps.map((item: any) => [item.stepId, item.status]));
       expect(runStepStatus.get('setup_status_daily')).toBe('completed');
       expect(runStepStatus.get('inspect_deep_dive_daily')).toBe('completed');
       expect(runStepStatus.get('report_daily')).toBe('completed');
       expect(runStepStatus.get('inspect_fleet_daily')).toBe('completed');
       expect(runStepStatus.get('decision_distribute_or_escalate')).toBe('gate_pending');
 
-      const deepDiveStep = runOutput.steps.find((item: FlowStep) => item.stepId === 'inspect_deep_dive_daily');
+      const deepDiveStep = runOutput.steps.find((item: any) => item.stepId === 'inspect_deep_dive_daily');
       expect(typeof deepDiveStep?.artifactPath).toBe('string');
       const deepDiveArtifact = JSON.parse(readFileSync(deepDiveStep.artifactPath, 'utf8'));
       expect(deepDiveArtifact.windowHours).toBe(12);

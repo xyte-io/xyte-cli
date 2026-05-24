@@ -2,10 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createInputController } from '../../src/tui/input-controller';
 
-type KeyArg = Parameters<ReturnType<typeof createInputController>['dispatch']>[0]['key'];
-
-function key(full: string): KeyArg {
-  return { name: full, full } as KeyArg;
+function key(full: string) {
+  return { name: full, full } as any;
 }
 
 describe('tui input controller', () => {
@@ -90,7 +88,7 @@ describe('tui input controller', () => {
 
     const result = controller.dispatch({
       ch: undefined,
-      key: { name: 'q', full: 'q' } as KeyArg,
+      key: { name: 'q', full: 'q' } as any,
       timestamp: Date.now()
     });
 

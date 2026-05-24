@@ -1,14 +1,6 @@
+import type blessed from 'blessed';
+
 import type { TuiArrowHandleResult, TuiArrowKey, TuiPaneId } from './types';
-
-export interface ListTableLike {
-  selected?: number;
-  select(index: number): void;
-  setData?(rows: string[][]): void;
-}
-
-export interface ScrollBoxLike {
-  scroll?(amount: number): void;
-}
 
 export interface SelectionSyncState {
   syncing: boolean;
@@ -38,7 +30,7 @@ function withSelectionSyncGuard(state: SelectionSyncState | undefined, fn: () =>
 }
 
 export function setListTableData(
-  list: ListTableLike | undefined,
+  list: blessed.Widgets.ListTableElement | undefined,
   rows: Array<Array<string | number>>,
   state?: SelectionSyncState
 ): void {
@@ -46,12 +38,12 @@ export function setListTableData(
     return;
   }
   withSelectionSyncGuard(state, () => {
-    list.setData?.(rows.map((row) => row.map(String)));
+    list.setData(rows as unknown as string[][]);
   });
 }
 
 export function syncListSelection(
-  list: ListTableLike | undefined,
+  list: blessed.Widgets.ListTableElement | undefined,
   rowIndex: number,
   state: SelectionSyncState
 ): void {
@@ -63,7 +55,7 @@ export function syncListSelection(
   }
 
   const target = Math.max(0, rowIndex) + 1;
-  const currentSelected = list.selected;
+  const currentSelected = (list as unknown as { selected?: number }).selected;
   if (currentSelected === target) {
     return;
   }
@@ -131,7 +123,7 @@ export function movePaneWithBoundary(
 }
 
 export function moveTableSelection(args: {
-  table?: ListTableLike;
+  table?: blessed.Widgets.ListTableElement;
   index: number;
   delta: number;
   totalRows: number;
@@ -150,11 +142,11 @@ export function moveTableSelection(args: {
   return next;
 }
 
-export function scrollBox(box: ScrollBoxLike | undefined, delta: number): void {
+export function scrollBox(box: blessed.Widgets.BoxElement | undefined, delta: number): void {
   if (!box || delta === 0) {
     return;
   }
-  const scroll = box.scroll;
+  const scroll = (box as unknown as { scroll?: (amount: number) => void }).scroll;
   if (typeof scroll !== 'function') {
     return;
   }

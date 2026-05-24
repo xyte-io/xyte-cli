@@ -21,7 +21,6 @@ import { generateOpsReport } from '../src/workflows/ops-report';
 import { runHeadlessRenderer } from '../src/tui/headless-renderer';
 import { MemorySecretStore } from '../src/secure/secret-store';
 import { MemoryProfileStore } from './support/memory-profile-store';
-import { makeXyteClientMock } from './support/typed-mocks';
 
 const ajv = new Ajv2020({ strict: false });
 const validateCallEnvelope = ajv.compile(callEnvelopeSchema);
@@ -205,7 +204,7 @@ describe('schema contracts', () => {
       }
     };
 
-    const client = makeXyteClientMock({
+    const client: any = {
       organization: {
         getDevices: async () => [{ id: 'dev-1', name: 'Device One', status: 'online' }],
         getIncidents: async () => [{ id: 'inc-1', severity: 'high', status: 'open' }],
@@ -217,7 +216,7 @@ describe('schema contracts', () => {
         getDevices: async () => [],
         getTickets: async () => []
       }
-    });
+    };
 
     await runHeadlessRenderer({
       client,

@@ -221,7 +221,7 @@ describe('cli action logging', () => {
       '--format',
       'json'
     ]);
-    const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    let parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
     expect(parsed.entry.event).toBe('api.call.complete');
 
     stdout.write.mockClear();

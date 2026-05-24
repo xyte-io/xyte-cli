@@ -18,7 +18,7 @@ class MockList extends EventEmitter {
     this.emit('select item', {}, index);
   }
 
-  setData(_rows: string[][]): void {
+  setData(_rows: unknown[]): void {
     this.select(1);
   }
 }
@@ -41,10 +41,10 @@ describe('selection sync guard', () => {
       if (shouldIgnoreSelectEvent(state)) {
         return;
       }
-      syncListSelection(list, Math.max(0, index - 1), state);
+      syncListSelection(list as any, Math.max(0, index - 1), state);
     });
 
-    syncListSelection(list, 0, state);
+    syncListSelection(list as any, 0, state);
 
     expect(selectEvents).toBe(1);
     expect(list.selected).toBe(1);
@@ -63,11 +63,11 @@ describe('selection sync guard', () => {
       if (shouldIgnoreSelectEvent(state)) {
         return;
       }
-      syncListSelection(list, list.selected - 1, state);
+      syncListSelection(list as any, list.selected - 1, state);
     });
 
     const nextIndex = moveTableSelection({
-      table: list,
+      table: list as any,
       index: 0,
       delta: 1,
       totalRows: 5,
@@ -93,7 +93,7 @@ describe('selection sync guard', () => {
       handledEvents += 1;
     });
 
-    setListTableData(list, [['ID'], ['1']], state);
+    setListTableData(list as any, [['ID'], ['1']], state);
 
     expect(ignoredEvents).toBe(1);
     expect(handledEvents).toBe(0);

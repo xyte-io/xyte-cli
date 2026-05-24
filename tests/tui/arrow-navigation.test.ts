@@ -39,7 +39,7 @@ describe('pane-focus arrow navigation', () => {
       };
       let index = 2;
       index = moveTableSelection({
-        table: list,
+        table: list as any,
         index,
         delta: 1,
         totalRows: 10
@@ -48,7 +48,7 @@ describe('pane-focus arrow navigation', () => {
       expect(list.selected, `${screenId} list select index should match +1 header offset`).toBe(4);
 
       index = moveTableSelection({
-        table: list,
+        table: list as any,
         index,
         delta: -1,
         totalRows: 10
@@ -68,6 +68,6 @@ describe('pane-focus arrow navigation', () => {
   });
 
   it('does not throw when scrolling non-scrollable box widgets', () => {
-    expect(() => scrollBox({}, 1)).not.toThrow();
+    expect(() => scrollBox({} as any, 1)).not.toThrow();
   });
 });

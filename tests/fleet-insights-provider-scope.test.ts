@@ -2,9 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { buildDeepDive, collectFleetSnapshot } from '../src/workflows/fleet-insights';
 import type { XyteClient } from '../src/types/client';
-import type { PublicEndpointSpec } from '../src/types/endpoints';
 import type { InspectProviderScope } from '../src/types/settings-enums';
-import { makeEndpointSpec, makeXyteClientMock } from './support/typed-mocks';
 
 type FixtureOptions = {
   hasOrganization: boolean;
@@ -59,22 +57,26 @@ function makeFixture(options: FixtureOptions): Fixture {
       throw options.listTenantEndpointsError;
     }
 
-    const endpoints: PublicEndpointSpec[] = [];
+    const endpoints: Array<{ authScope: 'organization' | 'partner' }> = [];
     if (options.hasOrganization) {
-      endpoints.push(makeEndpointSpec({ authScope: 'organization' }));
+      endpoints.push({ authScope: 'organization' });
     }
     if (options.hasPartner) {
-      endpoints.push(makeEndpointSpec({ authScope: 'partner' }));
+      endpoints.push({ authScope: 'partner' });
     }
-    return endpoints;
+    return endpoints as any;
   });
 
   return {
-    client: makeXyteClientMock({
-      organization,
-      partner,
+    client: {
+      organization: organization as any,
+      partner: partner as any,
+      call: vi.fn(),
+      callWithMeta: vi.fn(),
+      describeEndpoint: vi.fn(),
+      listEndpoints: vi.fn(),
       listTenantEndpoints
-    }),
+    },
     listTenantEndpoints,
     organization,
     partner
@@ -224,7 +226,7 @@ describe('fleet insights provider scope', () => {
 
   it('partner enrichment samples at most 25 devices and does not call multi-device history endpoint', async () => {
     const fixture = makeFixture({ hasOrganization: false, hasPartner: true });
-    fixture.partner.getDevices.mockImplementation(async ({ query }: { query?: { page?: number } } = {}) => {
+    fixture.partner.getDevices.mockImplementation(async ({ query }: any = {}) => {
       const page = Number(query?.page ?? 1);
       if (page > 1) {
         return { items: [] };
@@ -283,7 +285,7 @@ describe('fleet insights provider scope', () => {
 
   it('caps partner enrichment call concurrency at 5 devices', async () => {
     const fixture = makeFixture({ hasOrganization: false, hasPartner: true });
-    fixture.partner.getDevices.mockImplementation(async ({ query }: { query?: { page?: number } } = {}) => {
+    fixture.partner.getDevices.mockImplementation(async ({ query }: any = {}) => {
       const page = Number(query?.page ?? 1);
       if (page > 1) {
         return { items: [] };

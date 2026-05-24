@@ -7,7 +7,6 @@ import { SCREEN_PANE_CONFIG } from '../../src/tui/panes';
 import type { TuiScreenId } from '../../src/tui/types';
 import { MemoryProfileStore } from '../support/memory-profile-store';
 import { HEADLESS_FRAME_SCHEMA_VERSION } from '../../src/contracts/versions';
-import { makeXyteClientMock } from '../support/typed-mocks';
 
 function parseRuntimeFrame(chunks: string[]): (HeadlessFrame & { meta?: Record<string, unknown> }) | undefined {
   const parsed = chunks
@@ -25,6 +24,7 @@ async function makeReadyProfile() {
   await profileStore.upsertTenant({ id: 'acme', apiProvider: 'xyte-org' });
   await profileStore.setActiveTenant('acme');
   const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+    
     name: 'primary',
     fingerprint: 'sha256:test'
   });
@@ -45,7 +45,7 @@ describe('headless renderer', () => {
       }
     };
 
-    const client = makeXyteClientMock({
+    const client: any = {
       organization: {
         getDevices: async () => [{ id: 'dev-1', name: 'Device One', status: 'online' }],
         getIncidents: async () => [{ id: 'inc-1', severity: 'high', status: 'open' }],
@@ -57,7 +57,7 @@ describe('headless renderer', () => {
         getDevices: async () => [],
         getTickets: async () => []
       }
-    });
+    };
 
     await runHeadlessRenderer({
       client,
@@ -79,14 +79,14 @@ describe('headless renderer', () => {
     expect(runtimeFrame?.motionEnabled).toBe(false);
     expect(Array.isArray(runtimeFrame?.panels)).toBe(true);
     expect(runtimeFrame?.panels.length).toBeGreaterThan(0);
-    expect(runtimeFrame?.meta?.inputState).toBe('idle');
-    expect(runtimeFrame?.meta?.queueDepth).toBe(0);
-    expect(runtimeFrame?.meta?.droppedEvents).toBe(0);
-    expect(runtimeFrame?.meta?.transitionState).toBe('idle');
-    expect(runtimeFrame?.meta?.navigationMode).toBe('pane-focus');
-    expect(runtimeFrame?.meta?.refreshState).toBeDefined();
-    expect(runtimeFrame?.meta?.tabId).toBe('spaces');
-    expect(runtimeFrame?.meta?.tabOrder).toEqual([
+    expect((runtimeFrame?.meta as any)?.inputState).toBe('idle');
+    expect((runtimeFrame?.meta as any)?.queueDepth).toBe(0);
+    expect((runtimeFrame?.meta as any)?.droppedEvents).toBe(0);
+    expect((runtimeFrame?.meta as any)?.transitionState).toBe('idle');
+    expect((runtimeFrame?.meta as any)?.navigationMode).toBe('pane-focus');
+    expect((runtimeFrame?.meta as any)?.refreshState).toBeDefined();
+    expect((runtimeFrame?.meta as any)?.tabId).toBe('spaces');
+    expect((runtimeFrame?.meta as any)?.tabOrder).toEqual([
       'setup',
       'config',
       'dashboard',
@@ -95,13 +95,13 @@ describe('headless renderer', () => {
       'incidents',
       'tickets'
     ]);
-    expect(runtimeFrame?.meta?.tabNavBoundary).toBeNull();
-    expect(runtimeFrame?.meta?.renderSafety).toBeDefined();
-    expect(runtimeFrame?.meta?.tableFormat).toBe('compact-v1');
-    expect(runtimeFrame?.meta?.contract?.frameVersion).toBe(HEADLESS_FRAME_SCHEMA_VERSION);
-    expect(runtimeFrame?.meta?.actionsHint).toContain('interactive-only');
-    expect(runtimeFrame?.meta?.headlessWrite).toBe(false);
-    expect(runtimeFrame?.meta?.writePolicy).toBe('organization-only');
+    expect((runtimeFrame?.meta as any)?.tabNavBoundary).toBeNull();
+    expect((runtimeFrame?.meta as any)?.renderSafety).toBeDefined();
+    expect((runtimeFrame?.meta as any)?.tableFormat).toBe('compact-v1');
+    expect((runtimeFrame?.meta as any)?.contract?.frameVersion).toBe(HEADLESS_FRAME_SCHEMA_VERSION);
+    expect((runtimeFrame?.meta as any)?.actionsHint).toContain('interactive-only');
+    expect((runtimeFrame?.meta as any)?.headlessWrite).toBe(false);
+    expect((runtimeFrame?.meta as any)?.writePolicy).toBe('organization-only');
   });
 
   it('renders text frames with logo and panel sections', () => {
@@ -148,7 +148,7 @@ describe('headless renderer', () => {
       }
     };
 
-    const client = makeXyteClientMock({
+    const client: any = {
       organization: {
         getDevices: async () => [],
         getIncidents: async () => [],
@@ -160,7 +160,7 @@ describe('headless renderer', () => {
         getDevices: async () => [],
         getTickets: async () => []
       }
-    });
+    };
 
     await expect(
       runHeadlessRenderer({
@@ -190,7 +190,7 @@ describe('headless renderer', () => {
       }
     };
 
-    const client = makeXyteClientMock({
+    const client: any = {
       organization: {
         getOrganizationInfo: async () => ({ ok: true }),
         getDevices: async () => [],
@@ -203,7 +203,7 @@ describe('headless renderer', () => {
         getDevices: async () => [],
         getTickets: async () => []
       }
-    });
+    };
 
     await runHeadlessRenderer({
       client,
@@ -219,14 +219,14 @@ describe('headless renderer', () => {
     const runtimeFrame = parseRuntimeFrame(chunks);
 
     expect(runtimeFrame?.screen).toBe('setup');
-    expect(runtimeFrame?.meta?.redirectedFrom).toBe('dashboard');
+    expect((runtimeFrame?.meta as any)?.redirectedFrom).toBe('dashboard');
   });
 
   it('emits pane metadata for every screen in one-shot mode', async () => {
     const { profileStore, secretStore } = await makeReadyProfile();
     const screens: TuiScreenId[] = ['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets'];
 
-    const client = makeXyteClientMock({
+    const client: any = {
       organization: {
         getOrganizationInfo: async () => ({ ok: true }),
         getDevices: async () => [{ id: 'dev-1', name: 'Device One', status: 'online', space_id: 'sp-1' }],
@@ -239,7 +239,7 @@ describe('headless renderer', () => {
         getDevices: async () => [],
         getTickets: async () => []
       }
-    });
+    };
 
     for (const screen of screens) {
       const chunks: string[] = [];
@@ -265,11 +265,11 @@ describe('headless renderer', () => {
       expect(runtimeFrame).toBeDefined();
       expect(runtimeFrame?.schemaVersion).toBe(HEADLESS_FRAME_SCHEMA_VERSION);
       expect(runtimeFrame?.screen).toBe(screen);
-      expect(runtimeFrame?.meta?.navigationMode).toBe('pane-focus');
-      expect(runtimeFrame?.meta?.activePane).toBe(SCREEN_PANE_CONFIG[screen].defaultPane);
-      expect(runtimeFrame?.meta?.availablePanes).toEqual(SCREEN_PANE_CONFIG[screen].panes);
-      expect(runtimeFrame?.meta?.tabId).toBe(screen);
-      expect(runtimeFrame?.meta?.tabOrder).toEqual([
+      expect((runtimeFrame?.meta as any)?.navigationMode).toBe('pane-focus');
+      expect((runtimeFrame?.meta as any)?.activePane).toBe(SCREEN_PANE_CONFIG[screen].defaultPane);
+      expect((runtimeFrame?.meta as any)?.availablePanes).toEqual(SCREEN_PANE_CONFIG[screen].panes);
+      expect((runtimeFrame?.meta as any)?.tabId).toBe(screen);
+      expect((runtimeFrame?.meta as any)?.tabOrder).toEqual([
         'setup',
         'config',
         'dashboard',
@@ -278,9 +278,9 @@ describe('headless renderer', () => {
         'incidents',
         'tickets'
       ]);
-      expect(runtimeFrame?.meta?.renderSafety).toBeDefined();
-      expect(runtimeFrame?.meta?.tableFormat).toBe('compact-v1');
-      expect(runtimeFrame?.meta?.headlessWrite).toBe(false);
+      expect((runtimeFrame?.meta as any)?.renderSafety).toBeDefined();
+      expect((runtimeFrame?.meta as any)?.tableFormat).toBe('compact-v1');
+      expect((runtimeFrame?.meta as any)?.headlessWrite).toBe(false);
     }
   });
 });

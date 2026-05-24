@@ -113,7 +113,6 @@ export class ScreenRuntime {
       this.options.onError?.(error);
       this.emitStatus();
     } finally {
-      let startedQueuedRefresh = false;
       if (expectedMountToken === this.mountToken && token === this.refreshToken) {
         this.refreshInFlight = false;
         if (this.refreshQueued) {
@@ -121,12 +120,10 @@ export class ScreenRuntime {
           this.state = 'retrying';
           this.emitStatus();
           void this.execute(expectedMountToken);
-          startedQueuedRefresh = true;
+          return;
         }
       }
-      if (!startedQueuedRefresh) {
-        this.emitStatus();
-      }
+      this.emitStatus();
     }
   }
 

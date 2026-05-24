@@ -4,7 +4,6 @@ import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import pino from 'pino';
 import { describe, expect, it, vi } from 'vitest';
 
 async function loadSecretStoreModule() {
@@ -100,20 +99,18 @@ describe('secret store backends', () => {
     writeError.code = 'EROFS';
     const writeFileSpy = vi.spyOn(nodeFs.promises, 'writeFile').mockRejectedValue(writeError);
     const loggerModule = await import('../src/observability/logger');
-    const mockLogger = pino({ enabled: false });
-    const warnSpy = vi.spyOn(mockLogger, 'warn').mockImplementation(() => {});
-    const getLoggerSpy = vi.spyOn(loggerModule, 'getLogger').mockReturnValue(mockLogger);
+    const mockLogger = { warn: vi.fn(), info: vi.fn(), debug: vi.fn(), error: vi.fn(), silent: vi.fn() };
+    const getLoggerSpy = vi.spyOn(loggerModule, 'getLogger').mockReturnValue(mockLogger as any);
 
     try {
       const store = new FileSecretStore(filePath);
       expect(await store.getSlotSecret('acme', 'xyte-org', 'primary')).toBe('org-key');
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      const [obj] = warnSpy.mock.calls[0] ?? [];
-      expect(String((obj as Record<string, unknown>).file)).toContain(filePath.split('/').pop());
+      expect(mockLogger.warn).toHaveBeenCalledTimes(1);
+      const [obj] = mockLogger.warn.mock.calls[0] ?? [];
+      expect(String((obj as any)?.file)).toContain(filePath.split('/').pop());
     } finally {
       writeFileSpy.mockRestore();
       getLoggerSpy.mockRestore();
-      warnSpy.mockRestore();
     }
   });
 

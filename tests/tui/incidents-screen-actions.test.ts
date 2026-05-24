@@ -1,18 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { closeIncidentWithGuard } from '../../src/tui/screens/incidents';
-import { makeTuiContext, makeXyteClientMock } from '../support/typed-mocks';
 
 describe('incidents screen actions', () => {
   it('closes incident after token confirmation', async () => {
     const closeIncident = vi.fn().mockResolvedValue({ ok: true });
-    const context = makeTuiContext({
-      client: makeXyteClientMock({ organization: { closeIncident } }),
+    const context: any = {
+      client: {
+        organization: { closeIncident }
+      },
       getActiveTenantId: vi.fn().mockResolvedValue('acme'),
       confirmWrite: vi.fn().mockResolvedValue(true),
       setStatus: vi.fn(),
       showError: vi.fn()
-    });
+    };
 
     const result = await closeIncidentWithGuard({
       incident: { id: 'inc-1' },
@@ -29,13 +30,15 @@ describe('incidents screen actions', () => {
 
   it('does not close when id is missing', async () => {
     const closeIncident = vi.fn();
-    const context = makeTuiContext({
-      client: makeXyteClientMock({ organization: { closeIncident } }),
+    const context: any = {
+      client: {
+        organization: { closeIncident }
+      },
       getActiveTenantId: vi.fn().mockResolvedValue('acme'),
       confirmWrite: vi.fn().mockResolvedValue(true),
       setStatus: vi.fn(),
       showError: vi.fn()
-    });
+    };
 
     const result = await closeIncidentWithGuard({
       incident: {},

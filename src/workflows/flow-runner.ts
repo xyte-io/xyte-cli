@@ -63,9 +63,7 @@ class FlowNeedsInputError extends Error {
   }
 }
 
-type RunContextArgs = Omit<RunDeterministicFlowArgs, 'inspectProviderScope'> & {
-  inspectProviderScope: InspectProviderScope;
-};
+type RunContextArgs = Omit<RunDeterministicFlowArgs, 'inspectProviderScope'> & { inspectProviderScope: InspectProviderScope };
 
 interface RunContext {
   args: RunContextArgs;
@@ -84,22 +82,8 @@ interface RunContext {
 }
 
 type TaskExecutionResult =
-  | {
-      ok: true;
-      output?: unknown;
-      artifactPath?: string;
-      primaryOutputPath?: string;
-      watchFrames?: WatchFrameV1[];
-      contextUpdates?: Record<string, string>;
-    }
-  | {
-      ok: false;
-      failureDetail: string;
-      output?: unknown;
-      artifactPath?: string;
-      primaryOutputPath?: string;
-      contextUpdates?: Record<string, string>;
-    };
+  | { ok: true; output?: unknown; artifactPath?: string; primaryOutputPath?: string; watchFrames?: WatchFrameV1[]; contextUpdates?: Record<string, string> }
+  | { ok: false; failureDetail: string; output?: unknown; artifactPath?: string; primaryOutputPath?: string; contextUpdates?: Record<string, string> };
 
 interface FlowRunInputsPayload {
   flowId?: string;
@@ -305,16 +289,8 @@ function applyDefinitionContextDefaults(ctx: RunContext): void {
   const def = getBuiltInFlowDefinition(ctx.resolvedFlowId);
   for (const [key, template] of Object.entries(def.contextDefaults ?? {})) {
     if (!context[key]) {
-      let missingContext = false;
-      const value = template.replace(TEMPLATE_VAR_RE, (_, k: string) => {
-        const resolved = context[k.trim()];
-        if (resolved === undefined) {
-          missingContext = true;
-          return '';
-        }
-        return resolved;
-      });
-      if (!missingContext && value && !value.includes('{{')) {
+      const value = template.replace(TEMPLATE_VAR_RE, (_, k: string) => context[k.trim()] ?? '');
+      if (value && !value.includes('{{')) {
         context[key] = value;
       }
     }
@@ -335,7 +311,10 @@ function classifyFailure(problem: ReturnType<typeof toProblemDetails>): FlowRunC
   return 'bug';
 }
 
-function toNeedsInputProblem(error: FlowNeedsInputError, instance: string): ProblemDetails {
+function toNeedsInputProblem(
+  error: FlowNeedsInputError,
+  instance: string
+): ProblemDetails {
   return {
     type: 'https://xyte.dev/problems/flow-needs-input',
     title: 'Flow requires additional input',
@@ -417,6 +396,7 @@ function buildReportInputNeedsDataMessage(stepId: string, inputStepId: string, c
   return `${base} ${cause.message}`;
 }
 
+
 function extractCallOutputContext(
   data: unknown,
   spec: { contextKey: string; arrayPath: string; valueField: string }
@@ -424,20 +404,12 @@ function extractCallOutputContext(
   if (!isRecord(data)) return undefined;
   const arr = data[spec.arrayPath];
   if (!Array.isArray(arr)) return undefined;
-  const first = arr.find(
-    (item): item is Record<string, unknown> => isRecord(item) && typeof item[spec.valueField] === 'string'
-  );
+  const first = arr.find((item): item is Record<string, unknown> => isRecord(item) && typeof item[spec.valueField] === 'string');
   return first ? { [spec.contextKey]: first[spec.valueField] as string } : undefined;
 }
 
 function evaluateReadinessWithConnectivity(ctx: RunContext): ReturnType<typeof evaluateReadiness> {
-  return evaluateReadiness({
-    profileStore: ctx.args.profileStore,
-    secretStore: ctx.args.secretStore,
-    tenantId: ctx.args.tenantId,
-    client: ctx.args.client,
-    checkConnectivity: true
-  });
+  return evaluateReadiness({ profileStore: ctx.args.profileStore, secretStore: ctx.args.secretStore, tenantId: ctx.args.tenantId, client: ctx.args.client, checkConnectivity: true });
 }
 
 async function handleSetupStatusStep(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
@@ -459,12 +431,7 @@ async function handleConfigDoctor(_step: FlowTaskStep, ctx: RunContext): Promise
 }
 
 async function handleStatusFast(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
-  const readiness = await evaluateReadiness({
-    profileStore: ctx.args.profileStore,
-    secretStore: ctx.args.secretStore,
-    tenantId: ctx.args.tenantId,
-    checkConnectivity: false
-  });
+  const readiness = await evaluateReadiness({ profileStore: ctx.args.profileStore, secretStore: ctx.args.secretStore, tenantId: ctx.args.tenantId, checkConnectivity: false });
   return { ok: true, output: buildStatusContract({ mode: 'fast', checkConnectivity: false, readiness }) };
 }
 
@@ -489,16 +456,7 @@ function handleMigrationReport(args: {
   tenantId: string;
   outPath: string;
 }): TaskExecutionResult {
-  const {
-    stepId,
-    inputFromStepId,
-    fleetFromStepId,
-    verificationFromStepId,
-    reportInput,
-    taskOutputs,
-    tenantId,
-    outPath
-  } = args;
+  const { stepId, inputFromStepId, fleetFromStepId, verificationFromStepId, reportInput, taskOutputs, tenantId, outPath } = args;
   if (reportInput.schemaVersion !== UTILITY_BATCH_SCHEMA_VERSION || reportInput.command !== 'device.move') {
     throw new FlowNeedsInputError(`Step ${stepId} requires device.move batch output from ${inputFromStepId}.`);
   }
@@ -539,9 +497,7 @@ async function handleReportGenerate(step: FlowTaskStep, ctx: RunContext): Promis
   try {
     reportInput = parseReportInput(input, ctx.args.tenantId);
   } catch (error) {
-    throw new FlowNeedsInputError(buildReportInputNeedsDataMessage(step.id, report.inputFromStepId, error), {
-      cause: error
-    });
+    throw new FlowNeedsInputError(buildReportInputNeedsDataMessage(step.id, report.inputFromStepId, error), { cause: error });
   }
   const outPath = path.join(ctx.outputsDir, report.outFileName);
   const { fleetFromStepId, verificationFromStepId } = report;
@@ -650,11 +606,7 @@ function handleUtilityPrepare(step: FlowTaskStep, _stepIndex: number, ctx: RunCo
   return { ok: true, output: result, primaryOutputPath: result.artifacts.primary, contextUpdates };
 }
 
-async function handleDeviceMatch(
-  step: FlowTaskStep,
-  _stepIndex: number,
-  ctx: RunContext
-): Promise<TaskExecutionResult> {
+async function handleDeviceMatch(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
   const deviceMatch = requireStepConfig(step.deviceMatch, step.id, 'device match');
   const sourcePath = path.resolve(resolveTemplateString(deviceMatch.sourcePath, ctx.resolvedContext));
   const targetPath = path.resolve(resolveTemplateString(deviceMatch.targetPath, ctx.resolvedContext));
@@ -670,11 +622,7 @@ async function handleDeviceMatch(
   return { ok: true, output: result, primaryOutputPath: outputPath };
 }
 
-async function handleDeviceMoveBatch(
-  step: FlowTaskStep,
-  _stepIndex: number,
-  ctx: RunContext
-): Promise<TaskExecutionResult> {
+async function handleDeviceMoveBatch(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
   const deviceMoveBatch = requireStepConfig(step.deviceMoveBatch, step.id, 'device move batch');
   const inputPath = path.resolve(resolveTemplateString(deviceMoveBatch.inputPath, ctx.resolvedContext));
   const reportPath = path.join(ctx.outputsDir, path.basename(deviceMoveBatch.reportPath));
@@ -690,22 +638,12 @@ async function handleDeviceMoveBatch(
     ? { execute_moves_report_path: reportPath }
     : { dry_run_moves_report_path: reportPath };
   if (result.totals.failed > 0 || result.stoppedEarly) {
-    return {
-      ok: false,
-      failureDetail: `Step ${step.id} failed because the move batch reported ${result.totals.failed} failed row(s).`,
-      output: result,
-      primaryOutputPath: reportPath,
-      contextUpdates
-    };
+    return { ok: false, failureDetail: `Step ${step.id} failed because the move batch reported ${result.totals.failed} failed row(s).`, output: result, primaryOutputPath: reportPath, contextUpdates };
   }
   return { ok: true, output: result, primaryOutputPath: reportPath, contextUpdates };
 }
 
-async function handleDeviceVerifyBatch(
-  step: FlowTaskStep,
-  stepIndex: number,
-  ctx: RunContext
-): Promise<TaskExecutionResult> {
+async function handleDeviceVerifyBatch(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
   const deviceVerifyBatch = requireStepConfig(step.deviceVerifyBatch, step.id, 'device verification');
   const inputPath = path.resolve(resolveTemplateString(deviceVerifyBatch.inputPath, ctx.resolvedContext));
   const artifactPath = buildStepArtifactPath(ctx, stepIndex, step.id, 'json');
@@ -716,21 +654,12 @@ async function handleDeviceVerifyBatch(
     outputPath: artifactPath
   });
   if (result.totals.mismatched > 0 || result.totals.missing > 0) {
-    return {
-      ok: false,
-      failureDetail: `Step ${step.id} found ${result.totals.mismatched} mismatched and ${result.totals.missing} missing planned device(s).`,
-      output: result,
-      artifactPath
-    };
+    return { ok: false, failureDetail: `Step ${step.id} found ${result.totals.mismatched} mismatched and ${result.totals.missing} missing planned device(s).`, output: result, artifactPath };
   }
   return { ok: true, output: result, artifactPath };
 }
 
-async function handleSpaceImportTree(
-  step: FlowTaskStep,
-  _stepIndex: number,
-  ctx: RunContext
-): Promise<TaskExecutionResult> {
+async function handleSpaceImportTree(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
   const spaceImportTree = requireStepConfig(step.spaceImportTree, step.id, 'space import');
   const inputPath = path.resolve(resolveTemplateString(spaceImportTree.inputPath, ctx.resolvedContext));
   const reportPath = path.join(ctx.outputsDir, path.basename(spaceImportTree.reportPath));
@@ -745,11 +674,7 @@ async function handleSpaceImportTree(
   return { ok: true, output: result, artifactPath: reportPath, primaryOutputPath: reportPath };
 }
 
-function resolvePollOptions(
-  ctx: RunContext,
-  intervalKey?: string,
-  timeoutKey?: string
-): { intervalMs?: number; timeoutMs?: number } {
+function resolvePollOptions(ctx: RunContext, intervalKey?: string, timeoutKey?: string): { intervalMs?: number; timeoutMs?: number } {
   const options: { intervalMs?: number; timeoutMs?: number } = {};
   const resolvedIntervalKey = intervalKey ?? 'edge_poll_interval_ms';
   const resolvedTimeoutKey = timeoutKey ?? 'edge_poll_timeout_ms';
@@ -796,11 +721,7 @@ async function handleEdgeClaim(step: FlowTaskStep, _stepIndex: number, ctx: RunC
   return { ok: true, output: outcome };
 }
 
-async function handleEdgeClaimBatch(
-  step: FlowTaskStep,
-  _stepIndex: number,
-  ctx: RunContext
-): Promise<TaskExecutionResult> {
+async function handleEdgeClaimBatch(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
   const config = requireStepConfig(step.edgeClaimBatch, step.id, 'edge claim batch');
   const inputPath = path.resolve(resolveTemplateString(config.inputPath, ctx.resolvedContext));
   const reportPath = path.join(ctx.outputsDir, path.basename(config.reportPath));
@@ -859,42 +780,24 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
   ensureContextKeys(step, ctx.resolvedContext);
 
   switch (step.task) {
-    case 'doctor.install':
-      return { ok: true, output: buildInstallDoctorReport(path.resolve(__dirname, '../../dist/bin/xyte-cli.js')) };
-    case 'setup.status':
-      return handleSetupStatusStep(step, ctx);
-    case 'config.doctor':
-      return handleConfigDoctor(step, ctx);
-    case 'status.fast':
-      return handleStatusFast(step, ctx);
-    case 'inspect.fleet':
-      return handleFleetInspect(step, ctx);
-    case 'inspect.deep-dive':
-      return handleDeepDive(step, ctx);
-    case 'report.generate':
-      return handleReportGenerate(step, ctx);
-    case 'watch':
-      return handleWatch(step, stepIndex, ctx);
-    case 'call':
-      return handleCall(step, stepIndex, ctx);
-    case 'utility.prepare':
-      return handleUtilityPrepare(step, stepIndex, ctx);
-    case 'device.match':
-      return handleDeviceMatch(step, stepIndex, ctx);
-    case 'device.move-batch':
-      return handleDeviceMoveBatch(step, stepIndex, ctx);
-    case 'device.verify-batch':
-      return handleDeviceVerifyBatch(step, stepIndex, ctx);
-    case 'space.import-tree':
-      return handleSpaceImportTree(step, stepIndex, ctx);
-    case 'edge.claim':
-      return handleEdgeClaim(step, stepIndex, ctx);
-    case 'edge.claim-batch':
-      return handleEdgeClaimBatch(step, stepIndex, ctx);
-    case 'edge.ping':
-      return handleEdgePing(step, stepIndex, ctx);
-    default:
-      throw new Error(`Unsupported flow task type: ${(step as { task: string }).task}`);
+    case 'doctor.install':    return { ok: true, output: buildInstallDoctorReport(path.resolve(__dirname, '../../dist/bin/xyte-cli.js')) };
+    case 'setup.status':      return handleSetupStatusStep(step, ctx);
+    case 'config.doctor':     return handleConfigDoctor(step, ctx);
+    case 'status.fast':       return handleStatusFast(step, ctx);
+    case 'inspect.fleet':     return handleFleetInspect(step, ctx);
+    case 'inspect.deep-dive': return handleDeepDive(step, ctx);
+    case 'report.generate':   return handleReportGenerate(step, ctx);
+    case 'watch':             return handleWatch(step, stepIndex, ctx);
+    case 'call':              return handleCall(step, stepIndex, ctx);
+    case 'utility.prepare':   return handleUtilityPrepare(step, stepIndex, ctx);
+    case 'device.match':      return handleDeviceMatch(step, stepIndex, ctx);
+    case 'device.move-batch': return handleDeviceMoveBatch(step, stepIndex, ctx);
+    case 'device.verify-batch': return handleDeviceVerifyBatch(step, stepIndex, ctx);
+    case 'space.import-tree': return handleSpaceImportTree(step, stepIndex, ctx);
+    case 'edge.claim':        return handleEdgeClaim(step, stepIndex, ctx);
+    case 'edge.claim-batch':  return handleEdgeClaimBatch(step, stepIndex, ctx);
+    case 'edge.ping':         return handleEdgePing(step, stepIndex, ctx);
+    default: throw new Error(`Unsupported flow task type: ${(step as { task: string }).task}`);
   }
 }
 
@@ -953,10 +856,7 @@ async function findRunBundle(outDir: string, resumeRef: string): Promise<string>
           return candidate;
         }
       } catch (error) {
-        getLogger().debug(
-          { manifestPath, error: errorMessage(error) },
-          'Skipping malformed manifest during resume search'
-        );
+        getLogger().debug({ manifestPath, error: errorMessage(error) }, 'Skipping malformed manifest during resume search');
       }
     }
   }
@@ -1078,10 +978,7 @@ async function restoreTaskOutputsFromSteps(steps: FlowRunStep[]): Promise<Map<st
       const parsed = JSON.parse(await readFile(step.artifactPath, 'utf8')) as unknown;
       taskOutputs.set(step.stepId, parsed);
     } catch (error) {
-      getLogger().warn(
-        { stepId: step.stepId, error: errorMessage(error) },
-        'Failed to restore task artifact from step during resume hydration'
-      );
+      getLogger().warn({ stepId: step.stepId, error: errorMessage(error) }, 'Failed to restore task artifact from step during resume hydration');
     }
   }
   return taskOutputs;
@@ -1115,9 +1012,7 @@ async function loadResumeState(resumeBundle: string): Promise<ResumeState> {
   try {
     existingSummary = FlowRunSummarySchema.parse(JSON.parse(raw));
   } catch {
-    throw new CliUserError({
-      summary: `Resume bundle manifest is invalid JSON or has unexpected shape: ${manifestPath}`
-    });
+    throw new CliUserError({ summary: `Resume bundle manifest is invalid JSON or has unexpected shape: ${manifestPath}` });
   }
   const storedInputs = await readStoredInputs(resumeBundle);
   return {
@@ -1128,10 +1023,9 @@ async function loadResumeState(resumeBundle: string): Promise<ResumeState> {
     cursorIndex: existingSummary.cursor.nextStepIndex,
     priorDecisions: await readLinesAsJson(path.join(resumeBundle, 'decisions.ndjson'), FlowRunDecisionSchema),
     priorErrors: await readLinesAsJson(path.join(resumeBundle, 'errors.ndjson'), FlowRunErrorEntrySchema),
-    resumedInspectProviderScope:
-      storedInputs && isInspectProviderScopeValue(storedInputs.inspectProviderScope)
-        ? storedInputs.inspectProviderScope
-        : undefined,
+    resumedInspectProviderScope: storedInputs && isInspectProviderScopeValue(storedInputs.inspectProviderScope)
+      ? storedInputs.inspectProviderScope
+      : undefined,
     resumedContext: toStringRecord(storedInputs?.context)
   };
 }
