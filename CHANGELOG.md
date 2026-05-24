@@ -6,14 +6,6 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
-## [0.11.0] - 2026-05-20
-
-### Added
-- Added Core API catalog, typed client, docs, skill data, and tests for organization device incident controls, Edge listing, users, groups, and partner organization creation.
-
-### Changed
-- Updated existing `organization.edge.*` async route templates to the canonical `/core/v1/organization/edges/devices/*` paths.
-
 ## [0.10.5] - 2026-05-12
 
 ### Fixed
