@@ -4,7 +4,7 @@ import { sceneFromDevicesState } from '../../src/tui/scene';
 
 describe('devices screen rendering', () => {
   it('renders device detail safely for cyclic payloads', () => {
-    const device: any = { id: 'dev-1', name: 'Display', status: 'online' };
+    const device: Record<string, unknown> = { id: 'dev-1', name: 'Display', status: 'online' };
     device.self = device;
 
     const panels = sceneFromDevicesState({

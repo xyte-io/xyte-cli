@@ -127,13 +127,13 @@ describe('namespace endpoint mappings', () => {
     });
   });
 
-  it('maps organization.listEdges to organization.edges.listEdges', async () => {
+  it('maps organization.getEdges to organization.edges.getEdges', async () => {
     const call = vi.fn().mockResolvedValue({ items: [] });
     const organization = createOrganizationNamespace(call);
 
-    await organization.listEdges({ query: { page: 1, per_page: 50 } });
+    await organization.getEdges({ query: { page: 1, per_page: 50 } });
 
-    expect(call).toHaveBeenCalledWith('organization.edges.listEdges', {
+    expect(call).toHaveBeenCalledWith('organization.edges.getEdges', {
       query: { page: 1, per_page: 50 }
     });
   });
@@ -142,31 +142,31 @@ describe('namespace endpoint mappings', () => {
     const call = vi.fn().mockResolvedValue({ ok: true });
     const organization = createOrganizationNamespace(call);
 
-    await organization.listUsers({ query: { page: 1 } });
+    await organization.getUsers({ query: { page: 1 } });
     await organization.createUser({ body: { email: 'jane@example.com', name: 'Jane Doe' } });
     await organization.getUser({ path: { id: 'user-1' } });
     await organization.deactivateUser({ path: { id: 'user-1' } });
     await organization.resendWelcome({ path: { id: 'user-1' } });
-    await organization.listGroups({ query: { page: 1 } });
+    await organization.getGroups({ query: { page: 1 } });
     await organization.createGroup({ body: { name: 'Support' } });
     await organization.getGroup({ path: { id: 'group-1' } });
     await organization.updateGroup({ path: { id: 'group-1' }, body: { name: 'Field Support' } });
-    await organization.addUsersToGroup({ path: { id: 'group-1' }, body: { user_ids: ['user-1'] } });
-    await organization.addExternalUserToGroup({
+    await organization.addUsers({ path: { id: 'group-1' }, body: { user_ids: ['user-1'] } });
+    await organization.addExternalUser({
       path: { id: 'group-1' },
       body: { email: 'partner@example.com' }
     });
-    await organization.removeUsersFromGroup({ path: { id: 'group-1' }, body: { user_ids: ['user-1'] } });
+    await organization.removeUsers({ path: { id: 'group-1' }, body: { user_ids: ['user-1'] } });
     await organization.deleteGroup({ path: { id: 'group-1' } });
 
-    expect(call).toHaveBeenNthCalledWith(1, 'organization.users.listUsers', { query: { page: 1 } });
+    expect(call).toHaveBeenNthCalledWith(1, 'organization.users.getUsers', { query: { page: 1 } });
     expect(call).toHaveBeenNthCalledWith(2, 'organization.users.createUser', {
       body: { email: 'jane@example.com', name: 'Jane Doe' }
     });
     expect(call).toHaveBeenNthCalledWith(3, 'organization.users.getUser', { path: { id: 'user-1' } });
     expect(call).toHaveBeenNthCalledWith(4, 'organization.users.deactivateUser', { path: { id: 'user-1' } });
     expect(call).toHaveBeenNthCalledWith(5, 'organization.users.resendWelcome', { path: { id: 'user-1' } });
-    expect(call).toHaveBeenNthCalledWith(6, 'organization.groups.listGroups', { query: { page: 1 } });
+    expect(call).toHaveBeenNthCalledWith(6, 'organization.groups.getGroups', { query: { page: 1 } });
     expect(call).toHaveBeenNthCalledWith(7, 'organization.groups.createGroup', { body: { name: 'Support' } });
     expect(call).toHaveBeenNthCalledWith(8, 'organization.groups.getGroup', { path: { id: 'group-1' } });
     expect(call).toHaveBeenNthCalledWith(9, 'organization.groups.updateGroup', {

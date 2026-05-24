@@ -117,7 +117,7 @@ Auth note:
 ```bash
 xyte-cli api endpoints list
 xyte-cli api endpoints describe organization.devices.getDevices
-xyte-cli api endpoints describe organization.users.listUsers
+xyte-cli api endpoints describe organization.users.getUsers
 xyte-cli api endpoints describe organization.groups.addUsers
 xyte-cli api endpoints describe partner.organizations.createOrganization
 xyte-cli api call organization.devices.getDevices --tenant <tenant-id>

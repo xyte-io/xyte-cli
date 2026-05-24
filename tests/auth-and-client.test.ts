@@ -25,9 +25,9 @@ describe('client auth behavior', () => {
 
     const transport = {
       request: vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } })
-    } as any;
+    };
 
-    const client = createXyteClient({ profileStore, secretStore, transport });
+    const client = createXyteClient({ profileStore, secretStore, transport: transport as unknown as HttpTransport });
     await client.organization.getDevices();
 
     expect(transport.request).toHaveBeenCalledTimes(1);
@@ -43,14 +43,14 @@ describe('client auth behavior', () => {
     const secretStore = new MemorySecretStore();
     const transport = {
       request: vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } })
-    } as any;
+    };
 
     await profileStore.addKeySlot('acme', 'xyte-org', {
       name: 'missing-secret',
       fingerprint: 'sha256:none'
     });
 
-    const client = createXyteClient({ profileStore, secretStore, transport });
+    const client = createXyteClient({ profileStore, secretStore, transport: transport as unknown as HttpTransport });
     await expect(client.organization.getDevices()).rejects.toBeInstanceOf(XyteAuthError);
   });
 
@@ -68,9 +68,9 @@ describe('client auth behavior', () => {
 
     const transport = {
       request: vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } })
-    } as any;
+    };
 
-    const client = createXyteClient({ profileStore, secretStore, transport });
+    const client = createXyteClient({ profileStore, secretStore, transport: transport as unknown as HttpTransport });
     await client.partner.getDevices();
 
     expect(transport.request).toHaveBeenCalledTimes(1);
@@ -140,7 +140,7 @@ describe('client auth behavior', () => {
     expect(sent.headers['Content-Type']).toBeUndefined();
   });
 
-  it('builds query URLs for organization users and edges list endpoints', async () => {
+  it('builds query URLs for organization users and edges collection endpoints', async () => {
     const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { items: [] } });
     const transport = { request } as unknown as HttpTransport;
 
@@ -149,8 +149,8 @@ describe('client auth behavior', () => {
       hubBaseUrl: 'https://hub.example.test',
       transport
     });
-    await client.organization.listUsers({ query: { page: 2, per_page: 50 } });
-    await client.organization.listEdges({ query: { page: 1, per_page: 25 } });
+    await client.organization.getUsers({ query: { page: 2, per_page: 50 } });
+    await client.organization.getEdges({ query: { page: 1, per_page: 25 } });
 
     expect(request).toHaveBeenNthCalledWith(
       1,
@@ -179,7 +179,7 @@ describe('client auth behavior', () => {
       hubBaseUrl: 'https://hub.example.test',
       transport
     });
-    await client.organization.addUsersToGroup({
+    await client.organization.addUsers({
       path: { id: 'group-1' },
       body: { user_ids: ['user-1'] }
     });
@@ -239,9 +239,9 @@ describe('client auth behavior', () => {
 
     const transport = {
       request: vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } })
-    } as any;
+    };
 
-    const client = createXyteClient({ profileStore, secretStore, transport });
+    const client = createXyteClient({ profileStore, secretStore, transport: transport as unknown as HttpTransport });
     await client.organization.getDevices();
 
     expect(transport.request.mock.calls[0][0].headers.Authorization).toBe('org-key-b');
@@ -269,9 +269,9 @@ describe('client auth behavior', () => {
 
     const transport = {
       request: vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } })
-    } as any;
+    };
 
-    const client = createXyteClient({ profileStore, secretStore, transport });
+    const client = createXyteClient({ profileStore, secretStore, transport: transport as unknown as HttpTransport });
     await client.organization.getDevices();
 
     expect(transport.request.mock.calls[0][0].headers.Authorization).toBe('org-key-file');

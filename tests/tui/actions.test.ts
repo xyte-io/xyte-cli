@@ -5,7 +5,7 @@ import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, promptC
 describe('tui actions helpers', () => {
   it('runs selected palette action', async () => {
     const run = vi.fn().mockResolvedValue(undefined);
-    const context: any = {
+    const context: Parameters<typeof openActionPalette>[0]['context'] = {
       prompt: vi.fn().mockResolvedValue('1'),
       setStatus: vi.fn(),
       showError: vi.fn()
@@ -22,7 +22,7 @@ describe('tui actions helpers', () => {
 
   it('does not run disabled palette action', async () => {
     const run = vi.fn();
-    const context: any = {
+    const context: Parameters<typeof openActionPalette>[0]['context'] = {
       prompt: vi.fn().mockResolvedValue('1'),
       setStatus: vi.fn(),
       showError: vi.fn()
@@ -39,7 +39,7 @@ describe('tui actions helpers', () => {
   });
 
   it('requires exact token for write confirmation', async () => {
-    const context: any = {
+    const context: Parameters<typeof confirmWriteWithToken>[0]['context'] = {
       confirmWrite: vi.fn().mockResolvedValue(false),
       setStatus: vi.fn()
     };
@@ -55,7 +55,7 @@ describe('tui actions helpers', () => {
   });
 
   it('returns selected prompt choice', async () => {
-    const context: any = {
+    const context: Parameters<typeof promptChoice>[0]['context'] = {
       prompt: vi.fn().mockResolvedValue('2'),
       setStatus: vi.fn()
     };

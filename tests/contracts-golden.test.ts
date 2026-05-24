@@ -11,6 +11,7 @@ import { buildWatchFrame } from '../src/contracts/watch-frame';
 import { buildUpgradeCheck } from '../src/contracts/upgrade';
 import { MemorySecretStore } from '../src/secure/secret-store';
 import { runHeadlessRenderer } from '../src/tui/headless-renderer';
+import type { XyteClient } from '../src/types/client';
 import { runUtilityPrepare } from '../src/workflows/utility-prepare';
 import { buildDeepDive, buildFleetInspect, generateFleetReport } from '../src/workflows/fleet-insights';
 import { MemoryProfileStore } from './support/memory-profile-store';
@@ -41,15 +42,18 @@ function normalizeUtilityPrepare(
     outputDir: string;
   }
 ) {
-  const result = JSON.parse(JSON.stringify(value)) as Record<string, any>;
+  const result = JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
   const normalizePath = (input: string) => input.replaceAll('\\', '/');
   const outputDir = normalizePath(paths.outputDir);
+  const input = result.input as Record<string, unknown>;
+  const artifacts = result.artifacts as Record<string, unknown>;
+  const suggestedCommands = result.suggestedCommands as Record<string, unknown>;
   result.generatedAtUtc = '<ISO_TIMESTAMP>';
-  result.input.path = '<INPUT_PATH>';
-  result.artifacts.primary = normalizePath(String(result.artifacts.primary)).replace(outputDir, '<OUTPUT_DIR>');
-  result.artifacts.rejected = normalizePath(String(result.artifacts.rejected)).replace(outputDir, '<OUTPUT_DIR>');
-  result.artifacts.notes = normalizePath(String(result.artifacts.notes)).replace(outputDir, '<OUTPUT_DIR>');
-  result.suggestedCommands.next = normalizePath(String(result.suggestedCommands.next)).replace(
+  input.path = '<INPUT_PATH>';
+  artifacts.primary = normalizePath(String(artifacts.primary)).replace(outputDir, '<OUTPUT_DIR>');
+  artifacts.rejected = normalizePath(String(artifacts.rejected)).replace(outputDir, '<OUTPUT_DIR>');
+  artifacts.notes = normalizePath(String(artifacts.notes)).replace(outputDir, '<OUTPUT_DIR>');
+  suggestedCommands.next = normalizePath(String(suggestedCommands.next)).replace(
     outputDir,
     '<OUTPUT_DIR>'
   );
@@ -78,7 +82,7 @@ function normalizeWatchFrame(value: unknown) {
 }
 
 function normalizeFlowRunSummary(value: unknown) {
-  const summary = JSON.parse(JSON.stringify(value)) as Record<string, any>;
+  const summary = JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
   summary.generatedAtUtc = '<ISO_TIMESTAMP>';
   summary.startedAtUtc = '<ISO_TIMESTAMP>';
   summary.endedAtUtc = '<ISO_TIMESTAMP>';
@@ -206,7 +210,7 @@ describe('golden contracts', () => {
       }
     };
 
-    const client: any = {
+    const client = {
       organization: {
         getDevices: async () => [{ id: 'dev-1', name: 'Device One', status: 'online' }],
         getIncidents: async () => [{ id: 'inc-1', severity: 'high', status: 'open' }],
@@ -218,7 +222,7 @@ describe('golden contracts', () => {
         getDevices: async () => [],
         getTickets: async () => []
       }
-    };
+    } as unknown as XyteClient;
 
     await runHeadlessRenderer({
       client,

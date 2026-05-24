@@ -52,15 +52,15 @@ export interface OrganizationNamespace {
   getDevice: NamespaceCall;
   getDevices: NamespaceCall;
   getHistories: NamespaceCall;
-  listEdges: NamespaceCall;
+  getEdges: NamespaceCall;
   getOrganizationInfo: NamespaceCall;
-  addExternalUserToGroup: NamespaceCall;
-  addUsersToGroup: NamespaceCall;
+  addExternalUser: NamespaceCall;
+  addUsers: NamespaceCall;
   createGroup: NamespaceCall;
   deleteGroup: NamespaceCall;
   getGroup: NamespaceCall;
-  listGroups: NamespaceCall;
-  removeUsersFromGroup: NamespaceCall;
+  getGroups: NamespaceCall;
+  removeUsers: NamespaceCall;
   updateGroup: NamespaceCall;
   getIncidents: NamespaceCall;
   createSpace: NamespaceCall;
@@ -81,7 +81,7 @@ export interface OrganizationNamespace {
   createUser: NamespaceCall;
   deactivateUser: NamespaceCall;
   getUser: NamespaceCall;
-  listUsers: NamespaceCall;
+  getUsers: NamespaceCall;
   resendWelcome: NamespaceCall;
 }
 

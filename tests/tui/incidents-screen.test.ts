@@ -21,7 +21,7 @@ describe('incidents screen helpers', () => {
   });
 
   it('renders incident detail safely for cyclic payloads', () => {
-    const incident: any = { id: 'inc-1', severity: 'high', status: 'open' };
+    const incident: Record<string, unknown> = { id: 'inc-1', severity: 'high', status: 'open' };
     incident.self = incident;
 
     const panels = sceneFromIncidentsState({

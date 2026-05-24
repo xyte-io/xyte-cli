@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
+import type { XyteClient } from '../src/types/client';
 import { runVerifyMovedDevices } from '../src/workflows/verify-device-moves';
 
 function makeTempInput(rows: Array<Record<string, string | number>>): string {
@@ -27,7 +28,7 @@ describe('runVerifyMovedDevices', () => {
     };
 
     const result = await runVerifyMovedDevices({
-      client: client as any,
+      client: client as unknown as XyteClient,
       tenantId: 'tenant-1',
       inputPath,
       outputPath
@@ -47,7 +48,7 @@ describe('runVerifyMovedDevices', () => {
     };
 
     const result = await runVerifyMovedDevices({
-      client: client as any,
+      client: client as unknown as XyteClient,
       tenantId: 'tenant-1',
       inputPath,
       outputPath
@@ -65,7 +66,7 @@ describe('runVerifyMovedDevices', () => {
     };
 
     const result = await runVerifyMovedDevices({
-      client: client as any,
+      client: client as unknown as XyteClient,
       tenantId: 'tenant-1',
       inputPath,
       outputPath

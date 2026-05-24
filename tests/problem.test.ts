@@ -19,13 +19,14 @@ describe('problem details redaction', () => {
     });
 
     const problem = toProblemDetails(error, '/call/organization.devices.getDevices');
-    const upstream = problem.upstream as Record<string, any>;
+    const upstream = problem.upstream as Record<string, unknown>;
 
     expect(problem.detail).toContain('token=[REDACTED]');
     expect(problem.detail).not.toContain('abc123');
     expect(upstream.authorization).toBe('[REDACTED]');
-    expect(upstream.metadata.api_key).toBe('[REDACTED]');
-    expect(upstream.metadata.safe).toBe('ok');
+    const metadata = upstream.metadata as Record<string, unknown>;
+    expect(metadata.api_key).toBe('[REDACTED]');
+    expect(metadata.safe).toBe('ok');
   });
 
   it('redacts unhandled string errors', () => {

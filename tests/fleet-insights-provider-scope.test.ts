@@ -64,19 +64,19 @@ function makeFixture(options: FixtureOptions): Fixture {
     if (options.hasPartner) {
       endpoints.push({ authScope: 'partner' });
     }
-    return endpoints as any;
+    return endpoints;
   });
 
   return {
     client: {
-      organization: organization as any,
-      partner: partner as any,
+      organization,
+      partner,
       call: vi.fn(),
       callWithMeta: vi.fn(),
       describeEndpoint: vi.fn(),
       listEndpoints: vi.fn(),
       listTenantEndpoints
-    },
+    } as unknown as XyteClient,
     listTenantEndpoints,
     organization,
     partner
@@ -226,7 +226,7 @@ describe('fleet insights provider scope', () => {
 
   it('partner enrichment samples at most 25 devices and does not call multi-device history endpoint', async () => {
     const fixture = makeFixture({ hasOrganization: false, hasPartner: true });
-    fixture.partner.getDevices.mockImplementation(async ({ query }: any = {}) => {
+    fixture.partner.getDevices.mockImplementation(async ({ query }: { query?: { page?: number } } = {}) => {
       const page = Number(query?.page ?? 1);
       if (page > 1) {
         return { items: [] };
@@ -285,7 +285,7 @@ describe('fleet insights provider scope', () => {
 
   it('caps partner enrichment call concurrency at 5 devices', async () => {
     const fixture = makeFixture({ hasOrganization: false, hasPartner: true });
-    fixture.partner.getDevices.mockImplementation(async ({ query }: any = {}) => {
+    fixture.partner.getDevices.mockImplementation(async ({ query }: { query?: { page?: number } } = {}) => {
       const page = Number(query?.page ?? 1);
       if (page > 1) {
         return { items: [] };

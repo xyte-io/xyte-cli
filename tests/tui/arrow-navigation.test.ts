@@ -6,6 +6,9 @@ import { describe, expect, it } from 'vitest';
 import { cyclePane, moveTableSelection, scrollBox } from '../../src/tui/navigation';
 import { SCREEN_PANE_CONFIG } from '../../src/tui/panes';
 
+type TableArg = Parameters<typeof moveTableSelection>[0]['table'];
+type ScrollBoxArg = Parameters<typeof scrollBox>[0];
+
 describe('pane-focus arrow navigation', () => {
   it('defines pane configuration for every screen', () => {
     const screens = Object.keys(SCREEN_PANE_CONFIG);
@@ -39,7 +42,7 @@ describe('pane-focus arrow navigation', () => {
       };
       let index = 2;
       index = moveTableSelection({
-        table: list as any,
+        table: list as unknown as TableArg,
         index,
         delta: 1,
         totalRows: 10
@@ -48,7 +51,7 @@ describe('pane-focus arrow navigation', () => {
       expect(list.selected, `${screenId} list select index should match +1 header offset`).toBe(4);
 
       index = moveTableSelection({
-        table: list as any,
+        table: list as unknown as TableArg,
         index,
         delta: -1,
         totalRows: 10
@@ -68,6 +71,6 @@ describe('pane-focus arrow navigation', () => {
   });
 
   it('does not throw when scrolling non-scrollable box widgets', () => {
-    expect(() => scrollBox({} as any, 1)).not.toThrow();
+    expect(() => scrollBox({} as unknown as ScrollBoxArg, 1)).not.toThrow();
   });
 });

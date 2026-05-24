@@ -2,22 +2,23 @@ import { describe, expect, it } from 'vitest';
 
 import { readConfigData } from '../src/tui/config-loader';
 import { PROVIDER_ORG } from '../src/types/profile';
+import type { ProfileStore, SecretStore } from '../src/types/stores';
 
 function makeProfileStore(overrides: Partial<{
-  listKeySlots: () => Promise<any[]>;
-  getActiveKeySlot: () => Promise<any>;
-}> = {}) {
+  listKeySlots: () => Promise<unknown[]>;
+  getActiveKeySlot: () => Promise<unknown>;
+}> = {}): ProfileStore {
   return {
     listKeySlots: async () => [],
     getActiveKeySlot: async () => undefined,
     ...overrides
-  } as any;
+  } as unknown as ProfileStore;
 }
 
-function makeSecretStore(hasSecret = false) {
+function makeSecretStore(hasSecret = false): SecretStore {
   return {
     getSlotSecret: async () => (hasSecret ? 'secret-value' : undefined)
-  } as any;
+  } as unknown as SecretStore;
 }
 
 describe('readConfigData', () => {

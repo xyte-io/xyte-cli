@@ -46,9 +46,9 @@ Derived from the bundled public endpoint spec.
 | `organization.devices.getHistories` | `status`, `from`, `to`, `device_id`, `space_id`, `name` | none | Filtered history lookup; can be time-windowed |
 | `organization.commands.getCommands` | `status`, `page`, `per_page` | `page`, `per_page` | Command history pagination and status filter |
 | `organization.incidents.getIncidents` | `from`, `to`, `status`, `priority`, `title`, `description`, `issue`, `device_model`, `partner_name`, `sub_model`, `space_id`, `page`, `per_page` | `page`, `per_page` | Incident filtering matrix. Use integer `from` and `to`; for reliable active-incident fetches use both (`from=0`, `to=<now>`). |
-| `organization.edges.listEdges` | `page`, `per_page` | `page`, `per_page` | Paginated Edge records |
-| `organization.groups.listGroups` | `page`, `per_page` | `page`, `per_page` | Paginated team access groups |
-| `organization.users.listUsers` | `page`, `per_page` | `page`, `per_page` | Paginated active users |
+| `organization.edges.getEdges` | `page`, `per_page` | `page`, `per_page` | Paginated Edge records |
+| `organization.groups.getGroups` | `page`, `per_page` | `page`, `per_page` | Paginated team access groups |
+| `organization.users.getUsers` | `page`, `per_page` | `page`, `per_page` | Paginated active users |
 
 For the complete current query-param set, run `xyte-cli api endpoints describe <endpoint-key>` before calling.
 
@@ -147,10 +147,10 @@ Organization:
 - `organization.devices.resumeIncidents`
 - `organization.incidents.closeIncident`
 - `organization.incidents.getIncidents`
-- `organization.edges.listEdges`
-- `organization.groups.listGroups`
+- `organization.edges.getEdges`
+- `organization.groups.getGroups`
 - `organization.groups.addUsers`
-- `organization.users.listUsers`
+- `organization.users.getUsers`
 - `organization.users.createUser`
 - `organization.tickets.getTickets`
 - `organization.commands.sendCommand`

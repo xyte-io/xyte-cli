@@ -10,6 +10,8 @@ import {
   type SelectionSyncState
 } from '../../src/tui/navigation';
 
+type TableArg = Parameters<typeof moveTableSelection>[0]['table'];
+
 class MockList extends EventEmitter {
   selected = 0;
 
@@ -41,10 +43,10 @@ describe('selection sync guard', () => {
       if (shouldIgnoreSelectEvent(state)) {
         return;
       }
-      syncListSelection(list as any, Math.max(0, index - 1), state);
+      syncListSelection(list as unknown as TableArg, Math.max(0, index - 1), state);
     });
 
-    syncListSelection(list as any, 0, state);
+    syncListSelection(list as unknown as TableArg, 0, state);
 
     expect(selectEvents).toBe(1);
     expect(list.selected).toBe(1);
@@ -63,11 +65,11 @@ describe('selection sync guard', () => {
       if (shouldIgnoreSelectEvent(state)) {
         return;
       }
-      syncListSelection(list as any, list.selected - 1, state);
+      syncListSelection(list as unknown as TableArg, list.selected - 1, state);
     });
 
     const nextIndex = moveTableSelection({
-      table: list as any,
+      table: list as unknown as TableArg,
       index: 0,
       delta: 1,
       totalRows: 5,
@@ -93,7 +95,7 @@ describe('selection sync guard', () => {
       handledEvents += 1;
     });
 
-    setListTableData(list as any, [['ID'], ['1']], state);
+    setListTableData(list as unknown as TableArg, [['ID'], ['1']], state);
 
     expect(ignoredEvents).toBe(1);
     expect(handledEvents).toBe(0);

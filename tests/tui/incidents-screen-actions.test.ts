@@ -5,7 +5,7 @@ import { closeIncidentWithGuard } from '../../src/tui/screens/incidents';
 describe('incidents screen actions', () => {
   it('closes incident after token confirmation', async () => {
     const closeIncident = vi.fn().mockResolvedValue({ ok: true });
-    const context: any = {
+    const context = {
       client: {
         organization: { closeIncident }
       },
@@ -13,7 +13,7 @@ describe('incidents screen actions', () => {
       confirmWrite: vi.fn().mockResolvedValue(true),
       setStatus: vi.fn(),
       showError: vi.fn()
-    };
+    } as unknown as Parameters<typeof closeIncidentWithGuard>[0]['context'];
 
     const result = await closeIncidentWithGuard({
       incident: { id: 'inc-1' },
@@ -30,7 +30,7 @@ describe('incidents screen actions', () => {
 
   it('does not close when id is missing', async () => {
     const closeIncident = vi.fn();
-    const context: any = {
+    const context = {
       client: {
         organization: { closeIncident }
       },
@@ -38,7 +38,7 @@ describe('incidents screen actions', () => {
       confirmWrite: vi.fn().mockResolvedValue(true),
       setStatus: vi.fn(),
       showError: vi.fn()
-    };
+    } as unknown as Parameters<typeof closeIncidentWithGuard>[0]['context'];
 
     const result = await closeIncidentWithGuard({
       incident: {},

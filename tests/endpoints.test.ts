@@ -137,14 +137,14 @@ describe('public endpoint catalog', () => {
       'path_includes'
     ]);
 
-    const listEdges = endpoints.find((item) => item.key === 'organization.edges.listEdges');
-    expect(listEdges?.queryParams).toEqual(['page', 'per_page']);
+    const getEdges = endpoints.find((item) => item.key === 'organization.edges.getEdges');
+    expect(getEdges?.queryParams).toEqual(['page', 'per_page']);
 
-    const listGroups = endpoints.find((item) => item.key === 'organization.groups.listGroups');
-    expect(listGroups?.queryParams).toEqual(['page', 'per_page']);
+    const getGroups = endpoints.find((item) => item.key === 'organization.groups.getGroups');
+    expect(getGroups?.queryParams).toEqual(['page', 'per_page']);
 
-    const listUsers = endpoints.find((item) => item.key === 'organization.users.listUsers');
-    expect(listUsers?.queryParams).toEqual(['page', 'per_page']);
+    const getUsers = endpoints.find((item) => item.key === 'organization.users.getUsers');
+    expect(getUsers?.queryParams).toEqual(['page', 'per_page']);
   });
 
   it('includes organization edge startClaim endpoint metadata', () => {
@@ -207,8 +207,8 @@ describe('public endpoint catalog', () => {
     expect(endpoint?.sourceFile).toBe('https://docs.xyte.io/reference/edgeget-ping-status');
   });
 
-  it('includes organization edge list endpoint metadata', () => {
-    const endpoint = endpoints.find((item) => item.key === 'organization.edges.listEdges');
+  it('includes organization edge collection endpoint metadata', () => {
+    const endpoint = endpoints.find((item) => item.key === 'organization.edges.getEdges');
     expect(endpoint).toBeDefined();
     expect(endpoint?.method).toBe('GET');
     expect(endpoint?.pathTemplate).toBe('/core/v1/organization/edges');
@@ -220,12 +220,12 @@ describe('public endpoint catalog', () => {
   });
 
   it('includes organization users and groups endpoint metadata', () => {
-    const listUsers = endpoints.find((item) => item.key === 'organization.users.listUsers');
-    expect(listUsers).toBeDefined();
-    expect(listUsers?.method).toBe('GET');
-    expect(listUsers?.pathTemplate).toBe('/core/v1/organization/users');
-    expect(listUsers?.bodyType).toBe('none');
-    expect(listUsers?.hasBody).toBe(false);
+    const getUsers = endpoints.find((item) => item.key === 'organization.users.getUsers');
+    expect(getUsers).toBeDefined();
+    expect(getUsers?.method).toBe('GET');
+    expect(getUsers?.pathTemplate).toBe('/core/v1/organization/users');
+    expect(getUsers?.bodyType).toBe('none');
+    expect(getUsers?.hasBody).toBe(false);
 
     const createUser = endpoints.find((item) => item.key === 'organization.users.createUser');
     expect(createUser?.method).toBe('POST');
@@ -239,12 +239,12 @@ describe('public endpoint catalog', () => {
     expect(resendWelcome?.bodyType).toBe('none');
     expect(resendWelcome?.hasBody).toBe(false);
 
-    const listGroups = endpoints.find((item) => item.key === 'organization.groups.listGroups');
-    expect(listGroups).toBeDefined();
-    expect(listGroups?.method).toBe('GET');
-    expect(listGroups?.pathTemplate).toBe('/core/v1/organization/groups');
-    expect(listGroups?.bodyType).toBe('none');
-    expect(listGroups?.hasBody).toBe(false);
+    const getGroups = endpoints.find((item) => item.key === 'organization.groups.getGroups');
+    expect(getGroups).toBeDefined();
+    expect(getGroups?.method).toBe('GET');
+    expect(getGroups?.pathTemplate).toBe('/core/v1/organization/groups');
+    expect(getGroups?.bodyType).toBe('none');
+    expect(getGroups?.hasBody).toBe(false);
 
     const addUsers = endpoints.find((item) => item.key === 'organization.groups.addUsers');
     expect(addUsers?.method).toBe('POST');

@@ -21,7 +21,7 @@ describe('upgrade utilities', () => {
         latestVersionOverride: '0.5.0'
       },
       {
-        fetchImpl: fetchImpl as any,
+        fetchImpl: fetchImpl as typeof fetch,
         getCurrentVersion: () => '0.4.0'
       }
     );
@@ -59,7 +59,7 @@ describe('upgrade utilities', () => {
         latestVersionOverride: '0.5.0'
       },
       {
-        fetchImpl: vi.fn() as any,
+        fetchImpl: vi.fn() as unknown as typeof fetch,
         commandRunner,
         getCurrentVersion: () => '0.4.0',
         installSkillsImpl: vi.fn().mockResolvedValue({
@@ -122,7 +122,7 @@ describe('upgrade utilities', () => {
         latestVersionOverride: '0.6.0'
       },
       {
-        fetchImpl: vi.fn() as any,
+        fetchImpl: vi.fn() as unknown as typeof fetch,
         commandRunner,
         getCurrentVersion: () => '0.5.0',
         installSkillsImpl: vi.fn().mockResolvedValue({

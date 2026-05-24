@@ -20,6 +20,7 @@ import { buildDeepDive, buildFleetInspect, generateFleetReport } from '../src/wo
 import { generateOpsReport } from '../src/workflows/ops-report';
 import { runHeadlessRenderer } from '../src/tui/headless-renderer';
 import { MemorySecretStore } from '../src/secure/secret-store';
+import type { XyteClient } from '../src/types/client';
 import { MemoryProfileStore } from './support/memory-profile-store';
 
 const ajv = new Ajv2020({ strict: false });
@@ -204,7 +205,7 @@ describe('schema contracts', () => {
       }
     };
 
-    const client: any = {
+    const client = {
       organization: {
         getDevices: async () => [{ id: 'dev-1', name: 'Device One', status: 'online' }],
         getIncidents: async () => [{ id: 'inc-1', severity: 'high', status: 'open' }],
@@ -216,7 +217,7 @@ describe('schema contracts', () => {
         getDevices: async () => [],
         getTickets: async () => []
       }
-    };
+    } as unknown as XyteClient;
 
     await runHeadlessRenderer({
       client,

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createXyteClient } from '../src/client/create-client';
+import type { XyteClient } from '../src/types/client';
 import {
   getBuiltInFlowDefinition,
   type BuiltInFlowDefinition,
@@ -511,7 +512,7 @@ describe('flow runner', () => {
       secretStore,
       client: {
         callWithMeta
-      } as any
+      } as unknown as XyteClient
     });
 
     expect(result.outcome).toBe('completed');

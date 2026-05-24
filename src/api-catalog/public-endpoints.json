@@ -393,10 +393,10 @@
     ]
   },
   {
-    "key": "organization.edges.listEdges",
+    "key": "organization.edges.getEdges",
     "namespace": "organization",
     "group": "edges",
-    "action": "listEdges",
+    "action": "getEdges",
     "title": "Get Edges",
     "method": "GET",
     "base": "hub",
@@ -549,10 +549,10 @@
     ]
   },
   {
-    "key": "organization.groups.listGroups",
+    "key": "organization.groups.getGroups",
     "namespace": "organization",
     "group": "groups",
-    "action": "listGroups",
+    "action": "getGroups",
     "title": "Get Groups",
     "method": "GET",
     "base": "hub",
@@ -1016,10 +1016,10 @@
     ]
   },
   {
-    "key": "organization.users.listUsers",
+    "key": "organization.users.getUsers",
     "namespace": "organization",
     "group": "users",
-    "action": "listUsers",
+    "action": "getUsers",
     "title": "Get Users",
     "method": "GET",
     "base": "hub",

@@ -3,23 +3,20 @@ import { describe, expect, it, vi } from 'vitest';
 import { collectFleetSnapshot } from '../src/workflows/fleet-insights';
 import type { XyteClient } from '../src/types/client';
 
-type PartialClient = Pick<XyteClient, 'organization' | 'partner' | 'listTenantEndpoints'> &
-  Pick<XyteClient, 'call' | 'callWithMeta' | 'describeEndpoint' | 'listEndpoints'>;
-
 function makeOrgClient(overrides: {
   getDevices?: ReturnType<typeof vi.fn>;
   getSpaces?: ReturnType<typeof vi.fn>;
   getIncidents?: ReturnType<typeof vi.fn>;
   getTickets?: ReturnType<typeof vi.fn>;
-}): PartialClient {
+}): XyteClient {
   return {
-    listTenantEndpoints: vi.fn(async () => [{ authScope: 'organization' }] as any),
+    listTenantEndpoints: vi.fn(async () => [{ authScope: 'organization' }]),
     organization: {
       getDevices: overrides.getDevices ?? vi.fn(async () => ({ items: [] })),
       getSpaces: overrides.getSpaces ?? vi.fn(async () => ({ items: [] })),
       getIncidents: overrides.getIncidents ?? vi.fn(async () => ({ items: [] })),
       getTickets: overrides.getTickets ?? vi.fn(async () => ({ items: [] }))
-    } as any,
+    },
     partner: {
       getDevices: vi.fn(async () => ({ items: [] })),
       getDeviceInfo: vi.fn(async () => ({})),
@@ -27,12 +24,12 @@ function makeOrgClient(overrides: {
       getTelemetries: vi.fn(async () => ({ telemetries: [] })),
       getStateHistory: vi.fn(async () => ({ history: [] })),
       getTickets: vi.fn(async () => ({ items: [] }))
-    } as any,
+    },
     call: vi.fn(),
     callWithMeta: vi.fn(),
     describeEndpoint: vi.fn(),
     listEndpoints: vi.fn()
-  };
+  } as unknown as XyteClient;
 }
 
 describe('fetchAllPages — pagination and non-paginated fallback', () => {
@@ -45,7 +42,7 @@ describe('fetchAllPages — pagination and non-paginated fallback', () => {
     });
     const client = makeOrgClient({ getDevices });
 
-    const snapshot = await collectFleetSnapshot({ client: client as any, tenantId: 't1', providerScope: 'organization' });
+    const snapshot = await collectFleetSnapshot({ client, tenantId: 't1', providerScope: 'organization' });
     expect(snapshot.devices).toHaveLength(100);
     // fetchSingle fallback should NOT have been called (pagination succeeded)
     // getDevices is called with page 1 (returns 100 items) then page 2 (returns empty)
@@ -60,7 +57,7 @@ describe('fetchAllPages — pagination and non-paginated fallback', () => {
     });
     const client = makeOrgClient({ getDevices });
 
-    const snapshot = await collectFleetSnapshot({ client: client as any, tenantId: 't1', providerScope: 'organization' });
+    const snapshot = await collectFleetSnapshot({ client, tenantId: 't1', providerScope: 'organization' });
     expect(snapshot.devices).toHaveLength(1);
     expect((snapshot.devices[0] as Record<string, unknown>).id).toBe('fallback-device');
   });
@@ -74,7 +71,7 @@ describe('loadAllOrganizationIncidents — deduplication', () => {
     const getIncidents = vi.fn(async () => ({ items: [sharedIncident] }));
     const client = makeOrgClient({ getIncidents });
 
-    const snapshot = await collectFleetSnapshot({ client: client as any, tenantId: 't1', providerScope: 'organization' });
+    const snapshot = await collectFleetSnapshot({ client, tenantId: 't1', providerScope: 'organization' });
     // The same incident ID should appear only once in the output
     const ids = snapshot.incidents.map((item) => (item as Record<string, unknown>).id);
     const unique = new Set(ids);
@@ -90,7 +87,7 @@ describe('loadAllOrganizationIncidents — deduplication', () => {
     });
     const client = makeOrgClient({ getIncidents });
 
-    const snapshot = await collectFleetSnapshot({ client: client as any, tenantId: 't1', providerScope: 'organization' });
+    const snapshot = await collectFleetSnapshot({ client, tenantId: 't1', providerScope: 'organization' });
     const ids = snapshot.incidents.map((item) => (item as Record<string, unknown>).id);
     expect(ids).toContain('inc-active');
     expect(ids).toContain('inc-closed');
@@ -108,8 +105,8 @@ describe('mapWithConcurrency — via partner enrichment', () => {
     const getStateHistory = vi.fn(async () => ({ history: [] }));
 
     const client = {
-      listTenantEndpoints: vi.fn(async () => [{ authScope: 'partner' }] as any),
-      organization: {} as any,
+      listTenantEndpoints: vi.fn(async () => [{ authScope: 'partner' }]),
+      organization: {},
       partner: {
         getDevices,
         getDeviceInfo,
@@ -117,18 +114,20 @@ describe('mapWithConcurrency — via partner enrichment', () => {
         getTelemetries,
         getStateHistory,
         getTickets: vi.fn(async () => ({ items: [] }))
-      } as any,
+      },
       call: vi.fn(),
       callWithMeta: vi.fn(),
       describeEndpoint: vi.fn(),
       listEndpoints: vi.fn()
-    };
+    } as unknown as XyteClient;
 
-    await collectFleetSnapshot({ client: client as any, tenantId: 't1', providerScope: 'partner' });
+    await collectFleetSnapshot({ client, tenantId: 't1', providerScope: 'partner' });
 
     // All 3 device IDs should have been enriched
     expect(getDeviceInfo).toHaveBeenCalledTimes(deviceIds.length);
-    const calledWith = getDeviceInfo.mock.calls.map((call) => (call as any)[0].path.device_id);
+    const calledWith = getDeviceInfo.mock.calls.map(
+      (call) => (call as unknown as [{ path: { device_id: string } }])[0].path.device_id
+    );
     expect(calledWith.sort()).toEqual(deviceIds.sort());
   });
 });

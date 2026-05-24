@@ -6,7 +6,7 @@ import { sceneFromTicketsState } from '../../src/tui/scene';
 describe('tickets screen write guard', () => {
   it('asks for confirmation before resolving ticket', async () => {
     const markResolved = vi.fn().mockResolvedValue({ ok: true });
-    const context: any = {
+    const context = {
       client: {
         organization: {
           markResolved
@@ -16,7 +16,7 @@ describe('tickets screen write guard', () => {
       confirmWrite: vi.fn().mockResolvedValue(false),
       setStatus: vi.fn(),
       showError: vi.fn()
-    };
+    } as unknown as Parameters<typeof markTicketResolvedWithGuard>[0]['context'];
 
     const result = await markTicketResolvedWithGuard({
       ticket: { id: 't-1', status: 'open' },
@@ -32,7 +32,7 @@ describe('tickets screen write guard', () => {
 
   it('resolves organization ticket after confirmation', async () => {
     const markResolved = vi.fn().mockResolvedValue({ ok: true });
-    const context: any = {
+    const context = {
       client: {
         organization: { markResolved }
       },
@@ -40,7 +40,7 @@ describe('tickets screen write guard', () => {
       confirmWrite: vi.fn().mockResolvedValue(true),
       setStatus: vi.fn(),
       showError: vi.fn()
-    };
+    } as unknown as Parameters<typeof markTicketResolvedWithGuard>[0]['context'];
 
     const result = await markTicketResolvedWithGuard({
       ticket: { id: 't-1' },
@@ -58,7 +58,7 @@ describe('tickets screen write guard', () => {
   });
 
   it('blocks resolve in partner mode by policy', async () => {
-    const context: any = {
+    const context = {
       client: {
         organization: { markResolved: vi.fn() }
       },
@@ -66,7 +66,7 @@ describe('tickets screen write guard', () => {
       confirmWrite: vi.fn().mockResolvedValue(true),
       setStatus: vi.fn(),
       showError: vi.fn()
-    };
+    } as unknown as Parameters<typeof markTicketResolvedWithGuard>[0]['context'];
 
     const result = await markTicketResolvedWithGuard({
       ticket: { id: 't-1' },
@@ -83,7 +83,7 @@ describe('tickets screen write guard', () => {
 
   it('does not attempt resolve when ticket id is missing', async () => {
     const markResolved = vi.fn().mockResolvedValue({ ok: true });
-    const context: any = {
+    const context = {
       client: {
         organization: { markResolved }
       },
@@ -91,7 +91,7 @@ describe('tickets screen write guard', () => {
       confirmWrite: vi.fn().mockResolvedValue(true),
       setStatus: vi.fn(),
       showError: vi.fn()
-    };
+    } as unknown as Parameters<typeof markTicketResolvedWithGuard>[0]['context'];
 
     const result = await markTicketResolvedWithGuard({
       ticket: { status: 'open' },
@@ -106,7 +106,7 @@ describe('tickets screen write guard', () => {
 
   it('sends ticket message after confirmation', async () => {
     const sendMessage = vi.fn().mockResolvedValue({ ok: true });
-    const context: any = {
+    const context = {
       client: {
         organization: { sendMessage }
       },
@@ -114,7 +114,7 @@ describe('tickets screen write guard', () => {
       confirmWrite: vi.fn().mockResolvedValue(true),
       setStatus: vi.fn(),
       showError: vi.fn()
-    };
+    } as unknown as Parameters<typeof sendTicketMessageWithGuard>[0]['context'];
 
     const result = await sendTicketMessageWithGuard({
       ticket: { id: 't-1' },
@@ -132,7 +132,7 @@ describe('tickets screen write guard', () => {
   });
 
   it('requires non-empty message', async () => {
-    const context: any = {
+    const context = {
       client: {
         organization: { sendMessage: vi.fn() }
       },
@@ -140,7 +140,7 @@ describe('tickets screen write guard', () => {
       confirmWrite: vi.fn().mockResolvedValue(true),
       setStatus: vi.fn(),
       showError: vi.fn()
-    };
+    } as unknown as Parameters<typeof sendTicketMessageWithGuard>[0]['context'];
 
     const result = await sendTicketMessageWithGuard({
       ticket: { id: 't-1' },
@@ -155,7 +155,7 @@ describe('tickets screen write guard', () => {
   });
 
   it('renders ticket detail safely for cyclic payloads', () => {
-    const ticket: any = { id: 't-1', status: 'open', subject: 'Help' };
+    const ticket: Record<string, unknown> = { id: 't-1', status: 'open', subject: 'Help' };
     ticket.self = ticket;
 
     const panels = sceneFromTicketsState({
