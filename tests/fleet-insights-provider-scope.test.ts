@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { buildDeepDive, collectFleetSnapshot } from '../src/workflows/fleet-insights';
 import type { XyteClient } from '../src/types/client';
+import type { PublicEndpointSpec } from '../src/types/endpoints';
 import type { InspectProviderScope } from '../src/types/settings-enums';
+import { makeEndpointSpec, makeXyteClientMock } from './support/typed-mocks';
 
 type FixtureOptions = {
   hasOrganization: boolean;
@@ -57,26 +59,22 @@ function makeFixture(options: FixtureOptions): Fixture {
       throw options.listTenantEndpointsError;
     }
 
-    const endpoints: Array<{ authScope: 'organization' | 'partner' }> = [];
+    const endpoints: PublicEndpointSpec[] = [];
     if (options.hasOrganization) {
-      endpoints.push({ authScope: 'organization' });
+      endpoints.push(makeEndpointSpec({ authScope: 'organization' }));
     }
     if (options.hasPartner) {
-      endpoints.push({ authScope: 'partner' });
+      endpoints.push(makeEndpointSpec({ authScope: 'partner' }));
     }
     return endpoints;
   });
 
   return {
-    client: {
+    client: makeXyteClientMock({
       organization,
       partner,
-      call: vi.fn(),
-      callWithMeta: vi.fn(),
-      describeEndpoint: vi.fn(),
-      listEndpoints: vi.fn(),
       listTenantEndpoints
-    } as unknown as XyteClient,
+    }),
     listTenantEndpoints,
     organization,
     partner

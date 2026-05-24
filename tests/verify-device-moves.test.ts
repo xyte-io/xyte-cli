@@ -2,10 +2,10 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import type { XyteClient } from '../src/types/client';
 import { runVerifyMovedDevices } from '../src/workflows/verify-device-moves';
+import { makeCallWithMeta, makeXyteClientMock } from './support/typed-mocks';
 
 function makeTempInput(rows: Array<Record<string, string | number>>): string {
   const dir = join(tmpdir(), `verify-test-${Date.now()}`);
@@ -21,14 +21,19 @@ describe('runVerifyMovedDevices', () => {
   it('returns verified when device space matches target', async () => {
     const inputPath = makeTempInput([{ device_id: 'dev-1', target_space_id: 100 }]);
     const outputPath = join(tmpdir(), `verify-out-${Date.now()}.json`);
-    const client = {
-      callWithMeta: vi.fn().mockResolvedValue({
-        data: { id: 'dev-1', name: 'Device 1', space_id: 100 }
-      })
-    };
+    const client = makeXyteClientMock({
+      callWithMeta: makeCallWithMeta(async () => ({
+        status: 200,
+        headers: {},
+        data: { id: 'dev-1', name: 'Device 1', space_id: 100 },
+        durationMs: 1,
+        retryCount: 0,
+        attempts: 1
+      }))
+    });
 
     const result = await runVerifyMovedDevices({
-      client: client as unknown as XyteClient,
+      client,
       tenantId: 'tenant-1',
       inputPath,
       outputPath
@@ -41,14 +46,19 @@ describe('runVerifyMovedDevices', () => {
   it('returns mismatched when device space differs from target', async () => {
     const inputPath = makeTempInput([{ device_id: 'dev-2', target_space_id: 200 }]);
     const outputPath = join(tmpdir(), `verify-out-${Date.now()}.json`);
-    const client = {
-      callWithMeta: vi.fn().mockResolvedValue({
-        data: { id: 'dev-2', name: 'Device 2', space_id: 999 }
-      })
-    };
+    const client = makeXyteClientMock({
+      callWithMeta: makeCallWithMeta(async () => ({
+        status: 200,
+        headers: {},
+        data: { id: 'dev-2', name: 'Device 2', space_id: 999 },
+        durationMs: 1,
+        retryCount: 0,
+        attempts: 1
+      }))
+    });
 
     const result = await runVerifyMovedDevices({
-      client: client as unknown as XyteClient,
+      client,
       tenantId: 'tenant-1',
       inputPath,
       outputPath
@@ -61,12 +71,14 @@ describe('runVerifyMovedDevices', () => {
   it('returns missing when API throws an error', async () => {
     const inputPath = makeTempInput([{ device_id: 'dev-3', target_space_id: 300 }]);
     const outputPath = join(tmpdir(), `verify-out-${Date.now()}.json`);
-    const client = {
-      callWithMeta: vi.fn().mockRejectedValue(new Error('Device not found'))
-    };
+    const client = makeXyteClientMock({
+      callWithMeta: makeCallWithMeta(async () => {
+        throw new Error('Device not found');
+      })
+    });
 
     const result = await runVerifyMovedDevices({
-      client: client as unknown as XyteClient,
+      client,
       tenantId: 'tenant-1',
       inputPath,
       outputPath

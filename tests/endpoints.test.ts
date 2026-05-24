@@ -84,6 +84,7 @@ describe('public endpoint catalog', () => {
     expect(suspend?.pathParams).toEqual(['device_id']);
     expect(suspend?.bodyType).toBe('none');
     expect(suspend?.hasBody).toBe(false);
+    expect(suspend?.sourceFile).toBe('https://docs.xyte.io/reference/suspend-incidents');
 
     const resume = endpoints.find((item) => item.key === 'organization.devices.resumeIncidents');
     expect(resume).toBeDefined();
@@ -92,6 +93,7 @@ describe('public endpoint catalog', () => {
     expect(resume?.pathParams).toEqual(['device_id']);
     expect(resume?.bodyType).toBe('none');
     expect(resume?.hasBody).toBe(false);
+    expect(resume?.sourceFile).toBe('https://docs.xyte.io/reference/resume-incidents');
   });
 
   it('does not include stale PR aliases for endpoints already represented on main', () => {

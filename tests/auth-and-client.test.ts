@@ -2,13 +2,13 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { createXyteClient } from '../src/client/create-client';
 import { createSecretStore, MemorySecretStore } from '../src/secure/secret-store';
 import { XyteAuthError } from '../src/http/errors';
-import type { HttpTransport } from '../src/http/transport';
 import { MemoryProfileStore } from './support/memory-profile-store';
+import { makeHttpTransportMock } from './support/typed-mocks';
 
 describe('client auth behavior', () => {
   it('injects organization auth header from tenant secretStore', async () => {
@@ -23,16 +23,14 @@ describe('client auth behavior', () => {
     });
     await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key-123');
 
-    const transport = {
-      request: vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } })
-    };
+    const { transport, request } = makeHttpTransportMock();
 
-    const client = createXyteClient({ profileStore, secretStore, transport: transport as unknown as HttpTransport });
+    const client = createXyteClient({ profileStore, secretStore, transport });
     await client.organization.getDevices();
 
-    expect(transport.request).toHaveBeenCalledTimes(1);
-    expect(transport.request.mock.calls[0][0].headers.Authorization).toBe('org-key-123');
-    expect(transport.request.mock.calls[0][0].headers['User-Agent']).toBe('CLI');
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request.mock.calls[0]?.[0].headers?.Authorization).toBe('org-key-123');
+    expect(request.mock.calls[0]?.[0].headers?.['User-Agent']).toBe('CLI');
   });
 
   it('throws auth error when scoped key is missing', async () => {
@@ -41,16 +39,14 @@ describe('client auth behavior', () => {
     await profileStore.setActiveTenant('acme');
 
     const secretStore = new MemorySecretStore();
-    const transport = {
-      request: vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } })
-    };
+    const { transport } = makeHttpTransportMock();
 
     await profileStore.addKeySlot('acme', 'xyte-org', {
       name: 'missing-secret',
       fingerprint: 'sha256:none'
     });
 
-    const client = createXyteClient({ profileStore, secretStore, transport: transport as unknown as HttpTransport });
+    const client = createXyteClient({ profileStore, secretStore, transport });
     await expect(client.organization.getDevices()).rejects.toBeInstanceOf(XyteAuthError);
   });
 
@@ -66,20 +62,17 @@ describe('client auth behavior', () => {
     });
     await secretStore.setSlotSecret('acme', 'xyte-partner', slot.slotId, 'partner-key-456');
 
-    const transport = {
-      request: vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } })
-    };
+    const { transport, request } = makeHttpTransportMock();
 
-    const client = createXyteClient({ profileStore, secretStore, transport: transport as unknown as HttpTransport });
+    const client = createXyteClient({ profileStore, secretStore, transport });
     await client.partner.getDevices();
 
-    expect(transport.request).toHaveBeenCalledTimes(1);
-    expect(transport.request.mock.calls[0][0].headers.Authorization).toBe('partner-key-456');
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request.mock.calls[0]?.[0].headers?.Authorization).toBe('partner-key-456');
   });
 
   it('does not send a body for organization command reads', async () => {
-    const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { items: [] } });
-    const transport = { request } as unknown as HttpTransport;
+    const { transport, request } = makeHttpTransportMock();
 
     const client = createXyteClient({
       auth: { organization: 'org-key-123' },
@@ -97,12 +90,11 @@ describe('client auth behavior', () => {
     expect(sent.method).toBe('GET');
     expect(sent.url).toBe('https://hub.example.test/core/v1/organization/devices/dev-1/commands?status=pending');
     expect(sent.body).toBeUndefined();
-    expect(sent.headers['Content-Type']).toBeUndefined();
+    expect(sent.headers?.['Content-Type']).toBeUndefined();
   });
 
   it('uses the callable partner ticket path without the docs copy suffix', async () => {
-    const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { id: 'ticket-1' } });
-    const transport = { request } as unknown as HttpTransport;
+    const { transport, request } = makeHttpTransportMock();
 
     const client = createXyteClient({
       auth: { partner: 'partner-key-456' },
@@ -119,8 +111,7 @@ describe('client auth behavior', () => {
   });
 
   it('does not send a body for organization device incident controls', async () => {
-    const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { success: true } });
-    const transport = { request } as unknown as HttpTransport;
+    const { transport, request } = makeHttpTransportMock();
 
     const client = createXyteClient({
       auth: { organization: 'org-key-123' },
@@ -137,12 +128,11 @@ describe('client auth behavior', () => {
     expect(sent.method).toBe('POST');
     expect(sent.url).toBe('https://hub.example.test/core/v1/organization/devices/dev-1/suspend_incidents');
     expect(sent.body).toBeUndefined();
-    expect(sent.headers['Content-Type']).toBeUndefined();
+    expect(sent.headers?.['Content-Type']).toBeUndefined();
   });
 
   it('builds query URLs for organization users and edges collection endpoints', async () => {
-    const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { items: [] } });
-    const transport = { request } as unknown as HttpTransport;
+    const { transport, request } = makeHttpTransportMock();
 
     const client = createXyteClient({
       auth: { organization: 'org-key-123' },
@@ -171,8 +161,7 @@ describe('client auth behavior', () => {
   });
 
   it('sends JSON bodies for organization group membership writes', async () => {
-    const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } });
-    const transport = { request } as unknown as HttpTransport;
+    const { transport, request } = makeHttpTransportMock();
 
     const client = createXyteClient({
       auth: { organization: 'org-key-123' },
@@ -189,12 +178,11 @@ describe('client auth behavior', () => {
     expect(sent.method).toBe('POST');
     expect(sent.url).toBe('https://hub.example.test/core/v1/organization/groups/group-1/add_users');
     expect(sent.body).toBe('{"user_ids":["user-1"]}');
-    expect(sent.headers['Content-Type']).toBe('application/json');
+    expect(sent.headers?.['Content-Type']).toBe('application/json');
   });
 
   it('sends partner organization creation through the partner auth scope', async () => {
-    const request = vi.fn().mockResolvedValue({ status: 201, headers: {}, data: { id: 'org-1' } });
-    const transport = { request } as unknown as HttpTransport;
+    const { transport, request } = makeHttpTransportMock();
 
     const client = createXyteClient({
       auth: { partner: 'partner-key-456' },
@@ -213,7 +201,7 @@ describe('client auth behavior', () => {
     const sent = request.mock.calls[0][0];
     expect(sent.method).toBe('POST');
     expect(sent.url).toBe('https://hub.example.test/core/v1/partner/organizations');
-    expect(sent.headers.Authorization).toBe('partner-key-456');
+    expect(sent.headers?.Authorization).toBe('partner-key-456');
     expect(sent.body).toBe(
       '{"name":"Acme HQ","admin_contact_email":"admin@example.com","admin_contact_name":"Jane Doe"}'
     );
@@ -237,14 +225,12 @@ describe('client auth behavior', () => {
     await secretStore.setSlotSecret('acme', 'xyte-org', slotB.slotId, 'org-key-b');
     await profileStore.setActiveKeySlot('acme', 'xyte-org', slotB.slotId);
 
-    const transport = {
-      request: vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } })
-    };
+    const { transport, request } = makeHttpTransportMock();
 
-    const client = createXyteClient({ profileStore, secretStore, transport: transport as unknown as HttpTransport });
+    const client = createXyteClient({ profileStore, secretStore, transport });
     await client.organization.getDevices();
 
-    expect(transport.request.mock.calls[0][0].headers.Authorization).toBe('org-key-b');
+    expect(request.mock.calls[0]?.[0].headers?.Authorization).toBe('org-key-b');
   });
 
   it('injects auth headers from the selected persisted file backend', async () => {
@@ -267,13 +253,11 @@ describe('client auth behavior', () => {
     });
     await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key-file');
 
-    const transport = {
-      request: vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } })
-    };
+    const { transport, request } = makeHttpTransportMock();
 
-    const client = createXyteClient({ profileStore, secretStore, transport: transport as unknown as HttpTransport });
+    const client = createXyteClient({ profileStore, secretStore, transport });
     await client.organization.getDevices();
 
-    expect(transport.request.mock.calls[0][0].headers.Authorization).toBe('org-key-file');
+    expect(request.mock.calls[0]?.[0].headers?.Authorization).toBe('org-key-file');
   });
 });

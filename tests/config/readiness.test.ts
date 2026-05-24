@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { evaluateReadiness } from '../../src/config/readiness';
 import { MemorySecretStore } from '../../src/secure/secret-store';
-import type { XyteClient } from '../../src/types/client';
 import { MemoryProfileStore } from '../support/memory-profile-store';
+import { makeXyteClientMock } from '../support/typed-mocks';
 
 describe('readiness evaluation', () => {
   it('returns needs_setup when no active tenant exists', async () => {
@@ -26,16 +26,15 @@ describe('readiness evaluation', () => {
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
     const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
-      
       name: 'primary',
       fingerprint: 'sha256:test'
     });
     await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key');
 
-    const client = {
+    const client = makeXyteClientMock({
       organization: { getOrganizationInfo: async () => ({ ok: true }) },
       partner: { getDevices: async () => [] }
-    } as unknown as XyteClient;
+    });
 
     const readiness = await evaluateReadiness({
       profileStore,
@@ -54,16 +53,19 @@ describe('readiness evaluation', () => {
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
     const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
-      
       name: 'primary',
       fingerprint: 'sha256:test'
     });
     await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key');
 
-    const client = {
-      organization: { getOrganizationInfo: async () => Promise.reject(new TypeError('fetch failed')) },
-      partner: { getDevices: async () => Promise.reject(new TypeError('fetch failed')) }
-    } as unknown as XyteClient;
+    const client = makeXyteClientMock({
+      organization: {
+        getOrganizationInfo: async () => Promise.reject(new TypeError('fetch failed'))
+      },
+      partner: {
+        getDevices: async () => Promise.reject(new TypeError('fetch failed'))
+      }
+    });
 
     const readiness = await evaluateReadiness({
       profileStore,

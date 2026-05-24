@@ -1,6 +1,14 @@
-import type blessed from 'blessed';
-
 import type { TuiArrowHandleResult, TuiArrowKey, TuiPaneId } from './types';
+
+export interface ListTableLike {
+  selected?: number;
+  select(index: number): void;
+  setData?(rows: string[][]): void;
+}
+
+export interface ScrollBoxLike {
+  scroll?(amount: number): void;
+}
 
 export interface SelectionSyncState {
   syncing: boolean;
@@ -30,7 +38,7 @@ function withSelectionSyncGuard(state: SelectionSyncState | undefined, fn: () =>
 }
 
 export function setListTableData(
-  list: blessed.Widgets.ListTableElement | undefined,
+  list: ListTableLike | undefined,
   rows: Array<Array<string | number>>,
   state?: SelectionSyncState
 ): void {
@@ -38,12 +46,12 @@ export function setListTableData(
     return;
   }
   withSelectionSyncGuard(state, () => {
-    list.setData(rows as unknown as string[][]);
+    list.setData?.(rows.map((row) => row.map(String)));
   });
 }
 
 export function syncListSelection(
-  list: blessed.Widgets.ListTableElement | undefined,
+  list: ListTableLike | undefined,
   rowIndex: number,
   state: SelectionSyncState
 ): void {
@@ -55,7 +63,7 @@ export function syncListSelection(
   }
 
   const target = Math.max(0, rowIndex) + 1;
-  const currentSelected = (list as unknown as { selected?: number }).selected;
+  const currentSelected = list.selected;
   if (currentSelected === target) {
     return;
   }
@@ -123,7 +131,7 @@ export function movePaneWithBoundary(
 }
 
 export function moveTableSelection(args: {
-  table?: blessed.Widgets.ListTableElement;
+  table?: ListTableLike;
   index: number;
   delta: number;
   totalRows: number;
@@ -142,11 +150,11 @@ export function moveTableSelection(args: {
   return next;
 }
 
-export function scrollBox(box: blessed.Widgets.BoxElement | undefined, delta: number): void {
+export function scrollBox(box: ScrollBoxLike | undefined, delta: number): void {
   if (!box || delta === 0) {
     return;
   }
-  const scroll = (box as unknown as { scroll?: (amount: number) => void }).scroll;
+  const scroll = box.scroll;
   if (typeof scroll !== 'function') {
     return;
   }

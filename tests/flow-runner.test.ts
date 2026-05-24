@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createXyteClient } from '../src/client/create-client';
-import type { XyteClient } from '../src/types/client';
 import {
   getBuiltInFlowDefinition,
   type BuiltInFlowDefinition,
@@ -16,6 +15,7 @@ import { runDeterministicFlow } from '../src/workflows/flow-runner';
 import { UtilityBatchResultSchema } from '../src/workflows/utility-batch';
 import { MemorySecretStore } from '../src/secure/secret-store';
 import { MemoryProfileStore } from './support/memory-profile-store';
+import { makeCallWithMeta, makeCallWithMetaHandler, makeXyteClientMock } from './support/typed-mocks';
 
 // Per-test overrides captured by the vi.mock factory closures below.
 let builtInDefinitionOverride: BuiltInFlowDefinition | null = null;
@@ -469,10 +469,12 @@ describe('flow runner', () => {
   it('reuses the transport requestId in flow call envelopes', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();
-    const callWithMeta = vi.fn(async (_endpointKey: string, _args: { requestId?: string }) => ({
+    const callWithMetaHandler = makeCallWithMetaHandler(async () => ({
       status: 200,
+      headers: {},
       durationMs: 12,
       retryCount: 0,
+      attempts: 1,
       data: { ok: true }
     }));
 
@@ -510,14 +512,14 @@ describe('flow runner', () => {
       strictJson: true,
       profileStore,
       secretStore,
-      client: {
-        callWithMeta
-      } as unknown as XyteClient
+      client: makeXyteClientMock({
+        callWithMeta: makeCallWithMeta(callWithMetaHandler)
+      })
     });
 
     expect(result.outcome).toBe('completed');
-    expect(callWithMeta).toHaveBeenCalledTimes(1);
-    const requestId = callWithMeta.mock.calls[0]?.[1]?.requestId;
+    expect(callWithMetaHandler).toHaveBeenCalledTimes(1);
+    const requestId = callWithMetaHandler.mock.calls[0]?.[1]?.requestId;
     expect(typeof requestId).toBe('string');
     const artifactPath = result.steps.find((step) => step.stepId === 'read_devices')?.artifactPath;
     expect(artifactPath).toBeDefined();

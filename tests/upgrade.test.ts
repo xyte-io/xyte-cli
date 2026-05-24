@@ -13,7 +13,8 @@ describe('upgrade utilities', () => {
   });
 
   it('uses override latest version without calling registry', async () => {
-    const fetchImpl = vi.fn();
+    const fetchMock = vi.fn(async (_input: Parameters<typeof fetch>[0], _init?: Parameters<typeof fetch>[1]) => new Response('{}'));
+    const fetchImpl: typeof fetch = (input, init) => fetchMock(input, init);
 
     const result = await checkForUpgrade(
       {
@@ -21,12 +22,12 @@ describe('upgrade utilities', () => {
         latestVersionOverride: '0.5.0'
       },
       {
-        fetchImpl: fetchImpl as typeof fetch,
+        fetchImpl,
         getCurrentVersion: () => '0.4.0'
       }
     );
 
-    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(result.latestVersion).toBe('0.5.0');
     expect(result.upToDate).toBe(false);
   });
@@ -59,7 +60,7 @@ describe('upgrade utilities', () => {
         latestVersionOverride: '0.5.0'
       },
       {
-        fetchImpl: vi.fn() as unknown as typeof fetch,
+        fetchImpl: async () => new Response('{}'),
         commandRunner,
         getCurrentVersion: () => '0.4.0',
         installSkillsImpl: vi.fn().mockResolvedValue({
@@ -122,7 +123,7 @@ describe('upgrade utilities', () => {
         latestVersionOverride: '0.6.0'
       },
       {
-        fetchImpl: vi.fn() as unknown as typeof fetch,
+        fetchImpl: async () => new Response('{}'),
         commandRunner,
         getCurrentVersion: () => '0.5.0',
         installSkillsImpl: vi.fn().mockResolvedValue({

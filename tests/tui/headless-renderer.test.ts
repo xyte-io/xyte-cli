@@ -5,9 +5,9 @@ import type { HeadlessFrame } from '../../src/tui/scene';
 import { MemorySecretStore } from '../../src/secure/secret-store';
 import { SCREEN_PANE_CONFIG } from '../../src/tui/panes';
 import type { TuiScreenId } from '../../src/tui/types';
-import type { XyteClient } from '../../src/types/client';
 import { MemoryProfileStore } from '../support/memory-profile-store';
 import { HEADLESS_FRAME_SCHEMA_VERSION } from '../../src/contracts/versions';
+import { makeXyteClientMock } from '../support/typed-mocks';
 
 function parseRuntimeFrame(chunks: string[]): (HeadlessFrame & { meta?: Record<string, unknown> }) | undefined {
   const parsed = chunks
@@ -25,7 +25,6 @@ async function makeReadyProfile() {
   await profileStore.upsertTenant({ id: 'acme', apiProvider: 'xyte-org' });
   await profileStore.setActiveTenant('acme');
   const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
-    
     name: 'primary',
     fingerprint: 'sha256:test'
   });
@@ -46,7 +45,7 @@ describe('headless renderer', () => {
       }
     };
 
-    const client = {
+    const client = makeXyteClientMock({
       organization: {
         getDevices: async () => [{ id: 'dev-1', name: 'Device One', status: 'online' }],
         getIncidents: async () => [{ id: 'inc-1', severity: 'high', status: 'open' }],
@@ -58,7 +57,7 @@ describe('headless renderer', () => {
         getDevices: async () => [],
         getTickets: async () => []
       }
-    } as unknown as XyteClient;
+    });
 
     await runHeadlessRenderer({
       client,
@@ -149,7 +148,7 @@ describe('headless renderer', () => {
       }
     };
 
-    const client = {
+    const client = makeXyteClientMock({
       organization: {
         getDevices: async () => [],
         getIncidents: async () => [],
@@ -161,7 +160,7 @@ describe('headless renderer', () => {
         getDevices: async () => [],
         getTickets: async () => []
       }
-    } as unknown as XyteClient;
+    });
 
     await expect(
       runHeadlessRenderer({
@@ -191,7 +190,7 @@ describe('headless renderer', () => {
       }
     };
 
-    const client = {
+    const client = makeXyteClientMock({
       organization: {
         getOrganizationInfo: async () => ({ ok: true }),
         getDevices: async () => [],
@@ -204,7 +203,7 @@ describe('headless renderer', () => {
         getDevices: async () => [],
         getTickets: async () => []
       }
-    } as unknown as XyteClient;
+    });
 
     await runHeadlessRenderer({
       client,
@@ -227,7 +226,7 @@ describe('headless renderer', () => {
     const { profileStore, secretStore } = await makeReadyProfile();
     const screens: TuiScreenId[] = ['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets'];
 
-    const client = {
+    const client = makeXyteClientMock({
       organization: {
         getOrganizationInfo: async () => ({ ok: true }),
         getDevices: async () => [{ id: 'dev-1', name: 'Device One', status: 'online', space_id: 'sp-1' }],
@@ -240,7 +239,7 @@ describe('headless renderer', () => {
         getDevices: async () => [],
         getTickets: async () => []
       }
-    } as unknown as XyteClient;
+    });
 
     for (const screen of screens) {
       const chunks: string[] = [];

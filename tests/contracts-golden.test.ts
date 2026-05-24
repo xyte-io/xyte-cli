@@ -11,10 +11,10 @@ import { buildWatchFrame } from '../src/contracts/watch-frame';
 import { buildUpgradeCheck } from '../src/contracts/upgrade';
 import { MemorySecretStore } from '../src/secure/secret-store';
 import { runHeadlessRenderer } from '../src/tui/headless-renderer';
-import type { XyteClient } from '../src/types/client';
 import { runUtilityPrepare } from '../src/workflows/utility-prepare';
 import { buildDeepDive, buildFleetInspect, generateFleetReport } from '../src/workflows/fleet-insights';
 import { MemoryProfileStore } from './support/memory-profile-store';
+import { makeXyteClientMock } from './support/typed-mocks';
 
 const GOLDEN_DIR = resolve(__dirname, 'fixtures/golden');
 
@@ -210,7 +210,7 @@ describe('golden contracts', () => {
       }
     };
 
-    const client = {
+    const client = makeXyteClientMock({
       organization: {
         getDevices: async () => [{ id: 'dev-1', name: 'Device One', status: 'online' }],
         getIncidents: async () => [{ id: 'inc-1', severity: 'high', status: 'open' }],
@@ -222,7 +222,7 @@ describe('golden contracts', () => {
         getDevices: async () => [],
         getTickets: async () => []
       }
-    } as unknown as XyteClient;
+    });
 
     await runHeadlessRenderer({
       client,

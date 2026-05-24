@@ -1,19 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { sendCommandWithGuard } from '../../src/tui/screens/devices';
+import { makeTuiContext, makeXyteClientMock } from '../support/typed-mocks';
 
 describe('devices screen actions', () => {
   it('sends command payload using command template', async () => {
     const sendCommand = vi.fn().mockResolvedValue({ ok: true });
-    const context = {
-      client: {
-        organization: { sendCommand }
-      },
+    const context = makeTuiContext({
+      client: makeXyteClientMock({ organization: { sendCommand } }),
       getActiveTenantId: vi.fn().mockResolvedValue('acme'),
       confirmWrite: vi.fn().mockResolvedValue(true),
       setStatus: vi.fn(),
       showError: vi.fn()
-    } as unknown as Parameters<typeof sendCommandWithGuard>[0]['context'];
+    });
 
     const result = await sendCommandWithGuard({
       device: { id: 'dev-1' },
@@ -35,15 +34,13 @@ describe('devices screen actions', () => {
 
   it('sends command payload using friendly_name template', async () => {
     const sendCommand = vi.fn().mockResolvedValue({ ok: true });
-    const context = {
-      client: {
-        organization: { sendCommand }
-      },
+    const context = makeTuiContext({
+      client: makeXyteClientMock({ organization: { sendCommand } }),
       getActiveTenantId: vi.fn().mockResolvedValue('acme'),
       confirmWrite: vi.fn().mockResolvedValue(true),
       setStatus: vi.fn(),
       showError: vi.fn()
-    } as unknown as Parameters<typeof sendCommandWithGuard>[0]['context'];
+    });
 
     const result = await sendCommandWithGuard({
       device: { id: 'dev-1' },
@@ -64,15 +61,13 @@ describe('devices screen actions', () => {
 
   it('fails when device id is missing', async () => {
     const sendCommand = vi.fn();
-    const context = {
-      client: {
-        organization: { sendCommand }
-      },
+    const context = makeTuiContext({
+      client: makeXyteClientMock({ organization: { sendCommand } }),
       getActiveTenantId: vi.fn().mockResolvedValue('acme'),
       confirmWrite: vi.fn().mockResolvedValue(true),
       setStatus: vi.fn(),
       showError: vi.fn()
-    } as unknown as Parameters<typeof sendCommandWithGuard>[0]['context'];
+    });
 
     const result = await sendCommandWithGuard({
       device: {},

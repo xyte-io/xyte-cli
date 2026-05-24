@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { XyteAuthError } from '../../src/http/errors';
-import type { XyteCallArgs, XyteClient } from '../../src/types/client';
+import type { XyteCallArgs } from '../../src/types/client';
 import type { SecretProvider } from '../../src/types/profile';
 import { MemoryProfileStore } from '../support/memory-profile-store';
+import { makeXyteClientMock } from '../support/typed-mocks';
 
 import {
   loadCommandTemplates,
@@ -20,27 +21,27 @@ async function makeProfileStore(provider: SecretProvider = 'xyte-org') {
 
 describe('tui data loaders', () => {
   it('loads spaces list from organization API', async () => {
-    const client: unknown = {
+    const client = makeXyteClientMock({
       organization: {
         getSpaces: async () => ({ data: [{ id: 's1', name: 'HQ' }] })
       }
-    };
+    });
 
-    const spaces = await loadSpacesData(client as XyteClient, 'acme');
+    const spaces = await loadSpacesData(client, 'acme');
     expect(spaces.data).toEqual([{ id: 's1', name: 'HQ' }]);
     expect(spaces.connectionState).toBe('connected');
   });
 
   it('loads space drilldown using query result when available', async () => {
     const profileStore = await makeProfileStore();
-    const client: unknown = {
+    const client = makeXyteClientMock({
       organization: {
         getSpace: async () => ({ id: 's1', name: 'HQ' }),
         getDevices: async () => ({ data: [{ id: 'd1', space_id: 's1' }] })
       }
-    };
+    });
 
-    const result = await loadSpaceDrilldownData(client as XyteClient, 'acme', { spaceId: 's1', profileStore });
+    const result = await loadSpaceDrilldownData(client, 'acme', { spaceId: 's1', profileStore });
     expect(result.data.spaceDetail).toEqual({ id: 's1', name: 'HQ' });
     expect(result.data.devicesInSpace.length).toBe(1);
     expect(result.data.devicesInSpace.length).toBeGreaterThan(0);
@@ -49,14 +50,14 @@ describe('tui data loaders', () => {
 
   it('falls back to cached devices when query returns none', async () => {
     const profileStore = await makeProfileStore();
-    const client: unknown = {
+    const client = makeXyteClientMock({
       organization: {
         getSpace: async () => ({ id: 's1', name: 'HQ' }),
         getDevices: async () => ({ data: [] })
       }
-    };
+    });
 
-    const result = await loadSpaceDrilldownData(client as XyteClient, 'acme', {
+    const result = await loadSpaceDrilldownData(client, 'acme', {
       spaceId: 's1',
       allDevicesCache: [
         { id: 'd1', space_id: 's1' },
@@ -70,7 +71,7 @@ describe('tui data loaders', () => {
   });
 
   it('extracts incidents from known wrappers and normalizes primitive values', async () => {
-    const client: unknown = {
+    const client = makeXyteClientMock({
       organization: {
         getIncidents: async () => ({
           response: {
@@ -78,16 +79,16 @@ describe('tui data loaders', () => {
           }
         })
       }
-    };
+    });
 
-    const incidents = await loadIncidentsData(client as XyteClient, 'acme');
+    const incidents = await loadIncidentsData(client, 'acme');
     expect(incidents.connectionState).toBe('connected');
     expect(incidents.data).toEqual([{ id: 'inc-1' }, { value: 'legacy-value' }]);
   });
 
   it('queries active incidents with integer range and pagination', async () => {
     const calls: XyteCallArgs[] = [];
-    const client: unknown = {
+    const client = makeXyteClientMock({
       organization: {
         getIncidents: async (args: XyteCallArgs = {}) => {
           calls.push(args);
@@ -101,9 +102,9 @@ describe('tui data loaders', () => {
           return { items: [], has_next_page: false };
         }
       }
-    };
+    });
 
-    const incidents = await loadIncidentsData(client as XyteClient, 'acme');
+    const incidents = await loadIncidentsData(client, 'acme');
     expect(incidents.connectionState).toBe('connected');
     expect(incidents.data.map((incident) => (incident as Record<string, unknown>).id)).toEqual(['inc-1', 'inc-2']);
     expect(calls.length).toBe(2);
@@ -116,15 +117,15 @@ describe('tui data loaders', () => {
   });
 
   it('returns connection metadata for incident loader failures', async () => {
-    const client: unknown = {
+    const client = makeXyteClientMock({
       organization: {
         getIncidents: async () => {
           throw new TypeError('network unavailable');
         }
       }
-    };
+    });
 
-    const incidents = await loadIncidentsData(client as XyteClient, 'acme');
+    const incidents = await loadIncidentsData(client, 'acme');
     expect(incidents.connectionState).toBe('network_error');
     expect(incidents.error?.class).toBe('network');
     expect(incidents.retry.retried).toBe(true);
@@ -132,7 +133,7 @@ describe('tui data loaders', () => {
 
   it('passes devices space_id query and preserves local fallback filtering', async () => {
     const profileStore = await makeProfileStore();
-    const client: unknown = {
+    const client = makeXyteClientMock({
       organization: {
         getDevices: async (args: XyteCallArgs = {}) => ({
           query: args.query,
@@ -145,16 +146,16 @@ describe('tui data loaders', () => {
       partner: {
         getDevices: async () => []
       }
-    };
+    });
 
-    const devices = await loadDevicesData(client as XyteClient, 'acme', { profileStore, query: { space_id: 's1' } });
+    const devices = await loadDevicesData(client, 'acme', { profileStore, query: { space_id: 's1' } });
     expect(devices.connectionState).toBe('connected');
     expect(devices.data.map((item) => (item as Record<string, unknown>).id)).toEqual(['d1']);
   });
 
   it('routes devices through stored partner provider without touching organization API', async () => {
     const profileStore = await makeProfileStore('xyte-partner');
-    const client: unknown = {
+    const client = makeXyteClientMock({
       organization: {
         getDevices: async () => {
           throw new Error('organization should not be called');
@@ -168,9 +169,9 @@ describe('tui data loaders', () => {
           ]
         })
       }
-    };
+    });
 
-    const devices = await loadDevicesData(client as XyteClient, 'acme', {
+    const devices = await loadDevicesData(client, 'acme', {
       profileStore,
       query: { space_id: 's1' }
     });
@@ -182,7 +183,7 @@ describe('tui data loaders', () => {
   it('does not fall back to partner when stored provider is organization', async () => {
     const profileStore = await makeProfileStore('xyte-org');
     let partnerCalls = 0;
-    const client: unknown = {
+    const client = makeXyteClientMock({
       organization: {
         getDevices: async () => {
           throw new XyteAuthError('organization auth failed');
@@ -194,9 +195,9 @@ describe('tui data loaders', () => {
           return { items: [{ id: 'd1' }] };
         }
       }
-    };
+    });
 
-    const devices = await loadDevicesData(client as XyteClient, 'acme', { profileStore });
+    const devices = await loadDevicesData(client, 'acme', { profileStore });
 
     expect(devices.connectionState).toBe('auth_required');
     expect(devices.data).toEqual([]);
@@ -205,16 +206,16 @@ describe('tui data loaders', () => {
 
   it('passes structured spaces query fields', async () => {
     const calls: XyteCallArgs[] = [];
-    const client: unknown = {
+    const client = makeXyteClientMock({
       organization: {
         getSpaces: async (args: XyteCallArgs = {}) => {
           calls.push(args);
           return { items: [{ id: 's1' }] };
         }
       }
-    };
+    });
 
-    const spaces = await loadSpacesData(client as XyteClient, 'acme', {
+    const spaces = await loadSpacesData(client, 'acme', {
       query: {
         name: 'HQ',
         parent_id: '100',
@@ -233,15 +234,15 @@ describe('tui data loaders', () => {
   });
 
   it('loads command templates from organization getCommands', async () => {
-    const client: unknown = {
+    const client = makeXyteClientMock({
       organization: {
         getCommands: async () => ({
           items: [{ command: 'reboot' }, { friendly_name: 'power_cycle' }]
         })
       }
-    };
+    });
 
-    const templates = await loadCommandTemplates(client as XyteClient, 'acme', { deviceId: 'dev-1' });
+    const templates = await loadCommandTemplates(client, 'acme', { deviceId: 'dev-1' });
     expect(templates.connectionState).toBe('connected');
     expect(templates.data).toEqual([
       { mode: 'command', value: 'reboot', label: 'command: reboot' },

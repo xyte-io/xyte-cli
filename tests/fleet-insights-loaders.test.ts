@@ -1,16 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { collectFleetSnapshot } from '../src/workflows/fleet-insights';
-import type { XyteClient } from '../src/types/client';
+import type { NamespaceCall, XyteCallArgs } from '../src/types/client';
+import { makeEndpointSpec, makeXyteClientMock } from './support/typed-mocks';
 
 function makeOrgClient(overrides: {
-  getDevices?: ReturnType<typeof vi.fn>;
-  getSpaces?: ReturnType<typeof vi.fn>;
-  getIncidents?: ReturnType<typeof vi.fn>;
-  getTickets?: ReturnType<typeof vi.fn>;
-}): XyteClient {
-  return {
-    listTenantEndpoints: vi.fn(async () => [{ authScope: 'organization' }]),
+  getDevices?: NamespaceCall;
+  getSpaces?: NamespaceCall;
+  getIncidents?: NamespaceCall;
+  getTickets?: NamespaceCall;
+}) {
+  return makeXyteClientMock({
+    listTenantEndpoints: vi.fn(async () => [makeEndpointSpec({ authScope: 'organization' })]),
     organization: {
       getDevices: overrides.getDevices ?? vi.fn(async () => ({ items: [] })),
       getSpaces: overrides.getSpaces ?? vi.fn(async () => ({ items: [] })),
@@ -24,20 +25,16 @@ function makeOrgClient(overrides: {
       getTelemetries: vi.fn(async () => ({ telemetries: [] })),
       getStateHistory: vi.fn(async () => ({ history: [] })),
       getTickets: vi.fn(async () => ({ items: [] }))
-    },
-    call: vi.fn(),
-    callWithMeta: vi.fn(),
-    describeEndpoint: vi.fn(),
-    listEndpoints: vi.fn()
-  } as unknown as XyteClient;
+    }
+  });
 }
 
 describe('fetchAllPages — pagination and non-paginated fallback', () => {
   it('collects all items across multiple pages', async () => {
     // First call returns 100 items (a full page), second returns empty → stop paginating
     const page1Items = Array.from({ length: 100 }, (_, i) => ({ id: `d${i}` }));
-    const getDevices = vi.fn(async ({ query }: { query?: { page?: number } }) => {
-      if (!query || query.page === 1) return { items: page1Items };
+    const getDevices = vi.fn(async (args?: XyteCallArgs) => {
+      if (!args?.query || args.query.page === 1) return { items: page1Items };
       return { items: [] };
     });
     const client = makeOrgClient({ getDevices });
@@ -51,8 +48,8 @@ describe('fetchAllPages — pagination and non-paginated fallback', () => {
 
   it('falls back to non-paginated request when paginated call returns empty', async () => {
     // The paginated call returns empty; the non-paginated fetchSingle call returns items
-    const getDevices = vi.fn(async ({ query }: { query?: unknown }) => {
-      if (query) return { items: [] }; // paginated call — returns empty
+    const getDevices = vi.fn(async (args?: XyteCallArgs) => {
+      if (args?.query) return { items: [] }; // paginated call — returns empty
       return { items: [{ id: 'fallback-device' }] }; // fetchSingle — returns items
     });
     const client = makeOrgClient({ getDevices });
@@ -80,9 +77,9 @@ describe('loadAllOrganizationIncidents — deduplication', () => {
   });
 
   it('merges distinct incidents from active and closed statuses', async () => {
-    const getIncidents = vi.fn(async ({ query }: { query?: { status?: string } }) => {
-      if (query?.status === 'active') return { items: [{ id: 'inc-active', status: 'active' }] };
-      if (query?.status === 'closed') return { items: [{ id: 'inc-closed', status: 'closed' }] };
+    const getIncidents = vi.fn(async (args?: XyteCallArgs) => {
+      if (args?.query?.status === 'active') return { items: [{ id: 'inc-active', status: 'active' }] };
+      if (args?.query?.status === 'closed') return { items: [{ id: 'inc-closed', status: 'closed' }] };
       return { items: [] };
     });
     const client = makeOrgClient({ getIncidents });
@@ -99,14 +96,13 @@ describe('mapWithConcurrency — via partner enrichment', () => {
   it('enriches all sampled devices concurrently via partner scope', async () => {
     const deviceIds = ['d1', 'd2', 'd3'];
     const getDevices = vi.fn(async () => ({ items: deviceIds.map((id) => ({ id })) }));
-    const getDeviceInfo = vi.fn(async () => ({ device: { model: 'ModelX' } }));
+    const getDeviceInfo = vi.fn(async (_args?: XyteCallArgs) => ({ device: { model: 'ModelX' } }));
     const getCommands = vi.fn(async () => ({ commands: [] }));
     const getTelemetries = vi.fn(async () => ({ telemetries: [] }));
     const getStateHistory = vi.fn(async () => ({ history: [] }));
 
-    const client = {
-      listTenantEndpoints: vi.fn(async () => [{ authScope: 'partner' }]),
-      organization: {},
+    const client = makeXyteClientMock({
+      listTenantEndpoints: vi.fn(async () => [makeEndpointSpec({ authScope: 'partner' })]),
       partner: {
         getDevices,
         getDeviceInfo,
@@ -114,20 +110,14 @@ describe('mapWithConcurrency — via partner enrichment', () => {
         getTelemetries,
         getStateHistory,
         getTickets: vi.fn(async () => ({ items: [] }))
-      },
-      call: vi.fn(),
-      callWithMeta: vi.fn(),
-      describeEndpoint: vi.fn(),
-      listEndpoints: vi.fn()
-    } as unknown as XyteClient;
+      }
+    });
 
     await collectFleetSnapshot({ client, tenantId: 't1', providerScope: 'partner' });
 
     // All 3 device IDs should have been enriched
     expect(getDeviceInfo).toHaveBeenCalledTimes(deviceIds.length);
-    const calledWith = getDeviceInfo.mock.calls.map(
-      (call) => (call as unknown as [{ path: { device_id: string } }])[0].path.device_id
-    );
+    const calledWith = getDeviceInfo.mock.calls.map((call) => call[0]?.path?.device_id);
     expect(calledWith.sort()).toEqual(deviceIds.sort());
   });
 });

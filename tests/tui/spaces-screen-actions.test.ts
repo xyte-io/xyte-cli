@@ -1,19 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { claimDeviceWithGuard, createChildSpaceWithGuard, renameSpaceWithGuard } from '../../src/tui/screens/spaces';
+import { makeTuiContext, makeXyteClientMock } from '../support/typed-mocks';
 
 describe('spaces screen actions', () => {
   it('claims device with guided fields and confirmation', async () => {
     const claimDevice = vi.fn().mockResolvedValue({ ok: true });
-    const context = {
-      client: {
-        organization: { claimDevice }
-      },
+    const context = makeTuiContext({
+      client: makeXyteClientMock({ organization: { claimDevice } }),
       getActiveTenantId: vi.fn().mockResolvedValue('acme'),
       confirmWrite: vi.fn().mockResolvedValue(true),
       setStatus: vi.fn(),
       showError: vi.fn()
-    } as unknown as Parameters<typeof claimDeviceWithGuard>[0]['context'];
+    });
 
     const result = await claimDeviceWithGuard({
       spaceId: 'space-1',
@@ -35,15 +34,13 @@ describe('spaces screen actions', () => {
 
   it('rejects claim when identifiers are missing', async () => {
     const claimDevice = vi.fn();
-    const context = {
-      client: {
-        organization: { claimDevice }
-      },
+    const context = makeTuiContext({
+      client: makeXyteClientMock({ organization: { claimDevice } }),
       getActiveTenantId: vi.fn().mockResolvedValue('acme'),
       confirmWrite: vi.fn().mockResolvedValue(true),
       setStatus: vi.fn(),
       showError: vi.fn()
-    } as unknown as Parameters<typeof claimDeviceWithGuard>[0]['context'];
+    });
 
     const result = await claimDeviceWithGuard({
       spaceId: 'space-1',
@@ -57,15 +54,13 @@ describe('spaces screen actions', () => {
 
   it('creates child space after confirmation', async () => {
     const createSpace = vi.fn().mockResolvedValue({ ok: true });
-    const context = {
-      client: {
-        organization: { createSpace }
-      },
+    const context = makeTuiContext({
+      client: makeXyteClientMock({ organization: { createSpace } }),
       getActiveTenantId: vi.fn().mockResolvedValue('acme'),
       confirmWrite: vi.fn().mockResolvedValue(true),
       setStatus: vi.fn(),
       showError: vi.fn()
-    } as unknown as Parameters<typeof createChildSpaceWithGuard>[0]['context'];
+    });
 
     const result = await createChildSpaceWithGuard({
       parentSpaceId: 'space-1',
@@ -89,15 +84,13 @@ describe('spaces screen actions', () => {
 
   it('renames selected space after confirmation', async () => {
     const updateSpace = vi.fn().mockResolvedValue({ ok: true });
-    const context = {
-      client: {
-        organization: { updateSpace }
-      },
+    const context = makeTuiContext({
+      client: makeXyteClientMock({ organization: { updateSpace } }),
       getActiveTenantId: vi.fn().mockResolvedValue('acme'),
       confirmWrite: vi.fn().mockResolvedValue(true),
       setStatus: vi.fn(),
       showError: vi.fn()
-    } as unknown as Parameters<typeof renameSpaceWithGuard>[0]['context'];
+    });
 
     const result = await renameSpaceWithGuard({
       spaceId: 'space-1',
