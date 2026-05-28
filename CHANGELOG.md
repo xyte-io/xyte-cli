@@ -6,6 +6,14 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.10.6] - 2026-05-28
+
+### Added
+- Added CLI catalog, typed client, docs, tests, and shipped skill data for the newly deployed Core API coverage: organization device incident suspension/resume, organization edges, groups, users, and partner organization creation.
+
+### Fixed
+- Corrected the Edge claim and ping endpoint paths to use the deployed `/core/v1/organization/edges/devices/...` routes.
+
 ## [0.10.5] - 2026-05-12
 
 ### Fixed
