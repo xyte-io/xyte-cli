@@ -9,10 +9,36 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 ## [0.10.6] - 2026-05-28
 
 ### Added
-- Added CLI catalog, typed client, docs, tests, and shipped skill data for the newly deployed Core API coverage: organization device incident suspension/resume, organization edges, groups, users, and partner organization creation.
+- Added organization device incident controls:
+  - `organization.devices.suspendIncidents`
+  - `organization.devices.resumeIncidents`
+- Added organization edge discovery:
+  - `organization.edges.getEdges`
+- Added organization group management endpoints:
+  - `organization.groups.createGroup`
+  - `organization.groups.getGroups`
+  - `organization.groups.getGroup`
+  - `organization.groups.updateGroup`
+  - `organization.groups.deleteGroup`
+  - `organization.groups.addUsers`
+  - `organization.groups.removeUsers`
+  - `organization.groups.addExternalUser`
+- Added organization user management endpoints:
+  - `organization.users.createUser`
+  - `organization.users.getUsers`
+  - `organization.users.getUser`
+  - `organization.users.deactivateUser`
+  - `organization.users.resendWelcome`
+- Added partner organization creation:
+  - `partner.organizations.createOrganization`
+- Updated the typed client namespace surface, endpoint catalog, command docs, endpoint reference docs, tests, and shipped `xyte-cli` skill data for the new endpoints.
 
 ### Fixed
-- Corrected the Edge claim and ping endpoint paths to use the deployed `/core/v1/organization/edges/devices/...` routes.
+- Corrected the Edge claim and ping lifecycle routes to use the deployed `/core/v1/organization/edges/devices/...` paths:
+  - `organization.edge.startClaim`
+  - `organization.edge.getClaimStatus`
+  - `organization.edge.startPing`
+  - `organization.edge.getPingStatus`
 
 ## [0.10.5] - 2026-05-12
 
