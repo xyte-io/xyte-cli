@@ -102,7 +102,6 @@ export interface PartnerNamespace {
   updateTicket: NamespaceCall;
 }
 
-
 export interface XyteClient {
   organization: OrganizationNamespace;
   partner: PartnerNamespace;
