@@ -46,8 +46,11 @@ Derived from the bundled public endpoint spec.
 | `organization.devices.getHistories` | `status`, `from`, `to`, `device_id`, `space_id`, `name` | none | Filtered history lookup; can be time-windowed |
 | `organization.commands.getCommands` | `status`, `page`, `per_page` | `page`, `per_page` | Command history pagination and status filter |
 | `organization.incidents.getIncidents` | `from`, `to`, `status`, `priority`, `title`, `description`, `issue`, `device_model`, `partner_name`, `sub_model`, `space_id`, `page`, `per_page` | `page`, `per_page` | Incident filtering matrix. Use integer `from` and `to`; for reliable active-incident fetches use both (`from=0`, `to=<now>`). |
+| `organization.edges.getEdges` | `page`, `per_page` | `page`, `per_page` | Paginated Edge records |
+| `organization.groups.getGroups` | `page`, `per_page` | `page`, `per_page` | Paginated team access groups |
+| `organization.users.getUsers` | `page`, `per_page` | `page`, `per_page` | Paginated active users |
 
-All other current endpoint specs in this repo have no declared query params.
+For the complete current query-param set, run `xyte-cli api endpoints describe <endpoint-key>` before calling.
 
 ## Concrete Filter/Pagination Examples
 
@@ -105,14 +108,50 @@ xyte-cli api call organization.commands.sendCommand \
   --body-json '{"command":"reboot"}'
 ```
 
+### `organization.devices.suspendIncidents` / `organization.devices.resumeIncidents`
+
+```bash
+xyte-cli api call organization.devices.suspendIncidents \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}'
+
+xyte-cli api call organization.devices.resumeIncidents \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}'
+```
+
+### `organization.groups.addUsers`
+
+```bash
+xyte-cli api call organization.groups.addUsers \
+  --tenant <tenant-id> \
+  --path-json '{"id":"<group-id>"}' \
+  --body-json '{"user_ids":["<user-id>"]}'
+```
+
+### `partner.organizations.createOrganization`
+
+```bash
+xyte-cli api call partner.organizations.createOrganization \
+  --tenant <tenant-id> \
+  --body-json '{"name":"Acme HQ","admin_contact_email":"admin@example.com","admin_contact_name":"Jane Doe","finance_contact_email":"finance@example.com","finance_contact_name":"Finance Team"}'
+```
+
 ## Common Endpoint Keys
 
 Organization:
 - `organization.devices.getDevices`
 - `organization.devices.getDevice`
 - `organization.devices.claimDevice` (native claim)
+- `organization.devices.suspendIncidents`
+- `organization.devices.resumeIncidents`
 - `organization.incidents.closeIncident`
 - `organization.incidents.getIncidents`
+- `organization.edges.getEdges`
+- `organization.groups.getGroups`
+- `organization.groups.addUsers`
+- `organization.users.getUsers`
+- `organization.users.createUser`
 - `organization.tickets.getTickets`
 - `organization.commands.sendCommand`
 - `organization.edge.startClaim` (edge claim — async, poll with `getClaimStatus`)
@@ -123,6 +162,7 @@ Organization:
 Partner:
 - `partner.devices.getDevices`
 - `partner.devices.getDeviceInfo`
+- `partner.organizations.createOrganization`
 - `partner.tickets.getTickets`
 
 ## Edge Devices (Async)
@@ -130,10 +170,10 @@ Partner:
 Edge devices sit behind an Xyte Edge proxy. Claim/ping are **asynchronous**: the start endpoint returns 204, then you poll the matching status endpoint until terminal (`success` or `failed`). Prefer the `xyte-cli edge` command group or `flow.edge-claim*` flows over raw `api call` — they handle polling, backoff, and resume.
 
 Verified raw route mapping:
-- `organization.edge.startClaim` -> `POST /core/v1/organization/edge/devices/start_claim`
-- `organization.edge.getClaimStatus` -> `GET /core/v1/organization/edge/devices/get_claim_status`
-- `organization.edge.startPing` -> `POST /core/v1/organization/edge/devices/start_ping`
-- `organization.edge.getPingStatus` -> `GET /core/v1/organization/edge/devices/get_ping_status`
+- `organization.edge.startClaim` -> `POST /core/v1/organization/edges/devices/start_claim`
+- `organization.edge.getClaimStatus` -> `GET /core/v1/organization/edges/devices/get_claim_status`
+- `organization.edge.startPing` -> `POST /core/v1/organization/edges/devices/start_ping`
+- `organization.edge.getPingStatus` -> `GET /core/v1/organization/edges/devices/get_ping_status`
 
 ### `organization.edge.startClaim` + `organization.edge.getClaimStatus`
 

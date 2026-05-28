@@ -349,10 +349,10 @@ describe('edge command group', () => {
     const inputPath = join(tempDir, 'claims.csv');
     writeFileSync(inputPath, 'proxy_id,device_ip,device_model_id,space_id\nproxy-1,192.168.1.10,model-1,99\n', 'utf8');
     const fetchMock = vi.fn(async (url: string) => {
-      if (url.includes('/core/v1/organization/edge/devices/start_ping')) {
+      if (url.includes('/core/v1/organization/edges/devices/start_ping')) {
         return new Response(null, { status: 204 });
       }
-      if (url.includes('/core/v1/organization/edge/devices/get_ping_status')) {
+      if (url.includes('/core/v1/organization/edges/devices/get_ping_status')) {
         return new Response(JSON.stringify({ status: 'failed' }), {
           status: 200,
           headers: { 'content-type': 'application/json' }
@@ -510,7 +510,7 @@ describe('edge command group', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const url = fetchMock.mock.calls[0]?.[0] as string;
-    expect(url).toContain('/core/v1/organization/edge/devices/get_claim_status');
+    expect(url).toContain('/core/v1/organization/edges/devices/get_claim_status');
     expect(url).toContain('proxy_id=proxy-1');
     expect(url).toContain('device_ip=192.168.1.10');
 
@@ -582,7 +582,7 @@ describe('edge command group', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const url = fetchMock.mock.calls[0]?.[0] as string;
-    expect(url).toContain('/core/v1/organization/edge/devices/get_ping_status');
+    expect(url).toContain('/core/v1/organization/edges/devices/get_ping_status');
     expect(url).toContain('proxy_id=proxy-1');
     expect(url).toContain('device_ip=192.168.1.10');
 

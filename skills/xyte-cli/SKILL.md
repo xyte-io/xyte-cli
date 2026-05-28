@@ -5,7 +5,7 @@ description: "Use for @xyteai/cli operations: first-run setup, config/tenant/key
 
 # XYTE Skill Router (One-Stop, Agent-Native)
 
-Last updated: 2026-04-17
+Last updated: 2026-05-20
 
 This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
 
@@ -146,6 +146,7 @@ Rules:
 - `xyte-cli api endpoints list`
 - `xyte-cli api endpoints describe <endpoint-key>`
 - `xyte-cli api call <endpoint-key> --tenant <tenant-id> ...`
+- common raw endpoint examples and query fields: `references/endpoints.md`
 
 4. Insights/reports:
 - `xyte-cli ops inspect fleet --tenant <tenant-id> --provider-scope auto --output json`

@@ -117,6 +117,9 @@ Auth note:
 ```bash
 xyte-cli api endpoints list
 xyte-cli api endpoints describe organization.devices.getDevices
+xyte-cli api endpoints describe organization.users.getUsers
+xyte-cli api endpoints describe organization.groups.addUsers
+xyte-cli api endpoints describe partner.organizations.createOrganization
 xyte-cli api call organization.devices.getDevices --tenant <tenant-id>
 xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --output-mode envelope --strict-json [--note <text>]
 xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once
@@ -168,6 +171,19 @@ xyte-cli api call organization.commands.sendCommand \
 xyte-cli api call organization.commands.cancelCommand \
   --tenant <tenant-id> \
   --path-json '{"device_id":"DEVICE_ID","command_id":"COMMAND_ID"}'
+
+xyte-cli api call organization.devices.suspendIncidents \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"DEVICE_ID"}'
+
+xyte-cli api call organization.groups.addUsers \
+  --tenant <tenant-id> \
+  --path-json '{"id":"GROUP_ID"}' \
+  --body-json '{"user_ids":["USER_ID"]}'
+
+xyte-cli api call partner.organizations.createOrganization \
+  --tenant <tenant-id> \
+  --body-json '{"name":"Acme HQ","admin_contact_email":"admin@example.com","admin_contact_name":"Jane Doe","finance_contact_email":"finance@example.com","finance_contact_name":"Finance Team"}'
 ```
 
 ## Utility Pipelines, Space Import, And Device Migration
@@ -269,7 +285,7 @@ Notes:
 - `edge claim-batch` exits with code 1 if any row ends in `failed`, `rejected`, `timeout`, `proxy-offline`, `ping-failed`, or `aborted`; per-row dispositions are written to `--report`.
 - `edge ping` remains a standalone diagnostic command; batch does not rely on ping evidence from a separate command.
 - Raw endpoints remain available for advanced cases: `organization.edge.startClaim`, `organization.edge.getClaimStatus`, `organization.edge.startPing`, `organization.edge.getPingStatus`.
-- Raw route mapping: `startClaim` -> `POST /core/v1/organization/edge/devices/start_claim`, `getClaimStatus` -> `GET /core/v1/organization/edge/devices/get_claim_status`, `startPing` -> `POST /core/v1/organization/edge/devices/start_ping`, `getPingStatus` -> `GET /core/v1/organization/edge/devices/get_ping_status`.
+- Raw route mapping: `startClaim` -> `POST /core/v1/organization/edges/devices/start_claim`, `getClaimStatus` -> `GET /core/v1/organization/edges/devices/get_claim_status`, `startPing` -> `POST /core/v1/organization/edges/devices/start_ping`, `getPingStatus` -> `GET /core/v1/organization/edges/devices/get_ping_status`.
 
 ## Insights And Reports
 
