@@ -29,6 +29,8 @@ export interface OrganizationNamespace {
   getCommands: NamespaceCall;
   sendCommand: NamespaceCall;
   claimDevice: NamespaceCall;
+  mergeDevice: NamespaceCall;
+  splitDevice: NamespaceCall;
   updateDevice: NamespaceCall;
   deleteDevice: NamespaceCall;
   getDevice: NamespaceCall;
