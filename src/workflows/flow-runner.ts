@@ -3,51 +3,72 @@ import { appendFile, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
+import { z } from 'zod';
 import { buildCallEnvelope } from '../contracts/call-envelope';
+import type { ProblemDetails } from '../contracts/problem';
+import { INSPECT_DEEP_DIVE_SCHEMA_VERSION, UTILITY_BATCH_SCHEMA_VERSION } from '../contracts/versions';
 import {
   buildFlowRunSummary,
+  FlowRunDecisionSchema,
+  FlowRunErrorEntrySchema,
+  FlowRunSummarySchema,
   type FlowRunClassification,
   type FlowRunDecision,
   type FlowRunErrorEntry,
+  type FlowRunNextAction,
   type FlowRunStep,
   type FlowRunSummary
 } from '../contracts/flow-run';
-import { toProblemDetails } from '../http/problem-mapper';
+import { toProblemDetails } from '../client/errors';
 import { buildStatusContract } from '../contracts/status';
 import type { WatchFrameV1 } from '../contracts/watch-frame';
 import { getEndpoint } from '../client/catalog';
 import { evaluateReadiness } from '../config/readiness';
-import type { ProfileStore } from '../secure/profile-store';
-import type { SecretStore } from '../secure/secret-store';
+import type { ProfileStore, SecretStore } from '../types/stores';
 import type { XyteClient } from '../types/client';
-import { buildInstallDoctorReport } from '../utils/install-doctor';
+import { buildInstallDoctorReport } from './install-doctor';
+import { getLogger } from '../observability/logger';
 import { isMutatingMethod } from '../client/catalog';
 import { isRecord } from '../utils/json';
+import { errorMessage } from '../utils/error-format';
 import { runWatch } from './watch';
 import { runUtilityPrepare } from './utility-prepare';
 import { runSpaceImportTree } from './utility-commands';
+import { runDeviceMatch } from './device-match';
+import { runMoveDevices } from './move-devices';
+import { runVerifyMovedDevices } from './verify-device-moves';
+import { runEdgeClaim, runEdgeClaimBatch, validateEdgeClaimRow, batchExitedClean } from './edge-claim';
+import { runEdgePing } from './edge-ping';
+import { parsePositiveInt as parseEdgePollPositiveInt } from './edge-poll';
 import {
   buildDeepDive,
   buildFleetInspect,
   collectFleetSnapshot,
-  generateFleetReport,
-  InspectProviderScopeError,
-  parseDeepDiveForReport
+  generateDeviceMigrationReport,
+  InspectProviderScopeError
 } from './fleet-insights';
+import { generateOpsReport, parseReportInput, type OpsReportInput } from './ops-report';
 import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';
-import type { BuiltInFlowDefinition, FlowTaskStep } from './flow-catalog';
+import type { BuiltInFlowDefinition, FlowGateStep, FlowTaskStep } from './flow-catalog';
+import { hasBuiltInFlowDefinition, getBuiltInFlowDefinition, UTILITY_PREPARE_CONTEXT_KEY } from './flow-catalog';
+import { getFlowDefinition } from './flow-user-definitions';
+import { CliUserError } from '../contracts/user-error';
 
 export type FlowRunMode = 'plan' | 'apply';
 
 class FlowNeedsInputError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = 'FlowNeedsInputError';
   }
 }
 
+type RunContextArgs = Omit<RunDeterministicFlowArgs, 'inspectProviderScope'> & { inspectProviderScope: InspectProviderScope };
+
 interface RunContext {
-  args: RunDeterministicFlowArgs;
+  args: RunContextArgs;
+  resolvedFlowId: string;
+  definition: BuiltInFlowDefinition;
   bundleDir: string;
   stepsDir: string;
   outputsDir: string;
@@ -60,33 +81,40 @@ interface RunContext {
   taskOutputs: Map<string, unknown>;
 }
 
-interface TaskExecutionResult {
-  output?: unknown;
-  artifactPath?: string;
-  watchFrames?: WatchFrameV1[];
-  contextUpdates?: Record<string, string>;
-}
+type TaskExecutionResult =
+  | { ok: true; output?: unknown; artifactPath?: string; primaryOutputPath?: string; watchFrames?: WatchFrameV1[]; contextUpdates?: Record<string, string> }
+  | { ok: false; failureDetail: string; output?: unknown; artifactPath?: string; primaryOutputPath?: string; contextUpdates?: Record<string, string> };
 
 interface FlowRunInputsPayload {
-  flowId?: unknown;
-  resolvedFlowId?: unknown;
-  tenantId?: unknown;
-  mode?: unknown;
-  inspectProviderScope?: unknown;
-  context?: unknown;
-  resume?: unknown;
-  strictJson?: unknown;
-  once?: unknown;
-  generatedAtUtc?: unknown;
+  flowId?: string;
+  resolvedFlowId?: string;
+  tenantId?: string;
+  mode?: FlowRunMode;
+  inspectProviderScope?: InspectProviderScope;
+  context?: Record<string, string>;
+  resume?: string;
+  strictJson?: boolean;
+  once?: boolean;
+  generatedAtUtc?: string;
 }
+
+const FlowRunInputsPayloadSchema = z.object({
+  flowId: z.string().optional(),
+  resolvedFlowId: z.string().optional(),
+  tenantId: z.string().optional(),
+  mode: z.enum(['plan', 'apply']).optional(),
+  inspectProviderScope: z.enum(INSPECT_PROVIDER_SCOPES).optional(),
+  context: z.record(z.string(), z.string()).optional(),
+  resume: z.string().optional(),
+  strictJson: z.boolean().optional(),
+  once: z.boolean().optional(),
+  generatedAtUtc: z.string().optional()
+});
 
 interface RunDeterministicFlowArgs {
   flowId: string;
-  resolvedFlowId: string;
-  definition: BuiltInFlowDefinition;
   tenantId: string;
   mode: FlowRunMode;
-  allowWrite?: boolean;
   inspectProviderScope?: InspectProviderScope;
   outDir: string;
   resume?: string;
@@ -98,22 +126,20 @@ interface RunDeterministicFlowArgs {
   client: XyteClient;
 }
 
-function isInspectProviderScopeError(error: unknown): boolean {
-  return error instanceof InspectProviderScopeError;
-}
+const DEFAULT_FLOW_RUN_OUT_DIR = './tmp/flow-runs';
 
-async function collectSnapshotWithGuard(ctx: RunContext): Promise<ReturnType<typeof collectFleetSnapshot>> {
+async function collectFlowSnapshot(ctx: RunContext): Promise<ReturnType<typeof collectFleetSnapshot>> {
   const tenantProfile = await ctx.args.profileStore.getTenant(ctx.args.tenantId);
   try {
     return await collectFleetSnapshot({
       client: ctx.args.client,
       tenantId: ctx.args.tenantId,
       tenantName: tenantProfile?.name,
-      providerScope: ctx.args.inspectProviderScope ?? 'auto'
+      providerScope: ctx.args.inspectProviderScope
     });
   } catch (error) {
-    if (isInspectProviderScopeError(error)) {
-      throw new FlowNeedsInputError((error as Error).message);
+    if (error instanceof InspectProviderScopeError) {
+      throw new FlowNeedsInputError((error as Error).message, { cause: error });
     }
     throw error;
   }
@@ -146,25 +172,42 @@ function buildRunDirName(runId: string): string {
   return `${stamp}-${runId}`;
 }
 
+function extractWatchContextUpdates(frames: WatchFrameV1[]): Record<string, string> | undefined {
+  if (frames.length === 0 || !Array.isArray(frames[0].items) || frames[0].items.length === 0) {
+    return undefined;
+  }
+  const first = frames[0].items[0];
+  if (!isRecord(first)) {
+    return undefined;
+  }
+  const updates: Record<string, string> = {};
+  if (typeof first.device_id === 'string') updates.watch_device_id = first.device_id;
+  if (typeof first.uuid === 'string') updates.watch_incident_id = first.uuid;
+  if (typeof first.id === 'string') updates.watch_item_id = first.id;
+  return Object.keys(updates).length > 0 ? updates : undefined;
+}
+
 export function parseFlowVarOptions(values: string[] | undefined): Record<string, string> {
   const out: Record<string, string> = {};
   for (const entry of values ?? []) {
     const index = entry.indexOf('=');
     if (index <= 0) {
-      throw new Error(`Invalid --var entry: ${entry}. Use key=value.`);
+      throw new CliUserError({ summary: `Invalid --var entry: "${entry}". Use key=value.` });
     }
     const key = entry.slice(0, index).trim();
     const value = entry.slice(index + 1).trim();
     if (!key) {
-      throw new Error(`Invalid --var entry: ${entry}. Key cannot be empty.`);
+      throw new CliUserError({ summary: `Invalid --var entry: "${entry}". Key cannot be empty.` });
     }
     out[key] = value;
   }
   return out;
 }
 
+const TEMPLATE_VAR_RE = /{{\s*([a-zA-Z0-9._-]+)\s*}}/g;
+
 function resolveTemplateString(input: string, context: Record<string, string>): string {
-  return input.replace(/{{\s*([a-zA-Z0-9._-]+)\s*}}/g, (_all, rawKey: string) => {
+  return input.replace(TEMPLATE_VAR_RE, (_all, rawKey: string) => {
     const key = rawKey.trim();
     const value = context[key];
     if (value === undefined) {
@@ -194,16 +237,19 @@ function resolveTemplateValue<T>(input: T, context: Record<string, string>): T {
   return out as T;
 }
 
+function requireStepConfig<T>(value: T | undefined, stepId: string, label: string): T {
+  if (!value) {
+    throw new CliUserError({ summary: `Flow step ${stepId} is missing ${label} configuration.` });
+  }
+  return value;
+}
+
 function ensureContextKeys(step: FlowTaskStep, context: Record<string, string>): void {
   const required = step.requiresContext ?? [];
   const missing = required.filter((key) => !context[key]);
   if (missing.length > 0) {
     throw new FlowNeedsInputError(`Step ${step.id} requires context keys: ${missing.join(', ')}`);
   }
-}
-
-function buildGuidedRemediationDeviceName(deviceId: string): string {
-  return `Remediated ${deviceId}`;
 }
 
 function resolveFlowWindowHours(step: FlowTaskStep, context: Record<string, string>): number {
@@ -220,7 +266,7 @@ function resolveFlowWindowHours(step: FlowTaskStep, context: Record<string, stri
   return parsed;
 }
 
-function resolveDerivedFlowContext(ctx: RunContext): void {
+function promoteWatchOutputKeys(ctx: RunContext): void {
   const context = ctx.resolvedContext;
 
   if (!context.device_id && context.watch_device_id) {
@@ -233,9 +279,21 @@ function resolveDerivedFlowContext(ctx: RunContext): void {
       context.incident_id = incidentId;
     }
   }
+}
 
-  if (ctx.args.resolvedFlowId === 'flow.guided-remediation' && !context.updated_device_name && context.device_id) {
-    context.updated_device_name = buildGuidedRemediationDeviceName(context.device_id);
+function applyDefinitionContextDefaults(ctx: RunContext): void {
+  if (!hasBuiltInFlowDefinition(ctx.resolvedFlowId)) {
+    return;
+  }
+  const context = ctx.resolvedContext;
+  const def = getBuiltInFlowDefinition(ctx.resolvedFlowId);
+  for (const [key, template] of Object.entries(def.contextDefaults ?? {})) {
+    if (!context[key]) {
+      const value = template.replace(TEMPLATE_VAR_RE, (_, k: string) => context[k.trim()] ?? '');
+      if (value && !value.includes('{{')) {
+        context[key] = value;
+      }
+    }
   }
 }
 
@@ -253,7 +311,10 @@ function classifyFailure(problem: ReturnType<typeof toProblemDetails>): FlowRunC
   return 'bug';
 }
 
-function toNeedsInputProblem(error: FlowNeedsInputError, instance: string) {
+function toNeedsInputProblem(
+  error: FlowNeedsInputError,
+  instance: string
+): ProblemDetails {
   return {
     type: 'https://xyte.dev/problems/flow-needs-input',
     title: 'Flow requires additional input',
@@ -274,277 +335,473 @@ async function appendNdjson(targetPath: string, payload: unknown): Promise<void>
   await appendFile(targetPath, `${JSON.stringify(payload)}\n`, 'utf8');
 }
 
+async function recordStepFailure(
+  stepState: FlowRunStep,
+  problem: ReturnType<typeof toProblemDetails>,
+  opts: {
+    stepId: string;
+    startedAt: number;
+    errorsPath: string;
+    errors: FlowRunErrorEntry[];
+    artifactPath?: string;
+  }
+): Promise<FlowRunClassification> {
+  const classification = classifyFailure(problem);
+  stepState.status = 'failed';
+  stepState.endedAtUtc = nowIso();
+  stepState.durationMs = Date.now() - opts.startedAt;
+  if (opts.artifactPath !== undefined) {
+    stepState.artifactPath = opts.artifactPath;
+  }
+  stepState.error = problem;
+  stepState.classification = classification;
+  const errorEntry: FlowRunErrorEntry = {
+    timestamp: nowIso(),
+    stepId: opts.stepId,
+    classification,
+    error: problem
+  };
+  opts.errors.push(errorEntry);
+  await appendNdjson(opts.errorsPath, errorEntry);
+  return classification;
+}
+
+async function recordGatePending(
+  stepState: FlowRunStep,
+  opts: {
+    stepId: string;
+    requiresWrite: boolean;
+    detail: string;
+    decisionsPath: string;
+    decisions: FlowRunDecision[];
+  }
+): Promise<void> {
+  stepState.status = 'gate_pending';
+  const decision: FlowRunDecision = {
+    timestamp: nowIso(),
+    stepId: opts.stepId,
+    action: 'pending',
+    detail: opts.detail,
+    requiresWrite: opts.requiresWrite
+  };
+  opts.decisions.push(decision);
+  await appendNdjson(opts.decisionsPath, decision);
+}
+
 function buildReportInputNeedsDataMessage(stepId: string, inputStepId: string, cause: unknown): string {
-  const base = `Step ${stepId} requires deep-dive output from ${inputStepId}.`;
+  const base = `Step ${stepId} requires report-compatible output from ${inputStepId}.`;
   if (!(cause instanceof Error) || cause.message.trim().length === 0) {
     return base;
   }
   return `${base} ${cause.message}`;
 }
 
-function extractPrimaryOutputPath(value: unknown): string | undefined {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-  if (typeof value.outputPath === 'string') {
-    return value.outputPath;
-  }
-  if (isRecord(value.artifacts) && typeof value.artifacts.primary === 'string') {
-    return value.artifacts.primary;
-  }
-  if (typeof value.reportPath === 'string') {
-    return value.reportPath;
-  }
-  return undefined;
+
+function extractCallOutputContext(
+  data: unknown,
+  spec: { contextKey: string; arrayPath: string; valueField: string }
+): Record<string, string> | undefined {
+  if (!isRecord(data)) return undefined;
+  const arr = data[spec.arrayPath];
+  if (!Array.isArray(arr)) return undefined;
+  const first = arr.find((item): item is Record<string, unknown> => isRecord(item) && typeof item[spec.valueField] === 'string');
+  return first ? { [spec.contextKey]: first[spec.valueField] as string } : undefined;
 }
 
-function resolveReadiness(ctx: RunContext, checkConnectivity: boolean) {
-  return evaluateReadiness({
-    profileStore: ctx.args.profileStore,
-    secretStore: ctx.args.secretStore,
+function evaluateReadinessWithConnectivity(ctx: RunContext): ReturnType<typeof evaluateReadiness> {
+  return evaluateReadiness({ profileStore: ctx.args.profileStore, secretStore: ctx.args.secretStore, tenantId: ctx.args.tenantId, client: ctx.args.client, checkConnectivity: true });
+}
+
+async function handleSetupStatusStep(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
+  const readiness = await evaluateReadinessWithConnectivity(ctx);
+  if (readiness.state !== 'ready') {
+    throw new FlowNeedsInputError(`Setup status is ${readiness.state}. Run setup before continuing.`);
+  }
+  return { ok: true, output: readiness };
+}
+
+async function handleConfigDoctor(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
+  const readiness = await evaluateReadinessWithConnectivity(ctx);
+  if (readiness.connectionState !== 'connected') {
+    throw new FlowNeedsInputError(
+      `Connectivity is ${readiness.connectionState}. Resolve connectivity before continuing.`
+    );
+  }
+  return { ok: true, output: { retryAttempts: 2, retryBackoffMs: 250, readiness } };
+}
+
+async function handleStatusFast(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
+  const readiness = await evaluateReadiness({ profileStore: ctx.args.profileStore, secretStore: ctx.args.secretStore, tenantId: ctx.args.tenantId, checkConnectivity: false });
+  return { ok: true, output: buildStatusContract({ mode: 'fast', checkConnectivity: false, readiness }) };
+}
+
+async function handleFleetInspect(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
+  const snapshot = await collectFlowSnapshot(ctx);
+  return { ok: true, output: buildFleetInspect(snapshot) };
+}
+
+async function handleDeepDive(step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
+  const windowHours = resolveFlowWindowHours(step, ctx.resolvedContext);
+  const snapshot = await collectFlowSnapshot(ctx);
+  return { ok: true, output: buildDeepDive(snapshot, windowHours) };
+}
+
+function handleMigrationReport(args: {
+  stepId: string;
+  inputFromStepId: string;
+  fleetFromStepId: string;
+  verificationFromStepId: string;
+  reportInput: OpsReportInput;
+  taskOutputs: Map<string, unknown>;
+  tenantId: string;
+  outPath: string;
+}): TaskExecutionResult {
+  const { stepId, inputFromStepId, fleetFromStepId, verificationFromStepId, reportInput, taskOutputs, tenantId, outPath } = args;
+  if (reportInput.schemaVersion !== UTILITY_BATCH_SCHEMA_VERSION || reportInput.command !== 'device.move') {
+    throw new FlowNeedsInputError(`Step ${stepId} requires device.move batch output from ${inputFromStepId}.`);
+  }
+  const fleetInput = taskOutputs.get(fleetFromStepId);
+  const verificationInput = taskOutputs.get(verificationFromStepId);
+  if (!fleetInput || typeof fleetInput !== 'object') {
+    throw new FlowNeedsInputError(`Step ${stepId}: fleet snapshot from ${fleetFromStepId} is missing or invalid.`);
+  }
+  const generated = generateDeviceMigrationReport({
+    execution: reportInput,
+    fleet: fleetInput,
+    verification: verificationInput,
+    tenantId,
+    outPath
+  });
+  return { ok: true, output: generated, artifactPath: outPath, primaryOutputPath: outPath };
+}
+
+async function handleOpsReport(args: {
+  reportInput: OpsReportInput;
+  format: 'markdown' | 'pdf';
+  includeSensitive: boolean;
+  tenantId: string;
+  outPath: string;
+}): Promise<TaskExecutionResult> {
+  const { reportInput, format, includeSensitive, tenantId, outPath } = args;
+  if (format === 'pdf' && reportInput.schemaVersion !== INSPECT_DEEP_DIVE_SCHEMA_VERSION) {
+    throw new CliUserError({ summary: 'PDF format is only supported for fleet deep-dive reports' });
+  }
+  const generated = await generateOpsReport({ input: reportInput, tenantId, format, outPath, includeSensitive });
+  return { ok: true, output: generated, artifactPath: outPath, primaryOutputPath: outPath };
+}
+
+async function handleReportGenerate(step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
+  const report = requireStepConfig(step.report, step.id, 'report');
+  const input = ctx.taskOutputs.get(report.inputFromStepId);
+  let reportInput: OpsReportInput;
+  try {
+    reportInput = parseReportInput(input, ctx.args.tenantId);
+  } catch (error) {
+    throw new FlowNeedsInputError(buildReportInputNeedsDataMessage(step.id, report.inputFromStepId, error), { cause: error });
+  }
+  const outPath = path.join(ctx.outputsDir, report.outFileName);
+  const { fleetFromStepId, verificationFromStepId } = report;
+  if (fleetFromStepId && verificationFromStepId) {
+    return handleMigrationReport({
+      stepId: step.id,
+      inputFromStepId: report.inputFromStepId,
+      fleetFromStepId,
+      verificationFromStepId,
+      reportInput,
+      taskOutputs: ctx.taskOutputs,
+      tenantId: ctx.args.tenantId,
+      outPath
+    });
+  }
+  return handleOpsReport({
+    reportInput,
+    format: report.format,
+    includeSensitive: report.includeSensitive === true,
     tenantId: ctx.args.tenantId,
-    ...(checkConnectivity ? { client: ctx.args.client, checkConnectivity: true } : { checkConnectivity: false })
+    outPath
   });
 }
 
+async function handleWatch(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  const watchConfig = requireStepConfig(step.watch, step.id, 'watch');
+  const frames: WatchFrameV1[] = [];
+  const once = ctx.args.once || watchConfig.once;
+  await runWatch({
+    client: ctx.args.client,
+    tenantId: ctx.args.tenantId,
+    profile: watchConfig.profile,
+    once,
+    intervalMs: watchConfig.intervalMs,
+    maxPolls: once ? 1 : watchConfig.maxPolls,
+    onFrame: (frame) => {
+      frames.push(frame);
+    }
+  });
+  const watchStepPath = buildStepArtifactPath(ctx, stepIndex, step.id, 'ndjson');
+  await writeFile(
+    watchStepPath,
+    frames.length > 0 ? `${frames.map((item) => JSON.stringify(item)).join('\n')}\n` : '',
+    'utf8'
+  );
+  return {
+    ok: true,
+    output: {
+      frameCount: frames.length,
+      lastEventType: frames.length > 0 ? frames[frames.length - 1].eventType : undefined
+    },
+    artifactPath: watchStepPath,
+    watchFrames: frames,
+    contextUpdates: extractWatchContextUpdates(frames)
+  };
+}
+
+async function handleCall(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  const callConfig = requireStepConfig(step.call, step.id, 'call');
+  const endpoint = getEndpoint(callConfig.endpointKey);
+  const method = endpoint.method.toUpperCase();
+  const isWrite = isMutatingMethod(method);
+  const requestId = randomUUID();
+  const pathPayload = callConfig.path ? resolveTemplateValue(callConfig.path, ctx.resolvedContext) : undefined;
+  const queryPayload = callConfig.query ? resolveTemplateValue(callConfig.query, ctx.resolvedContext) : undefined;
+  const bodyPayload = callConfig.body ? resolveTemplateValue(callConfig.body, ctx.resolvedContext) : undefined;
+  const result = await ctx.args.client.callWithMeta(callConfig.endpointKey, {
+    requestId,
+    tenantId: ctx.args.tenantId,
+    ...(pathPayload ? { path: pathPayload } : {}),
+    ...(queryPayload ? { query: queryPayload } : {}),
+    ...(bodyPayload !== undefined ? { body: bodyPayload } : {})
+  });
+  const envelope = buildCallEnvelope({
+    requestId,
+    tenantId: ctx.args.tenantId,
+    endpointKey: callConfig.endpointKey,
+    method,
+    guard: { allowWrite: isWrite },
+    request: { path: pathPayload, query: queryPayload, body: bodyPayload },
+    response: { status: result.status, durationMs: result.durationMs, retryCount: result.retryCount, data: result.data }
+  });
+  return {
+    ok: true,
+    output: envelope,
+    contextUpdates: callConfig.outputContext
+      ? extractCallOutputContext(result.data, callConfig.outputContext)
+      : undefined
+  };
+}
+
+function handleUtilityPrepare(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): TaskExecutionResult {
+  const utilityPrepare = requireStepConfig(step.utilityPrepare, step.id, 'utility prepare');
+  const inputPath = path.resolve(resolveTemplateString(utilityPrepare.inputPath, ctx.resolvedContext));
+  const outputDir = path.join(ctx.outputsDir, path.basename(utilityPrepare.outputDir));
+  const result = runUtilityPrepare({
+    inputPath,
+    actionKey: utilityPrepare.actionKey,
+    outputDir,
+    tenantId: ctx.args.tenantId,
+    primaryFormat: utilityPrepare.primaryFormat,
+    force: true
+  });
+  const contextKey = UTILITY_PREPARE_CONTEXT_KEY[utilityPrepare.actionKey];
+  const contextUpdates: Record<string, string> = contextKey ? { [contextKey]: result.artifacts.primary } : {};
+  return { ok: true, output: result, primaryOutputPath: result.artifacts.primary, contextUpdates };
+}
+
+async function handleDeviceMatch(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  const deviceMatch = requireStepConfig(step.deviceMatch, step.id, 'device match');
+  const sourcePath = path.resolve(resolveTemplateString(deviceMatch.sourcePath, ctx.resolvedContext));
+  const targetPath = path.resolve(resolveTemplateString(deviceMatch.targetPath, ctx.resolvedContext));
+  const outputPath = path.join(ctx.outputsDir, path.basename(deviceMatch.outputPath));
+  const result = await runDeviceMatch({
+    sourcePath,
+    targetPath,
+    sourceField: deviceMatch.sourceField,
+    targetField: deviceMatch.targetField,
+    outputPath,
+    tenantId: ctx.args.tenantId
+  });
+  return { ok: true, output: result, primaryOutputPath: outputPath };
+}
+
+async function handleDeviceMoveBatch(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  const deviceMoveBatch = requireStepConfig(step.deviceMoveBatch, step.id, 'device move batch');
+  const inputPath = path.resolve(resolveTemplateString(deviceMoveBatch.inputPath, ctx.resolvedContext));
+  const reportPath = path.join(ctx.outputsDir, path.basename(deviceMoveBatch.reportPath));
+  const result = await runMoveDevices({
+    client: ctx.args.client,
+    tenantId: ctx.args.tenantId,
+    inputPath,
+    apply: deviceMoveBatch.apply,
+    continueOnError: deviceMoveBatch.continueOnError === true,
+    reportPath
+  });
+  const contextUpdates: Record<string, string> = deviceMoveBatch.apply
+    ? { execute_moves_report_path: reportPath }
+    : { dry_run_moves_report_path: reportPath };
+  if (result.totals.failed > 0 || result.stoppedEarly) {
+    return { ok: false, failureDetail: `Step ${step.id} failed because the move batch reported ${result.totals.failed} failed row(s).`, output: result, primaryOutputPath: reportPath, contextUpdates };
+  }
+  return { ok: true, output: result, primaryOutputPath: reportPath, contextUpdates };
+}
+
+async function handleDeviceVerifyBatch(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  const deviceVerifyBatch = requireStepConfig(step.deviceVerifyBatch, step.id, 'device verification');
+  const inputPath = path.resolve(resolveTemplateString(deviceVerifyBatch.inputPath, ctx.resolvedContext));
+  const artifactPath = buildStepArtifactPath(ctx, stepIndex, step.id, 'json');
+  const result = await runVerifyMovedDevices({
+    client: ctx.args.client,
+    tenantId: ctx.args.tenantId,
+    inputPath,
+    outputPath: artifactPath
+  });
+  if (result.totals.mismatched > 0 || result.totals.missing > 0) {
+    return { ok: false, failureDetail: `Step ${step.id} found ${result.totals.mismatched} mismatched and ${result.totals.missing} missing planned device(s).`, output: result, artifactPath };
+  }
+  return { ok: true, output: result, artifactPath };
+}
+
+async function handleSpaceImportTree(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  const spaceImportTree = requireStepConfig(step.spaceImportTree, step.id, 'space import');
+  const inputPath = path.resolve(resolveTemplateString(spaceImportTree.inputPath, ctx.resolvedContext));
+  const reportPath = path.join(ctx.outputsDir, path.basename(spaceImportTree.reportPath));
+  const result = await runSpaceImportTree({
+    client: ctx.args.client,
+    tenantId: ctx.args.tenantId,
+    inputPath,
+    apply: spaceImportTree.apply,
+    continueOnError: false,
+    reportPath
+  });
+  return { ok: true, output: result, artifactPath: reportPath, primaryOutputPath: reportPath };
+}
+
+function resolvePollOptions(ctx: RunContext, intervalKey?: string, timeoutKey?: string): { intervalMs?: number; timeoutMs?: number } {
+  const options: { intervalMs?: number; timeoutMs?: number } = {};
+  const resolvedIntervalKey = intervalKey ?? 'edge_poll_interval_ms';
+  const resolvedTimeoutKey = timeoutKey ?? 'edge_poll_timeout_ms';
+  const intervalRaw = ctx.resolvedContext[resolvedIntervalKey];
+  const timeoutRaw = ctx.resolvedContext[resolvedTimeoutKey];
+  const interval = parseEdgePollPositiveInt(intervalRaw, resolvedIntervalKey);
+  const timeout = parseEdgePollPositiveInt(timeoutRaw, resolvedTimeoutKey);
+  if (interval !== undefined) options.intervalMs = interval;
+  if (timeout !== undefined) options.timeoutMs = timeout;
+  return options;
+}
+
+async function handleEdgeClaim(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  const context = ctx.resolvedContext;
+  const raw: Record<string, unknown> = {
+    proxy_id: context.proxy_id,
+    device_ip: context.device_ip,
+    device_model_id: context.device_model_id,
+    space_id: context.space_id,
+    display_name: context.display_name,
+    skip_connectivity_check: context.skip_connectivity_check,
+    custom_parameters: context.custom_parameters,
+    custom_partner_name: context.custom_partner_name,
+    custom_model_name: context.custom_model_name
+  };
+  const validation = validateEdgeClaimRow(raw, 1);
+  if (!validation.ok) {
+    return { ok: false, failureDetail: `Step ${step.id}: ${validation.reason}` };
+  }
+  const outcome = await runEdgeClaim({
+    client: ctx.args.client,
+    tenantId: ctx.args.tenantId,
+    row: validation.row,
+    pollOptions: resolvePollOptions(ctx, step.edgeClaim?.pollIntervalMsKey, step.edgeClaim?.pollTimeoutMsKey)
+  });
+  const ok = outcome.disposition === 'succeeded' || outcome.disposition === 'already-claimed';
+  if (!ok) {
+    return {
+      ok: false,
+      failureDetail: `Edge claim ${outcome.disposition}${outcome.detail ? `: ${outcome.detail}` : ''}.`,
+      output: outcome
+    };
+  }
+  return { ok: true, output: outcome };
+}
+
+async function handleEdgeClaimBatch(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  const config = requireStepConfig(step.edgeClaimBatch, step.id, 'edge claim batch');
+  const inputPath = path.resolve(resolveTemplateString(config.inputPath, ctx.resolvedContext));
+  const reportPath = path.join(ctx.outputsDir, path.basename(config.reportPath));
+  const resumePath = path.join(ctx.outputsDir, path.basename(config.resumePath));
+  const result = await runEdgeClaimBatch({
+    client: ctx.args.client,
+    tenantId: ctx.args.tenantId,
+    inputPath,
+    apply: config.apply,
+    reportPath,
+    resumePath,
+    pollOptions: resolvePollOptions(ctx, config.pollIntervalMsKey, config.pollTimeoutMsKey)
+  });
+  const contextUpdates: Record<string, string> = config.apply
+    ? { edge_claim_apply_report_path: reportPath }
+    : { edge_claim_dry_run_report_path: reportPath };
+  if (!batchExitedClean(result)) {
+    return {
+      ok: false,
+      failureDetail: `Edge claim batch reported ${result.totals.failed} failed, ${result.totals.rejected} rejected, ${result.totals.timeout} timeout, ${result.totals.proxyOffline} proxy-offline, ${result.totals.pingFailed} ping-failed, ${result.totals.aborted} aborted row(s).`,
+      output: result,
+      primaryOutputPath: reportPath,
+      contextUpdates
+    };
+  }
+  return { ok: true, output: result, primaryOutputPath: reportPath, contextUpdates };
+}
+
+async function handleEdgePing(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  const context = ctx.resolvedContext;
+  const proxyId = context.proxy_id?.trim();
+  const deviceIp = context.device_ip?.trim();
+  if (!proxyId || !deviceIp) {
+    return { ok: false, failureDetail: `Step ${step.id} requires context keys proxy_id and device_ip.` };
+  }
+  const outcome = await runEdgePing({
+    client: ctx.args.client,
+    tenantId: ctx.args.tenantId,
+    proxy_id: proxyId,
+    device_ip: deviceIp,
+    pollOptions: resolvePollOptions(ctx, step.edgePing?.pollIntervalMsKey, step.edgePing?.pollTimeoutMsKey)
+  });
+  if (outcome.disposition !== 'succeeded') {
+    return {
+      ok: false,
+      failureDetail: `Edge ping ${outcome.disposition}${outcome.detail ? `: ${outcome.detail}` : ''}.`,
+      output: outcome
+    };
+  }
+  return { ok: true, output: outcome };
+}
+
 async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
-  resolveDerivedFlowContext(ctx);
+  promoteWatchOutputKeys(ctx);
+  applyDefinitionContextDefaults(ctx);
   ensureContextKeys(step, ctx.resolvedContext);
 
   switch (step.task) {
-    case 'doctor.install': {
-      return {
-        output: buildInstallDoctorReport(path.resolve(__dirname, '../../dist/bin/xyte-cli.js'))
-      };
-    }
-    case 'setup.status': {
-      const readiness = await resolveReadiness(ctx, true);
-      if (readiness.state !== 'ready') {
-        throw new FlowNeedsInputError(`Setup status is ${readiness.state}. Run setup before continuing.`);
-      }
-      return {
-        output: readiness
-      };
-    }
-    case 'config.doctor': {
-      const readiness = await resolveReadiness(ctx, true);
-      const payload = {
-        retryAttempts: 2,
-        retryBackoffMs: 250,
-        readiness
-      };
-      if (readiness.connectionState !== 'connected') {
-        throw new FlowNeedsInputError(
-          `Connectivity is ${readiness.connectionState}. Resolve connectivity before continuing.`
-        );
-      }
-      return {
-        output: payload
-      };
-    }
-    case 'status.fast': {
-      const readiness = await resolveReadiness(ctx, false);
-      const payload = buildStatusContract({
-        mode: 'fast',
-        checkConnectivity: false,
-        readiness
-      });
-      return {
-        output: payload
-      };
-    }
-    case 'inspect.fleet': {
-      const snapshot = await collectSnapshotWithGuard(ctx);
-      return { output: buildFleetInspect(snapshot) };
-    }
-    case 'inspect.deep-dive': {
-      const windowHours = resolveFlowWindowHours(step, ctx.resolvedContext);
-      const snapshot = await collectSnapshotWithGuard(ctx);
-      return { output: buildDeepDive(snapshot, windowHours) };
-    }
-    case 'report.generate': {
-      if (!step.report) {
-        throw new Error(`Flow step ${step.id} is missing report configuration.`);
-      }
-      const input = ctx.taskOutputs.get(step.report.inputFromStepId);
-      let deepDiveForReport;
-      try {
-        deepDiveForReport = parseDeepDiveForReport(input, ctx.args.tenantId);
-      } catch (error) {
-        throw new FlowNeedsInputError(buildReportInputNeedsDataMessage(step.id, step.report.inputFromStepId, error));
-      }
-      const outPath = path.join(ctx.outputsDir, step.report.outFileName);
-      const generated = await generateFleetReport({
-        deepDive: deepDiveForReport,
-        format: step.report.format,
-        outPath,
-        includeSensitive: step.report.includeSensitive === true
-      });
-      return {
-        output: generated,
-        artifactPath: outPath
-      };
-    }
-    case 'watch': {
-      const watchConfig = step.watch;
-      if (!watchConfig) {
-        throw new Error(`Flow step ${step.id} is missing watch configuration.`);
-      }
-      const frames: WatchFrameV1[] = [];
-      const once = ctx.args.once || watchConfig.once;
-      await runWatch({
-        client: ctx.args.client,
-        tenantId: ctx.args.tenantId,
-        profile: watchConfig.profile,
-        once,
-        intervalMs: watchConfig.intervalMs,
-        maxPolls: once ? 1 : watchConfig.maxPolls,
-        onFrame: (frame) => {
-          frames.push(frame);
-        }
-      });
-
-      const watchStepPath = buildStepArtifactPath(ctx, stepIndex, step.id, 'ndjson');
-      if (frames.length > 0) {
-        await writeFile(watchStepPath, `${frames.map((item) => JSON.stringify(item)).join('\n')}\n`, 'utf8');
-      } else {
-        await writeFile(watchStepPath, '', 'utf8');
-      }
-
-      return {
-        output: {
-          frameCount: frames.length,
-          lastEventType: frames.length > 0 ? frames[frames.length - 1].eventType : undefined
-        },
-        artifactPath: watchStepPath,
-        watchFrames: frames,
-        contextUpdates:
-          frames.length > 0 &&
-          Array.isArray(frames[0].items) &&
-          frames[0].items.length > 0 &&
-          isRecord(frames[0].items[0])
-            ? {
-                ...(typeof frames[0].items[0].device_id === 'string'
-                  ? { watch_device_id: String(frames[0].items[0].device_id) }
-                  : {}),
-                ...(typeof frames[0].items[0].uuid === 'string'
-                  ? { watch_incident_id: String(frames[0].items[0].uuid) }
-                  : {}),
-                ...(typeof frames[0].items[0].id === 'string' ? { watch_item_id: String(frames[0].items[0].id) } : {})
-              }
-            : undefined
-      };
-    }
-    case 'call': {
-      if (!step.call) {
-        throw new Error(`Flow step ${step.id} is missing call configuration.`);
-      }
-
-      const endpoint = getEndpoint(step.call.endpointKey);
-      const method = endpoint.method.toUpperCase();
-      const isWrite = isMutatingMethod(method);
-      const requestId = randomUUID();
-
-      const pathPayload = step.call.path ? resolveTemplateValue(step.call.path, ctx.resolvedContext) : undefined;
-      const queryPayload = step.call.query ? resolveTemplateValue(step.call.query, ctx.resolvedContext) : undefined;
-      const bodyPayload = step.call.body ? resolveTemplateValue(step.call.body, ctx.resolvedContext) : undefined;
-
-      const result = await ctx.args.client.callWithMeta(step.call.endpointKey, {
-        requestId,
-        tenantId: ctx.args.tenantId,
-        ...(pathPayload ? { path: pathPayload } : {}),
-        ...(queryPayload ? { query: queryPayload } : {}),
-        ...(bodyPayload !== undefined ? { body: bodyPayload } : {})
-      });
-
-      const envelope = buildCallEnvelope({
-        requestId,
-        tenantId: ctx.args.tenantId,
-        endpointKey: step.call.endpointKey,
-        method,
-        guard: {
-          allowWrite: isWrite
-        },
-        request: {
-          path: pathPayload,
-          query: queryPayload,
-          body: bodyPayload
-        },
-        response: {
-          status: result.status,
-          durationMs: result.durationMs,
-          retryCount: result.retryCount,
-          data: result.data
-        }
-      });
-
-      const contextUpdates: Record<string, string> = {};
-      if (step.call.endpointKey === 'organization.commands.getCommands' && isRecord(result.data)) {
-        const items = Array.isArray(result.data.items) ? result.data.items : [];
-        const first = items.find((item) => isRecord(item) && typeof item.command === 'string');
-        if (first && typeof first.command === 'string') {
-          contextUpdates.command = first.command;
-        }
-      }
-
-      return {
-        output: envelope,
-        contextUpdates: Object.keys(contextUpdates).length > 0 ? contextUpdates : undefined
-      };
-    }
-    case 'utility.prepare': {
-      if (!step.utilityPrepare) {
-        throw new Error(`Flow step ${step.id} is missing utility prepare configuration.`);
-      }
-      const inputPath = path.resolve(resolveTemplateString(step.utilityPrepare.inputPath, ctx.resolvedContext));
-      const outputDir = path.join(ctx.outputsDir, path.basename(step.utilityPrepare.outputDir));
-      const result = runUtilityPrepare({
-        inputPath,
-        actionKey: step.utilityPrepare.actionKey,
-        outputDir,
-        tenantId: ctx.args.tenantId,
-        primaryFormat: step.utilityPrepare.primaryFormat,
-        force: true
-      });
-      const contextUpdates: Record<string, string> = {};
-      if (step.utilityPrepare.actionKey === 'space.import-tree') {
-        contextUpdates.space_import_tree_csv = result.artifacts.primary;
-      }
-      if (step.utilityPrepare.actionKey === 'organization.devices.claimDevice') {
-        contextUpdates.claim_prepare_csv = result.artifacts.primary;
-      }
-      return {
-        output: result,
-        contextUpdates
-      };
-    }
-    case 'space.import-tree': {
-      if (!step.spaceImportTree) {
-        throw new Error(`Flow step ${step.id} is missing space import configuration.`);
-      }
-
-      const inputPath = path.resolve(resolveTemplateString(step.spaceImportTree.inputPath, ctx.resolvedContext));
-      const reportPath = path.join(ctx.outputsDir, path.basename(step.spaceImportTree.reportPath));
-      const result = await runSpaceImportTree({
-        client: ctx.args.client,
-        tenantId: ctx.args.tenantId,
-        inputPath,
-        apply: step.spaceImportTree.apply,
-        continueOnError: false,
-        reportPath
-      });
-      return {
-        output: result,
-        artifactPath: reportPath
-      };
-    }
-    default: {
-      throw new Error(`Unsupported flow task type: ${(step as { task: string }).task}`);
-    }
+    case 'doctor.install':    return { ok: true, output: buildInstallDoctorReport(path.resolve(__dirname, '../../dist/bin/xyte-cli.js')) };
+    case 'setup.status':      return handleSetupStatusStep(step, ctx);
+    case 'config.doctor':     return handleConfigDoctor(step, ctx);
+    case 'status.fast':       return handleStatusFast(step, ctx);
+    case 'inspect.fleet':     return handleFleetInspect(step, ctx);
+    case 'inspect.deep-dive': return handleDeepDive(step, ctx);
+    case 'report.generate':   return handleReportGenerate(step, ctx);
+    case 'watch':             return handleWatch(step, stepIndex, ctx);
+    case 'call':              return handleCall(step, stepIndex, ctx);
+    case 'utility.prepare':   return handleUtilityPrepare(step, stepIndex, ctx);
+    case 'device.match':      return handleDeviceMatch(step, stepIndex, ctx);
+    case 'device.move-batch': return handleDeviceMoveBatch(step, stepIndex, ctx);
+    case 'device.verify-batch': return handleDeviceVerifyBatch(step, stepIndex, ctx);
+    case 'space.import-tree': return handleSpaceImportTree(step, stepIndex, ctx);
+    case 'edge.claim':        return handleEdgeClaim(step, stepIndex, ctx);
+    case 'edge.claim-batch':  return handleEdgeClaimBatch(step, stepIndex, ctx);
+    case 'edge.ping':         return handleEdgePing(step, stepIndex, ctx);
+    default: throw new Error(`Unsupported flow task type: ${(step as { task: string }).task}`);
   }
 }
 
-function computeDecisionCounts(decisions: FlowRunDecision[]) {
+function computeDecisionCounts(decisions: FlowRunDecision[]): { pending: number; approved: number; blocked: number } {
   return {
     pending: decisions.filter((item) => item.action === 'pending').length,
     approved: decisions.filter((item) => item.action === 'approved').length,
@@ -552,7 +809,7 @@ function computeDecisionCounts(decisions: FlowRunDecision[]) {
   };
 }
 
-function computeClassificationCounts(errors: FlowRunErrorEntry[]) {
+function computeClassificationCounts(errors: FlowRunErrorEntry[]): { needs_data: number; bug: number } {
   return {
     needs_data: errors.filter((item) => item.classification === 'needs_data').length,
     bug: errors.filter((item) => item.classification === 'bug').length
@@ -561,7 +818,7 @@ function computeClassificationCounts(errors: FlowRunErrorEntry[]) {
 
 async function findRunBundle(outDir: string, resumeRef: string): Promise<string> {
   if (!resumeRef.trim()) {
-    throw new Error('Invalid --resume value.');
+    throw new CliUserError({ summary: 'Invalid --resume value.' });
   }
 
   const direct = path.resolve(resumeRef);
@@ -598,13 +855,13 @@ async function findRunBundle(outDir: string, resumeRef: string): Promise<string>
         if (parsed.runId === resumeRef.trim()) {
           return candidate;
         }
-      } catch {
-        // ignore malformed manifests during search
+      } catch (error) {
+        getLogger().debug({ manifestPath, error: errorMessage(error) }, 'Skipping malformed manifest during resume search');
       }
     }
   }
 
-  throw new Error(`Unable to resolve resume run: ${resumeRef}`);
+  throw new CliUserError({ summary: `Unable to resolve resume run: ${resumeRef}` });
 }
 
 function createInitialSteps(definition: BuiltInFlowDefinition): FlowRunStep[] {
@@ -617,7 +874,10 @@ function createInitialSteps(definition: BuiltInFlowDefinition): FlowRunStep[] {
   }));
 }
 
-async function readLinesAsJson<T>(filePath: string): Promise<T[]> {
+async function readLinesAsJson<T>(
+  filePath: string,
+  schema: { safeParse: (v: unknown) => { success: true; data: T } | { success: false } }
+): Promise<T[]> {
   if (!existsSync(filePath)) {
     return [];
   }
@@ -629,11 +889,17 @@ async function readLinesAsJson<T>(filePath: string): Promise<T[]> {
     .filter(Boolean);
 
   for (let index = 0; index < lines.length; index += 1) {
+    let parsed: unknown;
     try {
-      items.push(JSON.parse(lines[index]) as T);
+      parsed = JSON.parse(lines[index]);
     } catch {
-      throw new Error(`Invalid JSON line ${index + 1} in ${filePath}.`);
+      throw new CliUserError({ summary: `Invalid JSON line ${index + 1} in ${filePath}.` });
     }
+    const result = schema.safeParse(parsed);
+    if (!result.success) {
+      throw new CliUserError({ summary: `Unexpected shape on line ${index + 1} in ${filePath}.` });
+    }
+    items.push(result.data);
   }
 
   return items;
@@ -643,41 +909,36 @@ function isInspectProviderScopeValue(value: unknown): value is InspectProviderSc
   return (INSPECT_PROVIDER_SCOPES as readonly string[]).includes(value as string);
 }
 
-async function readStoredInspectProviderScope(bundleDir: string): Promise<InspectProviderScope | undefined> {
-  const storedInputs = await readStoredInputs(bundleDir);
-  if (!storedInputs) {
-    return undefined;
-  }
-
-  if (isInspectProviderScopeValue(storedInputs.inspectProviderScope)) {
-    return storedInputs.inspectProviderScope;
-  }
-
-  return undefined;
-}
-
 async function readStoredInputs(bundleDir: string): Promise<FlowRunInputsPayload | undefined> {
   const inputsPath = path.join(bundleDir, 'inputs.json');
   if (!existsSync(inputsPath)) {
-    return undefined;
+    throw new CliUserError({ summary: `Resume inputs metadata is missing: ${inputsPath}.` });
   }
 
+  let parsed: unknown;
   try {
-    return JSON.parse(await readFile(inputsPath, 'utf8')) as FlowRunInputsPayload;
-  } catch {
-    // Ignore malformed resume inputs and use current invocation defaults.
-    return undefined;
+    parsed = JSON.parse(await readFile(inputsPath, 'utf8'));
+  } catch (error) {
+    throw new CliUserError({ summary: `Resume inputs are invalid JSON: ${inputsPath}.`, detail: errorMessage(error) });
   }
+  const result = FlowRunInputsPayloadSchema.safeParse(parsed);
+  if (!result.success) {
+    throw new CliUserError({
+      summary: `Resume inputs have unexpected shape: ${inputsPath}.`,
+      detail: result.error.issues.map((issue) => `${issue.path.join('.') || '<root>'}: ${issue.message}`).join('; ')
+    });
+  }
+  return result.data;
 }
 
 function buildFlowRunInputsPayload(
-  ctx: Pick<RunContext, 'resolvedContext'>,
+  ctx: Pick<RunContext, 'resolvedContext' | 'resolvedFlowId'>,
   args: RunDeterministicFlowArgs,
   inspectProviderScope: InspectProviderScope
 ): FlowRunInputsPayload {
   return {
     flowId: args.flowId,
-    resolvedFlowId: args.resolvedFlowId,
+    resolvedFlowId: ctx.resolvedFlowId,
     tenantId: args.tenantId,
     mode: args.mode,
     inspectProviderScope,
@@ -690,7 +951,7 @@ function buildFlowRunInputsPayload(
 }
 
 async function persistFlowRunInputs(
-  ctx: Pick<RunContext, 'inputsPath' | 'resolvedContext'>,
+  ctx: Pick<RunContext, 'inputsPath' | 'resolvedContext' | 'resolvedFlowId'>,
   args: RunDeterministicFlowArgs,
   inspectProviderScope: InspectProviderScope
 ): Promise<void> {
@@ -716,8 +977,8 @@ async function restoreTaskOutputsFromSteps(steps: FlowRunStep[]): Promise<Map<st
     try {
       const parsed = JSON.parse(await readFile(step.artifactPath, 'utf8')) as unknown;
       taskOutputs.set(step.stepId, parsed);
-    } catch {
-      // Ignore malformed task artifacts during resume hydration.
+    } catch (error) {
+      getLogger().warn({ stepId: step.stepId, error: errorMessage(error) }, 'Failed to restore task artifact from step during resume hydration');
     }
   }
   return taskOutputs;
@@ -727,62 +988,49 @@ async function writeSummaryToManifest(summary: FlowRunSummary, manifestPath: str
   await writeFile(manifestPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
 }
 
-export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Promise<FlowRunSummary> {
-  const outRoot = path.resolve(args.outDir);
-  const resumeBundle = args.resume ? await findRunBundle(outRoot, args.resume) : undefined;
+interface ResumeState {
+  runId: string;
+  bundleDir: string;
+  initialStartedAtUtc: string;
+  steps: FlowRunStep[];
+  cursorIndex: number;
+  priorDecisions: FlowRunDecision[];
+  priorErrors: FlowRunErrorEntry[];
+  resumedInspectProviderScope: InspectProviderScope | undefined;
+  resumedContext: Record<string, string>;
+}
 
-  let runId: string = randomUUID();
-  let bundleDir = path.join(outRoot, sanitizeFlowId(args.flowId), buildRunDirName(runId));
-  let initialStartedAtUtc = nowIso();
-  let steps = createInitialSteps(args.definition);
-  let cursorIndex = 0;
-  let priorDecisions: FlowRunDecision[] = [];
-  let priorErrors: FlowRunErrorEntry[] = [];
-  let resumedInspectProviderScope: InspectProviderScope | undefined;
-  let resumedContext: Record<string, string> = {};
-
-  if (resumeBundle) {
-    const manifestPath = path.join(resumeBundle, 'manifest.json');
-    let existingSummary: FlowRunSummary;
-    try {
-      existingSummary = JSON.parse(await readFile(manifestPath, 'utf8')) as FlowRunSummary;
-    } catch {
-      throw new Error(`Resume bundle manifest is invalid JSON: ${manifestPath}`);
-    }
-    runId = existingSummary.runId;
-    bundleDir = resumeBundle;
-    initialStartedAtUtc = existingSummary.startedAtUtc;
-    steps = existingSummary.steps;
-    cursorIndex = existingSummary.cursor.nextStepIndex;
-    priorDecisions = await readLinesAsJson<FlowRunDecision>(path.join(resumeBundle, 'decisions.ndjson'));
-    priorErrors = await readLinesAsJson<FlowRunErrorEntry>(path.join(resumeBundle, 'errors.ndjson'));
-    const storedInputs = await readStoredInputs(resumeBundle);
-    resumedInspectProviderScope = await readStoredInspectProviderScope(resumeBundle);
-    resumedContext = toStringRecord(storedInputs?.context);
+async function loadResumeState(resumeBundle: string): Promise<ResumeState> {
+  const manifestPath = path.join(resumeBundle, 'manifest.json');
+  let raw: string;
+  try {
+    raw = await readFile(manifestPath, 'utf8');
+  } catch {
+    throw new CliUserError({ summary: `Resume bundle manifest could not be read: ${manifestPath}` });
   }
-
-  const effectiveInspectProviderScope = args.inspectProviderScope ?? resumedInspectProviderScope ?? 'auto';
-  const restoredTaskOutputs = resumeBundle ? await restoreTaskOutputsFromSteps(steps) : new Map<string, unknown>();
-  const ctx: RunContext = {
-    args: {
-      ...args,
-      inspectProviderScope: effectiveInspectProviderScope
-    },
-    bundleDir,
-    stepsDir: path.join(bundleDir, 'steps'),
-    outputsDir: path.join(bundleDir, 'outputs'),
-    manifestPath: path.join(bundleDir, 'manifest.json'),
-    inputsPath: path.join(bundleDir, 'inputs.json'),
-    decisionsPath: path.join(bundleDir, 'decisions.ndjson'),
-    errorsPath: path.join(bundleDir, 'errors.ndjson'),
-    watchFramesPath: path.join(bundleDir, 'watch-frames.ndjson'),
-    resolvedContext: {
-      ...resumedContext,
-      ...args.context
-    },
-    taskOutputs: restoredTaskOutputs
+  let existingSummary: FlowRunSummary;
+  try {
+    existingSummary = FlowRunSummarySchema.parse(JSON.parse(raw));
+  } catch {
+    throw new CliUserError({ summary: `Resume bundle manifest is invalid JSON or has unexpected shape: ${manifestPath}` });
+  }
+  const storedInputs = await readStoredInputs(resumeBundle);
+  return {
+    runId: existingSummary.runId,
+    bundleDir: resumeBundle,
+    initialStartedAtUtc: existingSummary.startedAtUtc,
+    steps: existingSummary.steps,
+    cursorIndex: existingSummary.cursor.nextStepIndex,
+    priorDecisions: await readLinesAsJson(path.join(resumeBundle, 'decisions.ndjson'), FlowRunDecisionSchema),
+    priorErrors: await readLinesAsJson(path.join(resumeBundle, 'errors.ndjson'), FlowRunErrorEntrySchema),
+    resumedInspectProviderScope: storedInputs && isInspectProviderScopeValue(storedInputs.inspectProviderScope)
+      ? storedInputs.inspectProviderScope
+      : undefined,
+    resumedContext: toStringRecord(storedInputs?.context)
   };
+}
 
+async function ensureRunPaths(ctx: RunContext): Promise<void> {
   mkdirSync(ctx.stepsDir, { recursive: true });
   mkdirSync(ctx.outputsDir, { recursive: true });
   if (!existsSync(ctx.decisionsPath)) {
@@ -794,8 +1042,214 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
   if (!existsSync(ctx.watchFramesPath)) {
     await writeFile(ctx.watchFramesPath, '', 'utf8');
   }
+}
 
-  await persistFlowRunInputs(ctx, args, effectiveInspectProviderScope);
+interface RunState {
+  ctx: RunContext;
+  runId: string;
+  initialStartedAtUtc: string;
+  cursorIndex: number;
+  steps: FlowRunStep[];
+  priorDecisions: FlowRunDecision[];
+  priorErrors: FlowRunErrorEntry[];
+}
+
+interface ExecuteStepsResult {
+  outcome: FlowRunSummary['outcome'];
+  nextStepIndex: number;
+  decisions: FlowRunDecision[];
+  errors: FlowRunErrorEntry[];
+  durationMs: number;
+}
+
+async function resolveFlowDefinition(flowId: string): Promise<{
+  definition: BuiltInFlowDefinition;
+  resolvedFlowId: string;
+  flowDefaults: Record<string, string>;
+}> {
+  let resolvedFlowId = flowId;
+  let flowDefaults: Record<string, string> = {};
+  if (!hasBuiltInFlowDefinition(flowId)) {
+    const custom = await getFlowDefinition(flowId);
+    if (!custom) {
+      throw new CliUserError({ summary: `Unknown flow id: ${flowId}` });
+    }
+    if (!hasBuiltInFlowDefinition(custom.basedOn)) {
+      throw new CliUserError({
+        summary: `Custom flow ${flowId} references unknown built-in base flow: ${custom.basedOn}`
+      });
+    }
+    resolvedFlowId = custom.basedOn;
+    flowDefaults = custom.defaults;
+  }
+  return { definition: getBuiltInFlowDefinition(resolvedFlowId), resolvedFlowId, flowDefaults };
+}
+
+async function hydrateResume(
+  outRoot: string,
+  resumeRef: string | undefined,
+  freshRunId: string,
+  definition: BuiltInFlowDefinition,
+  flowId: string
+): Promise<{
+  resume: ResumeState | undefined;
+  runId: string;
+  bundleDir: string;
+  initialStartedAtUtc: string;
+  steps: FlowRunStep[];
+  cursorIndex: number;
+  priorDecisions: FlowRunDecision[];
+  priorErrors: FlowRunErrorEntry[];
+}> {
+  const resumeBundle = resumeRef ? await findRunBundle(outRoot, resumeRef) : undefined;
+  const resume = resumeBundle ? await loadResumeState(resumeBundle) : undefined;
+  const runId = resume?.runId ?? freshRunId;
+  const bundleDir = resume?.bundleDir ?? path.join(outRoot, sanitizeFlowId(flowId), buildRunDirName(freshRunId));
+  const initialStartedAtUtc = resume?.initialStartedAtUtc ?? nowIso();
+  const steps = resume?.steps ?? createInitialSteps(definition);
+  const cursorIndex = resume?.cursorIndex ?? 0;
+  const priorDecisions = resume?.priorDecisions ?? [];
+  const priorErrors = resume?.priorErrors ?? [];
+  return { resume, runId, bundleDir, initialStartedAtUtc, steps, cursorIndex, priorDecisions, priorErrors };
+}
+
+async function initRunState(args: RunDeterministicFlowArgs): Promise<RunState> {
+  const { definition, resolvedFlowId, flowDefaults } = await resolveFlowDefinition(args.flowId);
+  const outRoot = path.resolve(args.outDir);
+  const freshRunId = randomUUID();
+  const { resume, runId, bundleDir, initialStartedAtUtc, steps, cursorIndex, priorDecisions, priorErrors } =
+    await hydrateResume(outRoot, args.resume, freshRunId, definition, args.flowId);
+
+  const effectiveInspectProviderScope = args.inspectProviderScope ?? resume?.resumedInspectProviderScope ?? 'auto';
+  const restoredTaskOutputs = resume ? await restoreTaskOutputsFromSteps(steps) : new Map<string, unknown>();
+  const ctx: RunContext = {
+    args: {
+      ...args,
+      inspectProviderScope: effectiveInspectProviderScope
+    },
+    resolvedFlowId,
+    definition,
+    bundleDir,
+    stepsDir: path.join(bundleDir, 'steps'),
+    outputsDir: path.join(bundleDir, 'outputs'),
+    manifestPath: path.join(bundleDir, 'manifest.json'),
+    inputsPath: path.join(bundleDir, 'inputs.json'),
+    decisionsPath: path.join(bundleDir, 'decisions.ndjson'),
+    errorsPath: path.join(bundleDir, 'errors.ndjson'),
+    watchFramesPath: path.join(bundleDir, 'watch-frames.ndjson'),
+    resolvedContext: {
+      ...(resume?.resumedContext ?? {}),
+      ...flowDefaults,
+      ...args.context
+    },
+    taskOutputs: restoredTaskOutputs
+  };
+
+  await ensureRunPaths(ctx);
+  await persistFlowRunInputs(ctx, ctx.args, effectiveInspectProviderScope);
+
+  return { ctx, runId, initialStartedAtUtc, cursorIndex, steps, priorDecisions, priorErrors };
+}
+
+async function handleGateStep(
+  step: FlowGateStep,
+  stepState: FlowRunStep,
+  ctx: RunContext,
+  decisions: FlowRunDecision[],
+  gateApprovalsThisRun: number,
+  index: number
+): Promise<
+  | { action: 'pause'; nextStepIndex: number; gateApprovalsThisRun: number; outcome: 'pending_gate' }
+  | { action: 'continue'; nextStepIndex: number; gateApprovalsThisRun: number }
+> {
+  if (ctx.args.mode === 'plan') {
+    await recordGatePending(stepState, {
+      stepId: step.id,
+      requiresWrite: step.mutating,
+      detail: 'Plan mode paused at human decision gate.',
+      decisionsPath: ctx.decisionsPath,
+      decisions
+    });
+    return { action: 'pause', nextStepIndex: index, gateApprovalsThisRun, outcome: 'pending_gate' };
+  }
+
+  if (step.pauseOnFirstApply === true && gateApprovalsThisRun === 0 && stepState.status !== 'gate_pending') {
+    await recordGatePending(stepState, {
+      stepId: step.id,
+      requiresWrite: step.mutating,
+      detail: 'Apply mode paused at a gate that requires explicit resume approval.',
+      decisionsPath: ctx.decisionsPath,
+      decisions
+    });
+    return { action: 'pause', nextStepIndex: index, gateApprovalsThisRun, outcome: 'pending_gate' };
+  }
+
+  if (gateApprovalsThisRun >= 1) {
+    await recordGatePending(stepState, {
+      stepId: step.id,
+      requiresWrite: step.mutating,
+      detail: 'Single-gate apply limit reached for this invocation.',
+      decisionsPath: ctx.decisionsPath,
+      decisions
+    });
+    return { action: 'pause', nextStepIndex: index, gateApprovalsThisRun, outcome: 'pending_gate' };
+  }
+
+  stepState.status = 'gate_approved';
+  const decision: FlowRunDecision = {
+    timestamp: nowIso(),
+    stepId: step.id,
+    action: 'approved',
+    detail: 'Gate approved by apply mode execution.',
+    requiresWrite: step.mutating
+  };
+  decisions.push(decision);
+  await appendNdjson(ctx.decisionsPath, decision);
+  return { action: 'continue', nextStepIndex: index + 1, gateApprovalsThisRun: gateApprovalsThisRun + 1 };
+}
+
+async function recordStepSuccess(
+  result: TaskExecutionResult,
+  step: FlowTaskStep,
+  stepState: FlowRunStep,
+  ctx: RunContext,
+  artifactPath: string,
+  stepStartedAt: number
+): Promise<void> {
+  stepState.status = 'completed';
+  stepState.endedAtUtc = nowIso();
+  stepState.durationMs = Date.now() - stepStartedAt;
+  stepState.artifactPath = artifactPath;
+  // Convention: <stepId>_artifact holds the primary artifact path (e.g. CSV written by a utility-prepare step).
+  ctx.resolvedContext[`${step.id}_artifact`] = artifactPath;
+
+  if (result.ok && result.watchFrames && result.watchFrames.length > 0) {
+    for (const frame of result.watchFrames) {
+      await appendNdjson(ctx.watchFramesPath, frame);
+    }
+  }
+
+  if (result.contextUpdates) {
+    Object.assign(ctx.resolvedContext, result.contextUpdates);
+  }
+
+  if (result.output !== undefined) {
+    ctx.taskOutputs.set(step.id, result.output);
+  }
+
+  const primaryOutputPath = result.primaryOutputPath;
+  if (primaryOutputPath) {
+    // Convention: <stepId>_output holds the primary output path (e.g. NDJSON written by a match/move/verify step).
+    ctx.resolvedContext[`${step.id}_output`] = primaryOutputPath;
+  }
+
+  await persistFlowRunInputs(ctx, ctx.args, ctx.args.inspectProviderScope);
+}
+
+async function runSteps(state: RunState): Promise<ExecuteStepsResult> {
+  const { ctx, cursorIndex, steps, priorDecisions, priorErrors } = state;
+  const { definition } = ctx;
+  const args = ctx.args;
 
   const runStartedAt = Date.now();
   let outcome: FlowRunSummary['outcome'] = 'completed';
@@ -804,56 +1258,20 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
   const decisions = [...priorDecisions];
   const errors = [...priorErrors];
 
-  if (nextStepIndex < args.definition.steps.length) {
-    for (let index = nextStepIndex; index < args.definition.steps.length; index += 1) {
-      const step = args.definition.steps[index];
+  if (nextStepIndex < definition.steps.length) {
+    for (let index = nextStepIndex; index < definition.steps.length; index += 1) {
+      const step = definition.steps[index];
       const stepState = steps[index];
 
       if (step.kind === 'gate') {
-        if (args.mode === 'plan') {
-          stepState.status = 'gate_pending';
-          const decision: FlowRunDecision = {
-            timestamp: nowIso(),
-            stepId: step.id,
-            action: 'pending',
-            detail: 'Plan mode paused at human decision gate.',
-            requiresWrite: step.mutating
-          };
-          decisions.push(decision);
-          await appendNdjson(ctx.decisionsPath, decision);
-          outcome = 'pending_gate';
-          nextStepIndex = index;
+        const gateResult = await handleGateStep(step, stepState, ctx, decisions, gateApprovalsThisRun, index);
+        if (gateResult.action === 'pause') {
+          outcome = gateResult.outcome;
+          nextStepIndex = gateResult.nextStepIndex;
           break;
         }
-
-        if (gateApprovalsThisRun >= 1) {
-          stepState.status = 'gate_pending';
-          const decision: FlowRunDecision = {
-            timestamp: nowIso(),
-            stepId: step.id,
-            action: 'pending',
-            detail: 'Single-gate apply limit reached for this invocation.',
-            requiresWrite: step.mutating
-          };
-          decisions.push(decision);
-          await appendNdjson(ctx.decisionsPath, decision);
-          outcome = 'pending_gate';
-          nextStepIndex = index;
-          break;
-        }
-
-        stepState.status = 'gate_approved';
-        const decision: FlowRunDecision = {
-          timestamp: nowIso(),
-          stepId: step.id,
-          action: 'approved',
-          detail: 'Gate approved by apply mode execution.',
-          requiresWrite: step.mutating
-        };
-        decisions.push(decision);
-        await appendNdjson(ctx.decisionsPath, decision);
-        gateApprovalsThisRun += 1;
-        nextStepIndex = index + 1;
+        gateApprovalsThisRun = gateResult.gateApprovalsThisRun;
+        nextStepIndex = gateResult.nextStepIndex;
         continue;
       }
 
@@ -868,33 +1286,21 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
           await writeFile(artifactPath, `${JSON.stringify(result.output ?? {}, null, 2)}\n`, 'utf8');
         }
 
-        stepState.status = 'completed';
-        stepState.endedAtUtc = nowIso();
-        stepState.durationMs = Date.now() - stepStartedAt;
-        stepState.artifactPath = artifactPath;
-
-        if (result.watchFrames && result.watchFrames.length > 0) {
-          for (const frame of result.watchFrames) {
-            await appendNdjson(ctx.watchFramesPath, frame);
-          }
+        if (!result.ok) {
+          const problem = toProblemDetails(new Error(result.failureDetail), `/flow/${args.flowId}/${step.id}`);
+          const classification = await recordStepFailure(stepState, problem, {
+            stepId: step.id,
+            startedAt: stepStartedAt,
+            errorsPath: ctx.errorsPath,
+            errors,
+            artifactPath
+          });
+          outcome = classification === 'needs_data' ? 'needs_input' : 'failed';
+          nextStepIndex = index;
+          break;
         }
 
-        if (result.contextUpdates) {
-          Object.assign(ctx.resolvedContext, result.contextUpdates);
-        }
-
-        if (result.output !== undefined) {
-          ctx.taskOutputs.set(step.id, result.output);
-        }
-
-        const primaryOutputPath = extractPrimaryOutputPath(result.output);
-        if (primaryOutputPath) {
-          ctx.resolvedContext[`${step.id}_output`] = primaryOutputPath;
-        }
-
-        if (result.contextUpdates || primaryOutputPath) {
-          await persistFlowRunInputs(ctx, args, effectiveInspectProviderScope);
-        }
+        await recordStepSuccess(result, step, stepState, ctx, artifactPath, stepStartedAt);
 
         nextStepIndex = index + 1;
         continue;
@@ -903,23 +1309,12 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
           error instanceof FlowNeedsInputError
             ? toNeedsInputProblem(error, `/flow/${args.flowId}/${step.id}`)
             : toProblemDetails(error, `/flow/${args.flowId}/${step.id}`);
-        const classification = classifyFailure(problem);
-
-        stepState.status = 'failed';
-        stepState.endedAtUtc = nowIso();
-        stepState.durationMs = Date.now() - stepStartedAt;
-        stepState.error = problem;
-        stepState.classification = classification;
-
-        const errorEntry: FlowRunErrorEntry = {
-          timestamp: nowIso(),
+        const classification = await recordStepFailure(stepState, problem, {
           stepId: step.id,
-          classification,
-          error: problem
-        };
-        errors.push(errorEntry);
-        await appendNdjson(ctx.errorsPath, errorEntry);
-
+          startedAt: stepStartedAt,
+          errorsPath: ctx.errorsPath,
+          errors
+        });
         outcome = classification === 'needs_data' ? 'needs_input' : 'failed';
         nextStepIndex = index;
         break;
@@ -927,15 +1322,148 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
     }
   }
 
-  const decisionsCount = computeDecisionCounts(decisions);
-  const classificationCount = computeClassificationCounts(errors);
+  return { outcome, nextStepIndex, decisions, errors, durationMs: Date.now() - runStartedAt };
+}
+
+function posixQuoteArg(value: string): string {
+  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(value)) {
+    return value;
+  }
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function windowsQuoteArg(value: string): string {
+  if (/^[A-Za-z0-9_@+=:,./\\-]+$/.test(value)) {
+    return value;
+  }
+
+  let quoted = '"';
+  let backslashes = 0;
+  for (const char of value) {
+    if (char === '\\') {
+      backslashes += 1;
+      continue;
+    }
+    if (char === '"') {
+      quoted += '\\'.repeat(backslashes * 2 + 1);
+      quoted += '"';
+      backslashes = 0;
+      continue;
+    }
+    quoted += '\\'.repeat(backslashes);
+    quoted += char;
+    backslashes = 0;
+  }
+  quoted += '\\'.repeat(backslashes * 2);
+  quoted += '"';
+  return quoted;
+}
+
+function commandQuoteArg(value: string): string {
+  return process.platform === 'win32' ? windowsQuoteArg(value) : posixQuoteArg(value);
+}
+
+function usesNonDefaultOutDir(outDir: string): boolean {
+  return path.resolve(outDir) !== path.resolve(DEFAULT_FLOW_RUN_OUT_DIR);
+}
+
+function buildResumeCommand(args: RunContextArgs, runId: string, outcome: FlowRunSummary['outcome']): string {
+  const mode = outcome === 'pending_gate' ? 'apply' : args.mode;
+  const parts = [
+    'xyte-cli',
+    'flow',
+    'run',
+    args.flowId,
+    '--tenant',
+    args.tenantId,
+    `--${mode}`,
+    '--inspect-provider-scope',
+    args.inspectProviderScope
+  ];
+  if (usesNonDefaultOutDir(args.outDir)) {
+    parts.push('--out-dir', args.outDir);
+  }
+  parts.push('--resume', runId);
+  return parts.map(commandQuoteArg).join(' ');
+}
+
+function collectOutputArtifactPaths(output: unknown, paths: Set<string>): void {
+  if (!isRecord(output)) {
+    return;
+  }
+  const artifacts = output.artifacts;
+  if (isRecord(artifacts)) {
+    for (const value of Object.values(artifacts)) {
+      if (typeof value === 'string') {
+        paths.add(value);
+      }
+    }
+  }
+  for (const key of ['primaryOutputPath', 'reportPath', 'resumePath', 'outputPath', 'summaryPath']) {
+    const value = output[key];
+    if (typeof value === 'string') {
+      paths.add(value);
+    }
+  }
+}
+
+function collectCompletedArtifactPaths(steps: FlowRunStep[], taskOutputs: Map<string, unknown>): string[] {
+  const paths = new Set<string>();
+  for (const step of steps) {
+    if (step.status !== 'completed') {
+      continue;
+    }
+    if (typeof step.artifactPath === 'string') {
+      paths.add(step.artifactPath);
+    }
+    collectOutputArtifactPaths(taskOutputs.get(step.stepId), paths);
+  }
+  return [...paths];
+}
+
+function buildNextAction(args: {
+  outcome: FlowRunSummary['outcome'];
+  nextStep: BuiltInFlowDefinition['steps'][number];
+  steps: FlowRunStep[];
+  taskOutputs: Map<string, unknown>;
+  runArgs: RunContextArgs;
+  runId: string;
+}): FlowRunNextAction | undefined {
+  if (args.outcome === 'completed') {
+    return undefined;
+  }
+  const kind: FlowRunNextAction['kind'] =
+    args.outcome === 'pending_gate' ? 'approve_gate' : args.outcome === 'needs_input' ? 'provide_input' : 'fix_failure';
+  return {
+    kind,
+    stepId: args.nextStep.id,
+    title: args.nextStep.title,
+    requiresWrite: args.nextStep.mutating,
+    artifactPaths: collectCompletedArtifactPaths(args.steps, args.taskOutputs),
+    command: buildResumeCommand(args.runArgs, args.runId, args.outcome)
+  };
+}
+
+export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Promise<FlowRunSummary> {
+  const state = await initRunState(args);
+  const { ctx, runId, initialStartedAtUtc, steps } = state;
+  const { definition } = ctx;
+  const runArgs = ctx.args;
+
+  const execution = await runSteps(state);
+  const { outcome, nextStepIndex, decisions, errors, durationMs } = execution;
+  const nextStep = nextStepIndex < definition.steps.length ? definition.steps[nextStepIndex] : undefined;
+  const resumeCommand = nextStep ? buildResumeCommand(runArgs, runId, outcome) : undefined;
+  const nextAction = nextStep
+    ? buildNextAction({ outcome, nextStep, steps, taskOutputs: ctx.taskOutputs, runArgs, runId })
+    : undefined;
 
   const summary = buildFlowRunSummary({
     runId,
-    flowId: args.flowId,
-    resolvedFlowId: args.resolvedFlowId,
-    mode: args.mode,
-    tenantId: args.tenantId,
+    flowId: runArgs.flowId,
+    resolvedFlowId: ctx.resolvedFlowId,
+    mode: runArgs.mode,
+    tenantId: runArgs.tenantId,
     bundleDir: ctx.bundleDir,
     manifestPath: ctx.manifestPath,
     inputsPath: ctx.inputsPath,
@@ -944,23 +1472,18 @@ export async function runDeterministicFlow(args: RunDeterministicFlowArgs): Prom
     watchFramesPath: ctx.watchFramesPath,
     startedAtUtc: initialStartedAtUtc,
     endedAtUtc: nowIso(),
-    durationMs: Date.now() - runStartedAt,
-    ...(args.resume ? { resumeFrom: args.resume } : {}),
+    durationMs,
+    ...(runArgs.resume ? { resumeFrom: runArgs.resume } : {}),
     outcome,
-    ...(nextStepIndex < args.definition.steps.length
-      ? { nextResumeStepId: args.definition.steps[nextStepIndex].id }
-      : {}),
-    ...(nextStepIndex < args.definition.steps.length
-      ? {
-          resumeCommand: `xyte-cli flow run ${args.flowId} --tenant ${args.tenantId} --${args.mode} --inspect-provider-scope ${effectiveInspectProviderScope} --resume ${runId}`
-        }
-      : {}),
+    ...(nextStep ? { nextResumeStepId: nextStep.id } : {}),
+    ...(resumeCommand ? { resumeCommand } : {}),
+    ...(nextAction ? { nextAction } : {}),
     steps,
-    decisions: decisionsCount,
-    classifications: classificationCount,
+    decisions: computeDecisionCounts(decisions),
+    classifications: computeClassificationCounts(errors),
     cursor: {
       nextStepIndex,
-      ...(nextStepIndex < args.definition.steps.length ? { nextStepId: args.definition.steps[nextStepIndex].id } : {})
+      ...(nextStepIndex < definition.steps.length ? { nextStepId: definition.steps[nextStepIndex].id } : {})
     }
   });
 

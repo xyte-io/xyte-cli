@@ -13,6 +13,7 @@ export {
   formatDeepDiveMarkdown,
   generateFleetReport
 } from './workflows/fleet-insights';
+export { generateOpsReport } from './workflows/ops-report';
 
 export { FileProfileStore, createProfileStore } from './secure/profile-store';
 export { createSecretStore, MemorySecretStore, FileSecretStore } from './secure/secret-store';

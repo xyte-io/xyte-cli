@@ -2,7 +2,7 @@ import blessed from 'blessed';
 
 import {
   clampIndex,
-  movePaneWithBoundary,
+  handleHorizontalArrow,
   moveTableSelection,
   setListTableData,
   scrollBox,
@@ -12,17 +12,43 @@ import {
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
 import { createRenderErrorTracker } from '../render-error-tracker';
-import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
+import { createScreenRenderLogger, logScreenDataFetch } from '../screen-render-logger';
+import type { TuiArrowKey, TuiContext, NavigableScreen, TuiPaneId } from '../types';
 import type { CommandTemplate } from '../data-loaders';
 import { loadCommandTemplates, loadDevicesData } from '../data-loaders';
 import { sceneFromDevicesState } from '../scene';
 import { payloadSummary, safeSearchText } from '../serialize';
-import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, promptChoice } from '../actions';
+import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, promptChoice, runGuardedAction } from '../actions';
 import { errorMessage } from '../../utils/error-format';
+import { asRecord, asRecordOrUndefined } from '../../utils/json';
 
 function deviceIdOf(device: unknown): string {
-  const rec = device && typeof device === 'object' ? (device as Record<string, unknown>) : undefined;
+  const rec = asRecordOrUndefined(device);
   return String(rec?.id ?? rec?._id ?? rec?.device_id ?? '');
+}
+
+function renderDeviceFallbackTable(
+  table: blessed.Widgets.ListTableElement | undefined,
+  filtered: unknown[],
+  selectionSync: SelectionSyncState
+): void {
+  if (!table) return;
+  setListTableData(
+    table,
+    [
+      ['ID', 'Name', 'Status', 'Space'],
+      ...filtered.map((device, index) => {
+        const d = asRecord(device);
+        return [
+          String(d.id ?? d._id ?? `row-${index + 1}`),
+          String(d.name ?? d.title ?? 'n/a'),
+          String(d.status ?? d.state ?? 'unknown'),
+          String(d.space_name ?? d.space_id ?? 'n/a')
+        ];
+      })
+    ],
+    selectionSync
+  );
 }
 
 interface SendCommandWithGuardArgs {
@@ -55,23 +81,85 @@ export async function sendCommandWithGuard(args: SendCommandWithGuardArgs): Prom
     body.params = args.params;
   }
 
-  args.context.setStatus('Sending command...');
-  try {
-    const tenantId = await args.context.getActiveTenantId();
+  return runGuardedAction(args.context, 'Sending command...', async (tenantId) => {
     await args.context.client.organization.sendCommand({
       tenantId,
       path: { device_id: deviceId },
       body
     });
     args.context.setStatus(`Command sent to device ${deviceId}.`);
-    return true;
-  } catch (error) {
-    args.context.showError(error);
-    return false;
+  });
+}
+
+async function runSendCommandWizard(args: {
+  context: TuiContext;
+  getIsMounted: () => boolean;
+  selectedDevice: () => unknown;
+  refreshDevices: (deviceId?: string) => Promise<void>;
+}): Promise<void> {
+  const { context, getIsMounted, selectedDevice, refreshDevices } = args;
+  const device = selectedDevice();
+  if (!device) {
+    context.setStatus('No device selected.');
+    return;
+  }
+  const deviceId = deviceIdOf(device);
+  if (!deviceId) {
+    context.setStatus('Selected device has no id.');
+    return;
+  }
+  const tenantId = await context.getActiveTenantId();
+  const templatesOutcome = await loadCommandTemplates(context.client, tenantId, { deviceId });
+  if (templatesOutcome.error) {
+    context.setStatus(`Command templates unavailable: ${templatesOutcome.error.message}`);
+    return;
+  }
+  if (!templatesOutcome.data.length) {
+    context.setStatus('No command templates available for selected device.');
+    return;
+  }
+
+  const choice = await promptChoice({
+    context,
+    title: `Command templates for ${deviceId}`,
+    choices: templatesOutcome.data.map((template: CommandTemplate) => ({
+      label: template.label,
+      value: `${template.mode}:${template.value}`
+    }))
+  });
+  if (!choice || !getIsMounted()) {
+    return;
+  }
+  const selectedTemplate = templatesOutcome.data.find(
+    (template: CommandTemplate) => `${template.mode}:${template.value}` === choice.value
+  );
+  if (!selectedTemplate) {
+    context.setStatus('Template selection is invalid.');
+    return;
+  }
+
+  const paramsInput = await context.prompt('Optional params JSON object (empty skips):', '');
+  if (paramsInput === undefined || !getIsMounted()) {
+    context.setStatus('Send command canceled.');
+    return;
+  }
+  let params: Record<string, unknown> | undefined;
+  if (paramsInput.trim()) {
+    const parsed = parseJsonObjectInput(paramsInput);
+    if (!parsed.ok) {
+      context.setStatus(`Invalid params JSON: ${parsed.error}`);
+      return;
+    }
+    params = parsed.value;
+  }
+
+  const sent = await sendCommandWithGuard({ device, template: selectedTemplate, params, context });
+  if (sent && getIsMounted()) {
+    await refreshDevices(deviceId);
   }
 }
 
-export function createDevicesScreen(): TuiScreen {
+export function createDevicesScreen(): NavigableScreen {
   let root: blessed.Widgets.BoxElement | undefined;
   let table: blessed.Widgets.ListTableElement | undefined;
   let detail: blessed.Widgets.BoxElement | undefined;
@@ -88,6 +176,7 @@ export function createDevicesScreen(): TuiScreen {
   let activePane: TuiPaneId = paneConfig.defaultPane;
   let isMounted = false;
   const renderErrors = createRenderErrorTracker();
+  const renderLog = createScreenRenderLogger('devices', () => context.debugLog, renderErrors);
   let spaceFilter = '';
 
   const focusPane = () => {
@@ -104,45 +193,23 @@ export function createDevicesScreen(): TuiScreen {
     if (!isMounted) {
       return;
     }
-    context.debugLog?.('screen.render.start', {
-      screen: 'devices'
-    });
+    renderLog.onRenderStart();
     if (!searchText) {
       filtered = devices;
     } else {
       const needle = searchText.toLowerCase();
       filtered = devices.filter((device) => safeSearchText(device).includes(needle));
     }
-    if (restoreDeviceId) {
-      const restoreIndex = filtered.findIndex((device) => deviceIdOf(device) === restoreDeviceId);
-      selectedIndex = restoreIndex >= 0 ? restoreIndex : clampIndex(selectedIndex, filtered.length);
-    } else {
-      selectedIndex = clampIndex(selectedIndex, filtered.length);
-    }
+    const restoreIndex = restoreDeviceId
+      ? filtered.findIndex((device) => deviceIdOf(device) === restoreDeviceId)
+      : -1;
+    selectedIndex = restoreIndex >= 0 ? restoreIndex : clampIndex(selectedIndex, filtered.length);
 
     const actionsHint = 'actions: a send-command, f endpoint filter';
 
     try {
       if (renderErrors.frozen) {
-        setListTableData(
-          table,
-          [
-            ['ID', 'Name', 'Status', 'Space'],
-            ...filtered.map((device, index) => {
-              const d =
-                device && typeof device === 'object'
-                  ? (device as Record<string, unknown>)
-                  : ({} as Record<string, unknown>);
-              return [
-                String(d.id ?? d._id ?? `row-${index + 1}`),
-                String(d.name ?? d.title ?? 'n/a'),
-                String(d.status ?? d.state ?? 'unknown'),
-                String(d.space_name ?? d.space_id ?? 'n/a')
-              ];
-            })
-          ],
-          selectionSync
-        );
+        renderDeviceFallbackTable(table, filtered, selectionSync);
         detail?.setContent(
           [
             'Render fallback mode enabled.',
@@ -172,42 +239,13 @@ export function createDevicesScreen(): TuiScreen {
         detail?.setContent((detailPanel?.text?.lines ?? ['No matching devices.']).join('\n'));
       }
       renderErrors.recordSuccess();
-      context.debugLog?.('screen.render.complete', {
-        screen: 'devices',
-        frozen: renderErrors.frozen
-      });
+      renderLog.onRenderComplete();
     } catch (error) {
       const message = errorMessage(error);
       renderErrors.recordError(message);
+      renderLog.onRenderError(message);
 
-      context.debugLog?.('screen.render.error', {
-        screen: 'devices',
-        message,
-        frozen: renderErrors.frozen
-      });
-      context.debugLog?.('screen.render.fallback.applied', {
-        screen: 'devices'
-      });
-
-      setListTableData(
-        table,
-        [
-          ['ID', 'Name', 'Status', 'Space'],
-          ...filtered.map((device, index) => {
-            const d =
-              device && typeof device === 'object'
-                ? (device as Record<string, unknown>)
-                : ({} as Record<string, unknown>);
-            return [
-              String(d.id ?? d._id ?? `row-${index + 1}`),
-              String(d.name ?? d.title ?? 'n/a'),
-              String(d.status ?? d.state ?? 'unknown'),
-              String(d.space_name ?? d.space_id ?? 'n/a')
-            ];
-          })
-        ],
-        selectionSync
-      );
+      renderDeviceFallbackTable(table, filtered, selectionSync);
       detail?.setContent(
         [
           'Unable to render device detail safely.',
@@ -227,11 +265,7 @@ export function createDevicesScreen(): TuiScreen {
     }
 
     const tenantId = await context.getActiveTenantId();
-    context.debugLog?.('screen.data.fetch.start', {
-      screen: 'devices',
-      tenantId,
-      spaceFilter
-    });
+    logScreenDataFetch(context.debugLog, 'devices', 'start', { tenantId, spaceFilter });
     const loaded = await loadDevicesData(context.client, tenantId, {
       profileStore: context.profileStore,
       query: {
@@ -242,8 +276,7 @@ export function createDevicesScreen(): TuiScreen {
       return;
     }
     devices = loaded.data;
-    context.debugLog?.('screen.data.fetch.complete', {
-      screen: 'devices',
+    logScreenDataFetch(context.debugLog, 'devices', 'complete', {
       tenantId,
       count: devices.length,
       connectionState: loaded.connectionState,
@@ -253,11 +286,7 @@ export function createDevicesScreen(): TuiScreen {
     });
     if (loaded.error) {
       context.setStatus(`Devices ${loaded.connectionState}: ${loaded.error.message}`);
-      context.debugLog?.('screen.data.fetch.error', {
-        screen: 'devices',
-        message: loaded.error.message,
-        state: loaded.connectionState
-      });
+      logScreenDataFetch(context.debugLog, 'devices', 'error', { message: loaded.error.message, state: loaded.connectionState });
     }
     applyFilter(restoreDeviceId);
   };
@@ -344,16 +373,12 @@ export function createDevicesScreen(): TuiScreen {
       return paneConfig.panes;
     },
     async handleArrow(key: TuiArrowKey) {
-      if (key === 'left' || key === 'right') {
-        const next = movePaneWithBoundary(paneConfig.panes, activePane, key);
-        if (next.boundary) {
-          return 'boundary';
-        }
-        activePane = next.pane;
+      const h = handleHorizontalArrow(key, paneConfig.panes, activePane, (newPane) => {
+        activePane = newPane;
         focusPane();
         context.setStatus(`Pane: ${activePane}`);
-        return 'handled';
-      }
+      });
+      if (h !== null) return h;
 
       const delta = key === 'up' ? -1 : key === 'down' ? 1 : 0;
       if (!delta) {
@@ -416,71 +441,12 @@ export function createDevicesScreen(): TuiScreen {
           actions: [
             {
               label: 'Send command',
-              run: async () => {
-                const device = selectedDevice();
-                if (!device) {
-                  context.setStatus('No device selected.');
-                  return;
-                }
-                const deviceId = deviceIdOf(device);
-                if (!deviceId) {
-                  context.setStatus('Selected device has no id.');
-                  return;
-                }
-                const tenantId = await context.getActiveTenantId();
-                const templatesOutcome = await loadCommandTemplates(context.client, tenantId, { deviceId });
-                if (templatesOutcome.error) {
-                  context.setStatus(`Command templates unavailable: ${templatesOutcome.error.message}`);
-                  return;
-                }
-                if (!templatesOutcome.data.length) {
-                  context.setStatus('No command templates available for selected device.');
-                  return;
-                }
-
-                const choice = await promptChoice(context, {
-                  title: `Command templates for ${deviceId}`,
-                  choices: templatesOutcome.data.map((template) => ({
-                    label: template.label,
-                    value: `${template.mode}:${template.value}`
-                  }))
-                });
-                if (!choice || !isMounted) {
-                  return;
-                }
-                const selectedTemplate = templatesOutcome.data.find(
-                  (template) => `${template.mode}:${template.value}` === choice.value
-                );
-                if (!selectedTemplate) {
-                  context.setStatus('Template selection is invalid.');
-                  return;
-                }
-
-                const paramsInput = await context.prompt('Optional params JSON object (empty skips):', '');
-                if (paramsInput === undefined || !isMounted) {
-                  context.setStatus('Send command canceled.');
-                  return;
-                }
-                let params: Record<string, unknown> | undefined;
-                if (paramsInput.trim()) {
-                  const parsed = parseJsonObjectInput(paramsInput);
-                  if (!parsed.ok) {
-                    context.setStatus(`Invalid params JSON: ${parsed.error}`);
-                    return;
-                  }
-                  params = parsed.value;
-                }
-
-                const sent = await sendCommandWithGuard({
-                  device,
-                  template: selectedTemplate,
-                  params,
-                  context
-                });
-                if (sent && isMounted) {
-                  await refreshDevices(deviceId);
-                }
-              }
+              run: () => runSendCommandWizard({
+                context,
+                getIsMounted: () => isMounted,
+                selectedDevice,
+                refreshDevices
+              })
             }
           ]
         });

@@ -13,6 +13,12 @@ describe('parseSettingValue', () => {
     expect(parseSettingValue('output.mode', 'auto')).toBe('auto');
   });
 
+  it('parses auth.secretStoreBackend as enum', () => {
+    expect(parseSettingValue('auth.secretStoreBackend', 'auto')).toBe('auto');
+    expect(parseSettingValue('auth.secretStoreBackend', 'native')).toBe('native');
+    expect(parseSettingValue('auth.secretStoreBackend', 'file')).toBe('file');
+  });
+
   it('throws for invalid output.mode', () => {
     expect(() => parseSettingValue('output.mode', 'xml')).toThrow('Invalid');
   });
@@ -48,6 +54,7 @@ describe('SUPPORTED_SETTING_KEYS', () => {
   });
 
   it('includes known keys', () => {
+    expect(SUPPORTED_SETTING_KEYS).toContain('auth.secretStoreBackend');
     expect(SUPPORTED_SETTING_KEYS).toContain('output.mode');
     expect(SUPPORTED_SETTING_KEYS).toContain('defaults.tenant');
     expect(SUPPORTED_SETTING_KEYS).toContain('http.retryAttempts');

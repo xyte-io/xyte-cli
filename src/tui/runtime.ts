@@ -1,5 +1,22 @@
 import { errorMessage } from '../utils/error-format';
 
+export function createStaleSafeSelectionLoader<TInput, TResult>(args: {
+  load: (input: TInput) => Promise<TResult>;
+  apply: (result: TResult) => void;
+}): (input: TInput) => Promise<boolean> {
+  let token = 0;
+
+  return async (input: TInput): Promise<boolean> => {
+    const current = ++token;
+    const result = await args.load(input);
+    if (current !== token) {
+      return false;
+    }
+    args.apply(result);
+    return true;
+  };
+}
+
 export type RefreshReason = 'mount' | 'manual' | 'background' | 'readiness';
 export type RefreshState = 'idle' | 'loading' | 'retrying' | 'error';
 

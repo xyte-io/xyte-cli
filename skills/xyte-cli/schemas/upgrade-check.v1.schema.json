@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xyte.dev/schemas/upgrade-check.v1.schema.json",
+  "title": "Xyte Upgrade Check V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generatedAtUtc",
+    "packageName",
+    "currentVersion",
+    "latestVersion",
+    "upToDate",
+    "recommendedCommand"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "xyte.upgrade.check.v1"
+    },
+    "generatedAtUtc": {
+      "type": "string"
+    },
+    "packageName": {
+      "type": "string"
+    },
+    "currentVersion": {
+      "type": "string"
+    },
+    "latestVersion": {
+      "type": "string"
+    },
+    "upToDate": {
+      "type": "boolean"
+    },
+    "recommendedCommand": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

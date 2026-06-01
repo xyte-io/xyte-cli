@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { resolveTicketWithGuard, sendTicketMessageWithGuard } from '../../src/tui/screens/tickets';
+import { markTicketResolvedWithGuard, sendTicketMessageWithGuard } from '../../src/tui/screens/tickets';
 import { sceneFromTicketsState } from '../../src/tui/scene';
 
 describe('tickets screen write guard', () => {
@@ -18,7 +18,7 @@ describe('tickets screen write guard', () => {
       showError: vi.fn()
     };
 
-    const result = await resolveTicketWithGuard({
+    const result = await markTicketResolvedWithGuard({
       ticket: { id: 't-1', status: 'open' },
       mode: 'organization',
       context
@@ -42,7 +42,7 @@ describe('tickets screen write guard', () => {
       showError: vi.fn()
     };
 
-    const result = await resolveTicketWithGuard({
+    const result = await markTicketResolvedWithGuard({
       ticket: { id: 't-1' },
       mode: 'organization',
       context
@@ -68,7 +68,7 @@ describe('tickets screen write guard', () => {
       showError: vi.fn()
     };
 
-    const result = await resolveTicketWithGuard({
+    const result = await markTicketResolvedWithGuard({
       ticket: { id: 't-1' },
       mode: 'partner',
       context
@@ -93,7 +93,7 @@ describe('tickets screen write guard', () => {
       showError: vi.fn()
     };
 
-    const result = await resolveTicketWithGuard({
+    const result = await markTicketResolvedWithGuard({
       ticket: { status: 'open' },
       mode: 'organization',
       context

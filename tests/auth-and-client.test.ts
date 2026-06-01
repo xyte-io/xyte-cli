@@ -1,8 +1,13 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { createXyteClient } from '../src/client/create-client';
-import { MemorySecretStore } from '../src/secure/secret-store';
+import { createSecretStore, MemorySecretStore } from '../src/secure/secret-store';
 import { XyteAuthError } from '../src/http/errors';
+import type { HttpTransport } from '../src/http/transport';
 import { MemoryProfileStore } from './support/memory-profile-store';
 
 describe('client auth behavior', () => {
@@ -12,8 +17,8 @@ describe('client auth behavior', () => {
     await profileStore.setActiveTenant('acme');
 
     const secretStore = new MemorySecretStore();
-    const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'primary',
       fingerprint: 'sha256:org'
     });
@@ -28,6 +33,7 @@ describe('client auth behavior', () => {
 
     expect(transport.request).toHaveBeenCalledTimes(1);
     expect(transport.request.mock.calls[0][0].headers.Authorization).toBe('org-key-123');
+    expect(transport.request.mock.calls[0][0].headers['User-Agent']).toBe('CLI');
   });
 
   it('throws auth error when scoped key is missing', async () => {
@@ -40,8 +46,8 @@ describe('client auth behavior', () => {
       request: vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } })
     } as any;
 
-    await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'missing-secret',
       fingerprint: 'sha256:none'
     });
@@ -56,8 +62,8 @@ describe('client auth behavior', () => {
     await profileStore.setActiveTenant('acme');
 
     const secretStore = new MemorySecretStore();
-    const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-partner',
+    const slot = await profileStore.addKeySlot('acme', 'xyte-partner', {
+      
       name: 'partner-primary',
       fingerprint: 'sha256:partner'
     });
@@ -74,19 +80,60 @@ describe('client auth behavior', () => {
     expect(transport.request.mock.calls[0][0].headers.Authorization).toBe('partner-key-456');
   });
 
+  it('does not send a body for organization command reads', async () => {
+    const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { items: [] } });
+    const transport = { request } as unknown as HttpTransport;
+
+    const client = createXyteClient({
+      auth: { organization: 'org-key-123' },
+      hubBaseUrl: 'https://hub.example.test',
+      transport
+    });
+    await client.organization.getCommands({
+      path: { device_id: 'dev-1' },
+      query: { status: 'pending' },
+      body: { device_id: 'dev-1' }
+    });
+
+    expect(request).toHaveBeenCalledTimes(1);
+    const sent = request.mock.calls[0][0];
+    expect(sent.method).toBe('GET');
+    expect(sent.url).toBe('https://hub.example.test/core/v1/organization/devices/dev-1/commands?status=pending');
+    expect(sent.body).toBeUndefined();
+    expect(sent.headers['Content-Type']).toBeUndefined();
+  });
+
+  it('uses the callable partner ticket path without the docs copy suffix', async () => {
+    const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { id: 'ticket-1' } });
+    const transport = { request } as unknown as HttpTransport;
+
+    const client = createXyteClient({
+      auth: { partner: 'partner-key-456' },
+      hubBaseUrl: 'https://hub.example.test',
+      transport
+    });
+    await client.partner.getTicket({ path: { ticket_id: 'ticket-1' } });
+
+    expect(request).toHaveBeenCalledTimes(1);
+    const sent = request.mock.calls[0][0];
+    expect(sent.method).toBe('GET');
+    expect(sent.url).toBe('https://hub.example.test/core/v1/partner/tickets/ticket-1');
+    expect(sent.body).toBeUndefined();
+  });
+
   it('uses active slot secret when multiple slots exist', async () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
 
     const secretStore = new MemorySecretStore();
-    const slotA = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slotA = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'slot-a',
       fingerprint: 'sha256:a'
     });
-    const slotB = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slotB = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'slot-b',
       fingerprint: 'sha256:b'
     });
@@ -102,5 +149,35 @@ describe('client auth behavior', () => {
     await client.organization.getDevices();
 
     expect(transport.request.mock.calls[0][0].headers.Authorization).toBe('org-key-b');
+  });
+
+  it('injects auth headers from the selected persisted file backend', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+
+    const configDir = mkdtempSync(join(tmpdir(), 'xyte-client-file-backend-'));
+    const secretStore = createSecretStore({
+      env: {
+        ...process.env,
+        XYTE_CLI_CONFIG_DIR: configDir,
+        XYTE_CLI_SECRET_STORE_BACKEND: 'file'
+      },
+      platform: 'linux'
+    });
+    const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      name: 'primary',
+      fingerprint: 'sha256:file'
+    });
+    await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key-file');
+
+    const transport = {
+      request: vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } })
+    } as any;
+
+    const client = createXyteClient({ profileStore, secretStore, transport });
+    await client.organization.getDevices();
+
+    expect(transport.request.mock.calls[0][0].headers.Authorization).toBe('org-key-file');
   });
 });

@@ -2,7 +2,7 @@ import type { XyteClient } from '../types/client';
 import type { InspectProviderScope } from '../types/settings-enums';
 import { asRecord, asRecordOrUndefined, extractArray, extractHasNextPage, firstText, safeString } from '../utils/json';
 import { withSpan } from '../observability/tracing';
-import { parseTimestamp } from './report/time-format';
+import { parseTimestamp } from '../utils/timestamp';
 
 import type {
   FleetSnapshot,
@@ -23,9 +23,30 @@ const PARTNER_ENRICHMENT_SAMPLE_SIZE = 25;
 const PARTNER_ENRICHMENT_CONCURRENCY = 5;
 const PARTNER_ENRICHMENT_TIMEOUT_MS = 3_000;
 const PARTNER_FRESH_TELEMETRY_WINDOW_HOURS = 24;
+const RECENCY_1H_MS = 3_600_000;
+const RECENCY_24H_MS = 86_400_000;
+const RECENCY_7D_MS = 604_800_000;
+const PAGINATION_PER_PAGE = 100;
+const PAGINATION_PAGE_CAP = 50;
 
 function countValue(counter: StatusCounts, key: string): void {
   counter[key] = (counter[key] ?? 0) + 1;
+}
+
+async function withEndpointTracking(
+  outcome: PartnerEndpointOutcome,
+  operation: () => Promise<unknown>
+): Promise<unknown> {
+  outcome.attempted += 1;
+  try {
+    const value = await withTimeout(operation, PARTNER_ENRICHMENT_TIMEOUT_MS);
+    outcome.succeeded += 1;
+    return value;
+  } catch (error) {
+    outcome.failed += 1;
+    outcome.lastError = error instanceof Error ? error.message : String(error);
+    return undefined;
+  }
 }
 
 function emptyEndpointOutcome(): PartnerEndpointOutcome {
@@ -63,7 +84,7 @@ function extractObject(value: unknown, preferredKeys: string[]): Record<string, 
   return record;
 }
 
-function deviceId(value: unknown): string | undefined {
+function deviceIdOf(value: unknown): string | undefined {
   const r = asRecord(value);
   const raw = r.id ?? r.device_id ?? asRecord(r.device).id;
   if (raw === undefined || raw === null || String(raw).trim() === '') {
@@ -78,13 +99,13 @@ function recencyBucket(timestamp: unknown): string {
     return 'unknown';
   }
   const ageMs = Math.max(0, Date.now() - parsed.getTime());
-  if (ageMs <= 3_600_000) {
+  if (ageMs <= RECENCY_1H_MS) {
     return '<=1h';
   }
-  if (ageMs <= 86_400_000) {
+  if (ageMs <= RECENCY_24H_MS) {
     return '1h-24h';
   }
-  if (ageMs <= 604_800_000) {
+  if (ageMs <= RECENCY_7D_MS) {
     return '1d-7d';
   }
   return '>7d';
@@ -127,15 +148,15 @@ async function mapWithConcurrency<T>(
   );
 }
 
-async function paginateAll(args: {
+async function fetchAllPages(args: {
   fetch: (query: { page: number; per_page: number }) => Promise<unknown>;
   fetchSingle: () => Promise<unknown>;
   extractionKeys: string[];
 }): Promise<unknown[]> {
-  const perPage = 100;
+  const perPage = PAGINATION_PER_PAGE;
   const all: unknown[] = [];
 
-  for (let page = 1; page <= 50; page += 1) {
+  for (let page = 1; page <= PAGINATION_PAGE_CAP; page += 1) {
     const raw = await args.fetch({ page, per_page: perPage });
     const pageItems = extractArray(raw, args.extractionKeys);
     if (!pageItems.length) {
@@ -151,20 +172,24 @@ async function paginateAll(args: {
     return all;
   }
 
+  // Some API endpoints do not support pagination parameters and return all items in a single call.
+  // Fall back to a non-paginated request when pagination yielded nothing.
   const single = await args.fetchSingle();
   return extractArray(single, args.extractionKeys);
 }
 
 function loadAllOrganizationDevices(client: XyteClient, tenantId: string): Promise<unknown[]> {
-  return paginateAll({
+  return fetchAllPages({
     fetch: (query) => client.organization.getDevices({ tenantId, query }),
     fetchSingle: () => client.organization.getDevices({ tenantId }),
     extractionKeys: ['devices', 'data', 'items']
   });
 }
 
+// Partner device endpoints may ignore pagination parameters and return all items in one response;
+// fetchAllPages handles this via its non-paginated fetchSingle fallback.
 function loadAllPartnerDevices(client: XyteClient, tenantId: string): Promise<unknown[]> {
-  return paginateAll({
+  return fetchAllPages({
     fetch: (query) => client.partner.getDevices({ tenantId, query }),
     fetchSingle: () => client.partner.getDevices({ tenantId }),
     extractionKeys: ['devices', 'data', 'items']
@@ -172,7 +197,7 @@ function loadAllPartnerDevices(client: XyteClient, tenantId: string): Promise<un
 }
 
 function loadAllSpaces(client: XyteClient, tenantId: string): Promise<unknown[]> {
-  return paginateAll({
+  return fetchAllPages({
     fetch: (query) => client.organization.getSpaces({ tenantId, query }),
     fetchSingle: () => client.organization.getSpaces({ tenantId }),
     extractionKeys: ['spaces', 'data', 'items']
@@ -180,13 +205,13 @@ function loadAllSpaces(client: XyteClient, tenantId: string): Promise<unknown[]>
 }
 
 async function loadAllOrganizationIncidents(client: XyteClient, tenantId: string): Promise<unknown[]> {
-  const perPage = 100;
+  const perPage = PAGINATION_PER_PAGE;
   const to = Math.floor(Date.now() / 1000);
   const merged = new Map<string, unknown>();
   const statuses = ['active', 'closed'] as const;
 
   for (const status of statuses) {
-    for (let page = 1; page <= 50; page += 1) {
+    for (let page = 1; page <= PAGINATION_PAGE_CAP; page += 1) {
       const raw = await client.organization.getIncidents({
         tenantId,
         query: {
@@ -244,7 +269,7 @@ async function collectPartnerEnrichment(
   devices: unknown[]
 ): Promise<PartnerEnrichmentSnapshot> {
   const sampledDeviceIds = Array.from(
-    new Set(devices.map((device) => deviceId(device)).filter((id): id is string => Boolean(id)))
+    new Set(devices.map((device) => deviceIdOf(device)).filter((id): id is string => Boolean(id)))
   )
     .sort((a, b) => a.localeCompare(b))
     .slice(0, PARTNER_ENRICHMENT_SAMPLE_SIZE);
@@ -278,31 +303,16 @@ async function collectPartnerEnrichment(
 
   const baseDevicesById = new Map<string, Record<string, unknown>>();
   for (const item of devices) {
-    const id = deviceId(item);
+    const id = deviceIdOf(item);
     if (id && !baseDevicesById.has(id)) {
       baseDevicesById.set(id, asRecord(item));
-    }
-  }
-
-  async function safeCall(
-    outcome: PartnerEndpointOutcome,
-    operation: () => Promise<unknown>
-  ): Promise<unknown | undefined> {
-    outcome.attempted += 1;
-    try {
-      const value = await withTimeout(operation, PARTNER_ENRICHMENT_TIMEOUT_MS);
-      outcome.succeeded += 1;
-      return value;
-    } catch {
-      outcome.failed += 1;
-      return undefined;
     }
   }
 
   await mapWithConcurrency(sampledDeviceIds, PARTNER_ENRICHMENT_CONCURRENCY, async (id) => {
     const base = baseDevicesById.get(id);
 
-    const infoRaw = await safeCall(snapshot.endpointAvailability.deviceInfo, () =>
+    const infoRaw = await withEndpointTracking(snapshot.endpointAvailability.deviceInfo, () =>
       client.partner.getDeviceInfo({
         tenantId,
         path: { device_id: id }
@@ -344,7 +354,7 @@ async function collectPartnerEnrichment(
     );
     countValue(snapshot.lastSeenRecency, recencyBucket(lastSeen));
 
-    const commandsRaw = await safeCall(snapshot.endpointAvailability.commands, () =>
+    const commandsRaw = await withEndpointTracking(snapshot.endpointAvailability.commands, () =>
       client.partner.getCommands({
         tenantId,
         path: { device_id: id }
@@ -357,7 +367,7 @@ async function collectPartnerEnrichment(
       countValue(snapshot.commandPosture, status ? status.toLowerCase() : 'unknown');
     }
 
-    const telemetriesRaw = await safeCall(snapshot.endpointAvailability.telemetries, () =>
+    const telemetriesRaw = await withEndpointTracking(snapshot.endpointAvailability.telemetries, () =>
       client.partner.getTelemetries({
         tenantId,
         path: { device_id: id }
@@ -375,7 +385,7 @@ async function collectPartnerEnrichment(
       }
     }
 
-    const historyRaw = await safeCall(snapshot.endpointAvailability.stateHistory, () =>
+    const historyRaw = await withEndpointTracking(snapshot.endpointAvailability.stateHistory, () =>
       client.partner.getStateHistory({
         tenantId,
         path: { device_id: id }
@@ -391,7 +401,7 @@ async function collectPartnerEnrichment(
   return snapshot;
 }
 
-async function resolveInspectProviderScope(
+async function fetchInspectProviderScope(
   client: XyteClient,
   tenantId: string,
   providerScope: InspectProviderScope
@@ -440,7 +450,7 @@ export async function collectFleetSnapshot(args: {
 }): Promise<FleetSnapshot> {
   const { client, tenantId, tenantName, providerScope = 'auto' } = args;
   return withSpan('xyte.inspect.collect_snapshot', { 'xyte.tenant.id': tenantId }, async () => {
-    const resolvedScope = await resolveInspectProviderScope(client, tenantId, providerScope);
+    const resolvedScope = await fetchInspectProviderScope(client, tenantId, providerScope);
     let devices: unknown[];
     let spaces: unknown[];
     let incidents: unknown[];

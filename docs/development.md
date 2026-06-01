@@ -17,16 +17,13 @@ npm run release:check
 npm run test:commit
 ```
 
-Before running the commit gate, set `XYTE_CLI_KEY` in your current shell and optionally set `XYTE_E2E_TENANT`.
-
 `test:commit` runs:
 
 1. `npm run typecheck`
 2. `npm test`
-3. `npm run smoke:external-live`
+3. `npm run smoke:pack-install`
 
-If `XYTE_E2E_TENANT` is omitted, `default` is used.
-If `XYTE_CLI_KEY` is missing, smoke fails before install calls.
+Native secure-storage certification runs separately in CI via `windows-native-secret-store-cert` and `linux-native-secret-store-cert`.
 
 ## Local Utility Sandbox
 
@@ -67,6 +64,8 @@ See [`release.md`](release.md) for publish and release-asset workflows.
 
 ```bash
 xyte-cli --log-actions --log-actions-path ./logs/xyte-cli.actions.ndjson status --tenant acme
+xyte-cli logs list --path ./logs/xyte-cli.actions.ndjson --output text
+xyte-cli logs show --path ./logs/xyte-cli.actions.ndjson --entry <sessionId>:<seq> --output json
 xyte-cli logs view --path ./logs/xyte-cli.actions.ndjson
 ```
 

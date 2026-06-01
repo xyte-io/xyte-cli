@@ -2,7 +2,7 @@ import blessed from 'blessed';
 
 import {
   clampIndex,
-  movePaneWithBoundary,
+  handleHorizontalArrow,
   moveTableSelection,
   scrollBox,
   setListTableData,
@@ -11,11 +11,15 @@ import {
   type SelectionSyncState
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
-import type { TuiArrowKey, TuiContext, TuiScreen } from '../types';
+import type { TuiArrowKey, TuiContext, NavigableScreen } from '../types';
 import { getSpaceId, getSpaceName, loadDevicesData, loadSpaceDrilldownData, loadSpacesData } from '../data-loaders';
 import { sceneFromSpacesState } from '../scene';
 import { safeSearchText } from '../serialize';
-import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput } from '../actions';
+import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, runGuardedAction } from '../actions';
+import { createStaleSafeSelectionLoader } from '../runtime';
+import { createRenderErrorTracker } from '../render-error-tracker';
+import { createScreenRenderLogger, logScreenDataFetch } from '../screen-render-logger';
+import { errorMessage } from '../../utils/error-format';
 
 const SPINNER_FRAMES = ['|', '/', '-', '\\'];
 
@@ -58,9 +62,7 @@ export async function claimDeviceWithGuard(args: ClaimDeviceWithGuardArgs): Prom
     return false;
   }
 
-  args.context.setStatus('Claiming device...');
-  try {
-    const tenantId = await args.context.getActiveTenantId();
+  return runGuardedAction(args.context, 'Claiming device...', async (tenantId) => {
     await args.context.client.organization.claimDevice({
       tenantId,
       body: {
@@ -72,11 +74,7 @@ export async function claimDeviceWithGuard(args: ClaimDeviceWithGuardArgs): Prom
       }
     });
     args.context.setStatus('Device claimed successfully.');
-    return true;
-  } catch (error) {
-    args.context.showError(error);
-    return false;
-  }
+  });
 }
 
 interface CreateChildSpaceWithGuardArgs {
@@ -111,9 +109,7 @@ export async function createChildSpaceWithGuard(args: CreateChildSpaceWithGuardA
     return false;
   }
 
-  args.context.setStatus('Creating child space...');
-  try {
-    const tenantId = await args.context.getActiveTenantId();
+  return runGuardedAction(args.context, 'Creating child space...', async (tenantId) => {
     await args.context.client.organization.createSpace({
       tenantId,
       body: {
@@ -124,11 +120,7 @@ export async function createChildSpaceWithGuard(args: CreateChildSpaceWithGuardA
       }
     });
     args.context.setStatus('Child space created.');
-    return true;
-  } catch (error) {
-    args.context.showError(error);
-    return false;
-  }
+  });
 }
 
 interface RenameSpaceWithGuardArgs {
@@ -160,40 +152,17 @@ export async function renameSpaceWithGuard(args: RenameSpaceWithGuardArgs): Prom
     return false;
   }
 
-  args.context.setStatus('Renaming space...');
-  try {
-    const tenantId = await args.context.getActiveTenantId();
+  return runGuardedAction(args.context, 'Renaming space...', async (tenantId) => {
     await args.context.client.organization.updateSpace({
       tenantId,
       path: { space_id: spaceId },
       body: { name }
     });
     args.context.setStatus('Space renamed.');
-    return true;
-  } catch (error) {
-    args.context.showError(error);
-    return false;
-  }
+  });
 }
 
-export function createStaleSafeSelectionLoader<TInput, TResult>(args: {
-  load: (input: TInput) => Promise<TResult>;
-  apply: (result: TResult) => void;
-}): (input: TInput) => Promise<boolean> {
-  let token = 0;
-
-  return async (input: TInput): Promise<boolean> => {
-    const current = ++token;
-    const result = await args.load(input);
-    if (current !== token) {
-      return false;
-    }
-    args.apply(result);
-    return true;
-  };
-}
-
-export function createSpacesScreen(): TuiScreen {
+export function createSpacesScreen(): NavigableScreen {
   let root: blessed.Widgets.BoxElement | undefined;
   let spaceTable: blessed.Widgets.ListTableElement | undefined;
   let detailBox: blessed.Widgets.BoxElement | undefined;
@@ -223,6 +192,8 @@ export function createSpacesScreen(): TuiScreen {
   const paneConfig = SCREEN_PANE_CONFIG.spaces;
   let activePane = paneConfig.defaultPane;
   let isMounted = false;
+  const renderErrors = createRenderErrorTracker();
+  const renderLog = createScreenRenderLogger('spaces', () => context.debugLog, renderErrors);
   let idFilter = '';
   let nameFilter = '';
   let parentIdFilter = '';
@@ -270,6 +241,12 @@ export function createSpacesScreen(): TuiScreen {
     }, 140);
   };
 
+  const promptOrAbort = async (label: string, current: string): Promise<string | undefined> => {
+    const value = await context.prompt(label, current);
+    if (value === undefined || !isMounted) return undefined;
+    return value;
+  };
+
   const renderState = () => {
     if (!isMounted) {
       return;
@@ -278,54 +255,74 @@ export function createSpacesScreen(): TuiScreen {
       return;
     }
 
-    const actionsHint = 'actions: a claim/create/rename, f endpoint filters';
-    const endpointFilterSummary = [
-      idFilter ? `id=${idFilter}` : '',
-      nameFilter ? `name=${nameFilter}` : '',
-      parentIdFilter ? `parent=${parentIdFilter}` : '',
-      spaceTypeFilter ? `type=${spaceTypeFilter}` : '',
-      pathIncludesFilter ? `path~${pathIncludesFilter}` : ''
-    ]
-      .filter(Boolean)
-      .join(' ');
+    renderLog.onRenderStart();
+    try {
+      if (renderErrors.frozen) {
+        spaceTable.setContent('Render fallback mode enabled. Refresh (r) to retry.');
+        detailBox.setContent('Previous render errors were repeated. Reduce payload complexity and refresh.');
+      } else {
+        const actionsHint = 'actions: a claim/create/rename, f endpoint filters';
+        const endpointFilterSummary = [
+          idFilter ? `id=${idFilter}` : '',
+          nameFilter ? `name=${nameFilter}` : '',
+          parentIdFilter ? `parent=${parentIdFilter}` : '',
+          spaceTypeFilter ? `type=${spaceTypeFilter}` : '',
+          pathIncludesFilter ? `path~${pathIncludesFilter}` : ''
+        ]
+          .filter(Boolean)
+          .join(' ');
 
-    const panels = sceneFromSpacesState({
-      tenantId: activeTenantId,
-      searchText,
-      selectedIndex,
-      loading,
-      paneStatus,
-      spaces: filtered,
-      spaceDetail: selectedSpaceDetail,
-      devicesInSpace,
-      actionsHint,
-      endpointFilterSummary
-    });
+        const panels = sceneFromSpacesState({
+          tenantId: activeTenantId,
+          searchText,
+          selectedIndex,
+          loading,
+          paneStatus,
+          spaces: filtered,
+          spaceDetail: selectedSpaceDetail,
+          devicesInSpace,
+          actionsHint,
+          endpointFilterSummary
+        });
 
-    const listPanel = panels.find((panel) => panel.id === 'spaces-list');
-    const detailPanel = panels.find((panel) => panel.id === 'spaces-detail');
-    const devicesPanel = panels.find((panel) => panel.id === 'spaces-devices');
+        const listPanel = panels.find((panel) => panel.id === 'spaces-list');
+        const detailPanel = panels.find((panel) => panel.id === 'spaces-detail');
+        const devicesPanel = panels.find((panel) => panel.id === 'spaces-devices');
 
-    setListTableData(
-      spaceTable,
-      [
-        (listPanel?.table?.columns ?? ['ID', 'Name', 'Type', 'Path']) as [string, string, string, string],
-        ...((listPanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
-      ],
-      spaceSelectionSync
-    );
-    syncListSelection(spaceTable, selectedIndex, spaceSelectionSync);
+        setListTableData(
+          spaceTable,
+          [
+            (listPanel?.table?.columns ?? ['ID', 'Name', 'Type', 'Path']) as [string, string, string, string],
+            ...((listPanel?.table?.rows ?? []) as Array<[string, string, string, string]>)
+          ],
+          spaceSelectionSync
+        );
+        syncListSelection(spaceTable, selectedIndex, spaceSelectionSync);
 
-    detailBox.setContent((detailPanel?.text?.lines ?? ['No space selected.']).join('\n'));
+        detailBox.setContent((detailPanel?.text?.lines ?? ['No space selected.']).join('\n'));
 
-    setListTableData(devicesTable, [
-      (devicesPanel?.table?.columns ?? ['ID', 'Name', 'Status']) as [string, string, string],
-      ...((devicesPanel?.table?.rows ?? []) as Array<[string, string, string]>)
-    ]);
-    devicesTable.select(clampIndex(selectedDeviceIndex, devicesInSpace.length) + 1);
+        setListTableData(devicesTable, [
+          (devicesPanel?.table?.columns ?? ['ID', 'Name', 'Status']) as [string, string, string],
+          ...((devicesPanel?.table?.rows ?? []) as Array<[string, string, string]>)
+        ]);
+        devicesTable.select(clampIndex(selectedDeviceIndex, devicesInSpace.length) + 1);
+      }
 
-    const statusPrefix = loading ? `${SPINNER_FRAMES[spinnerPhase % SPINNER_FRAMES.length]} ` : '';
-    statusBox.setContent(` ${statusPrefix}${paneStatus}`);
+      const statusPrefix = loading ? `${SPINNER_FRAMES[spinnerPhase % SPINNER_FRAMES.length]} ` : '';
+      statusBox.setContent(` ${statusPrefix}${paneStatus}`);
+      renderErrors.recordSuccess();
+      renderLog.onRenderComplete();
+    } catch (error) {
+      const message = errorMessage(error);
+      renderErrors.recordError(message);
+      renderLog.onRenderError(message);
+      detailBox.setContent([
+        'Unable to render space detail safely.',
+        `Reason: ${message}`,
+        'Try narrowing search/filter and refresh.'
+      ].join('\n'));
+    }
+
     focusPane();
     context.screen.render();
   };
@@ -353,14 +350,16 @@ export function createSpacesScreen(): TuiScreen {
       }
 
       const id = getSpaceId(selected);
-      const drilldown = await loadSpaceDrilldownData(context.client, input.tenantId, id, allDevicesCache, {
+      const drilldown = await loadSpaceDrilldownData(context.client, input.tenantId, {
+        spaceId: id,
+        allDevicesCache,
         profileStore: context.profileStore
       });
       return {
         selectedSpaceId: id,
         selectedSpaceDetail: drilldown.data.spaceDetail,
         devicesInSpace: drilldown.data.devicesInSpace,
-        paneStatus: `${drilldown.data.paneStatus}${drilldown.error ? ` | ${drilldown.error.message}` : ''} (${getSpaceName(selected)})`,
+        paneStatus: `${drilldown.error ? `${drilldown.error.message} | ` : ''}(${getSpaceName(selected)})`,
         index: input.index
       };
     },
@@ -449,6 +448,7 @@ export function createSpacesScreen(): TuiScreen {
       return;
     }
     activeTenantId = tenantId;
+    logScreenDataFetch(context.debugLog, 'spaces', 'start', { tenantId });
     const [nextSpacesOutcome, devicesCacheOutcome] = await Promise.all([
       loadSpacesData(context.client, tenantId, {
         query: {
@@ -468,6 +468,7 @@ export function createSpacesScreen(): TuiScreen {
 
     spaces = nextSpacesOutcome.data;
     allDevicesCache = devicesCacheOutcome.data;
+    logScreenDataFetch(context.debugLog, 'spaces', 'complete', { tenantId, spaceCount: spaces.length, deviceCount: allDevicesCache.length });
     if (!isMounted) {
       return;
     }
@@ -597,16 +598,12 @@ export function createSpacesScreen(): TuiScreen {
       return paneConfig.panes;
     },
     async handleArrow(key: TuiArrowKey) {
-      if (key === 'left' || key === 'right') {
-        const next = movePaneWithBoundary(paneConfig.panes, activePane, key);
-        if (next.boundary) {
-          return 'boundary';
-        }
-        activePane = next.pane;
+      const h = handleHorizontalArrow(key, paneConfig.panes, activePane, (newPane) => {
+        activePane = newPane;
         focusPane();
         context.setStatus(`Pane: ${activePane}`);
-        return 'handled';
-      }
+      });
+      if (h !== null) return h;
 
       const delta = key === 'up' ? -1 : key === 'down' ? 1 : 0;
       if (!delta) {
@@ -663,34 +660,20 @@ export function createSpacesScreen(): TuiScreen {
       }
 
       if (ch === 'f') {
-        const nextId = await context.prompt('Filter id (empty clears):', idFilter);
-        if (nextId === undefined || !isMounted) {
-          return true;
-        }
-        const nextName = await context.prompt('Filter name (empty clears):', nameFilter);
-        if (nextName === undefined || !isMounted) {
-          return true;
-        }
-        const nextParentId = await context.prompt('Filter parent_id (empty clears):', parentIdFilter);
-        if (nextParentId === undefined || !isMounted) {
-          return true;
-        }
-        const nextType = await context.prompt('Filter space_type (empty clears):', spaceTypeFilter);
-        if (nextType === undefined || !isMounted) {
-          return true;
-        }
-        const nextPath = await context.prompt('Filter path_includes (empty clears):', pathIncludesFilter);
-        if (nextPath === undefined || !isMounted) {
-          return true;
-        }
-        const nextCreatedAfter = await context.prompt('Filter created_after (empty clears):', createdAfterFilter);
-        if (nextCreatedAfter === undefined || !isMounted) {
-          return true;
-        }
-        const nextCreatedBefore = await context.prompt('Filter created_before (empty clears):', createdBeforeFilter);
-        if (nextCreatedBefore === undefined || !isMounted) {
-          return true;
-        }
+        const nextId = await promptOrAbort('Filter id (empty clears):', idFilter);
+        if (nextId === undefined) return true;
+        const nextName = await promptOrAbort('Filter name (empty clears):', nameFilter);
+        if (nextName === undefined) return true;
+        const nextParentId = await promptOrAbort('Filter parent_id (empty clears):', parentIdFilter);
+        if (nextParentId === undefined) return true;
+        const nextType = await promptOrAbort('Filter space_type (empty clears):', spaceTypeFilter);
+        if (nextType === undefined) return true;
+        const nextPath = await promptOrAbort('Filter path_includes (empty clears):', pathIncludesFilter);
+        if (nextPath === undefined) return true;
+        const nextCreatedAfter = await promptOrAbort('Filter created_after (empty clears):', createdAfterFilter);
+        if (nextCreatedAfter === undefined) return true;
+        const nextCreatedBefore = await promptOrAbort('Filter created_before (empty clears):', createdBeforeFilter);
+        if (nextCreatedBefore === undefined) return true;
 
         idFilter = nextId.trim();
         nameFilter = nextName.trim();

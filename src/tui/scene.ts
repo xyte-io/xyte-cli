@@ -3,9 +3,9 @@ import type { EndpointNamespace } from '../types/endpoints';
 import { safePreviewLines } from './serialize';
 import { fitCell, formatBoolTag, sanitizePrintable, shortId } from './table-format';
 import { HEADLESS_FRAME_SCHEMA_VERSION } from '../contracts/versions';
-import type { ProviderReadiness } from '../config/readiness';
+import type { ProviderReadiness } from '../contracts/status';
 
-export interface SetupProviderRow {
+interface SetupProviderRow {
   provider: string;
   slotCount: number;
   activeSlot: string;

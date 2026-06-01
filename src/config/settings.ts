@@ -2,11 +2,17 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import path from 'node:path';
 
+import { CliUserError } from '../contracts/user-error';
 import { getXyteConfigDir } from '../utils/config-dir';
 import { isRecord } from '../utils/json';
-import { INSPECT_PROVIDER_SCOPES, type InspectProviderScope } from '../types/settings-enums';
-import { TUI_SCREEN_IDS, type TuiScreenId } from '../types/tui-screens';
+import {
+  INSPECT_PROVIDER_SCOPES,
+  SECRET_STORE_BACKEND_SELECTORS,
+  type InspectProviderScope,
+  type SecretStoreBackendSelector
+} from '../types/settings-enums';
 import { DEFAULT_WATCH_PROFILE, type WatchProfile } from '../contracts/watch-frame';
+import { TUI_SCREEN_IDS, type TuiScreenId } from '../types/tui-screens';
 
 const CLI_OUTPUT_MODES = ['auto', 'json', 'text'] as const;
 export type CliOutputMode = (typeof CLI_OUTPUT_MODES)[number];
@@ -16,6 +22,9 @@ interface CliSettingsFile {
   version?: 'settings.v1';
   defaults?: {
     tenant?: string;
+  };
+  auth?: {
+    secretStoreBackend?: SecretStoreBackendSelector;
   };
   output?: {
     mode?: CliOutputMode;
@@ -34,7 +43,7 @@ interface CliSettingsFile {
     retryBackoffMs?: number;
   };
   console?: {
-    screen?: TuiScreenId;
+    screen?: string;
     motion?: boolean;
     follow?: boolean;
     intervalMs?: number;
@@ -53,9 +62,12 @@ interface CliSettingsFile {
   };
 }
 
-export interface ResolvedCliSettings {
+interface ResolvedCliSettings {
   defaults: {
     tenant?: string;
+  };
+  auth: {
+    secretStoreBackend: SecretStoreBackendSelector;
   };
   output: {
     mode: CliOutputMode;
@@ -74,7 +86,7 @@ export interface ResolvedCliSettings {
     retryBackoffMs: number;
   };
   console: {
-    screen: TuiScreenId;
+    screen: TuiScreenId | undefined;
     motion: boolean;
     follow: boolean;
     intervalMs: number;
@@ -107,6 +119,9 @@ export interface ResolvedCliSettingsState {
 
 const DEFAULT_SETTINGS: ResolvedCliSettings = {
   defaults: {},
+  auth: {
+    secretStoreBackend: 'auto'
+  },
   output: {
     mode: 'auto',
     strictJson: false
@@ -142,6 +157,7 @@ const DEFAULT_SETTINGS: ResolvedCliSettings = {
 
 const SETTING_PATHS = [
   'defaults.tenant',
+  'auth.secretStoreBackend',
   'output.mode',
   'output.strictJson',
   'ops.providerScope',
@@ -265,7 +281,7 @@ function parseBoolean(value: unknown, label: string): boolean {
       return false;
     }
   }
-  throw new Error(`Invalid ${label}: ${String(value)}. Use true|false.`);
+  throw new CliUserError({ summary: `Invalid ${label}: ${String(value)}. Use true|false.` });
 }
 
 function parsePositiveInteger(value: unknown, label: string): number {
@@ -278,7 +294,7 @@ function parsePositiveInteger(value: unknown, label: string): number {
       return parsed;
     }
   }
-  throw new Error(`Invalid ${label}: ${String(value)}. Use a positive integer.`);
+  throw new CliUserError({ summary: `Invalid ${label}: ${String(value)}. Use a positive integer.` });
 }
 
 function parseOptionalPositiveInteger(value: unknown, label: string): number | undefined {
@@ -293,7 +309,18 @@ function parseOptionalString(value: unknown): string | undefined {
     return undefined;
   }
   const normalized = String(value).trim();
-  return normalized ? normalized : undefined;
+  return normalized || undefined;
+}
+
+function parseOptionalEnum<T extends string>(value: unknown, label: string, allowed: readonly T[]): T | undefined {
+  const normalized = parseOptionalString(value);
+  if (!normalized) {
+    return undefined;
+  }
+  if (allowed.includes(normalized as T)) {
+    return normalized as T;
+  }
+  throw new CliUserError({ summary: `Invalid ${label}: ${String(value)}. Use ${allowed.join('|')}.` });
 }
 
 function parseEnum<T extends string>(value: unknown, label: string, allowed: readonly T[]): T {
@@ -301,7 +328,7 @@ function parseEnum<T extends string>(value: unknown, label: string, allowed: rea
   if (normalized && allowed.includes(normalized as T)) {
     return normalized as T;
   }
-  throw new Error(`Invalid ${label}: ${String(value)}. Use ${allowed.join('|')}.`);
+  throw new CliUserError({ summary: `Invalid ${label}: ${String(value)}. Use ${allowed.join('|')}.` });
 }
 
 function validateSettingValue(keyPath: SettingPath, value: unknown): unknown {
@@ -310,6 +337,8 @@ function validateSettingValue(keyPath: SettingPath, value: unknown): unknown {
     case 'console.debugLogPath':
     case 'logs.path':
       return parseOptionalString(value);
+    case 'auth.secretStoreBackend':
+      return parseEnum(value, keyPath, [...SECRET_STORE_BACKEND_SELECTORS]);
     case 'output.mode':
       return parseEnum(value, keyPath, [...CLI_OUTPUT_MODES]);
     case 'output.strictJson':
@@ -334,10 +363,10 @@ function validateSettingValue(keyPath: SettingPath, value: unknown): unknown {
     case 'watch.maxPolls':
       return parseOptionalPositiveInteger(value, keyPath);
     case 'console.screen':
-      return parseEnum(value, keyPath, [...TUI_SCREEN_IDS]);
+      return parseOptionalEnum(value, keyPath, TUI_SCREEN_IDS);
     default: {
       const _exhaustive: never = keyPath;
-      throw new Error(`Unhandled setting key: ${_exhaustive}`);
+      throw new CliUserError({ summary: `Unhandled setting key: ${_exhaustive}` });
     }
   }
 }
@@ -346,6 +375,8 @@ function getEnvValue(env: NodeJS.ProcessEnv, keyPath: SettingPath): unknown {
   switch (keyPath) {
     case 'defaults.tenant':
       return env.XYTE_CLI_DEFAULT_TENANT;
+    case 'auth.secretStoreBackend':
+      return env.XYTE_CLI_SECRET_STORE_BACKEND;
     case 'output.mode':
       return env.XYTE_CLI_OUTPUT_MODE;
     case 'output.strictJson':
@@ -369,6 +400,8 @@ function getEnvValue(env: NodeJS.ProcessEnv, keyPath: SettingPath): unknown {
         return env.XYTE_CLI_CONSOLE_MOTION;
       }
       if (env.XYTE_TUI_REDUCED_MOTION !== undefined) {
+        // Note: XYTE_TUI_REDUCED_MOTION has inverted semantics — '1' means "reduce motion" (disable), not "enable".
+        process.stderr.write('Warning: XYTE_TUI_REDUCED_MOTION is deprecated, use XYTE_CLI_CONSOLE_MOTION instead.\n');
         return env.XYTE_TUI_REDUCED_MOTION === '1' ? 'false' : 'true';
       }
       return undefined;
@@ -377,19 +410,54 @@ function getEnvValue(env: NodeJS.ProcessEnv, keyPath: SettingPath): unknown {
     case 'console.intervalMs':
       return env.XYTE_CLI_CONSOLE_INTERVAL_MS;
     case 'console.debugLogPath':
-      return env.XYTE_CLI_CONSOLE_DEBUG_LOG_PATH ?? env.XYTE_TUI_DEBUG_LOG;
+      if (env.XYTE_CLI_CONSOLE_DEBUG_LOG_PATH !== undefined) return env.XYTE_CLI_CONSOLE_DEBUG_LOG_PATH;
+      if (env.XYTE_TUI_DEBUG_LOG !== undefined) {
+        process.stderr.write('Warning: XYTE_TUI_DEBUG_LOG is deprecated, use XYTE_CLI_CONSOLE_DEBUG_LOG_PATH instead.\n');
+        return env.XYTE_TUI_DEBUG_LOG;
+      }
+      return undefined;
     case 'logs.enabled':
-      return env.XYTE_CLI_LOGS_ENABLED ?? env.XYTE_LOG_ACTIONS;
+      if (env.XYTE_CLI_LOGS_ENABLED !== undefined) return env.XYTE_CLI_LOGS_ENABLED;
+      if (env.XYTE_LOG_ACTIONS !== undefined) {
+        process.stderr.write('Warning: XYTE_LOG_ACTIONS is deprecated, use XYTE_CLI_LOGS_ENABLED instead.\n');
+        return env.XYTE_LOG_ACTIONS;
+      }
+      return undefined;
     case 'logs.path':
-      return env.XYTE_CLI_LOGS_PATH ?? env.XYTE_LOG_ACTIONS_PATH;
+      if (env.XYTE_CLI_LOGS_PATH !== undefined) return env.XYTE_CLI_LOGS_PATH;
+      if (env.XYTE_LOG_ACTIONS_PATH !== undefined) {
+        process.stderr.write('Warning: XYTE_LOG_ACTIONS_PATH is deprecated, use XYTE_CLI_LOGS_PATH instead.\n');
+        return env.XYTE_LOG_ACTIONS_PATH;
+      }
+      return undefined;
     case 'logs.verbose':
-      return env.XYTE_CLI_LOGS_VERBOSE ?? env.XYTE_LOG_ACTIONS_VERBOSE;
+      if (env.XYTE_CLI_LOGS_VERBOSE !== undefined) return env.XYTE_CLI_LOGS_VERBOSE;
+      if (env.XYTE_LOG_ACTIONS_VERBOSE !== undefined) {
+        process.stderr.write('Warning: XYTE_LOG_ACTIONS_VERBOSE is deprecated, use XYTE_CLI_LOGS_VERBOSE instead.\n');
+        return env.XYTE_LOG_ACTIONS_VERBOSE;
+      }
+      return undefined;
     case 'logs.maxFileBytes':
-      return env.XYTE_CLI_LOGS_MAX_FILE_BYTES ?? env.XYTE_LOG_ACTIONS_MAX_FILE_BYTES;
+      if (env.XYTE_CLI_LOGS_MAX_FILE_BYTES !== undefined) return env.XYTE_CLI_LOGS_MAX_FILE_BYTES;
+      if (env.XYTE_LOG_ACTIONS_MAX_FILE_BYTES !== undefined) {
+        process.stderr.write('Warning: XYTE_LOG_ACTIONS_MAX_FILE_BYTES is deprecated, use XYTE_CLI_LOGS_MAX_FILE_BYTES instead.\n');
+        return env.XYTE_LOG_ACTIONS_MAX_FILE_BYTES;
+      }
+      return undefined;
     case 'logs.maxFiles':
-      return env.XYTE_CLI_LOGS_MAX_FILES ?? env.XYTE_LOG_ACTIONS_MAX_FILES;
+      if (env.XYTE_CLI_LOGS_MAX_FILES !== undefined) return env.XYTE_CLI_LOGS_MAX_FILES;
+      if (env.XYTE_LOG_ACTIONS_MAX_FILES !== undefined) {
+        process.stderr.write('Warning: XYTE_LOG_ACTIONS_MAX_FILES is deprecated, use XYTE_CLI_LOGS_MAX_FILES instead.\n');
+        return env.XYTE_LOG_ACTIONS_MAX_FILES;
+      }
+      return undefined;
     case 'logs.mirrorToStderr':
-      return env.XYTE_CLI_LOGS_MIRROR_TO_STDERR ?? env.XYTE_LOG_ACTIONS_STDERR;
+      if (env.XYTE_CLI_LOGS_MIRROR_TO_STDERR !== undefined) return env.XYTE_CLI_LOGS_MIRROR_TO_STDERR;
+      if (env.XYTE_LOG_ACTIONS_STDERR !== undefined) {
+        process.stderr.write('Warning: XYTE_LOG_ACTIONS_STDERR is deprecated, use XYTE_CLI_LOGS_MIRROR_TO_STDERR instead.\n');
+        return env.XYTE_LOG_ACTIONS_STDERR;
+      }
+      return undefined;
     case 'report.includeSensitive':
       return env.XYTE_CLI_REPORT_INCLUDE_SENSITIVE;
     default: {
@@ -451,13 +519,13 @@ function getSettingsValueSources(args: {
 }
 
 function buildResolvedSettings(values: Record<SettingPath, SourceValue>): ResolvedCliSettings {
-  const resolved = cloneSettings(DEFAULT_SETTINGS) as unknown as Record<string, unknown>;
+  const resolved = cloneSettings(DEFAULT_SETTINGS);
   for (const [keyPath, sourceValue] of Object.entries(values) as Array<[SettingPath, SourceValue]>) {
     if (sourceValue.value !== undefined) {
-      setPathValue(resolved, keyPath, sourceValue.value);
+      setPathValue(resolved as unknown as Record<string, unknown>, keyPath, sourceValue.value);
     }
   }
-  return resolved as unknown as ResolvedCliSettings;
+  return resolved;
 }
 
 export const SUPPORTED_SETTING_KEYS = SETTING_PATHS;
@@ -528,7 +596,7 @@ export function resolveCliSettingsSync(
 
 export function parseSettingValue(keyPath: string, rawValue: string): unknown {
   if (!SETTING_PATHS.includes(keyPath as SettingPath)) {
-    throw new Error(`Unknown config key: ${keyPath}.`);
+    throw new CliUserError({ summary: `Unknown config key: ${keyPath}.` });
   }
   return validateSettingValue(keyPath as SettingPath, rawValue);
 }
@@ -544,13 +612,13 @@ export function setCliSettingSync(args: {
   const env = args.env ?? process.env;
   const filePath = args.scope === 'user' ? getUserSettingsPath(env) : getWorkspaceSettingsPath(cwd);
   const settings = readCliSettingsFile(args.scope, cwd, env);
-  const next = cloneSettings(settings) as Record<string, unknown>;
-  setPathValue(next, args.key, validateSettingValue(args.key, args.value));
+  const next = cloneSettings(settings);
+  setPathValue(next as unknown as Record<string, unknown>, args.key, validateSettingValue(args.key, args.value));
   next.version = 'settings.v1';
-  writeSettingsFile(filePath, next as CliSettingsFile);
+  writeSettingsFile(filePath, next);
   return {
     path: filePath,
-    data: next as CliSettingsFile
+    data: next
   };
 }
 
@@ -564,12 +632,12 @@ export function unsetCliSettingSync(args: {
   const env = args.env ?? process.env;
   const filePath = args.scope === 'user' ? getUserSettingsPath(env) : getWorkspaceSettingsPath(cwd);
   const settings = readCliSettingsFile(args.scope, cwd, env);
-  const next = cloneSettings(settings) as Record<string, unknown>;
-  unsetPathValue(next, args.key);
+  const next = cloneSettings(settings);
+  unsetPathValue(next as unknown as Record<string, unknown>, args.key);
   next.version = 'settings.v1';
-  writeSettingsFile(filePath, next as CliSettingsFile);
+  writeSettingsFile(filePath, next);
   return {
     path: filePath,
-    data: next as CliSettingsFile
+    data: next
   };
 }

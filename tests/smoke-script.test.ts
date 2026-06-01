@@ -1,7 +1,7 @@
 import path from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
-import * as smokeExternalUserLive from '../src/smoke/external-user-live';
+import * as smokeExternalUserLive from './smoke/external-user-live';
 
 describe('external live smoke script', () => {
   it('fails fast when XYTE_CLI_KEY is missing', async () => {

@@ -6,7 +6,7 @@ import { Command } from 'commander';
 
 import { createCliActionLogger, sanitizeArgvForLog, type CliActionLogger } from './action-logger';
 import { createXyteClient } from '../client/create-client';
-import { toProblemDetails } from '../http/problem-mapper';
+import { toProblemDetails } from '../client/errors';
 import { buildStatusContract, type StatusMode } from '../contracts/status';
 import { evaluateReadiness, type ReadinessCheck } from '../config/readiness';
 import {
@@ -17,19 +17,18 @@ import {
 } from '../config/settings';
 import { createSecretStore, type SecretStore } from '../secure/secret-store';
 import { createProfileStore, type ProfileStore } from '../secure/profile-store';
-import { buildInstallDoctorReport, type InstallDoctorResult } from '../utils/install-doctor';
+import { buildInstallDoctorReport, type InstallDoctorResult } from '../workflows/install-doctor';
 import { getCliVersion } from '../utils/version';
 import {
   installSkills,
   type SkillAgent,
   type SkillInstallOutcome,
   type SkillInstallScope
-} from '../utils/install-skills';
-import { applyUpgrade, checkForUpgrade, type UpgradeDependencies } from '../utils/upgrade';
+} from './install-skills';
+import { applyUpgrade, checkForUpgrade, type UpgradeDependencies } from './upgrade';
 import { runTuiApp } from '../tui/app';
-import type { TuiScreenId } from '../types/tui-screens';
 import { CliUserError } from '../contracts/user-error';
-import { errorMessage } from '../utils/error-format';
+import { errorMessage, parseCliErrorFormat } from '../utils/error-format';
 import { registerLogsCommands } from './commands/logs';
 import { registerConfigCommands } from './commands/config';
 import { registerFlowCommands } from './commands/flow';
@@ -42,10 +41,12 @@ import {
 import { registerOpsCommands } from './commands/ops';
 import { registerApiCommands } from './commands/api';
 import { registerUtilCommands } from './commands/util';
+import { registerEdgeCommands } from './commands/edge';
 import { formatReadinessText } from './format-readiness';
 import { resolveKeyValue } from './resolve-key';
 import {
   getExplicitGlobalOutput,
+  parseCliOutputMode,
   printJson,
   resolveStrictJson,
   resolveTextJsonOutput,
@@ -92,6 +93,7 @@ interface CliRuntime {
   isTTY?: boolean;
   stdoutIsTTY?: boolean;
   upgradeDependencies?: UpgradeDependencies;
+  watchDelayFn?: (ms: number) => Promise<void>;
   cwd?: string;
   env?: NodeJS.ProcessEnv;
 }
@@ -159,7 +161,7 @@ function parseSkillInstallScope(value: string | undefined): SkillInstallScope | 
 
   const normalized = value.trim().toLowerCase();
   if (!SKILL_SCOPES.includes(normalized as SkillInstallScope)) {
-    throw new Error(`Invalid scope: ${value}. Expected one of: ${SKILL_SCOPES.join(', ')}.`);
+    throw new CliUserError({ summary: `Invalid scope: ${value}. Expected one of: ${SKILL_SCOPES.join(', ')}.` });
   }
   return normalized as SkillInstallScope;
 }
@@ -175,19 +177,19 @@ function parseSkillAgents(value: string | undefined): SkillAgent[] | undefined {
     .filter(Boolean);
 
   if (!tokens.length) {
-    throw new Error('Invalid agents: empty value.');
+    throw new CliUserError({ summary: 'Invalid agents: empty value.' });
   }
 
   if (tokens.includes('all')) {
     if (tokens.length > 1) {
-      throw new Error('Invalid agents: "all" cannot be combined with specific agents.');
+      throw new CliUserError({ summary: 'Invalid agents: "all" cannot be combined with specific agents.' });
     }
     return [...SKILL_AGENTS];
   }
 
   const unknown = tokens.filter((item) => !SKILL_AGENTS.includes(item as SkillAgent));
   if (unknown.length > 0) {
-    throw new Error(`Invalid agents: ${unknown.join(', ')}. Expected "all" or ${SKILL_AGENTS.join(', ')}.`);
+    throw new CliUserError({ summary: `Invalid agents: ${unknown.join(', ')}. Expected "all" or ${SKILL_AGENTS.join(', ')}.` });
   }
 
   return SKILL_AGENTS.filter((agent) => tokens.includes(agent));
@@ -207,7 +209,7 @@ function formatInstallOutcome(outcome: SkillInstallOutcome): string {
 function parseStatusMode(value: string | undefined): StatusMode {
   const normalized = (value ?? 'fast').trim().toLowerCase();
   if (normalized !== 'fast' && normalized !== 'full') {
-    throw new Error(`Invalid status mode: ${value}. Use fast|full.`);
+    throw new CliUserError({ summary: `Invalid status mode: ${value}. Use fast|full.` });
   }
   return normalized as StatusMode;
 }
@@ -265,7 +267,7 @@ interface RootLauncherPayload {
   settings: {
     tenantId?: string;
     outputMode: CliOutputMode;
-    consoleScreen: TuiScreenId;
+    consoleScreen: string | undefined;
   };
   sections: Array<{
     title: string;
@@ -313,7 +315,7 @@ function buildRootLauncherPayload(args: {
           title: 'Console / Headless',
           description: 'Interactive console and machine-readable frames.',
           commands: [
-            `xyte-cli ops console --screen ${args.settings.values.console.screen}`,
+            `xyte-cli ops console --screen ${args.settings.values.console.screen ?? 'dashboard'}`,
             `xyte-cli ops console --headless --screen dashboard --tenant ${tenantId} --output json`
           ]
         },
@@ -427,7 +429,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       return runtime.secretStore;
     }
     if (!cachedSecretStore) {
-      cachedSecretStore = createSecretStore();
+      cachedSecretStore = createSecretStore({ cwd, env, stderr });
     }
     return cachedSecretStore;
   };
@@ -548,7 +550,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     if (failed.length > 0) {
       throw new CliUserError({
         summary: 'Skill installation failed.',
-        cause: `Failed on ${failed.length} target(s).`,
+        detail: `Failed on ${failed.length} target(s).`,
         suggestedCommands: ['Re-run with xyte-cli init --force', 'Inspect the failed targets reported above.']
       });
     }
@@ -582,7 +584,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       if (options.requireSetup === true) {
         throw new CliUserError({
           summary: 'Missing API key for init setup.',
-          cause: 'Neither XYTE_CLI_KEY nor interactive input supplied a key.',
+          detail: 'Neither XYTE_CLI_KEY nor interactive input supplied a key.',
           suggestedCommands: ['Run xyte-cli setup run --tenant <tenant-id>', 'Re-run xyte-cli init --no-setup']
         });
       }
@@ -606,7 +608,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       if (options.requireSetup === true) {
         throw new CliUserError({
           summary: 'Init setup did not complete.',
-          cause: setupResult.readiness.connectivity.message || 'Connectivity validation failed.',
+          detail: setupResult.readiness.connectivity.message || 'Connectivity validation failed.',
           suggestedCommands: [
             `xyte-cli setup status --tenant ${tenantId}`,
             `xyte-cli config doctor --tenant ${tenantId}`
@@ -691,6 +693,11 @@ export function createCli(runtime: CliRuntime = {}): Command {
       '  xyte-cli util prepare --action organization.devices.claimDevice --tenant <tenant-id> --input ./claims.csv'
     ].join('\n')
   );
+  program.hook('preAction', (_rootCommand, actionCommand) => {
+    const globals = actionCommand.optsWithGlobals() as { output?: string; errorFormat?: string };
+    parseCliOutputMode(globals.output);
+    parseCliErrorFormat(globals.errorFormat);
+  });
 
   const cliContext: CliContext = {
     stdout,
@@ -704,7 +711,13 @@ export function createCli(runtime: CliRuntime = {}): Command {
     prompt,
     readStdin,
     resolveSettings,
-    withClient
+    withClient,
+    logAction(event, data, level) {
+      if (!actionLogger?.enabled) {
+        return;
+      }
+      actionLogger.log(event, data, level);
+    }
   };
 
   program
@@ -743,8 +756,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       const settings = await resolveSettings();
       if (
         resolveTextJsonOutput({
-          output: getExplicitGlobalOutput(command),
-          format: options.format,
+          output: options.format ?? getExplicitGlobalOutput(command),
           stdoutIsTTY,
           settings
         }) === 'text'
@@ -807,8 +819,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
       if (
         resolveTextJsonOutput({
-          output: globals.output,
-          format: options.format,
+          output: options.format ?? globals.output,
           stdoutIsTTY,
           settings
         }) === 'text'
@@ -831,8 +842,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
     .action(async (options: { check?: boolean; yes?: boolean; format?: OutputFormat }, command: Command) => {
       const settings = await resolveSettings();
       const output = resolveTextJsonOutput({
-        output: getExplicitGlobalOutput(command),
-        format: options.format,
+        output: options.format ?? getExplicitGlobalOutput(command),
         stdoutIsTTY,
         settings
       });
@@ -859,7 +869,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
       if (!options.yes) {
         if (!isInteractive) {
-          throw new Error('Upgrade requires confirmation. Re-run with --yes or use --check.');
+          throw new CliUserError({ summary: 'Upgrade requires confirmation. Re-run with --yes or use --check.' });
         }
         const answer = (
           await prompt({
@@ -909,8 +919,9 @@ export function createCli(runtime: CliRuntime = {}): Command {
     });
 
   registerApiCommands(program, cliContext);
-  registerOpsCommands(program, cliContext, runTui);
+  registerOpsCommands(program, cliContext, runTui, runtime.watchDelayFn);
   registerUtilCommands(program, cliContext);
+  registerEdgeCommands(program, cliContext);
   registerFlowCommands(program, cliContext);
   registerSetupCommands(program, cliContext);
   registerConfigCommands(program, cliContext);

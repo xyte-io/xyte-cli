@@ -1,16 +1,16 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { randomUUID } from 'node:crypto';
 
-import type { ConnectionState } from '../config/connectivity';
+import type { ConnectionState } from '../contracts/status';
+import type { RetryState } from '../config/retry-policy';
 import { evaluateReadiness, type ReadinessCheck } from '../config/readiness';
-import type { SecretStore } from '../secure/secret-store';
-import type { ProfileStore } from '../secure/profile-store';
+import type { ProfileStore, SecretStore } from '../types/stores';
 import type { XyteClient } from '../types/client';
 import { startupFrames } from './animation';
 import { XYTE_LOGO_COMPACT } from './assets/logo';
 import {
   getSpaceId,
-  loadConfigData,
+  readConfigData,
   loadDashboardData,
   loadDevicesData,
   loadIncidentsData,
@@ -49,6 +49,10 @@ interface HeadlessRenderOptions {
 }
 
 type SafeWrite = (text: string) => boolean;
+
+function isRetryState(value: unknown): value is RetryState {
+  return typeof value === 'object' && value !== null && 'retried' in value;
+}
 
 function getRefreshState(args: {
   connectionState: ReadinessCheck['connectionState'];
@@ -187,7 +191,7 @@ function buildSetupFrame(args: {
   });
 }
 
-async function buildConfigFrame(args: {
+async function loadConfigFrame(args: {
   sessionId: string;
   sequence: number;
   profileStore: ProfileStore;
@@ -197,7 +201,7 @@ async function buildConfigFrame(args: {
   motionPhase: number;
   doctorStatus?: string;
 }): Promise<HeadlessFrame> {
-  const { providerRows, selectedProvider, slotRows } = await loadConfigData(
+  const { providerRows, selectedProvider, slotRows } = await readConfigData(
     args.profileStore,
     args.secretStore,
     args.readiness.tenantId
@@ -242,7 +246,7 @@ interface ScreenLoadResult {
   panels: ScenePanel[];
   connectionState: ConnectionState;
   error?: { message: string };
-  retry: unknown;
+  retry: RetryState | Record<string, RetryState | undefined> | undefined;
   extraMeta?: Record<string, unknown>;
 }
 
@@ -284,7 +288,7 @@ function buildFrameFromLoad(
         retry: load.retry,
         refreshState: getRefreshState({
           connectionState: load.connectionState,
-          retried: (load.retry as { retried?: boolean })?.retried
+          retried: isRetryState(load.retry) ? load.retry.retried : undefined
         }),
         ...load.extraMeta
       })
@@ -292,7 +296,59 @@ function buildFrameFromLoad(
   });
 }
 
-async function buildOperationalFrame(options: {
+async function loadSpacesFrame(options: {
+  sessionId: string;
+  sequence: number;
+  client: XyteClient;
+  profileStore: ProfileStore;
+  tenantId?: string;
+  motionEnabled: boolean;
+  motionPhase: number;
+  readiness: ReadinessCheck;
+}): Promise<HeadlessFrame> {
+  const spaces = await loadSpacesData(options.client, options.tenantId);
+  const selected = spaces.data[0];
+  const selectedSpaceId = selected ? getSpaceId(selected) : '';
+  let detail: unknown;
+  let devicesInSpace: unknown[] = [];
+  let paneStatus = selected ? 'Loading selected space...' : 'No spaces found for tenant.';
+  let drilldownError: string | undefined;
+  let drilldownRetry: RetryState | undefined;
+
+  if (selected && selectedSpaceId) {
+    const drilldown = await loadSpaceDrilldownData(options.client, options.tenantId, {
+      spaceId: selectedSpaceId,
+      profileStore: options.profileStore
+    });
+    detail = drilldown.data.spaceDetail;
+    devicesInSpace = drilldown.data.devicesInSpace;
+    paneStatus = drilldown.error?.message ?? 'Space details loaded.';
+    drilldownError = drilldown.error?.message;
+    drilldownRetry = drilldown.retry;
+  }
+
+  const panels = sceneFromSpacesState({
+    tenantId: options.tenantId,
+    searchText: '',
+    selectedIndex: 0,
+    loading: false,
+    paneStatus,
+    spaces: spaces.data,
+    spaceDetail: detail,
+    devicesInSpace,
+    endpointFilterSummary: '',
+    actionsHint: 'interactive-only: a claim/create/rename, f endpoint filters'
+  });
+  return buildFrameFromLoad(options, 'spaces', 'Spaces', {
+    panels,
+    connectionState: spaces.connectionState,
+    error: spaces.error,
+    retry: spaces.retry,
+    extraMeta: { connection: { state: spaces.connectionState, error: spaces.error?.message, drilldownError, drilldownRetry } }
+  });
+}
+
+async function loadOperationalFrame(options: {
   sessionId: string;
   sequence: number;
   client: XyteClient;
@@ -387,45 +443,7 @@ async function buildOperationalFrame(options: {
     }
 
     case 'spaces': {
-      const spaces = await loadSpacesData(options.client, options.tenantId);
-      const selected = spaces.data[0];
-      const selectedSpaceId = selected ? getSpaceId(selected) : '';
-      let detail: unknown;
-      let devicesInSpace: unknown[] = [];
-      let paneStatus = selected ? 'Loading selected space...' : 'No spaces found for tenant.';
-      let drilldownError: string | undefined;
-      let drilldownRetry: unknown;
-
-      if (selected && selectedSpaceId) {
-        const drilldown = await loadSpaceDrilldownData(options.client, options.tenantId, selectedSpaceId, [], {
-          profileStore: options.profileStore
-        });
-        detail = drilldown.data.spaceDetail;
-        devicesInSpace = drilldown.data.devicesInSpace;
-        paneStatus = drilldown.data.paneStatus;
-        drilldownError = drilldown.error?.message;
-        drilldownRetry = drilldown.retry;
-      }
-
-      const panels = sceneFromSpacesState({
-        tenantId: options.tenantId,
-        searchText: '',
-        selectedIndex: 0,
-        loading: false,
-        paneStatus,
-        spaces: spaces.data,
-        spaceDetail: detail,
-        devicesInSpace,
-        endpointFilterSummary: '',
-        actionsHint: 'interactive-only: a claim/create/rename, f endpoint filters'
-      });
-      return buildFrameFromLoad(options, 'spaces', 'Spaces', {
-        panels,
-        connectionState: spaces.connectionState,
-        error: spaces.error,
-        retry: { spaces: spaces.retry, drilldown: drilldownRetry },
-        extraMeta: { connection: { state: spaces.connectionState, error: spaces.error?.message, drilldownError } }
-      });
+      return loadSpacesFrame(options);
     }
   }
 }
@@ -557,7 +575,7 @@ export async function runHeadlessRenderer(options: HeadlessRenderOptions): Promi
           redirectedFrom: blocked ? requestedScreen : undefined
         });
       } else if (actualScreen === 'config') {
-        frame = await buildConfigFrame({
+        frame = await loadConfigFrame({
           sessionId,
           sequence: nextSequence(),
           profileStore: options.profileStore,
@@ -568,7 +586,7 @@ export async function runHeadlessRenderer(options: HeadlessRenderOptions): Promi
           doctorStatus: `${readiness.connectionState}: ${readiness.connectivity.message}`
         });
       } else {
-        frame = await buildOperationalFrame({
+        frame = await loadOperationalFrame({
           sessionId,
           sequence: nextSequence(),
           client: options.client,

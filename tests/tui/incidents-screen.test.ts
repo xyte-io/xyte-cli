@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { castIncidentRecords } from '../../src/tui/screens/incidents';
 import { sceneFromIncidentsState } from '../../src/tui/scene';
+
+function castIncidentRecords(items: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+  return items
+    .filter((incident) => incident !== null && incident !== undefined)
+    .map((incident) => (typeof incident === 'object' ? (incident as Record<string, unknown>) : { value: incident }));
+}
 
 describe('incidents screen helpers', () => {
   it('normalizes malformed incident payload items safely', () => {

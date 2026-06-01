@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import type { ApiKeySlotMeta } from '../types/profile';
+import { CliUserError } from '../contracts/user-error';
 
 export const DEFAULT_SLOT_ID = 'default';
 
@@ -41,7 +42,7 @@ export function matchesSlotRef(slot: ApiKeySlotMeta, slotRef: string): boolean {
 export function ensureSlotName(name: string): string {
   const trimmed = name.trim();
   if (!trimmed) {
-    throw new Error('Slot name must not be empty.');
+    throw new CliUserError({ summary: 'Slot name must not be empty.' });
   }
   return trimmed;
 }

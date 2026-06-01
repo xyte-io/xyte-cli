@@ -1,8 +1,15 @@
-import rawEndpoints from '../spec/public-endpoints.json';
+import { listEndpoints } from '../client/catalog';
 import type { PublicEndpointSpec } from '../types/endpoints';
+import { CliUserError } from '../contracts/user-error';
 import {
   buildFriendlyClaimDeviceProfile,
+  buildFriendlyConnectorSetupProfile,
+  buildFriendlyEdgeClaimProfile,
+  buildFriendlyMoveDeviceProfile,
   buildFriendlySpaceImportProfile,
+  buildFriendlyTeamAccessGroupsProfile,
+  buildFriendlyTeamAccessMembershipsProfile,
+  buildFriendlyTeamAccessUsersProfile,
   buildGenericEndpointProfile,
   type UtilityActionProfile
 } from './utility-action-profiles';
@@ -10,7 +17,7 @@ import {
 const WRITE_METHODS = new Set<PublicEndpointSpec['method']>(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 function loadWriteEndpoints(): PublicEndpointSpec[] {
-  return (rawEndpoints as PublicEndpointSpec[]).filter((endpoint) => WRITE_METHODS.has(endpoint.method));
+  return listEndpoints().filter((endpoint) => WRITE_METHODS.has(endpoint.method));
 }
 
 function endpointKeyComparator(left: PublicEndpointSpec, right: PublicEndpointSpec): number {
@@ -21,6 +28,10 @@ function buildProfiles(): UtilityActionProfile[] {
   const profiles = new Map<string, UtilityActionProfile>();
 
   profiles.set('space.import-tree', buildFriendlySpaceImportProfile());
+  profiles.set('organization.connectors.prepareSetup', buildFriendlyConnectorSetupProfile());
+  profiles.set('organization.teamAccess.groups', buildFriendlyTeamAccessGroupsProfile());
+  profiles.set('organization.teamAccess.users', buildFriendlyTeamAccessUsersProfile());
+  profiles.set('organization.teamAccess.memberships', buildFriendlyTeamAccessMembershipsProfile());
 
   const writeEndpoints = loadWriteEndpoints().sort(endpointKeyComparator);
   for (const endpoint of writeEndpoints) {
@@ -28,13 +39,26 @@ function buildProfiles(): UtilityActionProfile[] {
       profiles.set(endpoint.key, buildFriendlyClaimDeviceProfile(endpoint));
       continue;
     }
+    if (endpoint.key === 'organization.edge.startClaim') {
+      profiles.set(endpoint.key, buildFriendlyEdgeClaimProfile(endpoint));
+      continue;
+    }
+    if (endpoint.key === 'organization.devices.moveDevice') {
+      profiles.set('device.move', buildFriendlyMoveDeviceProfile(endpoint));
+    }
     profiles.set(endpoint.key, buildGenericEndpointProfile(endpoint));
   }
 
   return Array.from(profiles.values()).sort((left, right) => left.actionKey.localeCompare(right.actionKey));
 }
 
-const ACTION_PROFILES = buildProfiles();
+let _actionProfiles: UtilityActionProfile[] | undefined;
+function getActionProfiles(): UtilityActionProfile[] {
+  if (!_actionProfiles) {
+    _actionProfiles = buildProfiles();
+  }
+  return _actionProfiles;
+}
 
 interface ListUtilityActionOptions {
   entity?: string;
@@ -44,7 +68,7 @@ interface ListUtilityActionOptions {
 export function listUtilityActionProfiles(options: ListUtilityActionOptions = {}): UtilityActionProfile[] {
   const includeGeneric = options.includeGeneric !== false;
   const requestedEntity = options.entity?.trim().toLowerCase();
-  return ACTION_PROFILES.filter((profile) => {
+  return getActionProfiles().filter((profile) => {
     if (!includeGeneric && profile.mode === 'generic') {
       return false;
     }
@@ -57,9 +81,9 @@ export function listUtilityActionProfiles(options: ListUtilityActionOptions = {}
 
 export function getUtilityActionProfile(actionKey: string): UtilityActionProfile {
   const normalized = actionKey.trim();
-  const found = ACTION_PROFILES.find((profile) => profile.actionKey === normalized);
+  const found = getActionProfiles().find((profile) => profile.actionKey === normalized);
   if (!found) {
-    throw new Error(`Unknown utility action: ${actionKey}`);
+    throw new CliUserError({ summary: `Unknown utility action: ${actionKey}` });
   }
   return found;
 }
