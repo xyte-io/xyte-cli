@@ -1,0 +1,4 @@
+path,space_type,config
+HQ,site,"{""zone"":""root""}"
+HQ/Floor-1,floor,"{""zone"":""north""}"
+HQ/Floor-1/Room-A,room,"{""zone"":""a""}"

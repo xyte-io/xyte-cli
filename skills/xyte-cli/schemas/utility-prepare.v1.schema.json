@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xyte.dev/schemas/utility-prepare.v1.schema.json",
+  "title": "Xyte Utility Prepare V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generatedAtUtc",
+    "actionKey",
+    "entity",
+    "mode",
+    "input",
+    "canonical",
+    "decodeRules",
+    "artifacts",
+    "promptTemplatePath",
+    "skillNodePath",
+    "suggestedCommands",
+    "executionSupport"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "xyte.utility.prepare.v1"
+    },
+    "generatedAtUtc": {
+      "type": "string"
+    },
+    "actionKey": {
+      "type": "string"
+    },
+    "entity": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "friendly",
+        "generic"
+      ]
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "kind",
+        "extension",
+        "sizeBytes"
+      ],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "tabular",
+            "document",
+            "image",
+            "unknown"
+          ]
+        },
+        "extension": {
+          "type": "string"
+        },
+        "sizeBytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "canonical": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primaryFormat",
+        "headers",
+        "jsonShape"
+      ],
+      "properties": {
+        "primaryFormat": {
+          "type": "string",
+          "enum": [
+            "csv",
+            "jsonl"
+          ]
+        },
+        "headers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "jsonShape": {
+          "type": "object"
+        }
+      }
+    },
+    "decodeRules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primary",
+        "rejected",
+        "notes"
+      ],
+      "properties": {
+        "primary": {
+          "type": "string"
+        },
+        "rejected": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "promptTemplatePath": {
+      "type": "string"
+    },
+    "skillNodePath": {
+      "type": "string"
+    },
+    "suggestedCommands": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "next",
+        "apply",
+        "verify"
+      ],
+      "properties": {
+        "next": {
+          "type": "string"
+        },
+        "apply": {
+          "type": "string"
+        },
+        "verify": {
+          "type": "string"
+        }
+      }
+    },
+    "executionSupport": {
+      "type": "string",
+      "enum": [
+        "space.import-tree",
+        "device.move",
+        "edge.claim-batch",
+        "prepare-only",
+        "call-loop-only"
+      ]
+    }
+  }
+}

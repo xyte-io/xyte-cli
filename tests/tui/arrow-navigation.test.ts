@@ -9,7 +9,9 @@ import { SCREEN_PANE_CONFIG } from '../../src/tui/panes';
 describe('pane-focus arrow navigation', () => {
   it('defines pane configuration for every screen', () => {
     const screens = Object.keys(SCREEN_PANE_CONFIG);
-    expect(screens.sort()).toEqual(['config', 'dashboard', 'devices', 'incidents', 'setup', 'spaces', 'tickets'].sort());
+    expect(screens.sort()).toEqual(
+      ['config', 'dashboard', 'devices', 'incidents', 'setup', 'spaces', 'tickets'].sort()
+    );
 
     for (const [screenId, config] of Object.entries(SCREEN_PANE_CONFIG)) {
       expect(config.panes.length).toBeGreaterThan(0);

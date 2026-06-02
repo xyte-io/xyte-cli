@@ -1,20 +1,24 @@
+import { CliUserError } from '../contracts/user-error';
 import { makeKeyFingerprint, matchesSlotRef } from '../secure/key-slots';
 import type { ApiKeySlotMeta, SecretProvider } from '../types/profile';
+import { PROVIDER_ORG, SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
 import type { TuiContext } from './types';
 
-const PROVIDERS: SecretProvider[] = ['xyte-org', 'xyte-partner', 'xyte-device'];
+const PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
 
-interface WizardContext
-  extends Pick<TuiContext, 'prompt' | 'promptSecret' | 'confirmWrite' | 'setStatus' | 'profileStore' | 'keychain'> {}
+interface WizardContext extends Pick<
+  TuiContext,
+  'prompt' | 'promptSecret' | 'confirmWrite' | 'setStatus' | 'profileStore' | 'secretStore'
+> {}
 
-export interface KeyWizardResult {
+interface KeyWizardResult {
   canceled: boolean;
   provider?: SecretProvider;
   slotId?: string;
   message: string;
 }
 
-export interface RunKeyCreateWizardArgs {
+interface RunKeyCreateWizardArgs {
   context: WizardContext;
   tenantId: string;
   defaultProvider?: SecretProvider;
@@ -22,7 +26,7 @@ export interface RunKeyCreateWizardArgs {
   setActiveDefault?: boolean;
 }
 
-export interface RunKeyUpdateWizardArgs {
+interface RunKeyUpdateWizardArgs {
   context: WizardContext;
   tenantId: string;
   provider: SecretProvider;
@@ -53,7 +57,10 @@ function parseProviderInput(input: string): SecretProvider | undefined {
   return PROVIDERS.find((provider) => provider === trimmed);
 }
 
-async function promptProvider(context: WizardContext, defaultProvider: SecretProvider): Promise<SecretProvider | undefined> {
+async function promptProvider(
+  context: WizardContext,
+  defaultProvider: SecretProvider
+): Promise<SecretProvider | undefined> {
   while (true) {
     const menu = [
       'Provider:',
@@ -74,34 +81,26 @@ async function promptProvider(context: WizardContext, defaultProvider: SecretPro
 }
 
 async function promptNonEmpty(context: WizardContext, message: string, initial: string): Promise<string | undefined> {
-  while (true) {
-    const input = await context.prompt(message, initial);
-    if (input === undefined || !input.trim()) {
-      return undefined;
-    }
-    const normalized = input.trim();
-    if (normalized) {
-      return normalized;
-    }
-    context.setStatus('Value is required.');
+  const input = await context.prompt(message, initial);
+  if (input === undefined || !input.trim()) {
+    return undefined;
   }
+  return input.trim();
 }
 
 async function promptSecretNonEmpty(context: WizardContext, message: string): Promise<string | undefined> {
-  while (true) {
-    const input = await context.promptSecret(message, '');
-    if (input === undefined || !input.trim()) {
-      return undefined;
-    }
-    const normalized = input.trim();
-    if (normalized) {
-      return normalized;
-    }
-    context.setStatus('Value is required.');
+  const input = await context.promptSecret(message, '');
+  if (input === undefined || !input.trim()) {
+    return undefined;
   }
+  return input.trim();
 }
 
-async function promptYesNo(context: WizardContext, message: string, defaultValue: boolean): Promise<boolean | undefined> {
+async function promptYesNo(
+  context: WizardContext,
+  message: string,
+  defaultValue: boolean
+): Promise<boolean | undefined> {
   while (true) {
     const input = await context.prompt(`${message} (y/n)`, defaultValue ? 'y' : 'n');
     if (input === undefined || !input.trim()) {
@@ -124,7 +123,8 @@ function labelForSlot(slot: ApiKeySlotMeta): string {
 
 export async function runKeyCreateWizard(args: RunKeyCreateWizardArgs): Promise<KeyWizardResult> {
   const { context, tenantId } = args;
-  const provider = await promptProvider(context, args.defaultProvider ?? 'xyte-org');
+  const existingTenant = await context.profileStore.getTenant(tenantId);
+  const provider = await promptProvider(context, args.defaultProvider ?? PROVIDER_ORG);
   if (!provider) {
     return canceledResult();
   }
@@ -153,14 +153,15 @@ export async function runKeyCreateWizard(args: RunKeyCreateWizardArgs): Promise<
     return canceledResult();
   }
 
-  const slot = await context.profileStore.addKeySlot(tenantId, {
-    provider,
+  const slot = await context.profileStore.addKeySlot(tenantId, provider, {
     name: slotName,
     fingerprint
   });
-  await context.keychain.setSlotSecret(tenantId, provider, slot.slotId, keyValue);
+  await context.secretStore.setSlotSecret(tenantId, provider, slot.slotId, keyValue);
   if (setActive) {
     await context.profileStore.setActiveKeySlot(tenantId, provider, slot.slotId);
+  } else if (!existingTenant?.apiProvider) {
+    await context.profileStore.upsertTenant({ id: tenantId, apiProvider: provider });
   }
 
   const message = `Saved ${provider} slot ${labelForSlot(slot)}.`;
@@ -186,7 +187,7 @@ export async function runKeyUpdateWizard(args: RunKeyUpdateWizardArgs): Promise<
   const slots = await context.profileStore.listKeySlots(tenantId, provider);
   const slot = slots.find((item) => matchesSlotRef(item, slotRef));
   if (!slot) {
-    throw new Error(`Unknown slot "${slotRef}" for ${provider}.`);
+    throw new CliUserError({ summary: `Unknown slot "${slotRef}" for ${provider}.` });
   }
 
   const slotName = await promptNonEmpty(context, 'Slot name:', slot.name);
@@ -213,7 +214,7 @@ export async function runKeyUpdateWizard(args: RunKeyUpdateWizardArgs): Promise<
     return canceledResult();
   }
 
-  await context.keychain.setSlotSecret(tenantId, provider, slot.slotId, keyValue);
+  await context.secretStore.setSlotSecret(tenantId, provider, slot.slotId, keyValue);
   const updated = await context.profileStore.updateKeySlot(tenantId, provider, slot.slotId, {
     name: slotName,
     fingerprint

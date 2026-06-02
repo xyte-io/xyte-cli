@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import { evaluateReadiness } from '../../src/config/readiness';
-import { MemoryKeychain } from '../../src/secure/keychain';
+import { MemorySecretStore } from '../../src/secure/secret-store';
 import { MemoryProfileStore } from '../support/memory-profile-store';
 
 describe('readiness evaluation', () => {
   it('returns needs_setup when no active tenant exists', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
 
     const readiness = await evaluateReadiness({
       profileStore,
-      keychain,
+      secretStore,
       checkConnectivity: false
     });
 
@@ -21,15 +21,15 @@ describe('readiness evaluation', () => {
 
   it('returns ready when tenant and active Xyte key are configured', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
-    const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'primary',
       fingerprint: 'sha256:test'
     });
-    await keychain.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key');
+    await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key');
 
     const client: any = {
       organization: { getOrganizationInfo: async () => ({ ok: true }) },
@@ -38,7 +38,7 @@ describe('readiness evaluation', () => {
 
     const readiness = await evaluateReadiness({
       profileStore,
-      keychain,
+      secretStore,
       client,
       checkConnectivity: true
     });
@@ -49,15 +49,15 @@ describe('readiness evaluation', () => {
 
   it('returns degraded on transient connectivity failure', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
-    const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'primary',
       fingerprint: 'sha256:test'
     });
-    await keychain.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key');
+    await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key');
 
     const client: any = {
       organization: { getOrganizationInfo: async () => Promise.reject(new TypeError('fetch failed')) },
@@ -66,7 +66,7 @@ describe('readiness evaluation', () => {
 
     const readiness = await evaluateReadiness({
       profileStore,
-      keychain,
+      secretStore,
       client,
       checkConnectivity: true
     });

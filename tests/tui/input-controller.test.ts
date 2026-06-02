@@ -31,10 +31,9 @@ describe('tui input controller', () => {
     expect(controller.getState().queueDepth).toBeGreaterThanOrEqual(2);
 
     releaseFirst?.();
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await vi.waitFor(() => expect(controller.getState().queueDepth).toBe(0));
 
     expect(order).toEqual(['start:a', 'end:a', 'start:b', 'end:b', 'start:c', 'end:c']);
-    expect(controller.getState().queueDepth).toBe(0);
   });
 
   it('drops old events when queue is full', async () => {
@@ -60,7 +59,7 @@ describe('tui input controller', () => {
     controller.dispatch({ ch: 'e', key: key('e'), timestamp: Date.now() });
 
     releaseFirst?.();
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    await vi.waitFor(() => expect(handled.length).toBeGreaterThan(0));
     expect(controller.getState().droppedEvents).toBeGreaterThanOrEqual(1);
     expect(handled).toContain('e');
   });
@@ -77,9 +76,8 @@ describe('tui input controller', () => {
       timestamp: Date.now()
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await vi.waitFor(() => expect(handle).toHaveBeenCalledTimes(1));
     expect(result.bypassed).toBe(true);
-    expect(handle).toHaveBeenCalledTimes(1);
   });
 
   it('treats q keyname as critical even when ch is missing', async () => {
@@ -94,8 +92,7 @@ describe('tui input controller', () => {
       timestamp: Date.now()
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await vi.waitFor(() => expect(handle).toHaveBeenCalledTimes(1));
     expect(result.bypassed).toBe(true);
-    expect(handle).toHaveBeenCalledTimes(1);
   });
 });

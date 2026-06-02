@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "xyte.watch.frame.v1",
+  "timestamp": "<ISO_TIMESTAMP>",
+  "runId": "<RUN_ID>",
+  "sequence": 0,
+  "pollIndex": 1,
+  "intervalMs": 2000,
+  "profile": "incidents-active",
+  "endpointKey": "organization.incidents.getIncidents",
+  "tenantId": "acme",
+  "eventType": "delta",
+  "query": {
+    "status": "active",
+    "from": 0,
+    "to": 1700000000,
+    "page": 1,
+    "per_page": 100
+  },
+  "summary": {
+    "total": 2,
+    "added": 1,
+    "removed": 0,
+    "updated": 1,
+    "changed": true
+  },
+  "delta": {
+    "added": [
+      {
+        "id": "inc-2",
+        "after": {
+          "id": "inc-2",
+          "status": "active"
+        }
+      }
+    ],
+    "removed": [],
+    "updated": [
+      {
+        "id": "inc-1",
+        "before": {
+          "id": "inc-1",
+          "status": "active"
+        },
+        "after": {
+          "id": "inc-1",
+          "status": "resolved"
+        }
+      }
+    ]
+  }
+}

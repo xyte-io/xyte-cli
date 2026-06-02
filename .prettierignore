@@ -1,0 +1,7 @@
+dist
+node_modules
+video
+demo
+marketing
+*.json
+*.md

@@ -4,7 +4,7 @@ import { pulseChar } from './animation';
 import type { TuiScreenId } from './types';
 import { TAB_ORDER } from './tabs';
 
-export interface TuiLayout {
+interface TuiLayout {
   header: blessed.Widgets.BoxElement;
   tabs: blessed.Widgets.BoxElement;
   body: blessed.Widgets.BoxElement;
@@ -14,7 +14,7 @@ export interface TuiLayout {
   setPulsePhase(phase: number): void;
 }
 
-export interface TuiLayoutOptions {
+interface TuiLayoutOptions {
   motionEnabled: boolean;
 }
 
@@ -80,7 +80,8 @@ export function createLayout(screen: blessed.Widgets.Screen, options: TuiLayoutO
     left: 0,
     width: '100%',
     height: 1,
-    content: ' u setup | g config | d/s/v/i/t screens | r refresh | / search | ? help | q quit ',
+    content:
+      ' u/g/d/s/v/i/t screens | r refresh | a actions | f filters | [ ] pages | p per-page | / search | ? help | q quit ',
     style: {
       fg: 'white',
       bg: 'black'

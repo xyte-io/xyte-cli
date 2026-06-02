@@ -3,40 +3,45 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>xyte-cli — Deterministic Xyte Operations for Agents and Operators</title>
+    <title>Xyte AI CLI | Operate Xyte with command-line clarity</title>
     <meta
       name="description"
-      content="xyte-cli provides deterministic endpoint calls, guarded write flows, a full TUI, headless NDJSON snapshots, schema contracts, and MCP server support."
+      content="Install xyte-cli, connect a tenant key, inspect fleet state, open console workflows, and export shareable artifacts inside Xyte's design language."
     />
+    <link rel="icon" type="image/png" href="./media/xyte-ai-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@10..48,500;10..48,700;10..48,800&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
     <style>
       :root {
-        --bg: #0b1217;
-        --bg-elev: #111b22;
-        --bg-card: #17242d;
-        --bg-code: #0f1a22;
-        --line: rgba(176, 219, 238, 0.2);
-        --line-strong: rgba(176, 219, 238, 0.45);
-        --text: #eaf6fc;
-        --muted: #93b2c1;
-        --muted-strong: #b8d0db;
-        --aqua: #34d3d8;
-        --gold: #f9c46b;
-        --coral: #ff8e72;
-        --focus: #9ee0ff;
-        --radius-s: 10px;
-        --radius-m: 16px;
-        --radius-l: 24px;
-        --shadow-soft: 0 14px 45px rgba(0, 0, 0, 0.34);
-        --shadow-glow: 0 0 80px rgba(52, 211, 216, 0.14);
-        --font-display: "Bricolage Grotesque", "Segoe UI", sans-serif;
+        --bg: #05020b;
+        --bg-soft: #11071d;
+        --panel: rgba(20, 11, 33, 0.82);
+        --panel-strong: rgba(28, 16, 44, 0.92);
+        --panel-muted: rgba(255, 255, 255, 0.04);
+        --line: rgba(255, 255, 255, 0.1);
+        --line-strong: rgba(255, 255, 255, 0.18);
+        --text: #fcf9ff;
+        --text-soft: rgba(252, 249, 255, 0.76);
+        --text-faint: rgba(252, 249, 255, 0.54);
+        --violet: #7b1fa2;
+        --magenta: #680079;
+        --electric: #7c4dff;
+        --blue: #2979ff;
+        --gold: #ffc107;
+        --teal: #00bfa5;
+        --pink: #ff4081;
+        --navy: #283593;
+        --wrap: min(1240px, calc(100% - 48px));
+        --radius-s: 18px;
+        --radius-m: 26px;
+        --radius-l: 36px;
+        --shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
         --font-body: "Manrope", "Segoe UI", sans-serif;
-        --font-mono: "IBM Plex Mono", Menlo, monospace;
+        --font-mono: "JetBrains Mono", "SFMono-Regular", monospace;
       }
 
       * {
@@ -45,17 +50,26 @@
 
       html {
         scroll-behavior: smooth;
+        background-color: var(--bg);
       }
 
       body {
         margin: 0;
-        font-family: var(--font-body);
-        color: var(--text);
+        min-height: 100vh;
+        position: relative;
         background:
-          radial-gradient(circle at 15% -8%, rgba(52, 211, 216, 0.26), transparent 40%),
-          radial-gradient(circle at 85% 8%, rgba(249, 196, 107, 0.22), transparent 34%),
-          linear-gradient(180deg, #081015 0%, #0b1217 22%, #091015 100%);
-        line-height: 1.58;
+          radial-gradient(ellipse 80% 50% at 12% 18%, rgba(41, 121, 255, 0.15), transparent),
+          radial-gradient(ellipse 60% 40% at 76% 8%, rgba(124, 77, 255, 0.18), transparent),
+          radial-gradient(ellipse 70% 50% at 52% 72%, rgba(255, 64, 129, 0.08), transparent),
+          radial-gradient(ellipse 50% 60% at 90% 50%, rgba(0, 191, 165, 0.07), transparent),
+          radial-gradient(ellipse 40% 30% at 30% 90%, rgba(123, 31, 162, 0.12), transparent),
+          linear-gradient(180deg, #06020e 0%, #0a0318 34%, #100520 100%);
+        color: var(--text);
+        font-family: var(--font-body);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+        overflow-x: hidden;
       }
 
       body::before {
@@ -64,58 +78,60 @@
         inset: 0;
         pointer-events: none;
         background-image:
-          linear-gradient(rgba(167, 214, 232, 0.045) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(167, 214, 232, 0.045) 1px, transparent 1px);
-        background-size: 26px 26px;
-        mask-image: radial-gradient(circle at center, black 20%, transparent 95%);
-        z-index: -1;
+          linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+        background-size: 40px 40px;
+        mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 70%);
+        opacity: 0.32;
+        z-index: 0;
+      }
+
+      body::after {
+        content: "";
+        position: fixed;
+        top: -20%;
+        left: -10%;
+        width: 120%;
+        height: 140%;
+        pointer-events: none;
+        background:
+          radial-gradient(ellipse 30% 20% at 20% 20%, rgba(41, 121, 255, 0.06), transparent),
+          radial-gradient(ellipse 25% 18% at 80% 15%, rgba(124, 77, 255, 0.05), transparent),
+          radial-gradient(ellipse 35% 25% at 60% 80%, rgba(255, 64, 129, 0.04), transparent);
+        animation: aurora-drift 20s ease-in-out infinite alternate;
+        z-index: 0;
+      }
+
+      @keyframes aurora-drift {
+        0% { transform: translate(0, 0) scale(1); }
+        50% { transform: translate(2%, -1%) scale(1.02); }
+        100% { transform: translate(-1%, 2%) scale(0.98); }
       }
 
       a {
         color: inherit;
       }
 
-      .wrap {
-        width: min(1180px, 100% - 44px);
-        margin: 0 auto;
+      img {
+        display: block;
+        max-width: 100%;
       }
 
-      .section {
-        padding: 92px 0;
+      button,
+      input,
+      textarea,
+      select {
+        font: inherit;
       }
 
-      .section + .section {
-        border-top: 1px solid var(--line);
-      }
-
-      .eyebrow {
-        margin: 0 0 10px;
+      code,
+      pre {
         font-family: var(--font-mono);
-        font-size: 12px;
-        color: var(--gold);
-        text-transform: uppercase;
-        letter-spacing: 0.13em;
       }
 
-      h1,
-      h2,
-      h3 {
-        margin: 0;
-        font-family: var(--font-display);
-        line-height: 1.05;
-      }
-
-      h2 {
-        font-size: clamp(32px, 4vw, 48px);
-        margin-bottom: 14px;
-      }
-
-      p {
-        margin: 0;
-      }
-
-      .muted {
-        color: var(--muted);
+      :focus-visible {
+        outline: 2px solid #ffe183;
+        outline-offset: 3px;
       }
 
       .skip-link {
@@ -123,1148 +139,1707 @@
         left: -999px;
         top: 0;
         padding: 10px 14px;
-        background: var(--aqua);
-        color: #00272c;
-        border-radius: 0 0 var(--radius-s) var(--radius-s);
+        border-radius: 0 0 12px 12px;
+        background: #fff;
+        color: #000;
         font-weight: 700;
+        z-index: 100;
       }
 
       .skip-link:focus {
-        left: 16px;
-        z-index: 110;
+        left: 20px;
       }
+
+      .wrap {
+        width: var(--wrap);
+        margin: 0 auto;
+        position: relative;
+        z-index: 1;
+      }
+
+      .surface {
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03)),
+          var(--panel);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(20px) saturate(130%);
+        transition:
+          border-color 280ms ease,
+          box-shadow 280ms ease,
+          transform 280ms ease;
+      }
+
+      .surface:hover {
+        border-color: rgba(255, 255, 255, 0.14);
+        box-shadow:
+          0 24px 60px rgba(0, 0, 0, 0.3),
+          0 0 0 1px rgba(124, 77, 255, 0.06);
+      }
+
+      /* ─── Nav ─── */
 
       .site-nav {
         position: sticky;
         top: 0;
-        z-index: 100;
-        backdrop-filter: blur(10px) saturate(170%);
-        background: rgba(8, 16, 21, 0.74);
-        border-bottom: 1px solid var(--line);
+        z-index: 50;
+        background: rgba(6, 2, 12, 0.72);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(20px) saturate(140%);
       }
 
       .nav-row {
-        min-height: 64px;
+        min-height: 76px;
         display: flex;
         align-items: center;
-        gap: 14px;
-        flex-wrap: wrap;
-        padding: 10px 0;
+        gap: 20px;
       }
 
       .brand {
         margin-right: auto;
         display: inline-flex;
         align-items: center;
-        gap: 11px;
-        font-weight: 700;
+        gap: 12px;
+        min-height: 44px;
         text-decoration: none;
       }
 
-      .brand img {
-        width: 34px;
-        height: 34px;
-        border-radius: 9px;
-        background: #ffffff;
-        padding: 4px;
+      .brand-mark {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
       }
 
-      .brand-name {
-        font-family: var(--font-display);
-        font-size: 20px;
-        letter-spacing: 0.01em;
+      .brand-logo-nav {
+        width: 88px;
+        height: auto;
+      }
+
+      .brand-copy strong {
+        display: block;
+        font-size: 12px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .brand-copy span {
+        display: block;
+        margin-top: 2px;
+        color: var(--text-faint);
+        font-size: 12px;
       }
 
       .nav-links {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        flex-wrap: wrap;
+        gap: 18px;
       }
 
       .nav-links a {
-        font-family: var(--font-mono);
-        font-size: 12px;
-        color: var(--muted);
+        min-height: 40px;
+        display: inline-flex;
+        align-items: center;
+        color: var(--text-soft);
+        font-size: 14px;
         text-decoration: none;
-        padding: 7px 10px;
-        border-radius: 999px;
-        border: 1px solid transparent;
+        position: relative;
+        transition: color 200ms ease;
+      }
+
+      .nav-links a::after {
+        content: "";
+        position: absolute;
+        bottom: 6px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        border-radius: 1px;
+        background: var(--gold);
+        transform: scaleX(0);
+        transform-origin: center;
+        transition: transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
       }
 
       .nav-links a:hover {
         color: var(--text);
-        border-color: var(--line);
-        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .nav-links a:hover::after {
+        transform: scaleX(1);
       }
 
       .nav-cta {
-        margin-left: 8px;
-        padding: 10px 14px;
-        border-radius: 999px;
-        background: linear-gradient(135deg, var(--gold), #f6d998);
-        color: #221605;
-        text-decoration: none;
-        font-weight: 700;
-        font-size: 13px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-      }
-
-      .hero {
-        padding: 88px 0 68px;
-      }
-
-      .hero-grid {
-        display: grid;
-        grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-        gap: 34px;
-        align-items: end;
-      }
-
-      .hero h1 {
-        font-size: clamp(42px, 6vw, 76px);
-        margin-bottom: 22px;
-        max-width: 12ch;
-      }
-
-      .hero h1 em {
-        font-style: normal;
-        color: var(--aqua);
-      }
-
-      .hero-copy {
-        color: var(--muted-strong);
-        font-size: clamp(17px, 2vw, 21px);
-        max-width: 62ch;
-      }
-
-      .hero-actions {
-        margin-top: 32px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-      }
-
-      .btn {
+        min-height: 42px;
+        padding: 0 18px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         border-radius: 999px;
+        background: var(--gold);
+        color: #10090a;
+        font-size: 14px;
+        font-weight: 800;
+        text-decoration: none;
+        box-shadow:
+          0 14px 32px rgba(255, 193, 7, 0.16),
+          0 0 0 0 rgba(255, 193, 7, 0);
+        transition:
+          transform 200ms ease,
+          box-shadow 200ms ease;
+      }
+
+      .nav-cta:hover {
+        transform: translateY(-1px);
+        box-shadow:
+          0 18px 40px rgba(255, 193, 7, 0.22),
+          0 0 0 3px rgba(255, 193, 7, 0.1);
+      }
+
+      /* ─── Hero ─── */
+
+      .hero {
+        padding: 64px 0 40px;
+        position: relative;
+      }
+
+      .hero-glow {
+        position: absolute;
+        top: -80px;
+        right: -120px;
+        width: 600px;
+        height: 600px;
+        border-radius: 50%;
+        background:
+          radial-gradient(circle, rgba(123, 31, 162, 0.18) 0%, rgba(124, 77, 255, 0.08) 40%, transparent 70%);
+        filter: blur(60px);
+        pointer-events: none;
+        z-index: 0;
+        animation: hero-pulse 8s ease-in-out infinite alternate;
+      }
+
+      @keyframes hero-pulse {
+        0% { opacity: 0.6; transform: scale(1); }
+        100% { opacity: 1; transform: scale(1.08); }
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(360px, 0.9fr) minmax(520px, 1.1fr);
+        gap: 40px;
+        align-items: center;
+        position: relative;
+        z-index: 1;
+      }
+
+      .eyebrow {
+        margin: 0 0 14px;
+        color: rgba(255, 255, 255, 0.62);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        line-height: 1.02;
+        letter-spacing: -0.04em;
+        text-wrap: balance;
+      }
+
+      h1 {
+        max-width: 11ch;
+        font-size: clamp(2.6rem, 5.2vw, 4.25rem);
+        font-weight: 800;
+      }
+
+      h2 {
+        font-size: clamp(2rem, 3.2vw, 3rem);
+        font-weight: 800;
+      }
+
+      h3 {
+        font-size: 24px;
+        font-weight: 700;
+      }
+
+      .gradient-text {
+        background: linear-gradient(120deg, #ffffff 0%, #d4cdff 40%, #83c7ff 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+
+      .hero-copy p,
+      .section-head p,
+      .card-copy,
+      .card-copy p {
+        text-wrap: pretty;
+      }
+
+      .hero-logo {
+        width: min(220px, 56%);
+        margin-bottom: 18px;
+      }
+
+      .hero-lead {
+        margin: 18px 0 0;
+        max-width: 54ch;
+        color: var(--text-soft);
+        font-size: 16px;
+      }
+
+      .hero-actions {
+        margin-top: 28px;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        min-height: 44px;
+        padding: 0 18px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        border: 1px solid transparent;
         text-decoration: none;
         font-size: 14px;
-        font-weight: 700;
-        padding: 12px 18px;
-        transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        font-weight: 800;
+        cursor: pointer;
+        transition:
+          transform 200ms ease,
+          background 200ms ease,
+          border-color 200ms ease,
+          box-shadow 200ms ease;
       }
 
-      .btn-primary {
-        color: #02252c;
-        background: linear-gradient(135deg, var(--aqua), #7ce2e5);
-        box-shadow: var(--shadow-glow);
-      }
-
-      .btn-primary:hover {
+      .btn:hover,
+      .copy-btn:hover,
+      .inline-link:hover {
         transform: translateY(-1px);
       }
 
-      .btn-ghost {
+      .btn-primary {
+        background: var(--gold);
+        color: #10090a;
+        box-shadow: 0 8px 28px rgba(255, 193, 7, 0.18);
+      }
+
+      .btn-primary:hover {
+        box-shadow:
+          0 12px 36px rgba(255, 193, 7, 0.28),
+          0 0 0 3px rgba(255, 193, 7, 0.1);
+      }
+
+      .btn-secondary {
+        background: rgba(255, 255, 255, 0.04);
+        border-color: rgba(255, 255, 255, 0.12);
         color: var(--text);
-        border: 1px solid var(--line-strong);
-        background: rgba(255, 255, 255, 0.03);
       }
 
-      .btn-ghost:hover {
-        border-color: var(--aqua);
+      .btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.2);
       }
 
-      .hero-badges {
-        margin-top: 28px;
+      .hero-meta {
+        margin-top: 26px;
         display: flex;
+        gap: 10px;
         flex-wrap: wrap;
-        gap: 8px;
       }
 
-      .hero-badges span {
-        font-family: var(--font-mono);
-        font-size: 11px;
-        color: var(--muted);
-        border: 1px solid var(--line);
+      .hero-meta span {
+        min-height: 38px;
+        padding: 0 14px;
+        display: inline-flex;
+        align-items: center;
         border-radius: 999px;
-        padding: 6px 11px;
-        background: rgba(255, 255, 255, 0.02);
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: var(--text-soft);
+        font-size: 13px;
+        font-weight: 600;
       }
 
-      .terminal-card {
-        border: 1px solid var(--line);
+      .hero-panel {
+        padding: 28px;
+        border-radius: var(--radius-l);
+      }
+
+      .hero-panel:hover {
+        transform: none;
+      }
+
+      /* ─── Video ─── */
+
+      .video-showcase {
+        padding: 0 0 20px;
+        position: relative;
+        z-index: 1;
+      }
+
+      .video-container {
+        position: relative;
+        width: 100%;
+        max-width: 800px;
+        margin: 0 auto;
+        aspect-ratio: 16 / 9;
         border-radius: var(--radius-l);
         overflow: hidden;
-        background: linear-gradient(165deg, rgba(16, 27, 36, 0.92), rgba(10, 17, 24, 0.94));
-        box-shadow: var(--shadow-soft);
       }
 
-      .terminal-head {
-        border-bottom: 1px solid var(--line);
-        padding: 11px 14px;
+      .video-container iframe {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+      }
+
+      .shell-top {
         display: flex;
         align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 18px;
+      }
+
+      .shell-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .shell-dots {
+        display: inline-flex;
         gap: 6px;
       }
 
-      .dot {
-        width: 9px;
-        height: 9px;
-        border-radius: 50%;
+      .shell-dots span {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.18);
       }
 
-      .dot-red {
-        background: var(--coral);
+      .shell-tag {
+        min-height: 30px;
+        padding: 0 10px;
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        background: rgba(255, 193, 7, 0.12);
+        color: #ffe183;
+        font-size: 12px;
+        font-weight: 800;
       }
 
-      .dot-gold {
-        background: var(--gold);
+      .command-shell {
+        padding: 20px 22px;
+        border-radius: var(--radius-m);
+        background:
+          radial-gradient(ellipse 60% 50% at 100% 0%, rgba(124, 77, 255, 0.1), transparent),
+          linear-gradient(180deg, rgba(6, 2, 13, 0.78), rgba(4, 1, 10, 0.94));
+        border: 1px solid rgba(255, 255, 255, 0.08);
       }
 
-      .dot-aqua {
-        background: var(--aqua);
-      }
-
-      .terminal-title {
-        margin-left: 8px;
-        font-family: var(--font-mono);
-        font-size: 11px;
-        color: var(--muted);
-      }
-
-      .terminal-body {
-        font-family: var(--font-mono);
-        font-size: 13px;
-        line-height: 1.7;
+      .command-shell pre {
         margin: 0;
-        padding: 16px 18px;
-        background: var(--bg-code);
-        color: #d5e6ef;
+        color: #fbf7ff;
+        font-size: 13px;
+        line-height: 1.72;
+        white-space: pre-wrap;
       }
 
-      .term-cmd {
-        color: var(--aqua);
+      .command-shell .prompt {
+        color: #ffe183;
       }
 
-      .term-flg {
-        color: var(--gold);
+      .command-shell .comment {
+        color: #93bfff;
       }
 
-      .term-val {
-        color: #ffd6c8;
-      }
-
-      .term-cm {
-        color: #8ea9b6;
-      }
-
-      .lead {
-        max-width: 68ch;
-        color: var(--muted-strong);
-        font-size: 18px;
-      }
-
-      .split-cards {
-        margin-top: 26px;
+      .panel-grid {
+        margin-top: 18px;
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: 1fr 1fr;
         gap: 16px;
       }
 
+      .panel-card {
+        padding: 18px;
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        transition:
+          background 240ms ease,
+          border-color 240ms ease;
+      }
+
+      .panel-card:hover {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(255, 255, 255, 0.12);
+      }
+
+      .panel-card strong {
+        display: block;
+        font-size: 15px;
+      }
+
+      .panel-card span {
+        display: block;
+        margin-top: 6px;
+        color: var(--text-faint);
+        font-size: 13px;
+      }
+
+      /* ─── Sections ─── */
+
+      .section {
+        padding: 40px 0;
+      }
+
+      .section-head {
+        max-width: 70ch;
+        margin-bottom: 22px;
+      }
+
+      .section-head p {
+        margin: 12px 0 0;
+        color: var(--text-soft);
+      }
+
+      .section-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 24px;
+        align-items: start;
+      }
+
+      /* ─── Install flow ─── */
+
+      .install-flow {
+        display: grid;
+        gap: 20px;
+      }
+
+      .install-sheet {
+        padding: 0;
+        overflow: hidden;
+      }
+
+      .install-sheet-head {
+        padding: 26px 28px 18px;
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .install-sheet-head h3 {
+        margin: 8px 0 0;
+        font-size: clamp(1.2rem, 1.5vw, 1.45rem);
+        line-height: 1.18;
+        text-wrap: balance;
+      }
+
+      .install-sheet-head p {
+        max-width: 34ch;
+        margin: 0;
+        color: var(--text-soft);
+        font-size: 14px;
+        line-height: 1.55;
+        text-wrap: pretty;
+      }
+
+      .install-sheet-labels,
+      .install-sheet-row {
+        display: grid;
+        grid-template-columns: 72px minmax(0, 0.9fr) minmax(0, 1.2fr);
+        gap: 18px;
+        align-items: start;
+      }
+
+      .install-sheet-labels {
+        padding: 14px 28px 10px;
+        color: var(--text-faint);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .install-sheet-body {
+        padding: 0 28px 10px;
+      }
+
+      .install-sheet-row {
+        padding: 18px 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .install-sheet-row:first-child {
+        border-top: 0;
+      }
+
+      .sheet-step {
+        min-height: 38px;
+        padding: 0 12px;
+        width: fit-content;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.05);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.05),
+          0 0 0 1px rgba(255, 255, 255, 0.08);
+        color: #d7d0ff;
+        font-size: 13px;
+        font-weight: 800;
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+      }
+
+      .sheet-summary {
+        min-width: 0;
+      }
+
+      .sheet-summary strong {
+        display: block;
+        font-size: 17px;
+        line-height: 1.24;
+        text-wrap: balance;
+      }
+
+      .sheet-summary p {
+        margin: 6px 0 0;
+        color: var(--text-soft);
+        font-size: 15px;
+        line-height: 1.6;
+        text-wrap: pretty;
+      }
+
+      .sheet-command {
+        min-width: 0;
+      }
+
+      .sheet-code,
+      .sheet-subrow code,
+      .mini-list code {
+        display: block;
+        position: relative;
+        width: 100%;
+        padding: 13px 40px 13px 16px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: #d8e8ff;
+        font-size: 12px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        font-family: var(--font-mono);
+      }
+
+      .sheet-actions {
+        margin-top: 12px;
+      }
+
+      .sheet-subrows {
+        display: grid;
+        gap: 12px;
+      }
+
+      .sheet-subrow {
+        display: grid;
+        grid-template-columns: 190px minmax(0, 1fr);
+        gap: 14px;
+        align-items: start;
+      }
+
+      .sheet-subrow strong {
+        display: block;
+        padding-top: 10px;
+        font-size: 14px;
+        line-height: 1.35;
+      }
+
+      /* ─── Steps (install step 2) ─── */
+
+      .steps {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 0;
+        counter-reset: none;
+      }
+
+      .steps li {
+        display: grid;
+        grid-template-columns: 52px 1fr;
+        gap: 16px;
+        align-items: start;
+        padding: 20px 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .steps li:first-child {
+        padding-top: 4px;
+        border-top: 0;
+      }
+
+      .step-index {
+        min-height: 42px;
+        width: 42px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 14px;
+        background: rgba(124, 77, 255, 0.1);
+        border: 1px solid rgba(124, 77, 255, 0.18);
+        color: #c9b8ff;
+        font-size: 13px;
+        font-weight: 800;
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+        flex-shrink: 0;
+      }
+
+      .step-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .step-copy strong {
+        font-size: 17px;
+        line-height: 1.3;
+      }
+
+      .step-copy > span {
+        color: var(--text-soft);
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .detail-code {
+        display: block;
+        position: relative;
+        margin-top: 4px;
+        padding: 12px 40px 12px 16px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: #d8e8ff;
+        font-size: 12px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        font-family: var(--font-mono);
+      }
+
+      /* ─── Cards ─── */
+
       .card {
-        border: 1px solid var(--line);
+        padding: 24px;
         border-radius: var(--radius-m);
-        padding: 20px;
-        background: linear-gradient(180deg, rgba(23, 36, 45, 0.88), rgba(13, 23, 31, 0.88));
       }
 
-      .card h3 {
-        font-size: 22px;
-        margin-bottom: 8px;
+      .card-label {
+        margin: 0 0 14px;
+        color: rgba(255, 255, 255, 0.62);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
       }
 
-      .chip-row {
+      .action-row {
         margin-top: 14px;
         display: flex;
-        gap: 8px;
+        align-items: center;
+        gap: 12px;
         flex-wrap: wrap;
       }
 
-      .chip {
+      .copy-btn,
+      .inline-link {
+        min-height: 42px;
+        padding: 0 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         border-radius: 999px;
-        border: 1px solid var(--line-strong);
-        padding: 5px 10px;
-        font-family: var(--font-mono);
-        font-size: 11px;
-        color: var(--muted);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+        transition:
+          transform 200ms ease,
+          background 200ms ease,
+          border-color 200ms ease;
       }
 
-      .features-grid {
-        margin-top: 26px;
+      .copy-btn:hover,
+      .inline-link:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.18);
+      }
+
+      .toast {
+        min-height: 18px;
+        color: #ffe183;
+        font-size: 13px;
+      }
+
+      .mini-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 14px;
+      }
+
+      .mini-list li {
+        padding-top: 14px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .mini-list li:first-child {
+        padding-top: 0;
+        border-top: 0;
+      }
+
+      .mini-list strong {
+        display: block;
+        font-size: 15px;
+      }
+
+      .mini-list span {
+        display: block;
+        margin-top: 5px;
+        color: var(--text-soft);
+        font-size: 14px;
+      }
+
+      /* ─── Workflow ─── */
+
+      .workflow-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .workflow-card {
+        padding: 22px;
+        border-radius: 24px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .workflow-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, rgba(124, 77, 255, 0.4), transparent);
+        opacity: 0;
+        transition: opacity 300ms ease;
+      }
+
+      .workflow-card:hover::before {
+        opacity: 1;
+      }
+
+      .workflow-index {
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: #d7d0ff;
+        font-size: 12px;
+        font-weight: 800;
+        font-family: var(--font-mono);
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .workflow-card h3 {
+        margin-top: 16px;
+        font-size: 22px;
+      }
+
+      .workflow-card p {
+        margin: 10px 0 0;
+        color: var(--text-soft);
+        font-size: 14px;
+      }
+
+      .workflow-card code {
+        display: inline-flex;
+        margin-top: 16px;
+        padding: 7px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.05);
+        color: #d8e8ff;
+        font-size: 11px;
+      }
+
+      /* ─── Docs grid ─── */
+
+      .docs-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 16px;
       }
 
-      .feature-card {
-        border: 1px solid var(--line);
-        border-radius: var(--radius-m);
-        padding: 18px 18px 20px;
-        background: linear-gradient(180deg, rgba(17, 27, 34, 0.84), rgba(9, 16, 21, 0.88));
-        transition: transform 0.2s ease, border-color 0.2s ease;
-      }
-
-      .feature-card:hover {
-        transform: translateY(-2px);
-        border-color: var(--line-strong);
-      }
-
-      .feature-card h3 {
-        font-size: 20px;
-        margin-bottom: 9px;
-      }
-
-      .feature-card p {
-        color: var(--muted);
-      }
-
-      .feature-card code {
-        display: block;
-        margin-top: 12px;
-        font-family: var(--font-mono);
-        font-size: 12px;
-        color: #d9edf7;
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid var(--line);
-        border-radius: var(--radius-s);
-        padding: 8px 9px;
-      }
-
-      .flow-grid {
-        margin-top: 26px;
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 16px;
-      }
-
-      .panel {
-        border: 1px solid var(--line);
-        border-radius: var(--radius-m);
-        background: var(--bg-card);
-        overflow: hidden;
-      }
-
-      .panel h3 {
-        font-size: 20px;
-        padding: 16px 16px 0;
-      }
-
-      .panel p {
-        padding: 8px 16px 0;
-        color: var(--muted);
-      }
-
-      .panel pre {
-        margin: 16px;
-        padding: 14px;
-        border-radius: var(--radius-s);
-        border: 1px solid var(--line);
-        background: var(--bg-code);
-        overflow-x: auto;
-        font-family: var(--font-mono);
-        font-size: 12px;
-        line-height: 1.68;
-        color: #d8e9f1;
-      }
-
-      .table-wrap {
-        margin-top: 24px;
-        border: 1px solid var(--line);
-        border-radius: var(--radius-m);
-        overflow-x: auto;
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        min-width: 840px;
-        background: rgba(9, 16, 21, 0.9);
-      }
-
-      th,
-      td {
-        text-align: left;
-        border-bottom: 1px solid var(--line);
-        padding: 12px 14px;
-        vertical-align: top;
-      }
-
-      th {
-        font-family: var(--font-mono);
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--muted);
-      }
-
-      td {
-        font-size: 14px;
-        color: #d7eaf3;
-      }
-
-      td code {
-        font-family: var(--font-mono);
-        font-size: 12px;
-        color: #d3ebf6;
-      }
-
-      .warn-grid {
-        margin-top: 24px;
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 16px;
-      }
-
-      .warn {
-        border: 1px solid rgba(255, 142, 114, 0.45);
-        border-radius: var(--radius-m);
-        background: linear-gradient(180deg, rgba(40, 20, 15, 0.78), rgba(25, 13, 10, 0.84));
-        padding: 18px;
-      }
-
-      .warn h3 {
-        font-size: 20px;
-        color: #ffc2b2;
-        margin-bottom: 9px;
-      }
-
-      .warn pre {
-        margin: 12px 0 0;
-        padding: 12px;
-        border: 1px solid rgba(255, 142, 114, 0.35);
-        border-radius: var(--radius-s);
-        background: rgba(0, 0, 0, 0.25);
-        overflow-x: auto;
-        font-family: var(--font-mono);
-        font-size: 12px;
-        line-height: 1.7;
-      }
-
-      .schema-chips {
-        margin-top: 22px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-
-      .schema-chips a {
+      .docs-card {
+        padding: 22px;
+        border-radius: 24px;
         text-decoration: none;
-        border: 1px solid var(--line);
-        background: rgba(255, 255, 255, 0.02);
-        border-radius: 999px;
-        padding: 8px 12px;
-        font-family: var(--font-mono);
-        font-size: 12px;
-        color: #d0e7f2;
-      }
-
-      .schema-chips a:hover {
-        border-color: var(--aqua);
-      }
-
-      .shots-grid {
-        margin-top: 26px;
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 16px;
-      }
-
-      .shot {
-        border: 1px solid var(--line);
-        border-radius: var(--radius-m);
+        position: relative;
         overflow: hidden;
-        background: var(--bg-card);
+        transition:
+          transform 240ms ease,
+          border-color 240ms ease,
+          background 240ms ease;
       }
 
-      .shot img {
+      .docs-card::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, var(--gold), rgba(255, 193, 7, 0.2));
+        transform: scaleX(0);
+        transform-origin: left;
+        transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .docs-card:hover {
+        transform: translateY(-3px);
+        border-color: var(--line-strong);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04)),
+          var(--panel-strong);
+      }
+
+      .docs-card:hover::after {
+        transform: scaleX(1);
+      }
+
+      .docs-card strong {
         display: block;
-        width: 100%;
-        height: auto;
+        font-size: 18px;
       }
 
-      .shot figcaption {
-        padding: 12px 14px 13px;
-        color: var(--muted);
+      .docs-card p {
+        margin: 10px 0 0;
+        color: var(--text-soft);
         font-size: 14px;
       }
 
-      .agent-quick {
-        margin-top: 30px;
-        display: grid;
-        grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr);
+      .docs-card span {
+        display: inline-flex;
+        margin-top: 16px;
+        color: #ffe183;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      /* ─── Final CTA ─── */
+
+      .final-card {
+        padding: 28px;
+        border-radius: var(--radius-l);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
         gap: 24px;
-        align-items: start;
-      }
-
-      .agent-install {
-        border: 1px solid var(--line-strong);
-        border-radius: var(--radius-l);
-        padding: 24px;
-        background:
-          radial-gradient(circle at 88% 8%, rgba(52, 211, 216, 0.18), transparent 50%),
-          linear-gradient(160deg, rgba(17, 27, 34, 0.95), rgba(10, 17, 24, 0.95));
-        box-shadow: var(--shadow-soft);
-        display: flex;
-        flex-direction: column;
-        gap: 11px;
-      }
-
-      .agent-step {
-        display: inline-block;
-        margin-bottom: 2px;
-        font-family: var(--font-mono);
-        font-size: 11px;
-        letter-spacing: 0.11em;
-        text-transform: uppercase;
-        color: var(--gold);
-      }
-
-      .agent-install h3 {
-        font-size: 24px;
-        margin-bottom: 2px;
-      }
-
-      .agent-install p {
-        color: var(--muted);
-        margin: 0;
-        line-height: 1.44;
-      }
-
-      .agent-install pre {
-        margin: 2px 0 0;
-        padding: 14px 16px;
-        border-radius: 12px;
-        border: 1px solid var(--line);
-        background: rgba(4, 18, 26, 0.9);
-        overflow-x: auto;
-        font-family: var(--font-mono);
-        font-size: 13px;
-        line-height: 1.6;
-      }
-
-      .agent-note {
-        font-size: 13px;
-        margin-top: 2px;
-      }
-
-      .agent-prompt-single {
-        border: 1px solid var(--line);
-        border-radius: var(--radius-l);
-        padding: 24px;
-        background:
-          radial-gradient(circle at 10% 0%, rgba(249, 196, 107, 0.12), transparent 48%),
-          linear-gradient(160deg, rgba(13, 23, 30, 0.95), rgba(8, 15, 21, 0.95));
-        box-shadow: var(--shadow-soft);
-        display: flex;
-        flex-direction: column;
-        gap: 11px;
-      }
-
-      .agent-prompt-single h3 {
-        font-size: 24px;
-        margin-bottom: 2px;
-      }
-
-      .agent-prompt-single p {
-        color: var(--muted-strong);
-        margin: 0;
-        line-height: 1.44;
-      }
-
-      .agent-prompt-single code {
-        font-family: var(--font-mono);
-        font-size: 12px;
-        color: var(--aqua);
-      }
-
-      .agent-example-label {
-        margin: 4px 0 0;
-        font-family: var(--font-mono);
-        font-size: 11px;
-        letter-spacing: 0.11em;
-        text-transform: uppercase;
-        color: var(--gold);
-      }
-
-      .agent-prompt-single pre {
-        margin: 2px 0 0;
-        padding: 14px 16px;
-        border-radius: 12px;
-        border: 1px solid var(--line);
-        background: rgba(4, 18, 26, 0.86);
-        white-space: pre-wrap;
-        overflow-wrap: anywhere;
-        font-family: var(--font-mono);
-        font-size: 12px;
-        line-height: 1.65;
-      }
-
-      #agents .lead {
-        margin-top: 10px;
-        max-width: 68ch;
-      }
-
-      .cta-shell {
-        border: 1px solid var(--line);
-        border-radius: var(--radius-l);
-        padding: 34px;
-        background:
-          radial-gradient(circle at 80% 0%, rgba(249, 196, 107, 0.2), transparent 45%),
-          linear-gradient(180deg, rgba(14, 24, 31, 0.95), rgba(9, 16, 21, 0.95));
-      }
-
-      .cta-shell h2 {
-        margin-bottom: 12px;
-      }
-
-      .cta-actions {
-        margin-top: 22px;
-        display: flex;
         flex-wrap: wrap;
-        gap: 12px;
+        position: relative;
+        overflow: hidden;
       }
+
+      .final-card::before {
+        content: "";
+        position: absolute;
+        top: -50%;
+        right: -20%;
+        width: 400px;
+        height: 400px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 193, 7, 0.06), transparent 60%);
+        pointer-events: none;
+      }
+
+      .final-card:hover {
+        transform: none;
+      }
+
+      .final-card p {
+        margin: 10px 0 0;
+        max-width: 58ch;
+        color: var(--text-soft);
+      }
+
+      .final-actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      /* ─── Footer ─── */
 
       .footer {
-        border-top: 1px solid var(--line);
-        padding: 26px 0 40px;
+        padding: 18px 0 40px;
+        color: var(--text-faint);
+        font-size: 13px;
       }
 
       .footer-row {
+        padding-top: 18px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
         display: flex;
-        flex-wrap: wrap;
         align-items: center;
-        gap: 10px 16px;
-      }
-
-      .footer-left {
-        margin-right: auto;
-        display: inline-flex;
-        align-items: center;
-        gap: 9px;
-        color: var(--muted);
-      }
-
-      .footer-left img {
-        width: 24px;
-        height: 24px;
-        border-radius: 6px;
-        background: #ffffff;
-        padding: 3px;
-      }
-
-      .footer-links {
-        display: inline-flex;
+        justify-content: space-between;
+        gap: 16px;
         flex-wrap: wrap;
-        gap: 8px;
       }
 
-      .footer-links a {
-        font-family: var(--font-mono);
-        font-size: 12px;
-        color: var(--muted);
+      .footer-row a {
+        color: #ffe183;
         text-decoration: none;
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        padding: 6px 10px;
+        transition: color 200ms ease;
       }
 
-      .footer-links a:hover {
-        color: var(--text);
-        border-color: var(--line-strong);
+      .footer-row a:hover {
+        color: var(--gold);
       }
+
+      /* ─── Floating copy icon ─── */
+
+      .has-copy {
+        position: relative;
+      }
+
+      .cp {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(10, 5, 18, 0.7);
+        backdrop-filter: blur(8px);
+        color: var(--text-faint);
+        cursor: pointer;
+        opacity: 0;
+        transition:
+          opacity 180ms ease,
+          color 180ms ease,
+          background 180ms ease,
+          border-color 180ms ease;
+        z-index: 2;
+        padding: 0;
+        line-height: 1;
+      }
+
+      .cp svg {
+        width: 14px;
+        height: 14px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .has-copy:hover .cp,
+      .cp:focus-visible {
+        opacity: 1;
+      }
+
+      .cp:hover {
+        color: var(--text);
+        background: rgba(20, 12, 32, 0.9);
+        border-color: rgba(255, 255, 255, 0.16);
+      }
+
+      .cp.copied {
+        color: var(--teal);
+        opacity: 1;
+      }
+
+      /* ─── Scroll reveal ─── */
 
       .reveal {
         opacity: 0;
-        transform: translateY(22px);
-        transition: opacity 0.55s ease, transform 0.55s ease;
+        transform: translateY(18px);
       }
 
-      .reveal.is-visible {
-        opacity: 1;
-        transform: translateY(0);
+      .reveal.in-view {
+        animation: rise-in 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
       }
 
-      .stagger > * {
-        opacity: 0;
-        transform: translateY(16px);
-        animation: rise 0.55s ease forwards;
+      .reveal.in-view:nth-child(2) {
+        animation-delay: 80ms;
       }
 
-      .stagger > *:nth-child(1) {
-        animation-delay: 0.06s;
+      .reveal.in-view:nth-child(3) {
+        animation-delay: 160ms;
       }
 
-      .stagger > *:nth-child(2) {
-        animation-delay: 0.12s;
+      .reveal.in-view:nth-child(4) {
+        animation-delay: 240ms;
       }
 
-      .stagger > *:nth-child(3) {
-        animation-delay: 0.18s;
-      }
-
-      .stagger > *:nth-child(4) {
-        animation-delay: 0.24s;
-      }
-
-      @keyframes rise {
+      @keyframes rise-in {
+        from {
+          opacity: 0;
+          transform: translateY(18px);
+        }
         to {
           opacity: 1;
           transform: translateY(0);
         }
       }
 
-      :focus-visible {
-        outline: 2px solid var(--focus);
-        outline-offset: 2px;
+      /* ─── Section glow dividers ─── */
+
+      .section + .section {
+        position: relative;
       }
 
-      @media (max-width: 1060px) {
+      .section + .section::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(600px, 80%);
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(124, 77, 255, 0.2), rgba(255, 193, 7, 0.12), transparent);
+      }
+
+      /* ─── Responsive ─── */
+
+      @media (max-width: 1100px) {
         .hero-grid,
-        .split-cards,
-        .flow-grid,
-        .warn-grid,
-        .shots-grid,
-        .agent-quick {
+        .section-grid {
           grid-template-columns: 1fr;
         }
 
-        .agent-quick {
-          gap: 16px;
-        }
-
-        .agent-install,
-        .agent-prompt-single {
-          padding: 22px;
-        }
-
-        .features-grid {
+        .workflow-grid,
+        .docs-grid,
+        .panel-grid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
       }
 
       @media (max-width: 760px) {
-        .wrap {
-          width: min(1180px, 100% - 28px);
+        :root {
+          --wrap: min(100% - 24px, 1240px);
         }
 
-        .section {
-          padding: 72px 0;
+        .nav-row {
+          min-height: auto;
+          padding: 14px 0;
+          flex-wrap: wrap;
+        }
+
+        .brand {
+          width: 100%;
+        }
+
+        .nav-links {
+          width: 100%;
+          gap: 16px;
+          flex-wrap: wrap;
         }
 
         .hero {
-          padding: 64px 0 52px;
+          padding: 34px 0 26px;
         }
 
-        .features-grid {
+        h1 {
+          max-width: 11ch;
+          font-size: clamp(2.2rem, 9.6vw, 3.2rem);
+        }
+
+        .hero-logo {
+          width: min(176px, 54%);
+        }
+
+        .hero-glow {
+          width: 300px;
+          height: 300px;
+          top: -40px;
+          right: -60px;
+        }
+
+        .hero-panel,
+        .card,
+        .workflow-card,
+        .docs-card,
+        .final-card {
+          padding: 20px;
+        }
+
+        .video-container {
+          border-radius: var(--radius-s);
+        }
+
+        .workflow-grid,
+        .docs-grid,
+        .panel-grid {
           grid-template-columns: 1fr;
         }
 
-        .agent-install,
-        .agent-prompt-single {
-          padding: 18px;
-          gap: 9px;
+        .install-sheet-head,
+        .install-sheet-labels,
+        .install-sheet-body {
+          padding-left: 20px;
+          padding-right: 20px;
         }
 
-        .agent-install h3,
-        .agent-prompt-single h3 {
-          font-size: 22px;
+        .install-sheet-head {
+          padding-top: 20px;
+          padding-bottom: 16px;
+          align-items: start;
         }
 
-        .nav-cta {
-          margin-left: 0;
+        .install-sheet-labels {
+          display: none;
+        }
+
+        .install-sheet-row {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+
+        .sheet-subrow {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+
+        .sheet-subrow strong {
+          padding-top: 0;
+        }
+
+        .steps li {
+          grid-template-columns: 42px 1fr;
+          gap: 12px;
+        }
+
+        .section {
+          padding: 24px 0;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+
+        *,
+        *::before,
+        *::after {
+          animation: none !important;
+          transition: none !important;
+        }
+
+        .reveal {
+          opacity: 1;
+          transform: none;
         }
       }
     </style>
   </head>
   <body>
-    <a class="skip-link" href="#content">Skip to content</a>
+    <a class="skip-link" href="#main">Skip to content</a>
 
-    <header class="site-nav" role="banner">
+    <header class="site-nav">
       <div class="wrap nav-row">
-        <a href="#top" class="brand" aria-label="xyte-cli home">
-          <img src="./media/xyte-logo.jpg" alt="XYTE logo" />
-          <span class="brand-name">xyte-cli</span>
+        <a class="brand" href="#top" aria-label="xyte-cli home">
+          <span class="brand-mark">
+            <img class="brand-logo-nav" src="./media/xyte-ai-logo-white-color.svg" alt="XYTE AI" />
+          </span>
+          <span class="brand-copy">
+            <strong>CLI</strong>
+            <span>Operations for teams and AI agents</span>
+          </span>
         </a>
+
         <nav class="nav-links" aria-label="Primary">
-          <a href="#compare">Compare</a>
-          <a href="#capabilities">Capabilities</a>
-          <a href="#commands">Commands</a>
-          <a href="#contracts">Contracts</a>
+          <a href="#install">Install</a>
           <a href="#agents">Agents</a>
+          <a href="#workflow">Workflow</a>
+          <a href="#docs">Docs</a>
         </nav>
-        <a class="nav-cta" href="#start">Get Started</a>
+
+        <a class="nav-cta" href="https://www.npmjs.com/package/@xyteai/cli">Install from npm</a>
       </div>
     </header>
 
-    <main id="content">
+    <main id="main">
       <section class="hero">
+        <div class="hero-glow" aria-hidden="true"></div>
         <div class="wrap hero-grid">
-          <div class="stagger">
-            <p class="eyebrow">CLI + TUI + headless + MCP</p>
-            <h1>Operate Xyte fleets with <em>predictable CLI flows</em>.</h1>
-            <p class="hero-copy">
-              <code>xyte-cli</code> gives coding agents and operators one deterministic runtime for endpoint calls, guarded writes,
-              full-screen TUI operations, headless NDJSON snapshots, and schema-validated output contracts.
+          <div class="hero-copy reveal">
+            <img class="hero-logo" src="./media/xyte-ai-logo-white-color.svg" alt="XYTE AI" />
+            <p class="eyebrow">AI-powered orchestration in the terminal</p>
+            <h1>Operate Xyte with <span class="gradient-text">command-line clarity.</span></h1>
+            <p class="hero-lead">
+              <code>@xyteai/cli</code> exposes the real commands from install to tenant setup, fleet inspection,
+              console workflows, and exportable PDF or JSON handoff artifacts.
             </p>
+
             <div class="hero-actions">
-              <a class="btn btn-primary" href="#install">Install + setup</a>
-              <a class="btn btn-ghost" href="#commands">Command map</a>
+              <a class="btn btn-primary" href="#install">Start installation</a>
+              <a class="btn btn-secondary" href="https://github.com/xyte-io/xyte-cli">View on GitHub</a>
             </div>
-            <div class="hero-badges">
-              <span>Guarded mutations</span>
-              <span>Schema contracts</span>
-              <span>Agent-ready workflows</span>
+
+            <div class="hero-meta" aria-label="Quick facts">
+              <span>Node 22+</span>
+              <span>Read-first operator flows</span>
+              <span>CLI, JSON, and PDF outputs</span>
             </div>
           </div>
-          <article class="terminal-card reveal" aria-label="Quick terminal preview">
-            <div class="terminal-head">
-              <span class="dot dot-red" aria-hidden="true"></span>
-              <span class="dot dot-gold" aria-hidden="true"></span>
-              <span class="dot dot-aqua" aria-hidden="true"></span>
-              <span class="terminal-title">xyte-cli quickstart</span>
-            </div>
-            <pre class="terminal-body"><span class="term-cm"># install + verify</span>
-<span class="term-cmd">npm install -g @xyte/cli@latest</span>
-<span class="term-cmd">xyte-cli --help</span>
 
-<span class="term-cm"># setup readiness</span>
-<span class="term-cmd">xyte-cli setup status</span> <span class="term-flg">--tenant</span> <span class="term-val">acme</span> <span class="term-flg">--format</span> <span class="term-val">json</span>
-
-<span class="term-cm"># headless frame for agents</span>
-<span class="term-cmd">xyte-cli tui</span> <span class="term-flg">--headless --screen</span> <span class="term-val">dashboard</span> <span class="term-flg">--once</span> <span class="term-flg">--format</span> <span class="term-val">json</span></pre>
-          </article>
-        </div>
-      </section>
-
-      <section class="section reveal" id="compare" aria-labelledby="compare-title">
-        <div class="wrap">
-          <p class="eyebrow">Model fit</p>
-          <h2 id="compare-title">`xyte-cli` vs `xyte-cli mcp serve`</h2>
-          <p class="lead">
-            Both expose the same operational surface. The choice is execution model: command-driven loops for coding agents, or
-            tool transport for orchestration platforms.
-          </p>
-          <div class="split-cards">
-            <article class="card">
-              <h3>CLI mode</h3>
-              <p>
-                Best for low-token, deterministic command workflows where the agent shells out and controls flow explicitly.
-              </p>
-              <div class="chip-row">
-                <span class="chip">Fast command loops</span>
-                <span class="chip">Predictable stdout</span>
-                <span class="chip">Easy CI integration</span>
+          <aside class="hero-panel surface reveal" aria-label="CLI overview">
+            <div class="shell-top">
+              <div class="shell-title">
+                <span class="shell-dots" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </span>
+                <span>First-run path</span>
               </div>
-            </article>
-            <article class="card">
-              <h3>MCP mode</h3>
-              <p>
-                Best for tool-native runtimes that call `xyte-cli` capabilities over stdio through Model Context Protocol.
-              </p>
-              <div class="chip-row">
-                <span class="chip">Tool invocation</span>
-                <span class="chip">Orchestrator-friendly</span>
-                <span class="chip">Shared command contracts</span>
+              <span class="shell-tag">Install-first</span>
+            </div>
+
+            <div class="command-shell">
+              <pre id="hero-shell"><code><span class="prompt">$</span> npm install -g @xyteai/cli@latest
+<span class="prompt">$</span> xyte-cli init --no-setup
+<span class="prompt">$</span> xyte-cli setup run
+<span class="prompt">$</span> xyte-cli setup status --field tenantId
+<span class="comment"># inspect, watch, console, or generate report artifacts next</span></code></pre>
+            </div>
+
+            <div class="panel-grid">
+              <div class="panel-card">
+                <strong>Visible commands</strong>
+                <span>Every step is a real command you can copy and run. No hidden abstractions.</span>
               </div>
-            </article>
+              <div class="panel-card">
+                <strong>Read-first</strong>
+                <span>Inspect fleet state before changing anything. Watch incidents, then act.</span>
+              </div>
+              <div class="panel-card">
+                <strong>Agent-ready</strong>
+                <span>Built-in scaffolding for Codex, Claude, and Copilot agent workflows.</span>
+              </div>
+              <div class="panel-card">
+                <strong>Portable outputs</strong>
+                <span>Export fleet data as schema-backed JSON or formatted PDF reports.</span>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="video-showcase">
+        <div class="wrap" style="text-align:center">
+          <p class="eyebrow reveal">See it in action</p>
+          <div class="video-container surface reveal">
+            <iframe
+              src="https://www.youtube.com/embed/qVa6WMKKtxk"
+              title="Xyte CLI Demo"
+              loading="lazy"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen
+            ></iframe>
           </div>
         </div>
       </section>
 
-      <section class="section reveal" id="capabilities" aria-labelledby="cap-title">
+      <section class="section" id="install" aria-labelledby="install-title">
         <div class="wrap">
-          <p class="eyebrow">Core capabilities</p>
-          <h2 id="cap-title">Built for production operations</h2>
-          <div class="features-grid">
-            <article class="feature-card">
-              <h3>Skill bootstrap</h3>
-              <p>Install bundled skill docs for Claude, Copilot, and Codex from one command.</p>
-              <code>xyte-cli install --skills</code>
-            </article>
-            <article class="feature-card">
-              <h3>Provider + slot auth</h3>
-              <p>Named key slots per provider with add/use/update/rename/test/remove lifecycle.</p>
-              <code>xyte-cli auth key list --tenant acme --format json</code>
-            </article>
-            <article class="feature-card">
-              <h3>Full TUI</h3>
-              <p>Operational screens for setup, config, dashboard, spaces, devices, incidents, and tickets.</p>
-              <code>xyte-cli tui</code>
-            </article>
-            <article class="feature-card">
-              <h3>Headless NDJSON</h3>
-              <p>Machine-only snapshots for agent loops with schema-stable IDs.</p>
-              <code>xyte-cli tui --headless --screen dashboard --once --format json</code>
-            </article>
-            <article class="feature-card">
-              <h3>Guarded writes</h3>
-              <p>Write and destructive endpoints require explicit confirmation flags.</p>
-              <code>xyte-cli call ... --allow-write --confirm ...</code>
-            </article>
-            <article class="feature-card">
-              <h3>Deterministic reports</h3>
-              <p>Fleet inspect/deep-dive/report pipeline with versioned contract outputs.</p>
-              <code>xyte-cli report generate --tenant acme --input /tmp/deep.json --out /tmp/report.pdf</code>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="section reveal" id="install" aria-labelledby="install-title">
-        <div class="wrap">
-          <p class="eyebrow">Install + setup</p>
-          <h2 id="install-title">From zero to ready in one flow</h2>
-          <div class="flow-grid">
-            <article class="panel">
-              <h3>Global install</h3>
-              <p>Install package and verify command wiring.</p>
-              <pre><span class="term-cmd">npm install -g @xyte/cli@latest</span>
-<span class="term-cmd">xyte-cli --help</span>
-<span class="term-cmd">xyte-cli doctor install</span> <span class="term-flg">--format</span> <span class="term-val">json</span></pre>
-            </article>
-            <article class="panel">
-              <h3>Guided readiness</h3>
-              <p>Use guided setup or non-interactive setup in automation contexts.</p>
-              <pre><span class="term-cmd">xyte-cli setup run</span>
-
-<span class="term-cm"># CI/non-interactive</span>
-<span class="term-cmd">XYTE_CLI_KEY</span>=<span class="term-val">"&lt;your-key&gt;"</span> \
-<span class="term-cmd">xyte-cli setup run</span> <span class="term-flg">--non-interactive --tenant</span> <span class="term-val">acme</span></pre>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="section reveal" id="skills" aria-labelledby="skills-title">
-        <div class="wrap">
-          <p class="eyebrow">Skill install flow</p>
-          <h2 id="skills-title">Install skills where your agents live</h2>
-          <p class="lead">
-            The installer supports project/user scopes, agent targeting, forced overwrite, and setup skip. Non-interactive fallback defaults
-            to project scope and all agents.
-          </p>
-          <div class="flow-grid">
-            <article class="panel">
-              <h3>Interactive or targeted install</h3>
-              <pre><span class="term-cmd">xyte-cli install --skills</span>
-<span class="term-cmd">xyte-cli install --skills --scope project --agents claude,codex</span>
-<span class="term-cmd">xyte-cli install --skills --scope both --agents all --force</span></pre>
-            </article>
-            <article class="panel">
-              <h3>No-setup path</h3>
-              <pre><span class="term-cmd">xyte-cli install --skills --no-setup</span>
-<span class="term-cmd">xyte-cli install --skills --target /path/to/workspace</span></pre>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="section reveal" id="commands" aria-labelledby="commands-title">
-        <div class="wrap">
-          <p class="eyebrow">Command reference</p>
-          <h2 id="commands-title">High-signal command map</h2>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Area</th>
-                  <th>Example</th>
-                  <th>Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Core diagnostics</td>
-                  <td><code>xyte-cli config doctor --tenant acme --format json</code></td>
-                  <td>Readiness + connectivity checks.</td>
-                </tr>
-                <tr>
-                  <td>Tenant profile</td>
-                  <td><code>xyte-cli tenant add acme --name "Acme"</code></td>
-                  <td>Use <code>tenant use</code> and <code>tenant list</code> for profile management.</td>
-                </tr>
-                <tr>
-                  <td>Auth slots</td>
-                  <td><code>xyte-cli auth key add --tenant acme --provider xyte-org --name primary --key "&lt;value&gt;" --set-active</code></td>
-                  <td>Named slots per provider, with test/rotate support.</td>
-                </tr>
-                <tr>
-                  <td>Endpoint calls</td>
-                  <td><code>xyte-cli call organization.devices.getDevices --tenant acme --output-mode envelope</code></td>
-                  <td>Deterministic endpoint and envelope surface.</td>
-                </tr>
-                <tr>
-                  <td>Insights</td>
-                  <td><code>xyte-cli inspect deep-dive --tenant acme --window 24 --format json</code></td>
-                  <td>Feeds report generation pipeline.</td>
-                </tr>
-                <tr>
-                  <td>TUI / headless</td>
-                  <td><code>xyte-cli tui --headless --screen spaces --format json --follow --interval-ms 2000 --tenant acme</code></td>
-                  <td>Interactive screen parity with machine output mode.</td>
-                </tr>
-                <tr>
-                  <td>MCP server</td>
-                  <td><code>xyte-cli mcp serve</code></td>
-                  <td>Tool transport for MCP-compatible clients.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <section class="section reveal" id="guardrails" aria-labelledby="guardrails-title">
-        <div class="wrap">
-          <p class="eyebrow">Guarded writes</p>
-          <h2 id="guardrails-title">Mutations require explicit intent</h2>
-          <div class="warn-grid">
-            <article class="warn">
-              <h3>Write endpoint</h3>
-              <p class="muted">Non-read calls require <code>--allow-write</code>.</p>
-              <pre><span class="term-cmd">xyte-cli call organization.commands.sendCommand</span> \
-  <span class="term-flg">--tenant</span> <span class="term-val">acme</span> \
-  <span class="term-flg">--allow-write</span> \
-  <span class="term-flg">--path-json</span> <span class="term-val">'{"device_id":"DEVICE_ID"}'</span> \
-  <span class="term-flg">--body-json</span> <span class="term-val">'{"name":"reboot"}'</span></pre>
-            </article>
-            <article class="warn">
-              <h3>Destructive endpoint</h3>
-              <p class="muted">Delete-like behavior also requires endpoint confirmation token.</p>
-              <pre><span class="term-cmd">xyte-cli call organization.commands.cancelCommand</span> \
-  <span class="term-flg">--tenant</span> <span class="term-val">acme</span> \
-  <span class="term-flg">--allow-write</span> \
-  <span class="term-flg">--confirm</span> <span class="term-val">organization.commands.cancelCommand</span> \
-  <span class="term-flg">--path-json</span> <span class="term-val">'{"device_id":"DEVICE_ID","command_id":"COMMAND_ID"}'</span></pre>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="section reveal" id="contracts" aria-labelledby="contracts-title">
-        <div class="wrap">
-          <p class="eyebrow">Machine contracts</p>
-          <h2 id="contracts-title">Schema IDs and source files</h2>
-          <p class="lead">
-            Headless and workflow outputs are versioned with stable contract IDs. Validate them in CI before production automation loops.
-          </p>
-          <div class="schema-chips">
-            <a href="./schemas/headless-frame.v1.schema.json">xyte.headless.frame.v1</a>
-            <a href="./schemas/call-envelope.v1.schema.json">xyte.call.envelope.v1</a>
-            <a href="./schemas/inspect-fleet.v1.schema.json">xyte.inspect.fleet.v1</a>
-            <a href="./schemas/inspect-deep-dive.v1.schema.json">xyte.inspect.deep-dive.v1</a>
-            <a href="./schemas/report.v1.schema.json">xyte.report.v1</a>
-          </div>
-        </div>
-      </section>
-
-      <section class="section reveal" id="visuals" aria-labelledby="visuals-title">
-        <div class="wrap">
-          <p class="eyebrow">Visual demo</p>
-          <h2 id="visuals-title">Interactive TUI and headless output</h2>
-          <div class="shots-grid">
-            <figure class="shot">
-              <img src="./media/tui-dashboard-synthetic.png" alt="xyte-cli TUI dashboard with KPIs, incidents table, and ticket list" />
-              <figcaption>TUI dashboard for human operators.</figcaption>
-            </figure>
-            <figure class="shot">
-              <img src="./media/headless-frame-synthetic.png" alt="xyte-cli headless JSON frame output with schema and metadata fields" />
-              <figcaption>Headless frame for coding-agent loops.</figcaption>
-            </figure>
-          </div>
-        </div>
-      </section>
-
-      <section class="section reveal" id="agents" aria-labelledby="agents-title">
-        <div class="wrap">
-          <p class="eyebrow">Agent quick start</p>
-          <h2 id="agents-title">Install once, then prompt away</h2>
-          <p class="lead">Two steps only: install once, then use any coding agent and prompt it to run <code>xyte-cli</code> directly.</p>
-          <div class="agent-quick">
-            <article class="agent-install">
-              <span class="agent-step">Step 1</span>
-              <h3>Install skills once</h3>
-              <p>Run this once in the workspace where your agent will operate.</p>
-              <pre><span class="term-cmd">xyte-cli install --skills</span></pre>
-              <p class="agent-note">Done. No repeats needed.</p>
-            </article>
-
-            <article class="agent-prompt-single" aria-label="Step 2 prompt guidance">
-              <span class="agent-step">Step 2</span>
-              <h3>Use any agent and prompt away</h3>
-              <p>Open Claude, Codex, or GitHub Copilot and give it a direct task prompt that explicitly says to run <code>xyte-cli</code> commands.</p>
-              <p class="agent-example-label">Prompt example</p>
-              <pre><span class="term-cm">Inspect tenant acme and generate a report.</span>
-<span class="term-cm">Use xyte-cli commands directly and keep outputs JSON-first.</span></pre>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="section reveal" id="start" aria-labelledby="start-title">
-        <div class="wrap">
-          <div class="cta-shell">
-            <p class="eyebrow">Start now</p>
-            <h2 id="start-title">Deploy deterministic Xyte operations into your agent workflows.</h2>
-            <p class="lead">
-              Install the CLI, initialize skills, run setup once, and keep outputs JSON-first where possible for reliable automation.
+          <header class="section-head reveal">
+            <p class="eyebrow">Install</p>
+            <h2 id="install-title">Get running in three steps.</h2>
+            <p>
+              Install the package globally, initialize your workspace, connect a tenant key, and verify readiness.
+              Then move into fleet inspection, incident watch, or report generation.
             </p>
-            <div class="cta-actions">
+          </header>
+
+          <div class="install-flow reveal">
+            <article class="card surface">
+              <p class="card-label">Step 1 · Core install</p>
+              <div class="command-shell">
+                <pre id="install-snippet"><code>npm install -g @xyteai/cli@latest
+xyte-cli init --no-setup
+xyte-cli --version</code></pre>
+              </div>
+              <div class="action-row">
+                <button
+                  type="button"
+                  class="copy-btn"
+                  data-copy-target="install-snippet"
+                  data-copy-feedback="install-toast"
+                >
+                  Copy install commands
+                </button>
+                <a class="inline-link" href="https://www.npmjs.com/package/@xyteai/cli">Open npm package</a>
+                <span class="toast" id="install-toast" role="status" aria-live="polite"></span>
+              </div>
+            </article>
+
+            <article class="card surface">
+              <p class="card-label">Step 2 · Connect and verify</p>
+              <ol class="steps">
+                <li>
+                  <span class="step-index">01</span>
+                  <span class="step-copy">
+                    <strong>Connect the tenant key once</strong>
+                    <span>Run interactive setup once, or use the documented stdin flow for automation. Persisted credentials default to macOS Keychain, Windows DPAPI, or Linux Secret Service.</span>
+                    <span class="detail-code">xyte-cli setup run</span>
+                  </span>
+                </li>
+                <li>
+                  <span class="step-index">02</span>
+                  <span class="step-copy">
+                    <strong>Read readiness back out</strong>
+                    <span>Confirm the tenant is connected and capture the tenant ID for subsequent commands.</span>
+                    <span class="detail-code">xyte-cli setup status --field tenantId</span>
+                  </span>
+                </li>
+                <li>
+                  <span class="step-index">03</span>
+                  <span class="step-copy">
+                    <strong>Start with read-oriented workflows</strong>
+                    <span>Watch incidents, inspect devices, open console screens, or generate PDF reports.</span>
+                  </span>
+                </li>
+              </ol>
+            </article>
+
+            <article class="card surface">
+              <p class="card-label">Step 3 · Next commands</p>
+              <ul class="mini-list">
+                <li>
+                  <strong>Watch incidents once</strong>
+                  <span><code>xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-active --once</code></span>
+                </li>
+                <li>
+                  <strong>Export a deep-dive snapshot</strong>
+                  <span><code>xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json --out ./artifacts/deep-dive.json</code></span>
+                </li>
+                <li>
+                  <strong>Generate a report artifact</strong>
+                  <span><code>xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input ./artifacts/deep-dive.json --out ./reports/fleet-report.pdf</code></span>
+                </li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="agents" aria-labelledby="agents-title">
+        <div class="wrap">
+          <header class="section-head reveal">
+            <p class="eyebrow">Agents</p>
+            <h2 id="agents-title">First-class support for AI coding agents.</h2>
+            <p>
+              Drop a structured prompt into Codex, Claude, or Copilot. The CLI provides deterministic,
+              machine-readable outputs that agents can parse and act on.
+            </p>
+          </header>
+
+          <div class="section-grid reveal">
+            <article class="card surface">
+              <p class="card-label">Copyable prompt</p>
+              <div class="command-shell">
+                <pre id="agent-prompt"><code>Use @xyteai/cli in this workspace. Keep it concise and safe.
+
+Rules:
+- Never print secrets.
+- Do not invent IDs or outputs.
+
+Run:
+npm install -g @xyteai/cli@latest
+xyte-cli init --no-setup
+
+Then connect the tenant:
+xyte-cli setup run
+xyte-cli setup status --field tenantId
+
+Read tenantId from setup status and continue:
+xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-active --once --output json --strict-json
+xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json --out ./artifacts/deep-dive.json
+xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input ./artifacts/deep-dive.json --out ./reports/fleet-report.pdf</code></pre>
+              </div>
+              <div class="action-row">
+                <button
+                  type="button"
+                  class="copy-btn"
+                  data-copy-target="agent-prompt"
+                  data-copy-feedback="prompt-toast"
+                >
+                  Copy AI prompt
+                </button>
+                <a class="inline-link" href="./agents.md">Open agent guidance</a>
+                <span class="toast" id="prompt-toast" role="status" aria-live="polite"></span>
+              </div>
+            </article>
+
+            <article class="card surface">
+              <p class="card-label">Operator defaults</p>
+              <ul class="mini-list">
+                <li>
+                  <strong>Read-first by default</strong>
+                  <span>Human operators see readable terminal output. Agents add <code>--output json --strict-json</code> when they need machine-parseable results.</span>
+                </li>
+                <li>
+                  <strong>Strict JSON is opt-in</strong>
+                  <span>Machine output is enabled per command, not globally. The boundary between human and agent modes stays clear.</span>
+                </li>
+                <li>
+                  <strong>Copy-paste ready</strong>
+                  <span>One prompt covers install, setup, inspection, and reporting. Paste it into your agent and go.</span>
+                </li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="workflow" aria-labelledby="workflow-title">
+        <div class="wrap">
+          <header class="section-head reveal">
+            <p class="eyebrow">Workflow</p>
+            <h2 id="workflow-title">From install to fleet report in four steps.</h2>
+            <p>
+              Install the CLI, connect tenant context, inspect fleet state, and generate artifacts.
+              Each step feeds the next.
+            </p>
+          </header>
+
+          <div class="workflow-grid reveal">
+            <article class="workflow-card surface">
+              <span class="workflow-index">01</span>
+              <h3>Install and init</h3>
+              <p>Install from npm, then scaffold agent configs for Codex, Claude, and Copilot.</p>
+              <code>xyte-cli init --no-setup</code>
+            </article>
+            <article class="workflow-card surface">
+              <span class="workflow-index">02</span>
+              <h3>Connect tenant</h3>
+              <p>Provide your API key once. If native secure storage is unavailable, <code>auto</code> warns and falls back to file storage. Verify with <code>setup status</code> before running operational commands.</p>
+              <code>xyte-cli setup run</code>
+            </article>
+            <article class="workflow-card surface">
+              <span class="workflow-index">03</span>
+              <h3>Inspect fleet state</h3>
+              <p>Watch incidents, inspect devices, and browse console screens before making changes.</p>
+              <code>xyte-cli ops inspect fleet --output json</code>
+            </article>
+            <article class="workflow-card surface">
+              <span class="workflow-index">04</span>
+              <h3>Export artifacts</h3>
+              <p>Generate deep-dive JSON snapshots and PDF reports you can share or feed into other tools.</p>
+              <code>xyte-cli ops report generate ...</code>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="docs" aria-labelledby="docs-title">
+        <div class="wrap">
+          <header class="section-head reveal">
+            <p class="eyebrow">Docs and contracts</p>
+            <h2 id="docs-title">Reference and contracts.</h2>
+            <p>
+              Guides for first-run onboarding, full command reference, agent integration patterns,
+              flow authoring, and machine-readable JSON schemas.
+            </p>
+          </header>
+
+          <div class="docs-grid reveal">
+            <a class="docs-card surface" href="./getting-started.md">
+              <strong>Getting started</strong>
+              <p>First-run prerequisites, onboarding order, and the recommended setup sequence.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="docs-card surface" href="./commands.md">
+              <strong>Commands reference</strong>
+              <p>Exact command behavior, operator-facing examples, and the practical CLI surface area.</p>
+              <span>Open commands</span>
+            </a>
+            <a class="docs-card surface" href="./agents.md">
+              <strong>Agent guidance</strong>
+              <p>Patterns for using <code>xyte-cli</code> safely from Codex, Claude, or similar agent workflows.</p>
+              <span>Open agents</span>
+            </a>
+            <a class="docs-card surface" href="./flows/agent-ops.md">
+              <strong>Built-in flows</strong>
+              <p>Deterministic operational flow packs for incident response and repeated operator scenarios.</p>
+              <span>Open flows</span>
+            </a>
+            <a class="docs-card surface" href="./flows/custom-workflows.md">
+              <strong>Custom workflows</strong>
+              <p>Create, edit, share, and import reusable workflow definitions for your environment.</p>
+              <span>Open authoring</span>
+            </a>
+            <a class="docs-card surface" href="./schemas/flow-run.v1.schema.json">
+              <strong>Schema contracts</strong>
+              <p>Machine-readable JSON contracts in <code>docs/schemas</code> for validation and automation.</p>
+              <span>Open schemas</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="wrap">
+          <div class="final-card surface reveal">
+            <div>
+              <p class="eyebrow">Ready to run</p>
+              <h2>Start operating.</h2>
+              <p>
+                Install the CLI, connect your tenant, and run your first fleet inspection in under five minutes.
+              </p>
+            </div>
+            <div class="final-actions">
               <a class="btn btn-primary" href="#install">Install now</a>
-              <a class="btn btn-ghost" href="#commands">Review command map</a>
+              <a class="btn btn-secondary" href="https://github.com/xyte-io/xyte-cli">View repository</a>
             </div>
           </div>
         </div>
       </section>
     </main>
 
-    <footer class="footer" role="contentinfo">
+    <footer class="footer">
       <div class="wrap footer-row">
-        <div class="footer-left">
-          <img src="./media/xyte-logo.jpg" alt="" aria-hidden="true" />
-          <span>xyte-cli · deterministic fleet operations for humans and AI agents</span>
-        </div>
-        <div class="footer-links">
-          <a href="#top">Top</a>
-          <a href="./schemas/report.v1.schema.json">Schemas</a>
+        <span>xyte-cli · Xyte operations for humans and AI agents</span>
+        <span>
           <a href="https://github.com/xyte-io/xyte-cli">GitHub</a>
-          <a href="https://www.npmjs.com/package/@xyte/cli">@xyte/cli</a>
-        </div>
+          ·
+          <a href="https://www.npmjs.com/package/@xyteai/cli">npm</a>
+        </span>
       </div>
     </footer>
 
     <script>
-      (() => {
-        const revealed = document.querySelectorAll(".reveal");
-        if (!("IntersectionObserver" in window)) {
-          revealed.forEach((el) => el.classList.add("is-visible"));
-          return;
-        }
-        const observer = new IntersectionObserver(
-          (entries) => {
-            entries.forEach((entry) => {
-              if (entry.isIntersecting) {
-                entry.target.classList.add("is-visible");
-                observer.unobserve(entry.target);
-              }
+      (function () {
+        var clipSVG = '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+        var checkSVG = '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+
+        /* ── Floating copy icons on every code block ── */
+        function wireCopyIcons() {
+          var targets = document.querySelectorAll(".command-shell, .detail-code, .mini-list code");
+          targets.forEach(function (el) {
+            el.classList.add("has-copy");
+
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "cp";
+            btn.setAttribute("aria-label", "Copy to clipboard");
+            btn.innerHTML = clipSVG;
+            el.appendChild(btn);
+
+            btn.addEventListener("click", function (e) {
+              e.stopPropagation();
+              var text = (el.querySelector("pre") || el).innerText || "";
+              navigator.clipboard.writeText(text).then(function () {
+                btn.innerHTML = checkSVG;
+                btn.classList.add("copied");
+                setTimeout(function () {
+                  btn.innerHTML = clipSVG;
+                  btn.classList.remove("copied");
+                }, 1400);
+              });
             });
-          },
-          { threshold: 0.12, rootMargin: "0px 0px -32px 0px" }
-        );
-        revealed.forEach((el) => observer.observe(el));
+          });
+        }
+
+        /* ── Explicit copy buttons (step 1, agent prompt) ── */
+        function wireCopyButtons() {
+          document.querySelectorAll("[data-copy-target]").forEach(function (button) {
+            button.addEventListener("click", function () {
+              var target = document.getElementById(button.getAttribute("data-copy-target"));
+              var feedback = document.getElementById(button.getAttribute("data-copy-feedback"));
+              if (!target || !feedback) return;
+
+              navigator.clipboard.writeText(target.innerText || "").then(
+                function () { feedback.textContent = "Copied."; },
+                function () { feedback.textContent = "Copy failed."; }
+              );
+              setTimeout(function () { feedback.textContent = ""; }, 2200);
+            });
+          });
+        }
+
+        /* ── Scroll-triggered reveal ── */
+        function wireReveal() {
+          var els = document.querySelectorAll(".reveal");
+          if (!("IntersectionObserver" in window)) {
+            els.forEach(function (el) { el.classList.add("in-view"); });
+            return;
+          }
+
+          var observer = new IntersectionObserver(
+            function (entries) {
+              entries.forEach(function (entry) {
+                if (entry.isIntersecting) {
+                  entry.target.classList.add("in-view");
+                  observer.unobserve(entry.target);
+                }
+              });
+            },
+            { threshold: 0.12, rootMargin: "0px 0px -40px 0px" }
+          );
+          els.forEach(function (el) { observer.observe(el); });
+        }
+
+        wireCopyIcons();
+        wireCopyButtons();
+        wireReveal();
       })();
     </script>
   </body>

@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "xyte.flow.run.v1",
+  "generatedAtUtc": "<ISO_TIMESTAMP>",
+  "runId": "run-1",
+  "flowId": "flow.setup-readiness-10m",
+  "resolvedFlowId": "flow.setup-readiness-10m",
+  "mode": "plan",
+  "tenantId": "acme",
+  "bundleDir": "/tmp/flow-runs/flow.setup-readiness-10m/run-1",
+  "manifestPath": "/tmp/flow-runs/flow.setup-readiness-10m/run-1/manifest.json",
+  "inputsPath": "/tmp/flow-runs/flow.setup-readiness-10m/run-1/inputs.json",
+  "decisionsPath": "/tmp/flow-runs/flow.setup-readiness-10m/run-1/decisions.ndjson",
+  "errorsPath": "/tmp/flow-runs/flow.setup-readiness-10m/run-1/errors.ndjson",
+  "watchFramesPath": "/tmp/flow-runs/flow.setup-readiness-10m/run-1/watch-frames.ndjson",
+  "startedAtUtc": "<ISO_TIMESTAMP>",
+  "endedAtUtc": "<ISO_TIMESTAMP>",
+  "durationMs": 123,
+  "outcome": "pending_gate",
+  "nextResumeStepId": "gate_send_command",
+  "resumeCommand": "xyte-cli flow run flow.guided-remediation --tenant acme --apply --inspect-provider-scope auto --resume run-1",
+  "nextAction": {
+    "kind": "approve_gate",
+    "stepId": "gate_send_command",
+    "title": "Approve Send Command",
+    "requiresWrite": true,
+    "artifactPaths": [],
+    "command": "xyte-cli flow run flow.guided-remediation --tenant acme --apply --inspect-provider-scope auto --resume run-1"
+  },
+  "steps": [
+    {
+      "stepId": "watch_before",
+      "title": "Watch Before",
+      "kind": "task",
+      "command": "xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --strict-json > /tmp/xyte-watch.before.ndjson",
+      "status": "completed"
+    },
+    {
+      "stepId": "gate_send_command",
+      "title": "Approve Send Command",
+      "kind": "gate",
+      "command": "Human decision gate before sendCommand",
+      "status": "gate_pending"
+    }
+  ],
+  "decisions": {
+    "pending": 1,
+    "approved": 0,
+    "blocked": 0
+  },
+  "classifications": {
+    "needs_data": 0,
+    "bug": 0
+  },
+  "cursor": {
+    "nextStepIndex": 1,
+    "nextStepId": "gate_send_command"
+  }
+}

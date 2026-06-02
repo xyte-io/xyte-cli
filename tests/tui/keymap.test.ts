@@ -8,6 +8,10 @@ describe('tui keymaps', () => {
     expect(keys).toContain('←/→');
     expect(keys).toContain('↑/↓');
     expect(keys).toContain('Enter');
+    expect(keys).toContain('a');
+    expect(keys).toContain('f');
+    expect(keys).toContain('[ / ]');
+    expect(keys).toContain('p');
     expect(keys).toContain('u');
     expect(keys).toContain('g');
     expect(keys).toContain('d');
@@ -20,7 +24,7 @@ describe('tui keymaps', () => {
 
   it('defines workflow action shortcuts', () => {
     const actions = SCREEN_ACTION_KEYMAP.map((item) => item.keys);
-    expect(actions).toContain('Incidents: /');
-    expect(actions).toContain('Tickets: R or rr');
+    expect(actions).toContain('Incidents: a/f/[ ]/p/');
+    expect(actions).toContain('Tickets: a/f/R/rr/[ ]/p');
   });
 });

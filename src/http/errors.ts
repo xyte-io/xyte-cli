@@ -1,4 +1,4 @@
-export class XyteError extends Error {
+class XyteError extends Error {
   readonly code: string;
 
   constructor(message: string, code = 'XYTE_ERROR') {
@@ -13,6 +13,7 @@ export class XyteHttpError extends XyteError {
   readonly statusText: string;
   readonly endpointKey?: string;
   readonly details?: unknown;
+  readonly headers?: Record<string, string>;
 
   constructor(args: {
     message: string;
@@ -20,12 +21,14 @@ export class XyteHttpError extends XyteError {
     statusText: string;
     endpointKey?: string;
     details?: unknown;
+    headers?: Record<string, string>;
   }) {
     super(args.message, 'XYTE_HTTP_ERROR');
     this.status = args.status;
     this.statusText = args.statusText;
     this.endpointKey = args.endpointKey;
     this.details = args.details;
+    this.headers = args.headers;
   }
 }
 
