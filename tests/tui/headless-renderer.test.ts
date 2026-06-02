@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { runHeadlessRenderer, renderFrameAsText } from '../../src/tui/headless-renderer';
 import type { HeadlessFrame } from '../../src/tui/scene';
-import { MemoryKeychain } from '../../src/secure/keychain';
+import { MemorySecretStore } from '../../src/secure/secret-store';
 import { SCREEN_PANE_CONFIG } from '../../src/tui/panes';
 import type { TuiScreenId } from '../../src/tui/types';
 import { MemoryProfileStore } from '../support/memory-profile-store';
@@ -15,26 +15,27 @@ function parseRuntimeFrame(chunks: string[]): (HeadlessFrame & { meta?: Record<s
     .split('\n')
     .filter(Boolean)
     .map((line) => JSON.parse(line) as HeadlessFrame & { meta?: Record<string, unknown> });
-  return parsed.find((frame) => !((frame.meta as Record<string, unknown> | undefined)?.startup));
+  return parsed.find((frame) => !(frame.meta as Record<string, unknown> | undefined)?.startup);
 }
 
 async function makeReadyProfile() {
   const profileStore = new MemoryProfileStore();
-  const keychain = new MemoryKeychain();
-  await profileStore.upsertTenant({ id: 'acme' });
+  const secretStore = new MemorySecretStore();
+  await profileStore.upsertTenant({ id: 'acme', apiProvider: 'xyte-org' });
   await profileStore.setActiveTenant('acme');
-  const slot = await profileStore.addKeySlot('acme', {
-    provider: 'xyte-org',
+  const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+    
     name: 'primary',
     fingerprint: 'sha256:test'
   });
-  await keychain.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key');
-  return { profileStore, keychain };
+  await profileStore.setActiveKeySlot('acme', 'xyte-org', slot.slotId);
+  await secretStore.setSlotSecret('acme', 'xyte-org', slot.slotId, 'org-key');
+  return { profileStore, secretStore };
 }
 
 describe('headless renderer', () => {
   it('emits JSON frames with required schema', async () => {
-    const { profileStore, keychain } = await makeReadyProfile();
+    const { profileStore, secretStore } = await makeReadyProfile();
 
     const chunks: string[] = [];
     const output = {
@@ -61,7 +62,7 @@ describe('headless renderer', () => {
     await runHeadlessRenderer({
       client,
       profileStore,
-      keychain,
+      secretStore,
       screen: 'spaces',
       format: 'json',
       motionEnabled: false,
@@ -85,11 +86,22 @@ describe('headless renderer', () => {
     expect((runtimeFrame?.meta as any)?.navigationMode).toBe('pane-focus');
     expect((runtimeFrame?.meta as any)?.refreshState).toBeDefined();
     expect((runtimeFrame?.meta as any)?.tabId).toBe('spaces');
-    expect((runtimeFrame?.meta as any)?.tabOrder).toEqual(['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets']);
+    expect((runtimeFrame?.meta as any)?.tabOrder).toEqual([
+      'setup',
+      'config',
+      'dashboard',
+      'spaces',
+      'devices',
+      'incidents',
+      'tickets'
+    ]);
     expect((runtimeFrame?.meta as any)?.tabNavBoundary).toBeNull();
     expect((runtimeFrame?.meta as any)?.renderSafety).toBeDefined();
     expect((runtimeFrame?.meta as any)?.tableFormat).toBe('compact-v1');
     expect((runtimeFrame?.meta as any)?.contract?.frameVersion).toBe(HEADLESS_FRAME_SCHEMA_VERSION);
+    expect((runtimeFrame?.meta as any)?.actionsHint).toContain('interactive-only');
+    expect((runtimeFrame?.meta as any)?.headlessWrite).toBe(false);
+    expect((runtimeFrame?.meta as any)?.writePolicy).toBe('organization-only');
   });
 
   it('renders text frames with logo and panel sections', () => {
@@ -127,7 +139,7 @@ describe('headless renderer', () => {
 
   it('treats EPIPE as graceful termination', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     const output = {
       write: (_text: string) => {
         const error = new Error('pipe closed') as NodeJS.ErrnoException;
@@ -154,7 +166,7 @@ describe('headless renderer', () => {
       runHeadlessRenderer({
         client,
         profileStore,
-        keychain,
+        secretStore,
         screen: 'tickets',
         format: 'json',
         motionEnabled: false,
@@ -166,7 +178,7 @@ describe('headless renderer', () => {
 
   it('redirects blocked operational screen to setup when readiness is not complete', async () => {
     const profileStore = new MemoryProfileStore();
-    const keychain = new MemoryKeychain();
+    const secretStore = new MemorySecretStore();
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
 
@@ -196,7 +208,7 @@ describe('headless renderer', () => {
     await runHeadlessRenderer({
       client,
       profileStore,
-      keychain,
+      secretStore,
       screen: 'dashboard',
       format: 'json',
       motionEnabled: false,
@@ -211,7 +223,7 @@ describe('headless renderer', () => {
   });
 
   it('emits pane metadata for every screen in one-shot mode', async () => {
-    const { profileStore, keychain } = await makeReadyProfile();
+    const { profileStore, secretStore } = await makeReadyProfile();
     const screens: TuiScreenId[] = ['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets'];
 
     const client: any = {
@@ -241,7 +253,7 @@ describe('headless renderer', () => {
       await runHeadlessRenderer({
         client,
         profileStore,
-        keychain,
+        secretStore,
         screen,
         format: 'json',
         motionEnabled: false,
@@ -257,9 +269,18 @@ describe('headless renderer', () => {
       expect((runtimeFrame?.meta as any)?.activePane).toBe(SCREEN_PANE_CONFIG[screen].defaultPane);
       expect((runtimeFrame?.meta as any)?.availablePanes).toEqual(SCREEN_PANE_CONFIG[screen].panes);
       expect((runtimeFrame?.meta as any)?.tabId).toBe(screen);
-      expect((runtimeFrame?.meta as any)?.tabOrder).toEqual(['setup', 'config', 'dashboard', 'spaces', 'devices', 'incidents', 'tickets']);
+      expect((runtimeFrame?.meta as any)?.tabOrder).toEqual([
+        'setup',
+        'config',
+        'dashboard',
+        'spaces',
+        'devices',
+        'incidents',
+        'tickets'
+      ]);
       expect((runtimeFrame?.meta as any)?.renderSafety).toBeDefined();
       expect((runtimeFrame?.meta as any)?.tableFormat).toBe('compact-v1');
+      expect((runtimeFrame?.meta as any)?.headlessWrite).toBe(false);
     }
   });
 });

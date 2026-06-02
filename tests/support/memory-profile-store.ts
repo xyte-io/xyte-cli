@@ -5,6 +5,7 @@ import type {
   TenantKeyRegistry,
   TenantProfile
 } from '../../src/types/profile';
+import { SUPPORTED_SECRET_PROVIDERS } from '../../src/types/profile';
 import type { ProfileStore } from '../../src/secure/profile-store';
 import { buildSlotId, ensureSlotName, matchesSlotRef } from '../../src/secure/key-slots';
 
@@ -25,12 +26,17 @@ export class MemoryProfileStore implements ProfileStore {
     return structuredClone(this.data);
   }
 
+  async migrateIfNeeded(): Promise<void> {
+    // No-op for in-memory store.
+  }
+
   async listTenants(): Promise<TenantProfile[]> {
     return structuredClone(this.data.tenants);
   }
 
   async getTenant(tenantId: string): Promise<TenantProfile | undefined> {
-    return this.data.tenants.find((tenant) => tenant.id === tenantId);
+    const tenant = this.data.tenants.find((t) => t.id === tenantId);
+    return tenant ? structuredClone(tenant) : undefined;
   }
 
   async upsertTenant(input: {
@@ -38,6 +44,7 @@ export class MemoryProfileStore implements ProfileStore {
     name?: string;
     hubBaseUrl?: string;
     entryBaseUrl?: string;
+    apiProvider?: SecretProvider;
   }): Promise<TenantProfile> {
     const existing = this.data.tenants.find((tenant) => tenant.id === input.id);
     const now = new Date().toISOString();
@@ -46,6 +53,7 @@ export class MemoryProfileStore implements ProfileStore {
       existing.name = input.name ?? existing.name;
       existing.hubBaseUrl = input.hubBaseUrl ?? existing.hubBaseUrl;
       existing.entryBaseUrl = input.entryBaseUrl ?? existing.entryBaseUrl;
+      existing.apiProvider = input.apiProvider ?? existing.apiProvider;
       existing.keyRegistry = existing.keyRegistry ?? emptyRegistry();
       existing.updatedAt = now;
       return structuredClone(existing);
@@ -56,6 +64,7 @@ export class MemoryProfileStore implements ProfileStore {
       name: input.name ?? input.id,
       hubBaseUrl: input.hubBaseUrl,
       entryBaseUrl: input.entryBaseUrl,
+      apiProvider: input.apiProvider,
       keyRegistry: emptyRegistry(),
       createdAt: now,
       updatedAt: now
@@ -93,33 +102,37 @@ export class MemoryProfileStore implements ProfileStore {
     return structuredClone(provider ? slots.filter((slot) => slot.provider === provider) : slots);
   }
 
-  async addKeySlot(tenantId: string, input: { provider: SecretProvider; name: string; slotId?: string; fingerprint: string }): Promise<ApiKeySlotMeta> {
+  async addKeySlot(
+    tenantId: string,
+    provider: SecretProvider,
+    input: { name: string; slotId?: string; fingerprint: string }
+  ): Promise<ApiKeySlotMeta> {
     const tenant = this.getRequiredTenant(tenantId);
     tenant.keyRegistry = tenant.keyRegistry ?? emptyRegistry();
     const registry = tenant.keyRegistry;
     const now = new Date().toISOString();
     const slotName = ensureSlotName(input.name);
-    const providerSlots = registry.slots.filter((slot) => slot.provider === input.provider);
+    const providerSlots = registry.slots.filter((slot) => slot.provider === provider);
     if (providerSlots.some((slot) => slot.name.toLowerCase() === slotName.toLowerCase())) {
-      throw new Error(`A key slot named "${slotName}" already exists for provider ${input.provider}.`);
+      throw new Error(`A key slot named "${slotName}" already exists for provider ${provider}.`);
     }
 
     const existingIds = new Set(providerSlots.map((slot) => slot.slotId));
     const slotId = input.slotId?.trim() || buildSlotId(slotName, existingIds);
     if (existingIds.has(slotId)) {
-      throw new Error(`A key slot with id "${slotId}" already exists for provider ${input.provider}.`);
+      throw new Error(`A key slot with id "${slotId}" already exists for provider ${provider}.`);
     }
 
     const slot: ApiKeySlotMeta = {
       slotId,
-      provider: input.provider,
+      provider,
       name: slotName,
       fingerprint: input.fingerprint,
       createdAt: now,
       updatedAt: now
     };
     registry.slots.push(slot);
-    registry.activeSlotByProvider[input.provider] = registry.activeSlotByProvider[input.provider] ?? slotId;
+    registry.activeSlotByProvider[provider] = registry.activeSlotByProvider[provider] ?? slotId;
     tenant.updatedAt = now;
     return structuredClone(slot);
   }
@@ -177,6 +190,12 @@ export class MemoryProfileStore implements ProfileStore {
         delete registry.activeSlotByProvider[provider];
       }
     }
+    if (tenant.apiProvider === provider && !registry.slots.some((item) => item.provider === provider)) {
+      const configuredProviders = SUPPORTED_SECRET_PROVIDERS.filter((candidate) =>
+        registry.slots.some((item) => item.provider === candidate)
+      );
+      tenant.apiProvider = configuredProviders.length === 1 ? configuredProviders[0] : undefined;
+    }
     tenant.keyRegistry = registry;
     tenant.updatedAt = new Date().toISOString();
   }
@@ -204,6 +223,7 @@ export class MemoryProfileStore implements ProfileStore {
     }
 
     registry.activeSlotByProvider[provider] = slot.slotId;
+    tenant.apiProvider = provider;
     tenant.keyRegistry = registry;
     tenant.updatedAt = new Date().toISOString();
     return structuredClone(slot);

@@ -1,37 +1,13 @@
 import { XyteAuthError, XyteHttpError } from '../http/errors';
 import type { XyteClient } from '../types/client';
+import { errorMessage } from '../utils/error-format';
+import type { ConnectionErrorClass, ConnectionState, ConnectivityResult } from '../contracts/status';
 
-export type ConnectionErrorClass = 'auth' | 'missing_key' | 'network' | 'timeout' | 'rate_limit' | 'unknown';
+export type { ConnectionErrorClass, ConnectionState, ConnectivityResult };
 
-export type ConnectionState =
-  | 'connected'
-  | 'auth_required'
-  | 'missing_key'
-  | 'network_error'
-  | 'timeout'
-  | 'rate_limited'
-  | 'unknown_error'
-  | 'not_checked';
-
-export interface ConnectivityResult {
-  state: ConnectionState;
-  class?: ConnectionErrorClass;
-  message: string;
-  retriable: boolean;
-  endpointKey?: string;
-  statusCode?: number;
-}
-
-export interface ConnectivityProbeOptions {
+interface ConnectivityProbeOptions {
   client: XyteClient;
   tenantId?: string;
-}
-
-function errorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
 }
 
 function classToState(kind: ConnectionErrorClass): ConnectionState {
@@ -57,7 +33,7 @@ function isMissingKeyError(message: string): boolean {
   return /missing api key|requires .*api key|no active .*key/i.test(message);
 }
 
-export function isRetriableClass(kind: ConnectionErrorClass): boolean {
+function isRetriableClass(kind: ConnectionErrorClass): boolean {
   return !['auth', 'missing_key'].includes(kind);
 }
 
@@ -117,7 +93,10 @@ export function classifyConnectivityError(error: unknown): ConnectivityResult {
   }
 
   const maybeErrno = error as NodeJS.ErrnoException;
-  if (typeof maybeErrno?.code === 'string' && ['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT'].includes(maybeErrno.code)) {
+  if (
+    typeof maybeErrno?.code === 'string' &&
+    ['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT'].includes(maybeErrno.code)
+  ) {
     const kind: ConnectionErrorClass = maybeErrno.code === 'ETIMEDOUT' ? 'timeout' : 'network';
     return {
       state: classToState(kind),

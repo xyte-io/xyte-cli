@@ -1,10 +1,13 @@
 import blessed from 'blessed';
 
-import { movePaneWithBoundary, scrollBox } from '../navigation';
+import { handleHorizontalArrow, scrollBox } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
-import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
+import type { TuiArrowKey, TuiContext, NavigableScreen, TuiPaneId } from '../types';
 import { loadDashboardData } from '../data-loaders';
 import { sceneFromDashboardState } from '../scene';
+import { createRenderErrorTracker } from '../render-error-tracker';
+import { createScreenRenderLogger, logScreenDataFetch } from '../screen-render-logger';
+import { errorMessage } from '../../utils/error-format';
 
 function linesFromStats(stats: Array<{ label: string; value: string | number }> = []): string {
   return stats.map((item) => `${item.label}: ${item.value}`).join('\n');
@@ -17,7 +20,7 @@ function linesFromTableRows(rows: Array<Array<string | number>> = [], fallback: 
   return rows.map((row, index) => `${index + 1}. ${row[0]} | ${row[1]} | ${row[2]}`).join('\n');
 }
 
-export function createDashboardScreen(): TuiScreen {
+export function createDashboardScreen(): NavigableScreen {
   let root: blessed.Widgets.BoxElement | undefined;
   let kpis: blessed.Widgets.BoxElement | undefined;
   let incidentsBox: blessed.Widgets.BoxElement | undefined;
@@ -26,8 +29,11 @@ export function createDashboardScreen(): TuiScreen {
   let context: TuiContext;
   const paneConfig = SCREEN_PANE_CONFIG.dashboard;
   let activePane: TuiPaneId = paneConfig.defaultPane;
+  let isMounted = false;
+  const renderErrors = createRenderErrorTracker();
+  const renderLog = createScreenRenderLogger('dashboard', () => context.debugLog, renderErrors);
 
-  const focusActivePane = () => {
+  const focusPane = () => {
     if (activePane === 'kpi') {
       kpis?.focus();
       return;
@@ -48,6 +54,7 @@ export function createDashboardScreen(): TuiScreen {
     title: 'Dashboard',
     mount(parent, ctx) {
       context = ctx;
+      isMounted = true;
       root = blessed.box({
         parent,
         width: '100%-2',
@@ -115,40 +122,58 @@ export function createDashboardScreen(): TuiScreen {
       });
     },
     unmount() {
+      isMounted = false;
       root?.destroy();
       root = undefined;
     },
     async refresh() {
-      if (!root || !kpis || !incidentsBox || !ticketsBox || !providerBox) {
+      if (!isMounted || !root || !kpis || !incidentsBox || !ticketsBox || !providerBox) {
         return;
       }
 
       const tenantId = await context.getActiveTenantId();
-      const loaded = await loadDashboardData(context.client, tenantId);
-
-      const panels = sceneFromDashboardState({
-        tenantId,
-        devices: loaded.data.devices,
-        incidents: loaded.data.incidents,
-        tickets: loaded.data.tickets
+      logScreenDataFetch(context.debugLog, 'dashboard', 'start', { tenantId });
+      const loaded = await loadDashboardData(context.client, tenantId, {
+        profileStore: context.profileStore
       });
+      logScreenDataFetch(context.debugLog, 'dashboard', 'complete', { tenantId, connectionState: loaded.connectionState });
 
-      const kpiPanel = panels.find((panel) => panel.id === 'dashboard-kpis');
-      const providerPanel = panels.find((panel) => panel.id === 'dashboard-status');
-      const incidentPanel = panels.find((panel) => panel.id === 'dashboard-incidents');
-      const ticketPanel = panels.find((panel) => panel.id === 'dashboard-tickets');
+      renderLog.onRenderStart();
+      try {
+        const panels = sceneFromDashboardState({
+          tenantId,
+          devices: loaded.data.devices,
+          incidents: loaded.data.incidents,
+          tickets: loaded.data.tickets
+        });
 
-      kpis.setContent(linesFromStats(kpiPanel?.stats));
-      providerBox.setContent((providerPanel?.text?.lines ?? ['No provider state available.']).join('\n'));
-      incidentsBox.setContent(linesFromTableRows(incidentPanel?.table?.rows, 'No incidents available for this tenant.'));
-      ticketsBox.setContent(linesFromTableRows(ticketPanel?.table?.rows, 'No tickets available for this tenant.'));
+        const kpiPanel = panels.find((panel) => panel.id === 'dashboard-kpis');
+        const providerPanel = panels.find((panel) => panel.id === 'dashboard-status');
+        const incidentPanel = panels.find((panel) => panel.id === 'dashboard-incidents');
+        const ticketPanel = panels.find((panel) => panel.id === 'dashboard-tickets');
 
-      if (loaded.error) {
-        context.setStatus(`Dashboard ${loaded.connectionState}: ${loaded.error.message}`);
+        kpis.setContent(linesFromStats(kpiPanel?.stats));
+        providerBox.setContent((providerPanel?.text?.lines ?? ['No provider state available.']).join('\n'));
+        incidentsBox.setContent(
+          linesFromTableRows(incidentPanel?.table?.rows, 'No incidents available for this tenant.')
+        );
+        ticketsBox.setContent(linesFromTableRows(ticketPanel?.table?.rows, 'No tickets available for this tenant.'));
+
+        if (loaded.error) {
+          context.setStatus(`Dashboard ${loaded.connectionState}: ${loaded.error.message}`);
+        }
+
+        renderErrors.recordSuccess();
+        renderLog.onRenderComplete();
+      } catch (error) {
+        const message = errorMessage(error);
+        renderErrors.recordError(message);
+        renderLog.onRenderError(message);
+        kpis.setContent(`Dashboard render error: ${message}`);
       }
 
       context.screen.render();
-      focusActivePane();
+      focusPane();
     },
     getActivePane() {
       return activePane;
@@ -157,16 +182,12 @@ export function createDashboardScreen(): TuiScreen {
       return paneConfig.panes;
     },
     async handleArrow(key: TuiArrowKey) {
-      if (key === 'left' || key === 'right') {
-        const next = movePaneWithBoundary(paneConfig.panes, activePane, key);
-        if (next.boundary) {
-          return 'boundary';
-        }
-        activePane = next.pane;
-        focusActivePane();
+      const h = handleHorizontalArrow(key, paneConfig.panes, activePane, (newPane) => {
+        activePane = newPane;
+        focusPane();
         context.setStatus(`Pane: ${activePane}`);
-        return 'handled';
-      }
+      });
+      if (h !== null) return h;
 
       if (key === 'up' || key === 'down') {
         const delta = key === 'up' ? -1 : 1;
@@ -183,6 +204,9 @@ export function createDashboardScreen(): TuiScreen {
       }
 
       return 'unhandled';
+    },
+    focus() {
+      focusPane();
     }
   };
 }

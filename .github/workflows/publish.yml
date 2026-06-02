@@ -21,14 +21,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  meta:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Resolve tag
         id: meta
         shell: bash
@@ -52,12 +50,42 @@ jobs:
           echo "tag=${TAG}" >> "${GITHUB_OUTPUT}"
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
 
+  packaged-install-smoke:
+    needs: meta
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
       - name: Checkout tag
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch --force --tags origin
-          git checkout --detach "refs/tags/${{ steps.meta.outputs.tag }}"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: refs/tags/${{ needs.meta.outputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Secretless packaged install smoke
+        run: npm run smoke:pack-install
+
+  publish:
+    needs: [meta, packaged-install-smoke]
+    runs-on: ubuntu-latest
+    environment: ci
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: refs/tags/${{ needs.meta.outputs.tag }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -82,11 +110,22 @@ jobs:
         run: |
           set -euo pipefail
           PACKAGE_VERSION="$(node -p "require('./package.json').version")"
-          TAG_VERSION="${{ steps.meta.outputs.version }}"
+          TAG_VERSION="${{ needs.meta.outputs.version }}"
           if [[ "${PACKAGE_VERSION}" != "${TAG_VERSION}" ]]; then
             echo "::error::package.json version (${PACKAGE_VERSION}) does not match tag (${TAG_VERSION})."
             exit 1
           fi
 
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
       - name: Publish to npm
-        run: npm publish --access public
+        run: npm publish --access public --tag latest --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

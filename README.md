@@ -1,245 +1,320 @@
 # xyte-cli
 
-Xyte CLI with SKILLS, built for coding agents and operators.
+Deterministic Xyte operations for humans and AI agents.
 
-`xyte-cli` provides deterministic access to Xyte APIs, a full TUI (without a Network tab), guarded write flows, headless NDJSON snapshots, and an MCP server.
+- npm: [@xyteai/cli](https://www.npmjs.com/package/@xyteai/cli)
+- GitHub Page: [docs/index.html](./docs/index.html)
+- Command reference: [docs/commands.md](./docs/commands.md)
+- Flows: [docs/flows/agent-ops.md](./docs/flows/agent-ops.md)
+- Schemas: [docs/schemas](./docs/schemas)
 
-### xyte-cli vs xyte MCP
-
-- **CLI**: best fit for coding agents that need low-token, command-driven workflows.
-- **MCP**: available for tool-based integrations and external orchestration via `xyte-cli mcp serve`.
-
-### Key Features
-
-- One-command skill install flow: `xyte-cli install --skills`
-- Guided setup embedded into install flow (unless `--no-setup`)
-- Provider/slot key lifecycle (`add`, `use`, `update`, `rename`, `test`, `remove`)
-- Guarded endpoint writes (`--allow-write`) and deletes (`--confirm <endpoint-key>`)
-- Full TUI screens:
-  - `setup`, `config`, `dashboard`, `spaces`, `devices`, `incidents`, `tickets`
-- Provider-first Config screen with hotkeys:
-  - `a`, `e`, `u`, `t`, `x`, `n`, `c`, `r`
-- Headless JSON frames with stable contracts
-- Inspect/report pipelines with schema-versioned output
-
-## Requirements
-
-- Node.js 18+
-- A valid XYTE API key
-- Supported keychain backend:
-  - macOS Keychain
-  - Linux `secret-tool`
-  - test/runtime override: `XYTE_CLI_KEYCHAIN_BACKEND=memory`
-
-## Getting Started
-
-## Installation
-
-```bash
-npm install -g @xyte/cli@latest
-xyte-cli --help
-```
-
-### Install skills (recommended)
-
-```bash
-xyte-cli install --skills
-```
-
-By default, this command prompts for:
-- install scope: `project`, `user`, or `both`
-- agents: `all` or a subset of `claude,copilot,codex`
-
-Then it installs the same skill bundle to the selected destinations and runs guided setup in the same flow.
-
-When no prompt is available (CI/non-interactive), default is:
-- scope: `project`
-- agents: `all` (`claude`, `copilot`, `codex`)
-
-Path mapping:
-- Project scope:
-  - Claude: `.claude/skills/xyte-cli`
-  - Copilot: `.github/skills/xyte-cli`
-  - Codex: `.agents/skills/xyte-cli`
-- User scope:
-  - Claude: `~/.claude/skills/xyte-cli`
-  - Copilot: `~/.copilot/skills/xyte-cli`
-  - Codex: `~/.agents/skills/xyte-cli`
-
-Options:
-
-```bash
-xyte-cli install --skills --no-setup
-xyte-cli install --skills --target /path/to/workspace
-xyte-cli install --skills --scope project --agents claude,codex
-xyte-cli install --skills --scope both --agents all --force
-xyte-cli install --skills --force
-```
-
-### Non-interactive setup
-
-```bash
-XYTE_CLI_KEY="<your-key>" \
-xyte-cli setup run --non-interactive --tenant acme
-```
-
-### Skills-less operation
-
-Point your agent to `xyte-cli --help` and ask it to use CLI commands directly.
-
-Example prompt:
+## AI Agent Prompt (Copy/Paste)
 
 ```text
-Use xyte-cli to inspect tenant acme and generate a PDF report.
-Check xyte-cli --help first and keep outputs in JSON when possible.
+Use @xyteai/cli in this workspace. Keep it concise and safe.
+
+Rules:
+- Never print secrets.
+- Do not invent IDs or outputs.
+
+Run:
+npm install -g @xyteai/cli@latest
+xyte-cli --version
+xyte-cli init --no-setup
+
+Then connect the tenant:
+xyte-cli setup run
+xyte-cli setup status --field tenantId
+
+Read tenantId from setup status and continue:
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json
+xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json --out ./artifacts/deep-dive.json
+xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/deep-dive.json --out ./reports/fleet-report.pdf
+
+Finish with:
+- concise success/failure summary
+- exact failing command (if any)
 ```
 
-## Visual Demo
+---
 
-![XYTE TUI dashboard](docs/media/tui-dashboard-synthetic.png)
+## Install Flow
 
-![XYTE headless frame](docs/media/headless-frame-synthetic.png)
-
-## Commands
-
-### Core
+### 1) Install CLI
 
 ```bash
-xyte-cli install --skills [--target <path>] [--scope <project|user|both>] [--agents <all|claude|copilot|codex[,..]>] [--force] [--no-setup]
-xyte-cli doctor install --format json
-xyte-cli setup status --tenant <tenant-id> --format json
-xyte-cli setup run [--non-interactive] [--tenant <tenant-id>] [--key <value>]
-xyte-cli config doctor --tenant <tenant-id> --format json
+npm install -g @xyteai/cli@latest
+xyte-cli --version
 ```
 
-### Tenant + Auth Slots
+If your global npm bin is not on `PATH`, replace `xyte-cli` in the commands below with one of these published-package fallbacks:
 
 ```bash
-xyte-cli tenant add <tenant-id> --name "Acme"
-xyte-cli tenant use <tenant-id>
-xyte-cli tenant list
-
-xyte-cli auth key add --tenant <tenant-id> --provider xyte-org --name primary --key "<value>" --set-active
-xyte-cli auth key list --tenant <tenant-id> --format json
-xyte-cli auth key use --tenant <tenant-id> --provider xyte-org --slot primary
-xyte-cli auth key update --tenant <tenant-id> --provider xyte-org --slot primary --key "<value>"
-xyte-cli auth key rename --tenant <tenant-id> --provider xyte-org --slot primary --name prod-primary
-xyte-cli auth key test --tenant <tenant-id> --provider xyte-org --slot prod-primary
-xyte-cli auth key remove --tenant <tenant-id> --provider xyte-org --slot prod-primary --confirm
+npx @xyteai/cli@latest <command>
+npm exec -- @xyteai/cli@latest <command>
 ```
 
-### Endpoint Operations
+### 2) Install agent skills
 
 ```bash
-xyte-cli list-endpoints
-xyte-cli describe-endpoint organization.devices.getDevices
-xyte-cli call organization.devices.getDevices --tenant <tenant-id>
-xyte-cli call organization.devices.getDevices --tenant <tenant-id> --output-mode envelope
+xyte-cli init --no-setup
 ```
 
-### Guarded Writes
+### 3) Connect with tenant-bound API key
 
 ```bash
-xyte-cli call organization.commands.sendCommand \
+xyte-cli setup run
+xyte-cli setup status --field tenantId
+```
+
+Use that value as `<tenant-id>` in the examples below. Persisted credentials default to secure OS-native storage: macOS Keychain, Windows DPAPI, Linux Secret Service. If native storage is unavailable, `xyte-cli` warns and falls back to file storage. For non-interactive automation and backend details, use the setup guidance in [`docs/getting-started.md`](./docs/getting-started.md).
+
+---
+
+## Examples (Feature Catalog)
+
+### 1) Endpoint discovery
+
+```bash
+xyte-cli api endpoints list
+xyte-cli api endpoints describe organization.devices.getDevices
+```
+
+Key params:
+- `api endpoints describe <endpoint-key>`
+
+### 2) Read endpoint call (safe)
+
+```bash
+xyte-cli api call organization.devices.getDevices --tenant <tenant-id>
+```
+
+Key params:
+- `--tenant <tenant-id>`
+- `--output-mode envelope` for contract output
+- `--strict-json` for machine parsing
+
+### 3) Incident watch (active incidents)
+
+```bash
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once
+xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 10
+```
+
+Key params:
+- terminal output is human-readable by default; add `--output json --strict-json` for machine parsing
+- `--once` one snapshot poll and exit
+- `--interval-ms` minimum `1000`
+- `--max-polls` bounded polling
+
+### 4) Flow discovery and guided remediation
+
+```bash
+xyte-cli flow list --format text
+xyte-cli flow run flow.guided-remediation --tenant <tenant-id> --var incident_id=<incident-id> --var device_id=<device-id> --var command=reboot --var updated_device_name=<device-name>
+```
+
+Key params:
+- `flow run` defaults to plan mode
+- `--var key=value` for runtime context
+- non-completed runs include `nextAction` with the safest next operator command
+- gate continuation is `--apply --resume <run-id-or-path>`
+
+### 5) Tenant and key slots
+
+```bash
+xyte-cli config tenant add <tenant-id> --name "Acme"
+xyte-cli config tenant use <tenant-id>
+xyte-cli config key add --tenant <tenant-id> --provider xyte-org --name primary --key-file ~/.config/xyte/acme.key --set-active
+xyte-cli config key list --tenant <tenant-id> --output json
+xyte-cli config tenant remove <tenant-id> --confirm
+```
+
+Key params:
+- `config tenant remove` requires `--confirm`
+- prefer `--key-file`, `--key-stdin`, or `--key-command` over inline keys
+- pass `--provider xyte-org|xyte-partner` when you need deterministic routing
+
+### 6) Write example
+
+Primary read/setup/reporting workflows are shell-neutral. Advanced raw API examples like this one remain shell-specific because inline JSON quoting differs across PowerShell, CMD, Bash, and zsh.
+
+```bash
+xyte-cli api call organization.commands.sendCommand \
   --tenant <tenant-id> \
-  --allow-write \
-  --path-json '{"device_id":"DEVICE_ID"}' \
-  --body-json '{"name":"reboot"}'
+  --path-json '{"device_id":"<device-id>"}' \
+  --body-json '{"command":"reboot"}'
+```
 
-xyte-cli call organization.commands.cancelCommand \
+Behavior:
+- executes directly once you choose the write step
+
+### 7) Fleet insights and deep-dive data
+
+```bash
+xyte-cli ops inspect fleet --tenant <tenant-id> --provider-scope auto --output json
+xyte-cli ops inspect deep-dive --tenant <tenant-id> --provider-scope auto --window 24 --output json --out ./artifacts/deep-dive.json
+```
+
+Key params:
+- `--provider-scope organization|partner|auto`
+- `--window <hours>` for deep-dive
+- `--output json` for pipelines
+
+### 8) Generate report artifacts
+
+```bash
+xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/deep-dive.json --render pdf --out ./reports/fleet-report.pdf
+xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/deep-dive.json --render markdown --out ./reports/fleet-report.md
+```
+
+Key params:
+- `--input` deep-dive JSON
+- `--render markdown|pdf` for artifact format
+- `--output text|json` controls stdout, not report rendering
+
+### 9) Headless console snapshots (for agents/automation)
+
+```bash
+xyte-cli ops console --headless --screen dashboard --once --tenant <tenant-id> --output json
+xyte-cli ops console --headless --screen spaces --follow --interval-ms 2000 --tenant <tenant-id> --output json
+```
+
+Key params:
+- `--screen dashboard|spaces|...`
+- `--once` snapshot mode
+- `--follow` stream mode
+
+### 10) Utility preprocessing + executable workflows
+
+```bash
+xyte-cli util list-actions --output text --mode friendly
+xyte-cli util list-actions --output text --execution-support edge.claim-batch
+
+xyte-cli util prepare \
+  --action space.import-tree \
+  --input ./raw-hierarchy.xlsx \
+  --output-dir ./prepared
+
+xyte-cli util prepare \
+  --action organization.connectors.prepareSetup \
+  --input ./raw-connectors.csv \
+  --output-dir ./prepared
+
+xyte-cli util prepare \
+  --action organization.teamAccess.groups \
+  --input ./raw-team.csv \
+  --output-dir ./prepared
+
+xyte-cli util prepare \
+  --action organization.teamAccess.users \
+  --input ./raw-team.csv \
+  --output-dir ./prepared
+
+xyte-cli util prepare \
+  --action organization.teamAccess.memberships \
+  --input ./raw-team.csv \
+  --output-dir ./prepared
+
+xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv
+xyte-cli util import-tree --tenant <tenant-id> --input ./prepared/space-import-tree.csv --apply --report ./reports/space-import.apply.ndjson
+
+xyte-cli util match \
+  --source ./source-devices.json --target ./target-spaces.json \
+  --source-field name --target-field name \
+  --out ./device-moves.csv
+
+xyte-cli util move-devices --tenant <tenant-id> --input ./device-moves.csv
+xyte-cli util move-devices --tenant <tenant-id> --input ./device-moves.csv --apply --report ./reports/device-moves.apply.ndjson
+```
+
+Key params:
+- `util prepare --action ... --input ... --output-dir ...`
+- `util import-tree` and `util move-devices` are dry-run unless `--apply`
+- dry-runs count validated rows under `totals.planned`; `totals.succeeded` is for apply mode
+- generated `.notes.md` files are the human review artifact for prepared data
+- connector and team-access prepare actions are prepare-only normalization utilities
+- `--report` writes an NDJSON row report
+
+### 11) Claim devices
+
+Use [`docs/claim-devices.md`](./docs/claim-devices.md) first when the claim path is not explicit. Native/direct, Edge, and C2C are different flows.
+
+```bash
+# Native / direct claim
+xyte-cli api call organization.devices.claimDevice \
   --tenant <tenant-id> \
-  --allow-write \
-  --confirm organization.commands.cancelCommand \
-  --path-json '{"device_id":"DEVICE_ID","command_id":"COMMAND_ID"}'
+  --body-json '{"name":"<name>","space_id":<space-id>,"sn":"<sn>","mac":"<mac>","cloud_id":"<cloud-id>"}'
+
+# Single Edge claim, plan first
+xyte-cli edge claim \
+  --tenant <tenant-id> \
+  --proxy-id <proxy-id> \
+  --device-ip <device-ip> \
+  --device-model-id <device-model-id> \
+  --space-id <space-id> \
+  --plan
+
+# Bulk Edge claim, plan first
+xyte-cli util prepare --action organization.edge.startClaim --input ./edge-devices.xlsx --output-dir ./prepared
+xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --plan
+xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --apply --report ./reports/edge-claim.apply.ndjson --resume-artifact ./reports/edge-claim.resume.ndjson
 ```
 
-### Insights + Reports
+Key params:
+- `edge claim`, `edge claim-batch`, and `edge ping` are mutating; run `--plan` first
+- blank or `skip_connectivity_check=false` batch rows run a pre-claim ping before `startClaim`
+- `skip_connectivity_check=true` rows skip that batch-owned ping
+- C2C claiming is not exposed through the public API; use the End Customer Portal
+
+### 12) Edge diagnostics
 
 ```bash
-xyte-cli inspect fleet --tenant <tenant-id> --format json
-xyte-cli inspect deep-dive --tenant <tenant-id> --window 24 --format json > /tmp/deep-dive.json
-xyte-cli report generate --tenant <tenant-id> --input /tmp/deep-dive.json --out /tmp/xyte-report.pdf
+xyte-cli edge claim-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip>
+xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --plan
+xyte-cli edge ping-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip>
 ```
 
-### TUI + Headless
+Key params:
+- `edge claim-status` and `edge ping-status` are read-only
+- `edge ping` is a standalone diagnostic command
+- batch claim owns its own pre-claim ping for rows that require connectivity verification
+
+### 13) Upgrade flow
 
 ```bash
-xyte-cli tui
-xyte-cli tui --headless --screen dashboard --format json --once --tenant <tenant-id>
-xyte-cli tui --headless --screen spaces --format json --follow --interval-ms 2000 --tenant <tenant-id>
+xyte-cli upgrade --check --output json
+xyte-cli upgrade --yes --output json
 ```
 
-### MCP
+Key params:
+- `--check` dry check
+- `--yes` non-interactive upgrade
+
+### 14) Action logs and diagnostics
 
 ```bash
-xyte-cli mcp serve
+xyte-cli --log-actions --log-actions-path ./logs/xyte-cli.actions.ndjson status --tenant <tenant-id>
+xyte-cli logs list --path ./logs/xyte-cli.actions.ndjson --limit 200
+xyte-cli logs list --path ./logs/xyte-cli.actions.ndjson --session-id <session-id> --output json
+xyte-cli logs show --path ./logs/xyte-cli.actions.ndjson --entry <sessionId>:<seq> --output json
+xyte-cli logs show --path ./logs/xyte-cli.actions.ndjson --request-id <request-id> --output json
+xyte-cli logs stats --path ./logs/xyte-cli.actions.ndjson
 ```
 
-## Headless Contract IDs
+Key params:
+- `--log-actions` lifecycle NDJSON
+- `logs list --session-id` narrows a run
+- `logs show --entry` and `logs show --request-id` are exact non-interactive lookups
 
-- `xyte.headless.frame.v1`
-- `xyte.call.envelope.v1`
-- `xyte.inspect.fleet.v1`
-- `xyte.inspect.deep-dive.v1`
-- `xyte.report.v1`
+---
 
-Schemas:
+## Deep Docs
 
-- `docs/schemas/headless-frame.v1.schema.json`
-- `docs/schemas/call-envelope.v1.schema.json`
-- `docs/schemas/inspect-fleet.v1.schema.json`
-- `docs/schemas/inspect-deep-dive.v1.schema.json`
-- `docs/schemas/report.v1.schema.json`
-
-## Agent Quick Start
-
-### Claude
-
-```bash
-xyte-cli install --skills
-claude
-```
-
-### Codex
-
-```bash
-xyte-cli install --skills
-# in Codex prompts, ask to run xyte-cli commands directly
-```
-
-### GitHub Copilot
-
-```bash
-xyte-cli install --skills
-# in Copilot prompts, ask to run xyte-cli commands directly
-```
-
-## Development
-
-```bash
-npm ci
-npm run typecheck
-npm test
-npm run build
-npm pack
-```
-
-Local package smoke:
-
-```bash
-npm i -g ./xyte-cli-*.tgz
-xyte-cli install --skills --no-setup
-```
-
-## Release
-
-Manual npm release steps are documented in:
-
-- `docs/release.md`
-
-## Skill Package Layout
-
-- `skills/xyte-cli/SKILL.md`
-- `skills/xyte-cli/references/`
-- `skills/xyte-cli/scripts/`
-- `skills/xyte-cli/agents/`
+- [Getting started](./docs/getting-started.md)
+- [Commands reference](./docs/commands.md)
+- [Claim devices](./docs/claim-devices.md)
+- [Utility preprocessing](./docs/ai-utility-preprocessing.md)
+- [Agent guidance](./docs/agents.md)
+- [Flow authoring](./docs/flows/custom-workflows.md)
+- [Schema contracts](./docs/schemas)

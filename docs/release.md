@@ -1,58 +1,92 @@
 # Release Guide
 
-This project is prepared for manual npm publishing of `@xyte/cli`.
+## Node.js versions and CI support
 
-## Prerequisites
+This project targets **Node.js 22** as its primary runtime environment.
 
-- npm account has publish rights for the `@xyte` scope.
-- Scope visibility is set so public packages are allowed.
-- You are logged in: `npm whoami`.
+- The `engines` field in `package.json` requires **Node.js >=22**.
+- Our CI workflow currently runs the test suite on **Node.js 22.x** only.
+- Earlier Node.js releases, including **Node 18**, are no longer supported.
 
-## Manual Release Steps
+This repository ships one npm package: `@xyteai/cli`.
 
-1. Install dependencies:
-   - `npm ci`
-2. Verify types:
-   - `npm run typecheck`
-3. Run tests:
-   - `npm test`
-4. Validate package contents:
-   - `npm pack --dry-run`
-5. Bump version in `/Users/porton/Projects/xyte-cli/package.json` (and lockfile if needed).
-6. Publish:
-   - `npm publish`
+## Governance
 
-`publishConfig.access=public` is already configured, so first publish for the scoped package will be public.
+- Versioning and release notes live in `CHANGELOG.md`.
+- Security handling policy lives in `SECURITY.md`.
+- JSON contracts in `docs/schemas/*.schema.json` are treated as the automation compatibility boundary.
 
-## Helper Script
+## CI Gates
 
-Use the repo script when delegating deploy actions:
+`.github/workflows/ci.yml` runs on pushes and pull requests:
 
-- `npm run release:publish:cli` - publish only `@xyte/cli`
-- `npm run release:publish:pages` - trigger GitHub Pages workflow only
-- `npm run release:publish` - publish npm package, then trigger GitHub Pages workflow
+- matrix validation on `ubuntu-latest`, `macos-latest`, and `windows-latest`, Node `22`
+- `npm ci`
+- `npm run typecheck`
+- `npm test`
+- `npm run build`
+- packaged-install smoke from the built tarball (`npm run smoke:pack-install`)
+- Windows native secret-store certification (`windows-native-secret-store-cert`)
+- Linux native secret-store certification (`linux-native-secret-store-cert`)
+- separate security job: `npm audit --audit-level=high`
+- controlled upgrade smoke job: `npm run smoke:upgrade:controlled` on `ubuntu-latest`
 
-## GitHub Actions Publish (Recommended)
+Recommended branch protection:
 
-`/Users/porton/Projects/xyte-cli/.github/workflows/publish.yml` publishes `@xyte/cli` using npm trusted publishing (OIDC provenance).
+- require `CI / validate`
+- require `CI / packaged-install-smoke`
+- require `CI / security`
+- require `CI / upgrade-controlled-smoke`
+- require up-to-date branch before merge
 
-One-time npm setup (admin):
+## Local Pre-Release Check
 
-1. In npm package settings for `@xyte/cli`, configure a Trusted Publisher:
-   - Provider: GitHub Actions
-   - Repository: `xyte-io/xyte-cli`
-   - Workflow file: `.github/workflows/publish.yml`
+Run the full local gate:
 
-Run a release:
+```bash
+npm run release:check
+```
 
-1. Ensure `package.json` version matches the release tag.
-2. Push a semver tag (`0.1.0` or `v0.1.0`) OR run workflow `Publish CLI` manually with `tag` input.
-3. The workflow validates tag/version match, runs install/build checks, and publishes to npm.
-4. The workflow pins publish runtime to Node `22` and npm `11.5.1`.
+This script runs install, typecheck, tests, build, packaged-install smoke, audit, and optional external smoke (`XYTE_CLI_KEY` required).
+
+## Publish Workflow
+
+`.github/workflows/publish.yml` publishes to npm on semver tags (`vX.Y.Z` or `X.Y.Z`) or manual dispatch.
+
+Workflow gates:
+
+1. Resolve and validate semver tag.
+2. Checkout the exact tag commit.
+3. Validate `package.json` version matches tag version.
+4. Run `typecheck`, `test`, `build`, and the same packaged-install smoke used in CI.
+5. Publish to npm with provenance on Node `22` + npm `11.5.1`.
+
+Prerequisites:
+
+- npm package publish rights for `@xyteai/cli`.
+- `NPM_TOKEN` configured in repository/environment secrets.
+
+## Release Assets Workflow
+
+`.github/workflows/release-assets.yml` runs on the same tags (or manually) and attaches release artifacts to GitHub Releases:
+
+- the same packaged-install smoke validates the tarball before attach/upload steps
+- built npm tarball (`*.tgz`)
+- CycloneDX SBOM (`sbom.cdx.json`)
+- SHA-256 checksums (`checksums.txt`)
+
+## Manual Emergency Publish
+
+If GitHub Actions is unavailable:
+
+1. `npm run release:check`
+2. Bump `package.json` version and update `CHANGELOG.md`.
+3. `npm publish --access public --provenance`
+4. Backfill release assets with `release-assets.yml` once actions are restored.
 
 ## Rollback / Recovery
 
-- If a bad version is published, prefer a fast patch release with a bumped patch version.
-- To warn users away from a bad version, deprecate it:
-  - `npm deprecate @xyte/cli@<bad-version> "<message>"`
-- Avoid unpublish except where npm policy allows and only when absolutely necessary.
+- Prefer a fast patch release with a bumped patch version.
+- Deprecate bad versions instead of unpublish:
+  - `npm deprecate @xyteai/cli@<bad-version> "<message>"`
+- Avoid unpublish except where npm policy allows.

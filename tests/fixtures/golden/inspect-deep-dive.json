@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "xyte.inspect.deep-dive.v1",
+  "generatedAtUtc": "2026-02-25T00:00:00.000Z",
+  "tenantId": "acme",
+  "windowHours": 24,
+  "overviewMetrics": {
+    "totalDevices": 2,
+    "offlineDevices": 1,
+    "offlinePct": 50,
+    "totalIncidents": 1,
+    "activeIncidents": 1,
+    "activeIncidentPct": 100,
+    "totalTickets": 1,
+    "openTickets": 1,
+    "statusMismatches": 0
+  },
+  "summary": [
+    "Devices: 2 total, 1 offline (50%).",
+    "Incidents: 1 total, 1 active (100%).",
+    "Tickets: 1 total, 1 open.",
+    "24h churn: 0 incidents across 0 devices and 0 spaces.",
+    "Data quality: 0 status mismatches detected."
+  ],
+  "topOfflineSpaces": [
+    {
+      "space": "Overview/A",
+      "offlineDevices": 1,
+      "shareOfOfflinePct": 100
+    }
+  ],
+  "topIncidentDevices": [
+    {
+      "device": "Device One",
+      "incidentCount": 1,
+      "activeIncidents": 1
+    }
+  ],
+  "activeIncidentAging": [
+    {
+      "device": "Device One",
+      "space": "Overview/A",
+      "ageHours": 32,
+      "createdAtUtc": "2026-02-24T00:00:00.000Z"
+    }
+  ],
+  "churnWindow": {
+    "incidents": 0,
+    "devices": 0,
+    "spaces": 0,
+    "bySpace": [],
+    "byDevice": []
+  },
+  "ticketPosture": {
+    "openTickets": 1,
+    "overlappingActiveIncidentDevices": 0,
+    "oldestOpenTickets": [
+      {
+        "ticketId": "tic-1",
+        "title": "Need help",
+        "ageHours": 32,
+        "deviceId": "dev-1",
+        "createdAtUtc": "2026-02-24T00:00:00.000Z"
+      }
+    ]
+  },
+  "dataQuality": {
+    "statusMismatches": []
+  }
+}

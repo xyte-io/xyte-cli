@@ -1,4 +1,4 @@
-export type EllipsisMode = 'middle' | 'end';
+type EllipsisMode = 'middle' | 'end';
 
 export function sanitizePrintable(value: unknown): string {
   if (value === undefined || value === null) {

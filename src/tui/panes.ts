@@ -1,6 +1,6 @@
 import type { TuiPaneId, TuiScreenId } from './types';
 
-export interface ScreenPaneConfig {
+interface ScreenPaneConfig {
   panes: TuiPaneId[];
   defaultPane: TuiPaneId;
 }

@@ -1,10 +1,10 @@
-import { mkdtempSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { describe, expect, it } from 'vitest';
 
-import { installSkills, resolveSkillInstallDestinations } from '../src/utils/install-skills';
+import { installSkills, resolveSkillInstallDestinations } from '../src/cli/install-skills';
 
 describe('install skills', () => {
   it('resolves project destinations with deterministic path mapping', () => {
@@ -65,6 +65,20 @@ describe('install skills', () => {
     const home = mkdtempSync(join(tmpdir(), 'xyte-cli-home-'));
     const source = mkdtempSync(join(tmpdir(), 'xyte-cli-source-'));
     writeFileSync(join(source, 'SKILL.md'), '# Skill', 'utf8');
+    mkdirSync(join(source, 'agents'), { recursive: true });
+    mkdirSync(join(source, 'references'), { recursive: true });
+    mkdirSync(join(source, 'scripts'), { recursive: true });
+    mkdirSync(join(source, 'templates'), { recursive: true });
+    mkdirSync(join(source, 'schemas'), { recursive: true });
+    mkdirSync(join(source, 'data'), { recursive: true });
+    writeFileSync(join(source, 'agents', 'openai.yaml'), 'display_name: Xyte', 'utf8');
+    writeFileSync(join(source, 'references', 'ai-utility-preprocessing.md'), '# Utility Prep', 'utf8');
+    writeFileSync(join(source, 'references', 'flow-recipes.md'), '# Flow Recipes', 'utf8');
+    writeFileSync(join(source, 'scripts', 'check_headless.mjs'), 'console.log("ok");\n', 'utf8');
+    writeFileSync(join(source, 'templates', 'ai-utility-prepare-generic.prompt.md'), '# Prompt', 'utf8');
+    writeFileSync(join(source, 'templates', 'ai-space-import.prompt.md'), '# Prompt', 'utf8');
+    writeFileSync(join(source, 'schemas', 'headless-frame.v1.schema.json'), '{"type":"object"}\n', 'utf8');
+    writeFileSync(join(source, 'data', 'public-endpoints.json'), '[]\n', 'utf8');
 
     const result = await installSkills({
       skillName: 'xyte-cli',
@@ -79,6 +93,22 @@ describe('install skills', () => {
     expect(existsSync(join(workspace, '.claude', 'skills', 'xyte-cli', 'SKILL.md'))).toBe(true);
     expect(existsSync(join(workspace, '.github', 'skills', 'xyte-cli', 'SKILL.md'))).toBe(true);
     expect(existsSync(join(workspace, '.agents', 'skills', 'xyte-cli', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(workspace, '.claude', 'skills', 'xyte-cli', 'agents', 'openai.yaml'))).toBe(true);
+    expect(
+      existsSync(join(workspace, '.github', 'skills', 'xyte-cli', 'references', 'ai-utility-preprocessing.md'))
+    ).toBe(true);
+    expect(existsSync(join(workspace, '.github', 'skills', 'xyte-cli', 'references', 'flow-recipes.md'))).toBe(true);
+    expect(existsSync(join(workspace, '.agents', 'skills', 'xyte-cli', 'scripts', 'check_headless.mjs'))).toBe(true);
+    expect(
+      existsSync(join(workspace, '.agents', 'skills', 'xyte-cli', 'templates', 'ai-utility-prepare-generic.prompt.md'))
+    ).toBe(true);
+    expect(existsSync(join(workspace, '.agents', 'skills', 'xyte-cli', 'templates', 'ai-space-import.prompt.md'))).toBe(
+      true
+    );
+    expect(
+      existsSync(join(workspace, '.agents', 'skills', 'xyte-cli', 'schemas', 'headless-frame.v1.schema.json'))
+    ).toBe(true);
+    expect(existsSync(join(workspace, '.agents', 'skills', 'xyte-cli', 'data', 'public-endpoints.json'))).toBe(true);
   });
 
   it('skips existing destination without force and overwrites with force', async () => {

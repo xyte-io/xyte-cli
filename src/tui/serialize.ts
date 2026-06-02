@@ -1,4 +1,7 @@
-export interface SafeInspectOptions {
+import { asRecordOrUndefined } from '../utils/json';
+import { errorMessage } from '../utils/error-format';
+
+interface SafeInspectOptions {
   maxDepth?: number;
   maxArrayItems?: number;
   maxObjectKeys?: number;
@@ -6,7 +9,7 @@ export interface SafeInspectOptions {
   compact?: boolean;
 }
 
-export interface SafeInspectResult {
+interface SafeInspectResult {
   text: string;
   truncated: boolean;
   approxSize: number;
@@ -27,13 +30,6 @@ const DEFAULT_OPTIONS: Required<SafeInspectOptions> = {
   maxOutputChars: 40_000,
   compact: false
 };
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return undefined;
-  }
-  return value as Record<string, unknown>;
-}
 
 function sanitizeValue(
   value: unknown,
@@ -122,8 +118,7 @@ export function safeInspect(value: unknown, options: SafeInspectOptions = {}): S
     text = JSON.stringify(sanitized, null, merged.compact ? 0 : 2);
   } catch (error) {
     state.truncated = true;
-    const message = error instanceof Error ? error.message : String(error);
-    text = JSON.stringify({ error: `Serialization failed: ${message}` }, null, merged.compact ? 0 : 2);
+    text = JSON.stringify({ error: `Serialization failed: ${errorMessage(error)}` }, null, merged.compact ? 0 : 2);
   }
 
   if (text.length > merged.maxOutputChars) {
@@ -139,7 +134,12 @@ export function safeInspect(value: unknown, options: SafeInspectOptions = {}): S
   };
 }
 
-export function payloadSummary(value: unknown): { kind: string; approxSize: number; keyCount: number; truncated: boolean } {
+export function payloadSummary(value: unknown): {
+  kind: string;
+  approxSize: number;
+  keyCount: number;
+  truncated: boolean;
+} {
   const inspected = safeInspect(value, {
     compact: true,
     maxOutputChars: 8_000
@@ -153,8 +153,8 @@ export function payloadSummary(value: unknown): { kind: string; approxSize: numb
   };
 }
 
-export function summarizeObject(value: unknown): string[] {
-  const record = asRecord(value);
+function summarizeObject(value: unknown): string[] {
+  const record = asRecordOrUndefined(value);
   if (!record) {
     return [];
   }
@@ -183,16 +183,15 @@ export function summarizeObject(value: unknown): string[] {
   return lines;
 }
 
-export function safeLines(value: unknown, options: SafeInspectOptions = {}): { lines: string[]; truncated: boolean } {
+export function safePreviewLines(
+  value: unknown,
+  options: SafeInspectOptions = {}
+): { lines: string[]; truncated: boolean } {
   const inspected = safeInspect(value, options);
-  return {
+  const result = {
     lines: inspected.text.split('\n'),
     truncated: inspected.truncated
   };
-}
-
-export function safePreviewLines(value: unknown, options: SafeInspectOptions = {}): { lines: string[]; truncated: boolean } {
-  const result = safeLines(value, options);
   if (!result.truncated) {
     return result;
   }

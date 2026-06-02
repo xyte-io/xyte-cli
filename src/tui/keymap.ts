@@ -3,6 +3,10 @@ export const GLOBAL_KEYMAP: Array<{ keys: string; description: string }> = [
   { keys: 'Ctrl+←/→ (or Shift+←/→)', description: 'Move pane focus; at pane edge, switch tab' },
   { keys: '↑/↓', description: 'Move selection or scroll in active pane' },
   { keys: 'Enter', description: 'Primary action in active pane (screen-dependent)' },
+  { keys: 'a', description: 'Open action palette (ops screens)' },
+  { keys: 'f', description: 'Open structured filter editor (ops screens)' },
+  { keys: '[ / ]', description: 'Previous/next page (where supported)' },
+  { keys: 'p', description: 'Set per-page size (where supported)' },
   { keys: 'u', description: 'Setup' },
   { keys: 'g', description: 'Config' },
   { keys: 'd', description: 'Dashboard' },
@@ -18,9 +22,12 @@ export const GLOBAL_KEYMAP: Array<{ keys: string; description: string }> = [
 
 export const SCREEN_ACTION_KEYMAP: Array<{ keys: string; description: string }> = [
   { keys: 'Setup: a/u/k/p/c/r', description: 'Tenant setup + guided key wizard + connectivity checks' },
-  { keys: 'Config: a/n/u/e/t/x/c/r', description: 'Provider-first key slot add/rename/use/rotate/test/remove + doctor' },
-  { keys: 'Spaces: Enter', description: 'Load selected space details and devices asynchronously' },
-  { keys: 'Devices: Enter', description: 'Open selected device details' },
-  { keys: 'Tickets: R or rr', description: 'Mark selected ticket as resolved (with confirmation)' },
-  { keys: 'Incidents: /', description: 'Filter incidents by severity' }
+  {
+    keys: 'Config: a/n/u/e/t/x/c/r',
+    description: 'Provider-first key slot add/rename/use/rotate/test/remove + doctor'
+  },
+  { keys: 'Spaces: a/f/Enter', description: 'Claim device, create/rename space, endpoint filters, and drilldown' },
+  { keys: 'Devices: a/f/Enter', description: 'Send command via templates, endpoint space filter, and details' },
+  { keys: 'Tickets: a/f/R/rr/[ ]/p', description: 'Resolve/send message, local filters and paging controls' },
+  { keys: 'Incidents: a/f/[ ]/p/', description: 'Close incident, endpoint filters, paging, and severity quick filter' }
 ];
