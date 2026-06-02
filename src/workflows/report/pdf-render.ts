@@ -1,8 +1,8 @@
 import { createWriteStream } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { mkdirSync } from 'node:fs';
 
 import PDFDocument from 'pdfkit';
+
+import { ensureParentDir } from '../../utils/fs';
 
 import type { DeepDiveResult } from '../../types/deep-dive';
 import { drawTable } from './pdf-table';
@@ -22,10 +22,6 @@ import { registerReportFonts } from './font-asset';
 import { formatRelativeAgeFromHours, formatUtcForReport, formatWindowLabel } from './time-format';
 import { REPORT_THEME, getWindowFocus } from './theme';
 import { redactForDisplay as redactSensitive } from '../../utils/redact';
-
-function ensureDir(filePath: string): void {
-  mkdirSync(dirname(resolve(filePath)), { recursive: true });
-}
 
 function compactIdentifier(value: string): string {
   const trimmed = value.trim();
@@ -310,7 +306,7 @@ export function renderBrandedPdfReport(
   includeSensitive: boolean
 ): Promise<void> {
   return new Promise((resolvePromise, rejectPromise) => {
-    ensureDir(outputPath);
+    ensureParentDir(outputPath);
     const sectionPlan = buildDeepDiveReportSectionPlan(deepDive);
     const windowLabel = formatWindowLabel(deepDive.windowHours);
     const summaryPlan = buildDeepDiveSummaryPlan(deepDive);

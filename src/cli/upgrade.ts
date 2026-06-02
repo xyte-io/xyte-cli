@@ -1,7 +1,8 @@
 import type { SkillAgent, SkillInstallOutcome } from './install-skills';
 import { installSkills } from './install-skills';
-import { runProcess } from './run-command';
-import { getCliVersion } from './version';
+import { CliUserError } from '../contracts/user-error';
+import { runProcess } from '../utils/run-command';
+import { getCliVersion } from '../utils/version';
 import { buildUpgradeCheck, type UpgradeCheckV1, type UpgradeResultV1 } from '../contracts/upgrade';
 import { UPGRADE_RESULT_SCHEMA_VERSION } from '../contracts/versions';
 
@@ -31,7 +32,7 @@ interface UpgradeSettings {
   latestVersionOverride?: string;
 }
 
-import { compareSemver } from './semver';
+import { compareSemver } from '../contracts/semver';
 
 function defaultRunner(command: string, args: string[]): Promise<CommandResult> {
   return runProcess(command, args, { stdinMode: 'ignore' });
@@ -51,12 +52,12 @@ async function fetchLatestVersion(packageName: string, fetchImpl: typeof fetch):
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch latest version for ${packageName} (HTTP ${response.status}).`);
+    throw new CliUserError({ summary: `Failed to fetch latest version for ${packageName} (HTTP ${response.status}).` });
   }
 
   const payload = (await response.json()) as { version?: unknown };
   if (typeof payload.version !== 'string' || !payload.version.trim()) {
-    throw new Error(`Latest version response for ${packageName} is missing a valid version.`);
+    throw new CliUserError({ summary: `Latest version response for ${packageName} is missing a valid version.` });
   }
 
   return payload.version;
@@ -112,9 +113,9 @@ export async function applyUpgrade(
     };
     const installResult = await runner(npmCommand, updateArgs);
     if (installResult.code !== 0) {
-      throw new Error(
-        `Upgrade failed while running "${npmCommand} ${updateArgs.join(' ')}": ${installResult.stderr.trim() || installResult.stdout.trim() || 'unknown error'}`
-      );
+      throw new CliUserError({
+        summary: `Upgrade failed while running "${npmCommand} ${updateArgs.join(' ')}": ${installResult.stderr.trim() || installResult.stdout.trim() || 'unknown error'}`
+      });
     }
   }
 
@@ -124,16 +125,16 @@ export async function applyUpgrade(
   };
   const verifyResult = await runner(verifyCommand.command, verifyCommand.args);
   if (verifyResult.code !== 0) {
-    throw new Error(`Upgrade verification failed: unable to run "xyte-cli --version".`);
+    throw new CliUserError({ summary: `Upgrade verification failed: unable to run "xyte-cli --version".` });
   }
   const detectedVersion = parseVersionFromOutput(verifyResult.stdout.trim());
   if (!detectedVersion) {
-    throw new Error(`Upgrade verification failed: could not parse version from "xyte-cli --version" output.`);
+    throw new CliUserError({ summary: `Upgrade verification failed: could not parse version from "xyte-cli --version" output.` });
   }
   if (compareSemver(detectedVersion, check.latestVersion) < 0) {
-    throw new Error(
-      `Upgrade verification failed: detected ${detectedVersion}, expected at least ${check.latestVersion}.`
-    );
+    throw new CliUserError({
+      summary: `Upgrade verification failed: detected ${detectedVersion}, expected at least ${check.latestVersion}.`
+    });
   }
 
   const skills = await installSkillsImpl({

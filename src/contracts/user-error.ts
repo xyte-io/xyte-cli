@@ -1,13 +1,13 @@
 export interface CliUserErrorOptions {
   summary: string;
-  cause?: string;
+  detail?: string;
   suggestedCommands?: string[];
   xyteCode?: string;
 }
 
 export class CliUserError extends Error {
   readonly summary: string;
-  readonly causeDetail?: string;
+  readonly detail?: string;
   readonly suggestedCommands: string[];
   readonly xyteCode: string;
 
@@ -15,7 +15,7 @@ export class CliUserError extends Error {
     super(options.summary);
     this.name = 'CliUserError';
     this.summary = options.summary;
-    this.causeDetail = options.cause;
+    this.detail = options.detail;
     this.suggestedCommands = options.suggestedCommands ?? [];
     this.xyteCode = options.xyteCode ?? 'XYTE_CLI_USER_ERROR';
   }

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 
 import { describe, expect, it } from 'vitest';
 
-import { installSkills, resolveSkillInstallDestinations } from '../src/utils/install-skills';
+import { installSkills, resolveSkillInstallDestinations } from '../src/cli/install-skills';
 
 describe('install skills', () => {
   it('resolves project destinations with deterministic path mapping', () => {

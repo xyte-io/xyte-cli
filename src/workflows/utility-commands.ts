@@ -1,18 +1,10 @@
 import type { XyteClient } from '../types/client';
 import { loadInputRows, type UtilityInputFormat } from '../utils/input-parser';
 import { errorMessage } from '../utils/error-format';
+import { asRecord } from '../utils/json';
+import { CliUserError } from '../contracts/user-error';
 import { runUtilityBatch, type UtilityBatchOperation, type UtilityBatchResult } from './utility-batch';
-
-function requireNonEmptyString(value: unknown, fieldName: string, rowIndex: number): string {
-  if (typeof value !== 'string') {
-    throw new Error(`Row ${rowIndex}: field "${fieldName}" must be a string.`);
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    throw new Error(`Row ${rowIndex}: field "${fieldName}" cannot be empty.`);
-  }
-  return trimmed;
-}
+import { requireNonEmptyString } from './device-move-shared';
 
 function maybeString(value: unknown): string | undefined {
   if (typeof value !== 'string') {
@@ -30,18 +22,18 @@ function parseOptionalConfig(value: unknown, fieldName: string, rowIndex: number
     return value as Record<string, unknown>;
   }
   if (typeof value !== 'string') {
-    throw new Error(`Row ${rowIndex}: field "${fieldName}" must be a JSON object or object value.`);
+    throw new CliUserError({ summary: `Row ${rowIndex}: field "${fieldName}" must be a JSON object or object value.` });
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(value);
   } catch (error) {
-    throw new Error(`Row ${rowIndex}: field "${fieldName}" is not valid JSON (${errorMessage(error)}).`);
+    throw new CliUserError({ summary: `Row ${rowIndex}: field "${fieldName}" is not valid JSON (${errorMessage(error)}).` });
   }
 
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error(`Row ${rowIndex}: field "${fieldName}" must parse to an object.`);
+    throw new CliUserError({ summary: `Row ${rowIndex}: field "${fieldName}" must parse to an object.` });
   }
 
   return parsed as Record<string, unknown>;
@@ -54,7 +46,7 @@ function parsePathSegments(value: unknown, fieldName: string, rowIndex: number):
     .map((segment) => segment.trim())
     .filter((segment) => segment.length > 0);
   if (segments.length === 0) {
-    throw new Error(`Row ${rowIndex}: field "${fieldName}" must contain at least one path segment.`);
+    throw new CliUserError({ summary: `Row ${rowIndex}: field "${fieldName}" must contain at least one path segment.` });
   }
   return segments;
 }
@@ -76,7 +68,7 @@ function extractItemsFromSpacesResponse(data: unknown): Array<Record<string, unk
   if (!data || typeof data !== 'object') {
     return [];
   }
-  const maybeItems = (data as { items?: unknown }).items;
+  const maybeItems = asRecord(data).items;
   if (!Array.isArray(maybeItems)) {
     return [];
   }
@@ -102,7 +94,7 @@ async function listSpacesByParent(
     const data = response.data as unknown;
     const items = extractItemsFromSpacesResponse(data);
     results.push(...items);
-    const nextPageRaw = data && typeof data === 'object' ? (data as { next_page?: unknown }).next_page : undefined;
+    const nextPageRaw = asRecord(data).next_page;
     const nextPage = parseSpaceId(nextPageRaw);
     if (!nextPage) {
       break;
@@ -112,7 +104,7 @@ async function listSpacesByParent(
   return results;
 }
 
-async function resolveRootSpaceId(client: XyteClient, tenantId: string): Promise<number> {
+async function fetchRootSpaceId(client: XyteClient, tenantId: string): Promise<number> {
   const response = await client.callWithMeta('organization.spaces.getSpaces', {
     tenantId,
     query: {
@@ -125,12 +117,12 @@ async function resolveRootSpaceId(client: XyteClient, tenantId: string): Promise
   const root = items.find((item) => item.parent_id === null || item.parent_id === undefined) ?? items[0];
   const rootId = root ? parseSpaceId(root.id) : undefined;
   if (rootId === undefined) {
-    throw new Error('Unable to resolve root space for import-tree.');
+    throw new CliUserError({ summary: 'Unable to resolve root space for import-tree.' });
   }
   return rootId;
 }
 
-export function runSpaceImportTree(args: {
+export async function runSpaceImportTree(args: {
   client: XyteClient;
   tenantId: string;
   inputPath: string;
@@ -191,7 +183,7 @@ export function runSpaceImportTree(args: {
       });
       const createdId = parseSpaceId((created.data as { id?: unknown }).id);
       if (createdId === undefined) {
-        throw new Error(`Unable to resolve space id for "${params.name}" under parent ${params.parentId}.`);
+        throw new CliUserError({ summary: `Unable to resolve space id for "${params.name}" under parent ${params.parentId}.` });
       }
       resolvedSpaceCache.set(cacheKey, createdId);
       return createdId;
@@ -266,7 +258,7 @@ export function runSpaceImportTree(args: {
       execute: async (_client, tenantId) => {
         const preparedRow = prepare();
         if (resolvedRootSpaceId === undefined) {
-          resolvedRootSpaceId = await resolveRootSpaceId(args.client, tenantId);
+          resolvedRootSpaceId = await fetchRootSpaceId(args.client, tenantId);
         }
         let parentId = resolvedRootSpaceId;
         for (let segmentIndex = 0; segmentIndex < preparedRow.segments.length; segmentIndex += 1) {

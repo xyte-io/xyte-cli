@@ -6,6 +6,122 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.10.6] - 2026-05-28
+
+### Added
+- Added organization device incident controls:
+  - `organization.devices.suspendIncidents`
+  - `organization.devices.resumeIncidents`
+- Added organization edge discovery:
+  - `organization.edges.getEdges`
+- Added organization group management endpoints:
+  - `organization.groups.createGroup`
+  - `organization.groups.getGroups`
+  - `organization.groups.getGroup`
+  - `organization.groups.updateGroup`
+  - `organization.groups.deleteGroup`
+  - `organization.groups.addUsers`
+  - `organization.groups.removeUsers`
+  - `organization.groups.addExternalUser`
+- Added organization user management endpoints:
+  - `organization.users.createUser`
+  - `organization.users.getUsers`
+  - `organization.users.getUser`
+  - `organization.users.deactivateUser`
+  - `organization.users.resendWelcome`
+- Added partner organization creation:
+  - `partner.organizations.createOrganization`
+- Updated the typed client namespace surface, endpoint catalog, command docs, endpoint reference docs, tests, and shipped `xyte-cli` skill data for the new endpoints.
+
+### Fixed
+- Corrected the Edge claim and ping lifecycle routes to use the deployed `/core/v1/organization/edges/devices/...` paths:
+  - `organization.edge.startClaim`
+  - `organization.edge.getClaimStatus`
+  - `organization.edge.startPing`
+  - `organization.edge.getPingStatus`
+
+## [0.10.5] - 2026-05-12
+
+### Fixed
+- Corrected read endpoint metadata so organization command/ticket reads do not advertise request bodies and partner ticket reads use the callable ticket path without the docs copy suffix.
+
+## [0.10.4] - 2026-05-11
+
+### Fixed
+- Added `User-Agent: CLI` to Xyte API requests sent by the CLI.
+
+## [0.10.3] - 2026-04-29
+
+### Added
+- Added prepare-only `util prepare` normalization utilities for connector setup and team access groups, user invites, and memberships.
+- Added shipped skill and docs guidance for using the new connector and team access normalization utilities without attaching nonexistent API execution paths.
+- Added schema, CLI, and packaged-install smoke coverage for prepare-only utility actions.
+
+### Fixed
+- Corrected AI utility preprocessing docs and skill guidance for the generated `device.move` prepare headers.
+
+## [0.10.2] - 2026-04-26
+
+### Added
+- Added `edge claim-batch --skip-connectivity-check` for batches that intentionally skip batch-owned pre-claim connectivity checks on blank rows.
+- Added batch-owned pre-claim ping behavior for `edge claim-batch`: blank or `skip_connectivity_check=false` rows now run `edge ping` before `startClaim`; `skip_connectivity_check=true` rows skip the ping and send `true`.
+- Added `ping-failed`, `preClaimPing`, and `totals.pingFailed` reporting so batch claim failures clearly distinguish connectivity probe failures from claim failures.
+- Added `nextAction` hints to flow run summaries, `flow list --format text|json` discovery output, and non-interactive `logs show` lookup by entry or request id.
+
+### Changed
+- Updated `flow.edge-claim-batch`, docs, and the shipped `xyte-cli` skill guidance to describe plan-first batch claiming, resume artifacts, skip-connectivity precedence, and the row-result-only resume limitation.
+- Changed utility batch dry-run reporting to count validated rows under `totals.planned` instead of `totals.succeeded`.
+- Improved generated `util prepare` notes with a clearer column glossary, reject taxonomy, canonical JSON shape, and safe next commands.
+
+### Fixed
+- Fixed `edge claim-batch` so rows that require connectivity verification no longer call `startClaim` before the CLI has run and completed the corresponding Edge ping.
+- Fixed batch resume handling so previously `succeeded` or `already-claimed` rows are skipped before skip-connectivity conflict checks.
+- Fixed generated flow resume commands to include custom `--out-dir` values and use platform-appropriate argument quoting.
+- Fixed malformed or missing flow resume metadata to fail closed instead of silently falling back to invocation defaults.
+- Fixed global `--output` handling for `flow list` and `logs` commands when local `--format` was not explicitly provided.
+- Fixed exact `logs show` lookups so they are not limited to the recent log tail.
+- Added confirmation for `config tenant remove` and clarified removed profile/key-slot metadata in the command output.
+
+## [0.10.1] - 2026-04-20
+
+### Added
+- `--key-command <command>` on `setup run`, `config key add`, and `config key update`: runs an arbitrary shell command and uses its stdout as the API key. Intended for resolving keys from external secret managers (`op read`, `vault kv get`, `aws secretsmanager get-secret-value`, `pass show`, …) without shell glue or wrapper processes. The command value is redacted from action logs.
+
+### Fixed
+- `--key-command` failures now distinguish command-startup errors from non-zero exits and report non-zero exits as the exit code only, so command stdout/stderr are not leaked in user-facing errors or action logs.
+
+## [0.10.0] - 2026-04-20
+
+### Added
+- Added the Edge Devices API surface to the CLI catalog: `organization.edge.startClaim`, `organization.edge.getClaimStatus`, `organization.edge.startPing`, `organization.edge.getPingStatus` (async claim/ping lifecycle).
+- Added the `xyte-cli edge` command group: `edge claim`, `edge claim-batch`, `edge claim-status`, `edge ping`, `edge ping-status` with plan/apply semantics, poll overrides, and resume artifacts.
+- Added the `organization.edge.startClaim` utility-prepare profile with `proxy_id,device_ip,device_model_id,space_id,...` columns, deterministic primary/rejected/notes outputs, and a documented reject-reason taxonomy.
+- Added three built-in flows: `flow.edge-claim`, `flow.edge-claim-batch` (the north-star bulk-claim workflow with resume), and `flow.edge-ping`.
+- Added `docs/claim-devices.md`, a native-vs-edge-vs-C2C tutorial that codifies the mandatory disambiguation rule agents must ask, and the canonical C2C-unsupported response template.
+- Added `skills/xyte-cli/references/claim-playbook.md` — single-doc claim playbook for agents covering both claim paths plus the 20-row edge-case decision tree.
+- Added `scripts/sync_skills_data.mjs` and wired it into `npm run build` / `prepublishOnly` to keep `src/api-catalog/public-endpoints.json` and `skills/xyte-cli/data/public-endpoints.json` byte-identical.
+- Native persisted secret storage on Linux via Secret Service, alongside macOS Keychain and Windows DPAPI.
+- Secure-storage downgrade warnings that explain when `auth.secretStoreBackend=auto` falls back to file storage and how to require `native` or opt into `file`.
+- Dedicated `windows-native-secret-store-cert` and `linux-native-secret-store-cert` CI jobs for native secure-storage validation.
+
+### Changed
+- `xyte-cli config path` now reports `secretStoreBackend`, `secretStore`, and `legacySecretStore` so callers can inspect the resolved credential backend.
+
+### Removed
+- Removed the committed `HANDOFF.md` root document.
+
+## [0.9.0] - 2026-04-15
+
+### Added
+- Added `organization.devices.moveDevice` support to the public CLI endpoint catalog and typed client surface.
+- Added `xyte-cli util move-devices` for batch device moves with dry-run/apply execution, duplicate detection, row-level validation, and NDJSON reports.
+- Added the built-in `flow.device-migration` workflow to match devices, dry-run moves, execute approved moves, verify results, and generate migration reports.
+- Added move-verification and migration-reporting contracts so post-move verification and operator-facing summaries can be generated from structured outputs.
+
+### Fixed
+- Fixed the move-device route used by the CLI to match the live organization API path at `/core/v1/organization/devices/:device_id/move`.
+- Fixed `xyte-cli api call --output-mode` handling so invalid values fail fast instead of silently falling back to raw output.
+
 ## [0.8.0] - 2026-03-23
 
 ### Added

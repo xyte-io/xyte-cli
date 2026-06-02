@@ -1537,7 +1537,7 @@ xyte-cli --version</code></pre>
                   <span class="step-index">01</span>
                   <span class="step-copy">
                     <strong>Connect the tenant key once</strong>
-                    <span>Run interactive setup once, or use the documented stdin flow for automation.</span>
+                    <span>Run interactive setup once, or use the documented stdin flow for automation. Persisted credentials default to macOS Keychain, Windows DPAPI, or Linux Secret Service.</span>
                     <span class="detail-code">xyte-cli setup run</span>
                   </span>
                 </li>
@@ -1670,7 +1670,7 @@ xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input ./artifacts/deep
             <article class="workflow-card surface">
               <span class="workflow-index">02</span>
               <h3>Connect tenant</h3>
-              <p>Provide your API key once. Verify with <code>setup status</code> before running operational commands.</p>
+              <p>Provide your API key once. If native secure storage is unavailable, <code>auto</code> warns and falls back to file storage. Verify with <code>setup status</code> before running operational commands.</p>
               <code>xyte-cli setup run</code>
             </article>
             <article class="workflow-card surface">

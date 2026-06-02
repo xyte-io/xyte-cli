@@ -1,48 +1,53 @@
 import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { z } from 'zod';
 
+import { CliUserError } from '../contracts/user-error';
 import { UTILITY_PREPARE_SCHEMA_VERSION } from '../contracts/versions';
 import { getUtilityActionProfile, listUtilityActionProfiles } from './utility-action-catalog';
 import type {
   UtilityActionProfile,
   UtilityExecutionSupport,
-  UtilityPreparePrimaryFormat
+  UtilityPreparePrimaryFormat,
+  UtilityPrepareMode
 } from './utility-action-profiles';
 
-type UtilityPrepareInputKind = 'tabular' | 'document' | 'image' | 'unknown';
+type UtilityPrepareInputKind = UtilityPrepareResult['input']['kind'];
 
-interface UtilityPrepareResult {
-  schemaVersion: typeof UTILITY_PREPARE_SCHEMA_VERSION;
-  generatedAtUtc: string;
-  actionKey: string;
-  entity: string;
-  mode: 'friendly' | 'generic';
-  input: {
-    path: string;
-    kind: UtilityPrepareInputKind;
-    extension: string;
-    sizeBytes: number;
-  };
-  canonical: {
-    primaryFormat: UtilityPreparePrimaryFormat;
-    headers: string[];
-    jsonShape: Record<string, unknown>;
-  };
-  decodeRules: string[];
-  artifacts: {
-    primary: string;
-    rejected: string;
-    notes: string;
-  };
-  promptTemplatePath: string;
-  skillNodePath: string;
-  suggestedCommands: {
-    next: string;
-    apply: string;
-    verify: string;
-  };
-  executionSupport: 'space.import-tree' | 'call-loop-only';
-}
+const UtilityPrepareResultSchema = z.object({
+  schemaVersion: z.literal(UTILITY_PREPARE_SCHEMA_VERSION),
+  generatedAtUtc: z.string(),
+  actionKey: z.string(),
+  entity: z.string(),
+  mode: z.enum(['friendly', 'generic']),
+  input: z.object({
+    path: z.string(),
+    kind: z.enum(['tabular', 'document', 'image', 'unknown']),
+    extension: z.string(),
+    sizeBytes: z.number()
+  }),
+  canonical: z.object({
+    primaryFormat: z.enum(['csv', 'jsonl']),
+    headers: z.array(z.string()),
+    jsonShape: z.record(z.string(), z.unknown())
+  }),
+  decodeRules: z.array(z.string()),
+  artifacts: z.object({
+    primary: z.string(),
+    rejected: z.string(),
+    notes: z.string()
+  }),
+  promptTemplatePath: z.string(),
+  skillNodePath: z.string(),
+  suggestedCommands: z.object({
+    next: z.string(),
+    apply: z.string(),
+    verify: z.string()
+  }),
+  executionSupport: z.enum(['space.import-tree', 'device.move', 'edge.claim-batch', 'prepare-only', 'call-loop-only'])
+});
+
+type UtilityPrepareResult = z.infer<typeof UtilityPrepareResultSchema>;
 
 const TABULAR_EXTENSIONS = new Set(['.csv', '.tsv', '.xlsx', '.xls', '.json', '.jsonl', '.ndjson']);
 const DOCUMENT_EXTENSIONS = new Set(['.pdf', '.md', '.txt', '.doc', '.docx', '.rtf']);
@@ -64,7 +69,7 @@ function detectInputKind(extension: string): UtilityPrepareInputKind {
 
 function writeScaffoldFile(filePath: string, content: string, force: boolean): void {
   if (existsSync(filePath) && !force) {
-    throw new Error(`Scaffold file already exists: ${filePath}. Re-run with --force to overwrite.`);
+    throw new CliUserError({ summary: `Scaffold file already exists: ${filePath}. Re-run with --force to overwrite.` });
   }
   writeFileSync(filePath, content, 'utf8');
 }
@@ -122,11 +127,47 @@ function buildSuggestedCommands(
     };
   }
 
+  if (profile.actionKey === 'device.move') {
+    return {
+      next: [
+        `Review ${primaryPath}.`,
+        'Validate the target_space_id column before any writes.',
+        'Run util move-devices without --apply first and only execute after the dry-run report looks correct.'
+      ].join(' '),
+      apply: `xyte-cli util move-devices --tenant ${tenant} --input ${primaryPath} --apply --report ${path.join(outputDir, 'device-move.apply.ndjson')}`,
+      verify: `xyte-cli api call organization.devices.getDevice --tenant ${tenant} --path-json '{"device_id":"<device_id>"}'`
+    };
+  }
+
+  if (profile.actionKey === 'organization.edge.startClaim') {
+    const reportPath = path.join(outputDir, 'edge-claim.apply.ndjson');
+    const resumePath = path.join(outputDir, 'edge-claim.resume.ndjson');
+    return {
+      next: [
+        `Review ${primaryPath}.`,
+        'Run xyte-cli edge claim-batch with --plan first; apply only after the dry-run plan looks correct.',
+        'Resume interrupted runs by re-running --apply with the same --resume-artifact <path>.'
+      ].join(' '),
+      apply:
+        `xyte-cli edge claim-batch --tenant ${tenant} --input ${primaryPath} --apply ` +
+        `--report ${reportPath} --resume-artifact ${resumePath}`,
+      verify: `xyte-cli edge claim-status --tenant ${tenant} --proxy-id <proxy-id> --device-ip <device-ip>`
+    };
+  }
+
   if (profile.executionSupport === 'space.import-tree') {
     return {
       next: `xyte-cli util import-tree --tenant ${tenant} --input ${primaryPath}`,
       apply: `xyte-cli util import-tree --tenant ${tenant} --input ${primaryPath} --apply --report ${path.join(outputDir, 'space-import.apply.ndjson')}`,
       verify: `xyte-cli api call organization.spaces.getSpaces --tenant ${tenant} --query-json '{"path_includes":"<sample-path>"}'`
+    };
+  }
+
+  if (profile.executionSupport === 'prepare-only') {
+    return {
+      next: `Review ${primaryPath}, fill the prepared and rejected files from the source input, then consume the prepared CSV in the calling workflow.`,
+      apply: 'No CLI execution is available for this prepare-only utility.',
+      verify: `Review ${primaryPath} and the rejected artifact for unresolved rows.`
     };
   }
 
@@ -144,22 +185,106 @@ function buildSuggestedCommands(
   };
 }
 
-function buildNotes(profile: UtilityActionProfile, inputPath: string): string {
+function requiredHeadersForProfile(profile: UtilityActionProfile): string[] {
+  if (profile.actionKey === 'space.import-tree') {
+    return ['path'];
+  }
+  if (profile.actionKey === 'organization.edge.startClaim') {
+    return ['proxy_id', 'device_ip', 'device_model_id', 'space_id'];
+  }
+  if (profile.actionKey === 'device.move') {
+    return ['device_id', 'target_space_id'];
+  }
+  if (profile.actionKey === 'organization.connectors.prepareSetup') {
+    return ['connectorName', 'targetSpace', 'authorizationOwner'];
+  }
+  if (profile.actionKey === 'organization.teamAccess.groups') {
+    return ['groupName'];
+  }
+  if (profile.actionKey === 'organization.teamAccess.users') {
+    return ['email'];
+  }
+  if (profile.actionKey === 'organization.teamAccess.memberships') {
+    return ['email', 'groupName'];
+  }
+  if (profile.mode === 'generic') {
+    return profile.headers.filter((header) => header !== 'query_json' && header !== 'body_json');
+  }
+  return profile.headers.filter((header) => !['cloud_id', 'mac', 'sn', 'custom_parameters'].includes(header));
+}
+
+function exampleForHeader(profile: UtilityActionProfile, header: string): string {
+  const value = profile.jsonShape[header];
+  if (value !== undefined) {
+    return JSON.stringify(value);
+  }
+  if (header === 'query_json' || header === 'body_json') {
+    return '{}';
+  }
+  const nestedPath = profile.jsonShape.path;
+  if (nestedPath && typeof nestedPath === 'object' && !Array.isArray(nestedPath) && header in nestedPath) {
+    return JSON.stringify((nestedPath as Record<string, unknown>)[header]);
+  }
+  return JSON.stringify(`<${header}>`);
+}
+
+function rejectTaxonomy(profile: UtilityActionProfile, requiredHeaders: string[]): string[] {
+  const reasons = requiredHeaders.map((header) => `missing_${header}`);
+  const jsonHeaders = profile.headers.filter((header) => header.endsWith('_json') || header === 'config' || header === 'custom_parameters');
+  reasons.push(...jsonHeaders.map((header) => `invalid_${header}`));
+  if (profile.actionKey === 'organization.edge.startClaim') {
+    reasons.push('invalid_device_ip', 'invalid_space_id', 'invalid_skip_connectivity_check');
+  }
+  if (profile.actionKey === 'device.move') {
+    reasons.push('invalid_target_space_id');
+  }
+  if (profile.actionKey === 'organization.connectors.prepareSetup') {
+    reasons.push('unsupported_connector');
+  }
+  if (profile.actionKey === 'organization.teamAccess.users' || profile.actionKey === 'organization.teamAccess.memberships') {
+    reasons.push('invalid_email');
+  }
+  reasons.push('ambiguous_row');
+  return [...new Set(reasons)];
+}
+
+function buildNotes(
+  profile: UtilityActionProfile,
+  inputPath: string,
+  suggestedCommands: UtilityPrepareResult['suggestedCommands']
+): string {
+  const requiredHeaders = requiredHeadersForProfile(profile);
+  const requiredSet = new Set(requiredHeaders);
+  const rejectReasons = rejectTaxonomy(profile, requiredHeaders);
   return [
     '# Utility Prepare Notes',
     '',
     `Action: ${profile.actionKey}`,
     `Mode: ${profile.mode}`,
+    `Execution support: ${profile.executionSupport}`,
     `Source input: ${inputPath}`,
     '',
     '## Canonical Fields',
-    `- ${profile.headers.join(', ')}`,
+    ...profile.headers.map((header) => `- ${header}: ${requiredSet.has(header) ? 'required' : 'optional'}; example ${exampleForHeader(profile, header)}`),
+    '',
+    '## Canonical JSON Shape',
+    '```json',
+    JSON.stringify(profile.jsonShape, null, 2),
+    '```',
     '',
     '## Decode Rules',
     ...profile.decodeRules.map((rule) => `- ${rule}`),
     '',
+    '## Reject Taxonomy',
+    ...rejectReasons.map((reason) => `- ${reason}`),
+    '',
     '## Ambiguities',
     '- Place unresolved rows into the rejected file with reject_reason.',
+    '',
+    '## Safe Next Commands',
+    `- Next: ${suggestedCommands.next}`,
+    `- Apply: ${suggestedCommands.apply}`,
+    `- Verify: ${suggestedCommands.verify}`,
     '',
     '## Operator Decision Gate',
     '- After preprocessing is complete, ask what to do next (execute or stop).'
@@ -170,6 +295,7 @@ function buildCsvHeader(headers: string[]): string {
   return `${headers.join(',')}\n`;
 }
 
+/** Intentionally synchronous: all I/O uses synchronous Node.js APIs (existsSync, statSync, mkdirSync, writeFileSync). */
 export function runUtilityPrepare(args: {
   inputPath: string;
   actionKey: string;
@@ -180,11 +306,11 @@ export function runUtilityPrepare(args: {
 }): UtilityPrepareResult {
   const inputPath = path.resolve(args.inputPath);
   if (!existsSync(inputPath)) {
-    throw new Error(`Input file does not exist: ${inputPath}`);
+    throw new CliUserError({ summary: `Input file does not exist: ${inputPath}` });
   }
   const inputStats = statSync(inputPath);
   if (!inputStats.isFile()) {
-    throw new Error(`Input path must be a file: ${inputPath}`);
+    throw new CliUserError({ summary: `Input path must be a file: ${inputPath}` });
   }
 
   const profile = getUtilityActionProfile(args.actionKey);
@@ -207,9 +333,10 @@ export function runUtilityPrepare(args: {
     writeScaffoldFile(primary, '', force);
     writeScaffoldFile(rejected, '', force);
   }
-  writeScaffoldFile(notes, `${buildNotes(profile, inputPath)}\n`, force);
+  const suggestedCommands = buildSuggestedCommands(profile, tenant, primary, outputDir);
+  writeScaffoldFile(notes, `${buildNotes(profile, inputPath, suggestedCommands)}\n`, force);
 
-  return {
+  return UtilityPrepareResultSchema.parse({
     schemaVersion: UTILITY_PREPARE_SCHEMA_VERSION,
     generatedAtUtc: new Date().toISOString(),
     actionKey: profile.actionKey,
@@ -234,34 +361,51 @@ export function runUtilityPrepare(args: {
     },
     promptTemplatePath: profile.promptTemplatePath,
     skillNodePath: profile.skillNodePath,
-    suggestedCommands: buildSuggestedCommands(profile, tenant, primary, outputDir),
+    suggestedCommands,
     executionSupport: profile.executionSupport
-  };
+  });
 }
 
 interface UtilityActionSummary {
   actionKey: string;
   entity: string;
   title: string;
-  mode: 'friendly' | 'generic';
+  mode: UtilityPrepareMode;
   method: string | null;
   pathTemplate: string | null;
   executionSupport: UtilityExecutionSupport;
 }
 
 export function listUtilityPrepareActions(
-  args: { entity?: string; includeGeneric?: boolean } = {}
+  args: {
+    entity?: string;
+    includeGeneric?: boolean;
+    mode?: UtilityPrepareMode;
+    executionSupport?: UtilityExecutionSupport;
+  } = {}
 ): UtilityActionSummary[] {
   return listUtilityActionProfiles({
     entity: args.entity,
     includeGeneric: args.includeGeneric
-  }).map((profile) => ({
-    actionKey: profile.actionKey,
-    entity: profile.entity,
-    title: profile.title,
-    mode: profile.mode,
-    method: profile.method ?? null,
-    pathTemplate: profile.pathTemplate ?? null,
-    executionSupport: profile.executionSupport
-  }));
+  })
+    .filter((profile) => !args.mode || profile.mode === args.mode)
+    .filter((profile) => !args.executionSupport || profile.executionSupport === args.executionSupport)
+    .sort((left, right) => {
+      if (left.mode !== right.mode) {
+        return left.mode === 'friendly' ? -1 : 1;
+      }
+      if (left.executionSupport !== right.executionSupport) {
+        return left.executionSupport.localeCompare(right.executionSupport);
+      }
+      return left.actionKey.localeCompare(right.actionKey);
+    })
+    .map((profile) => ({
+      actionKey: profile.actionKey,
+      entity: profile.entity,
+      title: profile.title,
+      mode: profile.mode,
+      method: profile.method ?? null,
+      pathTemplate: profile.pathTemplate ?? null,
+      executionSupport: profile.executionSupport
+    }));
 }

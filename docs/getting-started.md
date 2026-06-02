@@ -35,6 +35,8 @@ Primary automation contract:
 
 Use `--key-file <path>` when the key already lives on disk, or pipe the API key on stdin into `xyte-cli setup run --non-interactive --tenant acme --key-stdin`. `--key-stdin` alone waits for stdin; it does not fetch a key by itself.
 
+If the key lives in a secret manager, use `--key-command "<cmd>"`: xyte-cli runs the command, trims leading and trailing whitespace from stdout, and uses the result as the API key. The command must print only the key on stdout and exit 0.
+
 Provider behavior:
 
 - If `--provider` is omitted, setup validates `xyte-org` first and falls through to `xyte-partner`.
@@ -47,6 +49,16 @@ xyte-cli setup status --field tenantId
 xyte-cli setup status --tenant acme --output json
 xyte-cli config doctor --tenant acme --output json
 ```
+
+Credential storage:
+
+- Default persisted credential mode is `auth.secretStoreBackend=auto`.
+- `auto` uses macOS Keychain on macOS, DPAPI on Windows, and Secret Service on Linux.
+- If native secure storage is unavailable, `xyte-cli` warns and falls back to local file storage.
+- Advanced override: `auth.secretStoreBackend=auto|native|file`.
+- Require native secure storage: `xyte-cli config set auth.secretStoreBackend native`
+- Use file storage intentionally: `xyte-cli config set auth.secretStoreBackend file`
+- `xyte-cli config path --output json` reports `secretStoreBackend`, `secretStore`, and `legacySecretStore`. `secretStore` is the effective location for the selected backend: a filesystem path when `secretStoreBackend` is `file`, and the service name used in the OS keychain (e.g. `xyte-cli`) when it is `keychain`, `dpapi`, or `secret-service`.
 
 Shell-specific non-interactive examples:
 
@@ -73,6 +85,24 @@ Key file:
 ```bash
 xyte-cli setup run --non-interactive --tenant acme --key-file ~/.config/xyte/acme.key
 ```
+
+Secret manager via `--key-command`:
+
+```bash
+# 1Password
+xyte-cli setup run --non-interactive --tenant acme --key-command "op read op://Employee/Xyte/credential"
+
+# HashiCorp Vault
+xyte-cli setup run --non-interactive --tenant acme --key-command "vault kv get -field=key secret/xyte"
+
+# AWS Secrets Manager
+xyte-cli setup run --non-interactive --tenant acme --key-command "aws secretsmanager get-secret-value --secret-id xyte --query SecretString --output text"
+
+# pass (the standard Unix password manager)
+xyte-cli setup run --non-interactive --tenant acme --key-command "pass show xyte/api-key"
+```
+
+Authenticate the secret manager before running xyte-cli (e.g. `eval $(op signin)` or `vault login`). Make sure the command prints only the key on stdout — extra lines or banners will be trimmed only at the edges.
 
 Offline example:
 
@@ -110,6 +140,27 @@ Install paths:
   - Claude: `~/.claude/skills/xyte-cli`
   - Copilot: `~/.copilot/skills/xyte-cli`
   - Codex: `~/.agents/skills/xyte-cli`
+
+## Claim Devices (Native, Edge, C2C)
+
+See [`claim-devices.md`](claim-devices.md) for the full native-vs-edge-vs-C2C decision guide. Two rules up front:
+
+- **Ask first.** When the path isn't explicit, ask which of native / edge / C2C applies; do not auto-pick from spreadsheet columns.
+- **C2C is not available** via the public API today — use the End Customer Portal.
+
+One-liners:
+
+```bash
+# Native / direct (sn + mac + cloud_id known):
+xyte-cli api call organization.devices.claimDevice --tenant <tenant-id> --body-json '{"name":"<name>","space_id":<space-id>,"sn":"<sn>","mac":"<mac>","cloud_id":"<cloud-id>"}'
+
+# Edge (behind an Xyte Edge proxy):
+xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip> --device-model-id <model-id> --space-id <space-id> --plan
+
+# Bulk edge (blank skip_connectivity_check rows ping before claim):
+xyte-cli util prepare --action organization.edge.startClaim --input ./edge-devices.xlsx --output-dir ./prepared
+xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --report ./artifacts/edge-claim-report.ndjson --plan
+```
 
 ## Skills-Less Operation
 

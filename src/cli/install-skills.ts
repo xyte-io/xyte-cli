@@ -2,7 +2,8 @@ import { access, constants, cp, mkdir, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
-import { errorMessage } from './error-format';
+import { errorMessage } from '../utils/error-format';
+import { CliUserError } from '../contracts/user-error';
 
 export type SkillAgent = 'claude' | 'copilot' | 'codex';
 export type SkillInstallScope = 'project' | 'user' | 'both';
@@ -111,7 +112,7 @@ export async function installSkills(options: InstallSkillsOptions): Promise<Inst
   const sourceDir = path.resolve(options.sourceDir);
 
   if (!(await pathExists(sourceDir))) {
-    throw new Error(`Skill source does not exist: ${sourceDir}`);
+    throw new CliUserError({ summary: `Skill source does not exist: ${sourceDir}` });
   }
 
   const destinations = resolveSkillInstallDestinations({

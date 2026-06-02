@@ -9,7 +9,7 @@ Custom flows do not define new step graphs. They alias one built-in flow and pin
 List built-in flow IDs:
 
 ```bash
-xyte-cli flow list
+xyte-cli flow list --format text
 ```
 
 Create a custom flow:
@@ -181,6 +181,20 @@ Then validate in `--plan` before any apply:
 ```bash
 xyte-cli flow run flow.local3000-guided-remediation --tenant local3000 --plan
 ```
+
+## Edge-Claim Aliases
+
+Pin poll timeouts for your team's edge-claim rollouts:
+
+```bash
+xyte-cli flow create flow.noc-edge-claim-batch \
+  --based-on flow.edge-claim-batch \
+  --title "NOC Edge Claim Batch" \
+  --var edge_poll_interval_ms=5000 \
+  --var edge_poll_timeout_ms=900000
+```
+
+Full native-vs-edge disambiguation and C2C-unsupported guidance: [`../claim-devices.md`](../claim-devices.md).
 
 ## References
 

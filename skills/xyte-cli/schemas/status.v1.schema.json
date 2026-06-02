@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xyte.dev/schemas/status.v1.schema.json",
+  "title": "Xyte Status V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generatedAtUtc",
+    "mode",
+    "checkConnectivity",
+    "readiness"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "xyte.status.v1"
+    },
+    "generatedAtUtc": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "fast",
+        "full"
+      ]
+    },
+    "checkConnectivity": {
+      "type": "boolean"
+    },
+    "readiness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "missingItems",
+        "recommendedActions",
+        "providers",
+        "connectionState",
+        "connectivity"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "ready",
+            "needs_setup",
+            "degraded"
+          ]
+        },
+        "tenantId": {
+          "type": "string"
+        },
+        "activeTenant": {
+          "type": "object"
+        },
+        "missingItems": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "recommendedActions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "providers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "provider",
+              "slotCount",
+              "hasActiveSecret"
+            ],
+            "properties": {
+              "provider": {
+                "type": "string"
+              },
+              "slotCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "activeSlotId": {
+                "type": "string"
+              },
+              "activeSlotName": {
+                "type": "string"
+              },
+              "hasActiveSecret": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "connectionState": {
+          "type": "string"
+        },
+        "connectivity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "message",
+            "retriable"
+          ],
+          "properties": {
+            "state": {
+              "type": "string"
+            },
+            "class": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "retriable": {
+              "type": "boolean"
+            },
+            "endpointKey": {
+              "type": "string"
+            },
+            "statusCode": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,8 +1,8 @@
 import { access } from 'node:fs/promises';
 import path from 'node:path';
 
-import { getEnvPathValue, setEnvPathValue } from '../utils/env-path';
-import { runProcess } from '../utils/run-command';
+import { getEnvPathValue, setEnvPathValue } from '../../src/utils/env-path';
+import { runProcess } from '../../src/utils/run-command';
 
 export const NPM_COMMAND = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 export const XYTE_COMMAND = process.platform === 'win32' ? 'xyte-cli.cmd' : 'xyte-cli';

@@ -1,7 +1,7 @@
 import path from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
-import * as smokePackInstall from '../src/smoke/pack-install';
+import * as smokePackInstall from './smoke/pack-install';
 
 describe('pack install smoke script', () => {
   it('runs expected command sequence with provided env', async () => {
@@ -43,6 +43,20 @@ describe('pack install smoke script', () => {
       if (args[0] === 'init') {
         return { code: 0, stdout: 'Skill install summary:\nsetup skipped', stderr: '' };
       }
+      if (args[0] === 'util' && args[1] === 'prepare') {
+        return {
+          code: 0,
+          stdout: '{"actionKey":"organization.connectors.prepareSetup","executionSupport":"prepare-only"}',
+          stderr: ''
+        };
+      }
+      if (args[0] === 'util' && args[1] === 'list-actions') {
+        return {
+          code: 0,
+          stdout: '[{"actionKey":"organization.connectors.prepareSetup","executionSupport":"prepare-only"}]',
+          stderr: ''
+        };
+      }
       if (args[0] === 'setup' && args[1] === 'run') {
         return {
           code: 0,
@@ -75,6 +89,7 @@ describe('pack install smoke script', () => {
     const mkdirFn = vi.fn(async () => undefined);
     const rmFn = vi.fn(async () => undefined);
     const unlinkFn = vi.fn(async () => undefined);
+    const writeFileFn = vi.fn(async () => undefined);
     const pathExistsFn = vi.fn(async () => true);
     const readFileFn = vi.fn(async (targetPath: string) => {
       if (targetPath.endsWith('.ndjson')) {
@@ -100,12 +115,13 @@ describe('pack install smoke script', () => {
       mkdirFn,
       rmFn,
       unlinkFn,
+      writeFileFn,
       pathExistsFn,
       readFileFn,
       startMockServerFn
     });
 
-    expect(calls).toHaveLength(13);
+    expect(calls).toHaveLength(15);
     expect(calls[0].args.join(' ')).toBe('pack --json');
     expect(calls[1].args.join(' ')).toBe(`install --global ${tarballPath}`);
     expect(calls[2].args.join(' ')).toBe('--help');
@@ -113,26 +129,37 @@ describe('pack install smoke script', () => {
     expect(calls[4].args.join(' ')).toBe('status --mode fast --output json');
     expect(calls[5].args.join(' ')).toBe(`init --scope both --agents all --target ${workspaceDir} --force`);
     expect(calls[6].args.join(' ')).toBe(
+      `util prepare --action organization.connectors.prepareSetup --input ${path.join(workspaceDir, 'connectors.csv')} --output-dir ${path.join(workspaceDir, 'prepared')} --force`
+    );
+    expect(calls[7].args.join(' ')).toBe(
+      'util list-actions --format json --mode friendly --execution-support prepare-only'
+    );
+    expect(calls[8].args.join(' ')).toBe(
       'setup run --non-interactive --tenant acme --provider xyte-org --key-stdin --connectivity never --output json'
     );
-    expect(calls[6].input).toBe('smoke-test-key\n');
-    expect(calls[7].args.join(' ')).toBe('setup status --tenant acme --field tenantId');
-    expect(calls[8].args.join(' ')).toBe(
+    expect(calls[8].input).toBe('smoke-test-key\n');
+    expect(calls[9].args.join(' ')).toBe('setup status --tenant acme --field tenantId');
+    expect(calls[10].args.join(' ')).toBe(
       'config tenant add acme --name Acme Mock --hub-url http://127.0.0.1:43123 --entry-url http://127.0.0.1:43123'
     );
-    expect(calls[9].args.join(' ')).toBe(
+    expect(calls[11].args.join(' ')).toBe(
       `ops watch incidents --tenant acme --profile incidents-active --once --output json --strict-json --out ${path.join(artifactsDir, 'xyte-watch.incidents.ndjson')}`
     );
-    expect(calls[10].args.join(' ')).toBe(
+    expect(calls[12].args.join(' ')).toBe(
       `ops inspect fleet --tenant acme --output json --out ${path.join(artifactsDir, 'xyte-fleet.json')}`
     );
-    expect(calls[11].args.join(' ')).toBe(
+    expect(calls[13].args.join(' ')).toBe(
       `ops inspect deep-dive --tenant acme --window 24 --output json --out ${path.join(artifactsDir, 'xyte-deep-dive.json')}`
     );
-    expect(calls[12].args.join(' ')).toBe(
+    expect(calls[14].args.join(' ')).toBe(
       `ops report generate --tenant acme --input ${path.join(artifactsDir, 'xyte-deep-dive.json')} --out ${path.join(reportsDir, 'fleet-report.md')} --render markdown`
     );
     expect(calls.slice(2).every((call) => call.cwd === workspaceDir)).toBe(true);
+    expect(writeFileFn).toHaveBeenCalledWith(
+      path.join(workspaceDir, 'connectors.csv'),
+      'platform,targetSpace,authorizationOwner\nZoom Rooms,Milan HQ,AV operations\n',
+      'utf8'
+    );
     expect(startMockServerFn).toHaveBeenCalledWith({
       cwd: repoRoot,
       env: expect.objectContaining({

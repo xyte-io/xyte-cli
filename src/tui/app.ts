@@ -1,9 +1,10 @@
 import blessed from 'blessed';
 import { setTimeout as delay } from 'node:timers/promises';
 
+import { CliUserError } from '../contracts/user-error';
 import { createLayout } from './layout';
 import { GLOBAL_KEYMAP, SCREEN_ACTION_KEYMAP } from './keymap';
-import type { TuiContext, TuiScreen, TuiScreenId } from './types';
+import type { TuiContext, NavigableScreen, TuiScreenId } from './types';
 import { createSetupScreen } from './screens/setup';
 import { createConfigScreen } from './screens/config';
 import { createDashboardScreen } from './screens/dashboard';
@@ -96,6 +97,16 @@ export function updateErrorStormState(
   };
 }
 
+export const CHAR_SCREEN_MAP: Record<string, TuiScreenId> = {
+  u: 'setup',
+  g: 'config',
+  d: 'dashboard',
+  s: 'spaces',
+  v: 'devices',
+  i: 'incidents',
+  t: 'tickets'
+};
+
 export async function runTuiApp(options: TuiAppOptions): Promise<void> {
   const profileStore = options.profileStore ?? createProfileStore();
   const secretStore = options.secretStore ?? createSecretStore();
@@ -116,7 +127,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
   if (options.headless) {
     const requestedFormat = options.format ?? 'json';
     if (requestedFormat !== 'json') {
-      throw new Error('Headless mode only supports JSON output.');
+      throw new CliUserError({ summary: 'Headless mode only supports JSON output.' });
     }
     try {
       await runHeadlessRenderer({
@@ -399,7 +410,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
         }
       };
 
-      const screens: Record<TuiScreenId, TuiScreen> = {
+      const screens: Record<TuiScreenId, NavigableScreen> = {
         setup: createSetupScreen(),
         config: createConfigScreen(),
         dashboard: createDashboardScreen(),
@@ -409,7 +420,7 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
         tickets: createTicketsScreen()
       };
 
-      let mounted: TuiScreen | undefined;
+      let mounted: NavigableScreen | undefined;
 
       const mountScreen = async (id: TuiScreenId) => {
         const token = ++mountTransitionToken;
@@ -542,32 +553,8 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
           await mountScreen(target);
           return;
         }
-        if (ch === 'u') {
-          await mountScreen('setup');
-          return;
-        }
-        if (ch === 'g') {
-          await mountScreen('config');
-          return;
-        }
-        if (ch === 'd') {
-          await mountScreen('dashboard');
-          return;
-        }
-        if (ch === 's') {
-          await mountScreen('spaces');
-          return;
-        }
-        if (ch === 'v') {
-          await mountScreen('devices');
-          return;
-        }
-        if (ch === 'i') {
-          await mountScreen('incidents');
-          return;
-        }
-        if (ch === 't') {
-          await mountScreen('tickets');
+        if (ch && CHAR_SCREEN_MAP[ch]) {
+          await mountScreen(CHAR_SCREEN_MAP[ch]);
           return;
         }
         if (ch === 'r') {
@@ -646,10 +633,10 @@ export async function runTuiApp(options: TuiAppOptions): Promise<void> {
             ch: event.ch,
             key: event.key,
             isModalActive: modalActive,
-            handleArrow: activeMounted?.handleArrow
+            handleArrow: activeMounted
               ? async (key) => {
                   try {
-                    return await activeMounted.handleArrow!(key);
+                    return await activeMounted.handleArrow(key);
                   } catch (error) {
                     logger.log('input.arrow.error', {
                       screen: activeMounted?.id,

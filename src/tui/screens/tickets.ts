@@ -2,7 +2,7 @@ import blessed from 'blessed';
 
 import {
   clampIndex,
-  movePaneWithBoundary,
+  handleHorizontalArrow,
   moveTableSelection,
   setListTableData,
   scrollBox,
@@ -12,14 +12,39 @@ import {
 } from '../navigation';
 import { SCREEN_PANE_CONFIG } from '../panes';
 import { createRenderErrorTracker } from '../render-error-tracker';
-import type { TuiArrowKey, TuiContext, TuiPaneId, TuiScreen } from '../types';
+import { createScreenRenderLogger, logScreenDataFetch } from '../screen-render-logger';
+import type { TuiArrowKey, TuiContext, NavigableScreen, TuiPaneId } from '../types';
 import type { EndpointNamespace } from '../../types/endpoints';
 import { loadTicketsData } from '../data-loaders';
 import { sceneFromTicketsState } from '../scene';
 import { payloadSummary, safePreviewLines, safeSearchText } from '../serialize';
-import { confirmWriteWithToken, openActionPalette } from '../actions';
+import { confirmWriteWithToken, openActionPalette, runGuardedAction } from '../actions';
 import { asRecord } from '../../utils/json';
 import { errorMessage } from '../../utils/error-format';
+
+function renderTicketFallbackTable(
+  list: blessed.Widgets.ListTableElement | undefined,
+  filtered: unknown[],
+  selectionSync: SelectionSyncState
+): void {
+  if (!list) return;
+  setListTableData(
+    list,
+    [
+      ['ID', 'Status', 'Priority', 'Subject'],
+      ...filtered.map((ticket, index) => {
+        const r = asRecord(ticket);
+        return [
+          String(r.id ?? r._id ?? `row-${index + 1}`),
+          String(r.status ?? r.state ?? 'unknown'),
+          String(r.priority ?? 'n/a'),
+          String(r.subject ?? r.title ?? 'n/a')
+        ];
+      })
+    ],
+    selectionSync
+  );
+}
 
 function ticketIdOf(ticket: unknown): string {
   const r = asRecord(ticket);
@@ -46,7 +71,7 @@ interface ResolveTicketWithGuardArgs {
   context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;
 }
 
-export async function resolveTicketWithGuard(args: ResolveTicketWithGuardArgs): Promise<boolean> {
+export async function markTicketResolvedWithGuard(args: ResolveTicketWithGuardArgs): Promise<boolean> {
   const { ticket, mode, context } = args;
   if (mode !== 'organization') {
     context.setStatus('Ticket write actions are disabled in partner mode (organization-only policy).');
@@ -69,16 +94,10 @@ export async function resolveTicketWithGuard(args: ResolveTicketWithGuardArgs): 
     return false;
   }
 
-  context.setStatus('Resolving ticket...');
-  try {
-    const tenantId = await context.getActiveTenantId();
+  return runGuardedAction(context, 'Resolving ticket...', async (tenantId) => {
     await context.client.organization.markResolved({ tenantId, path: { ticket_id: ticketId } });
     context.setStatus(`Ticket ${ticketId} resolved.`);
-    return true;
-  } catch (error) {
-    context.showError(error);
-    return false;
-  }
+  });
 }
 
 interface SendTicketMessageWithGuardArgs {
@@ -117,23 +136,17 @@ export async function sendTicketMessageWithGuard(args: SendTicketMessageWithGuar
     return false;
   }
 
-  context.setStatus('Sending ticket message...');
-  try {
-    const tenantId = await context.getActiveTenantId();
+  return runGuardedAction(context, 'Sending ticket message...', async (tenantId) => {
     await context.client.organization.sendMessage({
       tenantId,
       path: { ticket_id: ticketId },
       query: { message }
     });
     context.setStatus(`Message sent for ticket ${ticketId}.`);
-    return true;
-  } catch (error) {
-    context.showError(error);
-    return false;
-  }
+  });
 }
 
-export function createTicketsScreen(): TuiScreen {
+export function createTicketsScreen(): NavigableScreen {
   let root: blessed.Widgets.BoxElement | undefined;
   let list: blessed.Widgets.ListTableElement | undefined;
   let detail: blessed.Widgets.BoxElement | undefined;
@@ -159,6 +172,7 @@ export function createTicketsScreen(): TuiScreen {
   let activePane: TuiPaneId = paneConfig.defaultPane;
   let isMounted = false;
   const renderErrors = createRenderErrorTracker();
+  const renderLog = createScreenRenderLogger('tickets', () => context.debugLog, renderErrors);
   const detailCacheByTicket = new Map<string, string>();
 
   const focusPane = () => {
@@ -197,26 +211,17 @@ export function createTicketsScreen(): TuiScreen {
     const start = (page - 1) * Math.max(1, perPage);
     filtered = filteredAll.slice(start, start + Math.max(1, perPage));
 
-    if (restoreTicketId) {
-      const pageIndex = filtered.findIndex((ticket) => ticketIdOf(ticket) === restoreTicketId);
-      if (pageIndex >= 0) {
-        selectedIndex = pageIndex;
-      } else {
-        selectedIndex = clampIndex(selectedIndex, filtered.length);
-      }
-    } else {
-      selectedIndex = clampIndex(selectedIndex, filtered.length);
-    }
+    const pageIndex = restoreTicketId
+      ? filtered.findIndex((ticket) => ticketIdOf(ticket) === restoreTicketId)
+      : -1;
+    selectedIndex = pageIndex >= 0 ? pageIndex : clampIndex(selectedIndex, filtered.length);
   };
 
   const renderRows = (restoreTicketId?: string) => {
     if (!isMounted) {
       return;
     }
-    context.debugLog?.('screen.render.start', {
-      screen: 'tickets',
-      frozen: renderErrors.frozen
-    });
+    renderLog.onRenderStart();
     rebuildFiltered(restoreTicketId);
 
     const actionsHint = ticketWritesEnabled()
@@ -225,22 +230,7 @@ export function createTicketsScreen(): TuiScreen {
 
     try {
       if (renderErrors.frozen) {
-        setListTableData(
-          list,
-          [
-            ['ID', 'Status', 'Priority', 'Subject'],
-            ...filtered.map((ticket, index) => {
-              const r = asRecord(ticket);
-              return [
-                String(r.id ?? r._id ?? `row-${index + 1}`),
-                String(r.status ?? r.state ?? 'unknown'),
-                String(r.priority ?? 'n/a'),
-                String(r.subject ?? r.title ?? 'n/a')
-              ];
-            })
-          ],
-          selectionSync
-        );
+        renderTicketFallbackTable(list, filtered, selectionSync);
         detail?.setContent('Render fallback mode enabled for ticket details.');
       } else {
         const panels = sceneFromTicketsState({
@@ -271,37 +261,12 @@ export function createTicketsScreen(): TuiScreen {
         detail?.setContent((detailPanel?.text?.lines ?? ['No tickets.']).join('\n'));
       }
       renderErrors.recordSuccess();
-      context.debugLog?.('screen.render.complete', {
-        screen: 'tickets',
-        frozen: renderErrors.frozen
-      });
+      renderLog.onRenderComplete();
     } catch (error) {
       const message = errorMessage(error);
       renderErrors.recordError(message);
-      context.debugLog?.('screen.render.error', {
-        screen: 'tickets',
-        message,
-        frozen: renderErrors.frozen
-      });
-      context.debugLog?.('screen.render.fallback.applied', {
-        screen: 'tickets'
-      });
-      setListTableData(
-        list,
-        [
-          ['ID', 'Status', 'Priority', 'Subject'],
-          ...filtered.map((ticket, index) => {
-            const r = asRecord(ticket);
-            return [
-              String(r.id ?? r._id ?? `row-${index + 1}`),
-              String(r.status ?? r.state ?? 'unknown'),
-              String(r.priority ?? 'n/a'),
-              String(r.subject ?? r.title ?? 'n/a')
-            ];
-          })
-        ],
-        selectionSync
-      );
+      renderLog.onRenderError(message);
+      renderTicketFallbackTable(list, filtered, selectionSync);
       detail?.setContent(`Unable to render ticket detail safely.\nReason: ${message}`);
     }
     syncListSelection(list, selectedIndex, selectionSync);
@@ -432,10 +397,7 @@ export function createTicketsScreen(): TuiScreen {
       }
       const tenantId = await context.getActiveTenantId();
       const restoreTicketId = ticketIdOf(selectedTicket());
-      context.debugLog?.('screen.data.fetch.start', {
-        screen: 'tickets',
-        tenantId
-      });
+      logScreenDataFetch(context.debugLog, 'tickets', 'start', { tenantId });
       const loaded = await loadTicketsData(context.client, tenantId);
       if (!isMounted) {
         return;
@@ -446,8 +408,7 @@ export function createTicketsScreen(): TuiScreen {
       detailRequestToken += 1;
       detailCacheByTicket.clear();
       detailText = '';
-      context.debugLog?.('screen.data.fetch.complete', {
-        screen: 'tickets',
+      logScreenDataFetch(context.debugLog, 'tickets', 'complete', {
         tenantId,
         count: tickets.length,
         mode,
@@ -457,11 +418,7 @@ export function createTicketsScreen(): TuiScreen {
       });
       if (loaded.error) {
         context.setStatus(`Tickets ${loaded.connectionState}: ${loaded.error.message}`);
-        context.debugLog?.('screen.data.fetch.error', {
-          screen: 'tickets',
-          message: loaded.error.message,
-          state: loaded.connectionState
-        });
+        logScreenDataFetch(context.debugLog, 'tickets', 'error', { message: loaded.error.message, state: loaded.connectionState });
       }
       renderRows(restoreTicketId);
       if (filtered.length) {
@@ -479,16 +436,12 @@ export function createTicketsScreen(): TuiScreen {
       return paneConfig.panes;
     },
     async handleArrow(key: TuiArrowKey) {
-      if (key === 'left' || key === 'right') {
-        const next = movePaneWithBoundary(paneConfig.panes, activePane, key);
-        if (next.boundary) {
-          return 'boundary';
-        }
-        activePane = next.pane;
+      const h = handleHorizontalArrow(key, paneConfig.panes, activePane, (newPane) => {
+        activePane = newPane;
         focusPane();
         context.setStatus(`Pane: ${activePane}`);
-        return 'handled';
-      }
+      });
+      if (h !== null) return h;
 
       const delta = key === 'up' ? -1 : key === 'down' ? 1 : 0;
       if (!delta) {
@@ -529,7 +482,7 @@ export function createTicketsScreen(): TuiScreen {
           context.setStatus('No ticket selected.');
           return true;
         }
-        const resolved = await resolveTicketWithGuard({ ticket, mode, context });
+        const resolved = await markTicketResolvedWithGuard({ ticket, mode, context });
         if (!isMounted) {
           return true;
         }

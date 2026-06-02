@@ -29,6 +29,7 @@ const CallEnvelopeSchema = z.object({
   tenantId: z.string().optional(),
   endpointKey: z.string(),
   method: z.string(),
+  note: z.string().optional(),
   guard: CallGuardSchema,
   request: CallEnvelopeRequestSchema,
   response: CallEnvelopeResponseSchema.optional(),
@@ -53,6 +54,7 @@ interface BuildCallEnvelopeArgs {
   tenantId?: string;
   endpointKey: string;
   method: string;
+  note?: string;
   guard: {
     allowWrite: boolean;
     confirm?: string;
@@ -87,6 +89,7 @@ export function buildCallEnvelope(args: BuildCallEnvelopeArgs): CallEnvelopeV1 {
     tenantId: args.tenantId,
     endpointKey: args.endpointKey,
     method: args.method,
+    note: args.note,
     guard: {
       allowWrite: args.guard.allowWrite,
       confirm: args.guard.confirm

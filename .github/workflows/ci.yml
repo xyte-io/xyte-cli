@@ -68,6 +68,52 @@ jobs:
       - name: Secretless packaged install smoke
         run: npm run smoke:pack-install
 
+  windows-native-secret-store-cert:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Certify Windows native secret-store path
+        run: npm run smoke:windows:native-secret-store
+
+  linux-native-secret-store-cert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Linux secret-store dependencies
+        run: sudo apt-get update && sudo apt-get install -y dbus-x11 gnome-keyring libsecret-tools
+
+      - name: Build
+        run: npm run build
+
+      - name: Certify Linux native secret-store path
+        run: |
+          dbus-run-session -- bash -lc 'eval "$(printf "xyte-cli-ci-password" | gnome-keyring-daemon --unlock --components=secrets)"; npm run smoke:linux:native-secret-store'
+
   security:
     runs-on: ubuntu-latest
     steps:

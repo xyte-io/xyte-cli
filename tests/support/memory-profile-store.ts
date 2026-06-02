@@ -104,34 +104,35 @@ export class MemoryProfileStore implements ProfileStore {
 
   async addKeySlot(
     tenantId: string,
-    input: { provider: SecretProvider; name: string; slotId?: string; fingerprint: string }
+    provider: SecretProvider,
+    input: { name: string; slotId?: string; fingerprint: string }
   ): Promise<ApiKeySlotMeta> {
     const tenant = this.getRequiredTenant(tenantId);
     tenant.keyRegistry = tenant.keyRegistry ?? emptyRegistry();
     const registry = tenant.keyRegistry;
     const now = new Date().toISOString();
     const slotName = ensureSlotName(input.name);
-    const providerSlots = registry.slots.filter((slot) => slot.provider === input.provider);
+    const providerSlots = registry.slots.filter((slot) => slot.provider === provider);
     if (providerSlots.some((slot) => slot.name.toLowerCase() === slotName.toLowerCase())) {
-      throw new Error(`A key slot named "${slotName}" already exists for provider ${input.provider}.`);
+      throw new Error(`A key slot named "${slotName}" already exists for provider ${provider}.`);
     }
 
     const existingIds = new Set(providerSlots.map((slot) => slot.slotId));
     const slotId = input.slotId?.trim() || buildSlotId(slotName, existingIds);
     if (existingIds.has(slotId)) {
-      throw new Error(`A key slot with id "${slotId}" already exists for provider ${input.provider}.`);
+      throw new Error(`A key slot with id "${slotId}" already exists for provider ${provider}.`);
     }
 
     const slot: ApiKeySlotMeta = {
       slotId,
-      provider: input.provider,
+      provider,
       name: slotName,
       fingerprint: input.fingerprint,
       createdAt: now,
       updatedAt: now
     };
     registry.slots.push(slot);
-    registry.activeSlotByProvider[input.provider] = registry.activeSlotByProvider[input.provider] ?? slotId;
+    registry.activeSlotByProvider[provider] = registry.activeSlotByProvider[provider] ?? slotId;
     tenant.updatedAt = now;
     return structuredClone(slot);
   }

@@ -98,18 +98,19 @@ describe('secret store backends', () => {
     const writeError = new Error('read-only file system') as NodeJS.ErrnoException;
     writeError.code = 'EROFS';
     const writeFileSpy = vi.spyOn(nodeFs.promises, 'writeFile').mockRejectedValue(writeError);
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const loggerModule = await import('../src/observability/logger');
+    const mockLogger = { warn: vi.fn(), info: vi.fn(), debug: vi.fn(), error: vi.fn(), silent: vi.fn() };
+    const getLoggerSpy = vi.spyOn(loggerModule, 'getLogger').mockReturnValue(mockLogger as any);
 
     try {
       const store = new FileSecretStore(filePath);
       expect(await store.getSlotSecret('acme', 'xyte-org', 'primary')).toBe('org-key');
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      const [message] = warnSpy.mock.calls[0] ?? [];
-      expect(String(message)).toContain('Failed to persist normalized secret data');
-      expect(String(message)).toContain(filePath);
+      expect(mockLogger.warn).toHaveBeenCalledTimes(1);
+      const [obj] = mockLogger.warn.mock.calls[0] ?? [];
+      expect(String((obj as any)?.file)).toContain(filePath.split('/').pop());
     } finally {
       writeFileSpy.mockRestore();
-      warnSpy.mockRestore();
+      getLoggerSpy.mockRestore();
     }
   });
 

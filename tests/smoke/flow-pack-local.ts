@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { NPM_COMMAND, XYTE_COMMAND, normalizeJsonOutput, runCommand } from './shared';
-import { errorMessage } from '../utils/error-format';
+import { errorMessage } from '../../src/utils/error-format';
 
 interface ParsedArgs {
   tenant: string;

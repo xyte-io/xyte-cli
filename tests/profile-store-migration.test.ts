@@ -118,13 +118,13 @@ describe('profile store migration', () => {
     const store = new FileProfileStore(filePath);
 
     await store.upsertTenant({ id: 'acme', apiProvider: 'xyte-org' });
-    await store.addKeySlot('acme', {
-      provider: 'xyte-org',
+    await store.addKeySlot('acme', 'xyte-org', {
+      
       name: 'org-primary',
       fingerprint: 'sha256:org'
     });
-    await store.addKeySlot('acme', {
-      provider: 'xyte-partner',
+    await store.addKeySlot('acme', 'xyte-partner', {
+      
       name: 'partner-primary',
       fingerprint: 'sha256:partner'
     });

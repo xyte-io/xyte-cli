@@ -1,6 +1,6 @@
 {
   "name": "@xyteai/cli",
-  "version": "0.8.0",
+  "version": "0.10.6",
   "description": "Xyte CLI, TUI, skills, and headless contracts for zero-friction AI operations",
   "license": "Apache-2.0",
   "repository": {
@@ -38,13 +38,14 @@
   ],
   "scripts": {
     "clean": "node scripts/clean.mjs",
-    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "skills:sync": "node scripts/sync_skills_data.mjs",
+    "build": "npm run clean && npm run skills:sync && tsc -p tsconfig.build.json",
     "lint": "eslint src/ tests/",
     "lint:fix": "eslint src/ tests/ --fix",
     "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.ts' 'tests/**/*.ts'",
     "prepare": "npm run build",
-    "prepublishOnly": "npm run typecheck && npm test && npm run build && npm run smoke:pack-install",
+    "prepublishOnly": "npm run skills:sync && npm run typecheck && npm test && npm run build && npm run smoke:pack-install",
     "install:global": "npm run build && npm link",
     "uninstall:global": "node scripts/uninstall_global.mjs",
     "reinstall:global": "npm run uninstall:global && npm run install:global",
@@ -53,9 +54,11 @@
     "test:watch": "vitest",
     "mock:xyte:local": "node scripts/mock_xyte_local.mjs",
     "smoke:local:utilities": "node scripts/smoke_local_utilities.mjs",
-    "smoke:local:flow-pack": "tsx src/smoke/flow-pack-local.ts",
-    "smoke:pack-install": "tsx src/smoke/pack-install.ts",
-    "smoke:external-live": "tsx src/smoke/external-user-live.ts",
+    "smoke:local:flow-pack": "tsx tests/smoke/flow-pack-local.ts",
+    "smoke:linux:native-secret-store": "tsx tests/smoke/linux-native-secret-store.ts",
+    "smoke:pack-install": "tsx tests/smoke/pack-install.ts",
+    "smoke:windows:native-secret-store": "tsx tests/smoke/windows-native-secret-store.ts",
+    "smoke:external-live": "tsx tests/smoke/external-user-live.ts",
     "smoke:upgrade:controlled": "node scripts/smoke_upgrade_controlled.mjs",
     "test:commit": "npm run typecheck && npm test && npm run smoke:pack-install",
     "release:check": "node scripts/release_check.mjs",
@@ -69,6 +72,7 @@
     "blessed": "^0.1.81",
     "commander": "^14.0.3",
     "cross-spawn": "^7.0.6",
+    "fuse.js": "^7.3.0",
     "pdfkit": "^0.17.2",
     "pino": "^10.3.0",
     "zod": "^4.3.6"
@@ -86,6 +90,6 @@
     "tsx": "^4.19.3",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.57.1",
-    "vitest": "^2.1.8"
+    "vitest": "^4.1.4"
   }
 }

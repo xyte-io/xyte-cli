@@ -191,8 +191,8 @@ describe('golden contracts', () => {
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
 
-    const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'primary',
       fingerprint: 'sha256:test'
     });
@@ -298,7 +298,7 @@ describe('golden contracts', () => {
         changed: true
       },
       delta: {
-        added: [{ id: 'inc-2', current: { id: 'inc-2', status: 'active' } }],
+        added: [{ id: 'inc-2', after: { id: 'inc-2', status: 'active' } }],
         removed: [],
         updated: [
           { id: 'inc-1', before: { id: 'inc-1', status: 'active' }, after: { id: 'inc-1', status: 'resolved' } }
@@ -329,6 +329,14 @@ describe('golden contracts', () => {
       nextResumeStepId: 'gate_send_command',
       resumeCommand:
         'xyte-cli flow run flow.guided-remediation --tenant acme --apply --inspect-provider-scope auto --resume run-1',
+      nextAction: {
+        kind: 'approve_gate',
+        stepId: 'gate_send_command',
+        title: 'Approve Send Command',
+        requiresWrite: true,
+        artifactPaths: [],
+        command: 'xyte-cli flow run flow.guided-remediation --tenant acme --apply --inspect-provider-scope auto --resume run-1'
+      },
       steps: [
         {
           stepId: 'watch_before',

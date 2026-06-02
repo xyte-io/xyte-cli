@@ -1,6 +1,8 @@
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { classifyConnectivityError, type ConnectivityResult, type ConnectionState } from '../config/connectivity';
+import { CliUserError } from '../contracts/user-error';
+import { classifyConnectivityError } from '../config/connectivity';
+import type { ConnectivityResult, ConnectionState } from '../contracts/status';
 import {
   computeRetryDelayMs,
   DEFAULT_RETRY_POLICY,
@@ -8,13 +10,13 @@ import {
   type RetryPolicyOptions,
   type RetryState
 } from '../config/retry-policy';
-import type { ProfileStore } from '../secure/profile-store';
-import type { SecretStore } from '../secure/secret-store';
+import type { ProfileStore } from '../types/stores';
+
 import type { XyteClient } from '../types/client';
 import type { SecretProvider } from '../types/profile';
 import type { EndpointNamespace } from '../types/endpoints';
-import { SUPPORTED_SECRET_PROVIDERS } from '../types/profile';
-import { extractArray, extractHasNextPage, extractIncidentsArray } from '../utils/json';
+import { extractArray, extractHasNextPage } from '../utils/json';
+import { extractIncidentsArray } from '../utils/incidents';
 import { PROVIDER_ORG } from '../types/profile';
 
 interface LoadOutcome<T> {
@@ -26,6 +28,8 @@ interface LoadOutcome<T> {
 
 type QueryValue = string | number | boolean | null | undefined;
 type QueryShape = Record<string, QueryValue>;
+
+const PAGINATION_PAGE_CAP = 50;
 
 interface LoadWithOutcomeOptions {
   retry?: RetryPolicyOptions;
@@ -52,7 +56,7 @@ function pickWorstOutcome(outcomes: Array<LoadOutcome<unknown>>): LoadOutcome<un
   );
 }
 
-async function loadWithOutcome<T>(
+async function withOutcome<T>(
   operation: () => Promise<T>,
   fallback: T,
   options: LoadWithOutcomeOptions = {}
@@ -60,6 +64,7 @@ async function loadWithOutcome<T>(
   const retryOptions = { ...DEFAULT_RETRY_POLICY, ...(options.retry ?? {}) };
   let attempts = 0;
   let retried = false;
+  let lastClassified: ReturnType<typeof classifyConnectivityError> | undefined;
 
   for (let attempt = 1; attempt <= retryOptions.maxAttempts; attempt += 1) {
     attempts = attempt;
@@ -71,7 +76,11 @@ async function loadWithOutcome<T>(
         retry: { attempts, retried }
       };
     } catch (error) {
+      if (error instanceof CliUserError) {
+        throw error;
+      }
       const classified = classifyConnectivityError(error);
+      lastClassified = classified;
       const retryable = isRetryableErrorClass(classified.class) && classified.retriable;
       if (!retryable || attempt >= retryOptions.maxAttempts) {
         return {
@@ -88,15 +97,11 @@ async function loadWithOutcome<T>(
     }
   }
 
+  // maxAttempts === 0: degenerate config, return empty fallback
   return {
     data: fallback,
-    connectionState: 'unknown_error',
-    error: {
-      state: 'unknown_error',
-      class: 'unknown',
-      message: 'Unknown loader failure.',
-      retriable: true
-    },
+    connectionState: lastClassified?.state ?? 'unknown_error',
+    error: lastClassified,
     retry: { attempts, retried }
   };
 }
@@ -176,17 +181,18 @@ async function resolveTenantProvider(
   tenantId: string | undefined
 ): Promise<SecretProvider> {
   if (!tenantId) {
-    throw new Error('Device loading requires a tenant id.');
+    throw new CliUserError({ summary: 'Device loading requires a tenant id.' });
   }
 
   const tenant = await profileStore.getTenant(tenantId);
   if (!tenant) {
-    throw new Error(`Unknown tenant: ${tenantId}`);
+    throw new CliUserError({ summary: `Unknown tenant: ${tenantId}` });
   }
   if (!tenant.apiProvider) {
-    throw new Error(
-      `Tenant ${tenantId} has no API provider configured. Set an active provider-specific key before loading devices.`
-    );
+    throw new CliUserError({
+      summary: `Tenant ${tenantId} has no API provider configured.`,
+      detail: 'Set an active provider-specific key before loading devices.'
+    });
   }
 
   return tenant.apiProvider;
@@ -197,7 +203,7 @@ export async function loadDevicesData(
   tenantId: string | undefined,
   options: DevicesLoadOptions
 ): Promise<LoadOutcome<unknown[]>> {
-  const result = await loadWithOutcome(async () => {
+  const result = await withOutcome(async () => {
     const query = compactQuery(options.query as QueryShape | undefined);
     const provider = await resolveTenantProvider(options.profileStore, tenantId);
     const raw =
@@ -237,10 +243,10 @@ function normalizeIncidentItem(incident: unknown): Record<string, unknown> {
 
 export async function loadIncidentsData(
   client: XyteClient,
-  tenantId?: string,
+  tenantId: string | undefined,
   options: IncidentsLoadOptions = {}
 ): Promise<LoadOutcome<unknown[]>> {
-  return loadWithOutcome(async () => {
+  return withOutcome(async () => {
     const nowUnix = Math.floor(Date.now() / 1000);
     const merged: IncidentsQuery = {
       status: 'active',
@@ -279,7 +285,7 @@ export async function loadIncidentsData(
 
     const all: unknown[] = [];
 
-    for (let page = initialPage; page <= 50; page += 1) {
+    for (let page = initialPage; page <= PAGINATION_PAGE_CAP; page += 1) {
       const query = buildQuery(page);
       const raw = await client.organization.getIncidents({
         tenantId,
@@ -297,6 +303,9 @@ export async function loadIncidentsData(
     }
 
     if (!all.length) {
+      // Some API implementations ignore pagination params and return all items in a single
+      // un-paginated response. When the paginated pass yields nothing, fall back to a bare
+      // request without page/per_page so those endpoints still work.
       const raw = await client.organization.getIncidents({ tenantId });
       return extractIncidentsArray(raw).map(normalizeIncidentItem);
     }
@@ -310,12 +319,23 @@ interface TicketsLoadResult {
   tickets: unknown[];
 }
 
-export async function loadTicketsData(client: XyteClient, tenantId?: string): Promise<LoadOutcome<TicketsLoadResult>> {
-  const orgOutcome = await loadWithOutcome(async () => {
-    const org = await client.organization.getTickets({ tenantId });
+interface TicketsLoadOptions {
+  query?: QueryShape;
+}
+
+export async function loadTicketsData(
+  client: XyteClient,
+  tenantId: string | undefined,
+  options: TicketsLoadOptions = {}
+): Promise<LoadOutcome<TicketsLoadResult>> {
+  const query = compactQuery(options.query);
+  const orgOutcome = await withOutcome(async () => {
+    const org = await client.organization.getTickets({ tenantId, ...(query ? { query } : {}) });
     return extractArray(org, ['tickets', 'data', 'items']);
   }, []);
 
+  // If org returned tickets or connected successfully with an empty list, accept that result — an
+  // empty org response is authoritative and should not trigger a partner fallback.
   if (orgOutcome.data.length || orgOutcome.connectionState === 'connected') {
     return {
       data: {
@@ -328,8 +348,8 @@ export async function loadTicketsData(client: XyteClient, tenantId?: string): Pr
     };
   }
 
-  const partnerOutcome = await loadWithOutcome(async () => {
-    const partner = await client.partner.getTickets({ tenantId });
+  const partnerOutcome = await withOutcome(async () => {
+    const partner = await client.partner.getTickets({ tenantId, ...(query ? { query } : {}) });
     return extractArray(partner, ['tickets', 'data', 'items']);
   }, []);
 
@@ -361,10 +381,10 @@ interface SpacesLoadOptions {
 
 export async function loadSpacesData(
   client: XyteClient,
-  tenantId?: string,
+  tenantId: string | undefined,
   options: SpacesLoadOptions = {}
 ): Promise<LoadOutcome<unknown[]>> {
-  return loadWithOutcome(async () => {
+  return withOutcome(async () => {
     const query = compactQuery(options.query as QueryShape | undefined);
     const raw = await client.organization.getSpaces({ tenantId, ...(query ? { query } : {}) });
     return extractArray(raw, ['spaces', 'data', 'items']);
@@ -419,7 +439,7 @@ export async function loadCommandTemplates(
   tenantId: string | undefined,
   options: { deviceId: string }
 ): Promise<LoadOutcome<CommandTemplate[]>> {
-  return loadWithOutcome(async () => {
+  return withOutcome(async () => {
     const raw = await client.organization.getCommands({
       tenantId,
       path: { device_id: options.deviceId }
@@ -432,7 +452,6 @@ export async function loadCommandTemplates(
 interface SpaceDrilldownResult {
   spaceDetail?: unknown;
   devicesInSpace: unknown[];
-  paneStatus: string;
 }
 
 function matchesSpace(device: unknown, spaceId: string): boolean {
@@ -447,32 +466,28 @@ function matchesSpace(device: unknown, spaceId: string): boolean {
 export async function loadSpaceDrilldownData(
   client: XyteClient,
   tenantId: string | undefined,
-  spaceId: string,
-  allDevicesCache: unknown[],
-  options: { profileStore: ProfileStore }
+  options: { spaceId: string; allDevicesCache?: unknown[]; profileStore: ProfileStore }
 ): Promise<LoadOutcome<SpaceDrilldownResult>> {
+  const { spaceId, allDevicesCache = [] } = options;
   const [detailOutcome, queriedDevicesOutcome] = await Promise.all([
-    loadWithOutcome(() => client.organization.getSpace({ tenantId, path: { space_id: spaceId } }), undefined),
-    loadWithOutcome(async () => {
+    withOutcome(() => client.organization.getSpace({ tenantId, path: { space_id: spaceId } }), undefined),
+    withOutcome(async () => {
       const queried = await client.organization.getDevices({ tenantId, query: { space_id: spaceId } });
       return extractArray(queried, ['devices', 'data', 'items']);
     }, [])
   ]);
 
   let devicesInSpace = queriedDevicesOutcome.data;
-  let paneStatus = 'Loaded space detail and device listing.';
   let fallbackOutcome: LoadOutcome<unknown[]> | undefined;
 
   if (!devicesInSpace.length) {
     if (allDevicesCache.length) {
       devicesInSpace = allDevicesCache.filter((device) => matchesSpace(device, spaceId));
-      paneStatus = 'Filtered devices by cached space_id fallback.';
     } else {
       fallbackOutcome = await loadDevicesData(client, tenantId, {
         profileStore: options.profileStore
       });
       devicesInSpace = fallbackOutcome.data.filter((device) => matchesSpace(device, spaceId));
-      paneStatus = 'Filtered devices by fetched space_id fallback.';
     }
   }
 
@@ -482,8 +497,7 @@ export async function loadSpaceDrilldownData(
   return {
     data: {
       spaceDetail: detailOutcome.data,
-      devicesInSpace,
-      paneStatus
+      devicesInSpace
     },
     connectionState: worst.connectionState,
     error: worst.error,
@@ -501,76 +515,4 @@ export function getSpaceName(space: unknown): string {
   return String(rec?.name ?? rec?.title ?? rec?.path ?? 'n/a');
 }
 
-const CONFIG_PROVIDERS: SecretProvider[] = [...SUPPORTED_SECRET_PROVIDERS];
-
-export interface ConfigProviderRow {
-  provider: SecretProvider;
-  slotCount: number;
-  activeSlot: string;
-  hasSecret: 'yes' | 'no';
-  lastValidatedAt?: string;
-}
-
-export interface ConfigSlotRow {
-  provider: SecretProvider;
-  slotId: string;
-  name: string;
-  active: 'yes' | 'no';
-  hasSecret: 'yes' | 'no';
-  fingerprint: string;
-}
-
-export interface ConfigData {
-  providerRows: ConfigProviderRow[];
-  selectedProvider: SecretProvider;
-  slotRows: ConfigSlotRow[];
-}
-
-export async function loadConfigData(
-  profileStore: ProfileStore,
-  secretStore: SecretStore,
-  tenantId: string | undefined
-): Promise<ConfigData> {
-  const allSlots = tenantId ? await profileStore.listKeySlots(tenantId) : [];
-
-  const providerRows: ConfigProviderRow[] = await Promise.all(
-    CONFIG_PROVIDERS.map(async (provider) => {
-      const providerSlots = allSlots.filter((slot) => slot.provider === provider);
-      const activeSlot = tenantId ? await profileStore.getActiveKeySlot(tenantId, provider) : undefined;
-      const hasActiveSecret =
-        tenantId && activeSlot
-          ? Boolean(await secretStore.getSlotSecret(tenantId, provider, activeSlot.slotId))
-          : false;
-      return {
-        provider,
-        slotCount: providerSlots.length,
-        activeSlot: activeSlot?.slotId ?? 'none',
-        hasSecret: hasActiveSecret ? 'yes' : 'no',
-        lastValidatedAt: activeSlot?.lastValidatedAt
-      };
-    })
-  );
-
-  const selectedProvider = providerRows.find((row) => row.slotCount > 0)?.provider ?? PROVIDER_ORG;
-
-  const slotRows: ConfigSlotRow[] = await Promise.all(
-    allSlots
-      .filter((slot) => slot.provider === selectedProvider)
-      .map(async (slot) => {
-        const active = tenantId ? await profileStore.getActiveKeySlot(tenantId, slot.provider) : undefined;
-        const hasSecret = tenantId
-          ? Boolean(await secretStore.getSlotSecret(tenantId, slot.provider, slot.slotId))
-          : false;
-        return {
-          provider: slot.provider,
-          slotId: slot.slotId,
-          name: slot.name,
-          active: active?.slotId === slot.slotId ? 'yes' : 'no',
-          hasSecret: hasSecret ? 'yes' : 'no',
-          fingerprint: slot.fingerprint
-        };
-      })
-  );
-
-  return { providerRows, selectedProvider, slotRows };
-}
+export { readConfigData, type ConfigData } from './config-loader';

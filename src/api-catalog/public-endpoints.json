@@ -42,14 +42,15 @@
       "per_page"
     ],
     "authScope": "organization",
-    "bodyType": "json",
-    "hasBody": true,
+    "bodyType": "none",
+    "hasBody": false,
     "sourceFile": "https://docs.xyte.io/reference/get-commands",
     "notes": [
       "Docs page: https://docs.xyte.io/reference/get-commands",
       "Docs category: /branches/2.0/categories/reference/API Access",
       "Docs parent: /branches/2.0/reference/commands",
-      "Docs raw path params: device_id"
+      "Docs raw path params: device_id",
+      "Docs OpenAPI requestBody repeats device_id, but the verified route uses device_id as a path parameter and this GET request must not send a body."
     ]
   },
   {
@@ -100,6 +101,28 @@
     ]
   },
   {
+    "key": "organization.devices.moveDevice",
+    "namespace": "organization",
+    "group": "devices",
+    "action": "moveDevice",
+    "title": "Move Device",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/:device_id/move",
+    "pathParams": [
+      "device_id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/move-device",
+    "bodyExample": "{\n  \"space_id\": 99592\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/move-device"
+    ]
+  },
+  {
     "key": "organization.devices.mergeDevice",
     "namespace": "organization",
     "group": "devices",
@@ -142,6 +165,52 @@
     "notes": [
       "Detaches a shadow device from its primary.",
       "Body: { \"shadow_device_id\": \"<shadow_id>\" }"
+    ]
+  },
+  {
+    "key": "organization.devices.suspendIncidents",
+    "namespace": "organization",
+    "group": "devices",
+    "action": "suspendIncidents",
+    "title": "Suspend Incidents",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/:device_id/suspend_incidents",
+    "pathParams": [
+      "device_id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/suspend-incidents",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/suspend-incidents",
+      "Customer docs PR xyte-io/customer-docs-portal#9 documents POST /core/v1/organization/devices/:device_id/suspend_incidents.",
+      "Server route evidence: xyte-io/server#8769 links devices_controller#suspend_incidents; endpoint takes no request body and returns { \"success\": true }."
+    ]
+  },
+  {
+    "key": "organization.devices.resumeIncidents",
+    "namespace": "organization",
+    "group": "devices",
+    "action": "resumeIncidents",
+    "title": "Resume Incidents",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/:device_id/resume_incidents",
+    "pathParams": [
+      "device_id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/resume-incidents",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/resume-incidents",
+      "Customer docs PR xyte-io/customer-docs-portal#9 documents POST /core/v1/organization/devices/:device_id/resume_incidents.",
+      "Server route evidence: xyte-io/server#8769 links devices_controller#resume_incidents; endpoint takes no request body and returns { \"success\": true }."
     ]
   },
   {
@@ -269,6 +338,130 @@
     ]
   },
   {
+    "key": "organization.edge.startClaim",
+    "namespace": "organization",
+    "group": "edge",
+    "action": "startClaim",
+    "title": "Start Edge Claim",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/edges/devices/start_claim",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/edgeclaim-device",
+    "bodyExample": "{\n  \"proxy_id\": \"proxy-uuid\",\n  \"device_ip\": \"192.168.1.100\",\n  \"device_model_id\": \"model-uuid\",\n  \"space_id\": 10000,\n  \"display_name\": \"Conference Room Display\",\n  \"custom_parameters\": {},\n  \"skip_connectivity_check\": false\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/edgeclaim-device",
+      "Docs category: Edge Devices",
+      "Async endpoint: returns 204; poll organization.edge.getClaimStatus until pending/success/failed.",
+      "Legacy route live-verified on 2026-04-19: POST /core/v1/organization/edge/devices/start_claim returns 400 \"Must provide proxy id\" when called with an empty JSON body.",
+      "Server PR xyte-io/server#8732 made /core/v1/organization/edges/devices the canonical route; /core/v1/organization/edge/devices is legacy server compatibility and is not used by the CLI catalog."
+    ]
+  },
+  {
+    "key": "organization.edge.getClaimStatus",
+    "namespace": "organization",
+    "group": "edge",
+    "action": "getClaimStatus",
+    "title": "Get Edge Claim Status",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/edges/devices/get_claim_status",
+    "pathParams": [],
+    "queryParams": [
+      "proxy_id",
+      "device_ip"
+    ],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/edgeget-claim-status",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/edgeget-claim-status",
+      "Docs category: Edge Devices",
+      "Response: { \"result\": \"pending\" | \"success\" | \"failed\" }.",
+      "Legacy route live-verified on 2026-04-19: GET /core/v1/organization/edge/devices/get_claim_status returns 400 \"Proxy not found\" for an unknown proxy_id/device_ip pair.",
+      "Server PR xyte-io/server#8732 made /core/v1/organization/edges/devices the canonical route; /core/v1/organization/edge/devices is legacy server compatibility and is not used by the CLI catalog."
+    ]
+  },
+  {
+    "key": "organization.edge.startPing",
+    "namespace": "organization",
+    "group": "edge",
+    "action": "startPing",
+    "title": "Start Edge Ping",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/edges/devices/start_ping",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/edgestart-ping",
+    "bodyExample": "{\n  \"proxy_id\": \"proxy-uuid\",\n  \"device_ip\": \"192.168.1.100\"\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/edgestart-ping",
+      "Docs category: Edge Devices",
+      "Async endpoint: returns 204; poll organization.edge.getPingStatus until pending/success/failed.",
+      "Legacy route live-verified on 2026-04-19: POST /core/v1/organization/edge/devices/start_ping returns 400 \"Must provide proxy id\" when called with an empty JSON body.",
+      "Server PR xyte-io/server#8732 made /core/v1/organization/edges/devices the canonical route; /core/v1/organization/edge/devices is legacy server compatibility and is not used by the CLI catalog."
+    ]
+  },
+  {
+    "key": "organization.edge.getPingStatus",
+    "namespace": "organization",
+    "group": "edge",
+    "action": "getPingStatus",
+    "title": "Get Edge Ping Status",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/edges/devices/get_ping_status",
+    "pathParams": [],
+    "queryParams": [
+      "proxy_id",
+      "device_ip"
+    ],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/edgeget-ping-status",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/edgeget-ping-status",
+      "Docs category: Edge Devices",
+      "Response: { \"status\": \"pending\" | \"success\" | \"failed\" }.",
+      "Legacy route live-verified on 2026-04-19: GET /core/v1/organization/edge/devices/get_ping_status returns 400 \"Proxy not found\" for an unknown proxy_id/device_ip pair.",
+      "Server PR xyte-io/server#8732 made /core/v1/organization/edges/devices the canonical route; /core/v1/organization/edge/devices is legacy server compatibility and is not used by the CLI catalog."
+    ]
+  },
+  {
+    "key": "organization.edges.getEdges",
+    "namespace": "organization",
+    "group": "edges",
+    "action": "getEdges",
+    "title": "Get Edges",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/edges",
+    "pathParams": [],
+    "queryParams": [
+      "page",
+      "per_page"
+    ],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/get-edges",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-edges",
+      "Customer docs PR xyte-io/customer-docs-portal#4 documents this endpoint; server PR xyte-io/server#8732 is merged.",
+      "Returns paginated Edge records with { items, next_page }."
+    ]
+  },
+  {
     "key": "organization.getOrganizationInfo",
     "namespace": "organization",
     "group": "general",
@@ -287,6 +480,187 @@
       "Docs page: https://docs.xyte.io/reference/get-organizations-info",
       "Docs category: /branches/2.0/categories/reference/API Access",
       "Docs parent: /branches/2.0/reference/organisation-api"
+    ]
+  },
+  {
+    "key": "organization.groups.addExternalUser",
+    "namespace": "organization",
+    "group": "groups",
+    "action": "addExternalUser",
+    "title": "Add External User to Group",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/groups/:id/add_external_user",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/add-external-user-to-group",
+    "bodyExample": "{\n  \"email\": \"support.user@partner.com\"\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/add-external-user-to-group",
+      "Customer docs PR xyte-io/customer-docs-portal#2 documents this endpoint; server PR xyte-io/server#8670 is merged."
+    ]
+  },
+  {
+    "key": "organization.groups.addUsers",
+    "namespace": "organization",
+    "group": "groups",
+    "action": "addUsers",
+    "title": "Add Users to Group",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/groups/:id/add_users",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/add-users-to-group",
+    "bodyExample": "{\n  \"user_ids\": [\n    \"9e34b87d-79ca-4dc3-ac42-8ce9ebe8be82\"\n  ]\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/add-users-to-group",
+      "Customer docs PR xyte-io/customer-docs-portal#2 documents this endpoint; server PR xyte-io/server#8670 is merged."
+    ]
+  },
+  {
+    "key": "organization.groups.createGroup",
+    "namespace": "organization",
+    "group": "groups",
+    "action": "createGroup",
+    "title": "Create Group",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/groups",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/create-group",
+    "bodyExample": "{\n  \"name\": \"London Team\",\n  \"user_ids\": [\n    \"9e34b87d-79ca-4dc3-ac42-8ce9ebe8be82\"\n  ]\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/create-group",
+      "Customer docs PR xyte-io/customer-docs-portal#2 documents this endpoint; server PR xyte-io/server#8670 is merged."
+    ]
+  },
+  {
+    "key": "organization.groups.deleteGroup",
+    "namespace": "organization",
+    "group": "groups",
+    "action": "deleteGroup",
+    "title": "Delete Group",
+    "method": "DELETE",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/groups/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/delete-group",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/delete-group",
+      "Customer docs PR xyte-io/customer-docs-portal#2 documents this endpoint; server PR xyte-io/server#8670 is merged."
+    ]
+  },
+  {
+    "key": "organization.groups.getGroup",
+    "namespace": "organization",
+    "group": "groups",
+    "action": "getGroup",
+    "title": "Get Group",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/groups/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/get-group",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-group",
+      "Customer docs PR xyte-io/customer-docs-portal#2 documents this endpoint; server PR xyte-io/server#8670 is merged."
+    ]
+  },
+  {
+    "key": "organization.groups.getGroups",
+    "namespace": "organization",
+    "group": "groups",
+    "action": "getGroups",
+    "title": "Get Groups",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/groups",
+    "pathParams": [],
+    "queryParams": [
+      "page",
+      "per_page"
+    ],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/get-groups",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-groups",
+      "Customer docs PR xyte-io/customer-docs-portal#2 documents this endpoint; server PR xyte-io/server#8670 is merged.",
+      "Returns paginated group records with { items, next_page }."
+    ]
+  },
+  {
+    "key": "organization.groups.removeUsers",
+    "namespace": "organization",
+    "group": "groups",
+    "action": "removeUsers",
+    "title": "Remove Users from Group",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/groups/:id/remove_users",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/remove-users-from-group",
+    "bodyExample": "{\n  \"user_ids\": [\n    \"9e34b87d-79ca-4dc3-ac42-8ce9ebe8be82\"\n  ]\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/remove-users-from-group",
+      "Customer docs PR xyte-io/customer-docs-portal#2 documents this endpoint; server PR xyte-io/server#8670 is merged."
+    ]
+  },
+  {
+    "key": "organization.groups.updateGroup",
+    "namespace": "organization",
+    "group": "groups",
+    "action": "updateGroup",
+    "title": "Update Group",
+    "method": "PUT",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/groups/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/update-group",
+    "bodyExample": "{\n  \"name\": \"Updated Group Name\"\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/update-group",
+      "Customer docs PR xyte-io/customer-docs-portal#2 documents this endpoint; server PR xyte-io/server#8670 is merged."
     ]
   },
   {
@@ -515,15 +889,15 @@
     ],
     "queryParams": [],
     "authScope": "organization",
-    "bodyType": "json",
-    "hasBody": true,
+    "bodyType": "none",
+    "hasBody": false,
     "sourceFile": "https://docs.xyte.io/reference/get-ticket",
-    "bodyExample": "{\n  \"id\": \"022a67f7-00e2-41b....\",\n  \"title\": \"Temperature won't go down\",\n  \"description\": \"Overheating, Help!\",\n  \"status\": \"resolved\",\n  \"created_at\": \"2024-07-21T11:15:02Z\",\n  \"device_id\": \"47560fbb-d998-4e2f-.....\",\n  \"user_name\": \"S. James\",\n  \"user_email\": \"james@abcde.io\",\n  \"comments\": [\n    {\n      \"id\": \"11111\",\n      \"text\": \"Hi - my device is overheating and it won't cool off. Help!\",\n      \"created_at\": \"2024-07-21T11:15:26.830Z\",\n      \"system\": false,\n      \"user\": \"S. James\",\n      \"owner\": \"Green Energy Corp\",\n      \"owner_type\": \"organization\"\n    }\n  ]\n}",
     "notes": [
       "Docs page: https://docs.xyte.io/reference/get-ticket",
       "Docs category: /branches/2.0/categories/reference/API Access",
       "Docs parent: /branches/2.0/reference/tickets-2",
-      "Docs raw path params: ticket_id"
+      "Docs raw path params: ticket_id",
+      "Docs OpenAPI requestBody is a response-shaped sample, but this GET request is path-parameter only and must not send a body."
     ]
   },
   {
@@ -619,6 +993,117 @@
       "Docs category: /branches/2.0/categories/reference/API Access",
       "Docs parent: /branches/2.0/reference/tickets-2",
       "Docs raw path params: ticket_id"
+    ]
+  },
+  {
+    "key": "organization.users.createUser",
+    "namespace": "organization",
+    "group": "users",
+    "action": "createUser",
+    "title": "Create User",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/users",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/create-user",
+    "bodyExample": "{\n  \"email\": \"jane@example.com\",\n  \"name\": \"Jane Doe\",\n  \"group_ids\": [\n    \"269ec8e1-f599-4918-a36b-424aaeef6b83\"\n  ]\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/create-user",
+      "Customer docs PR xyte-io/customer-docs-portal#2 documents this endpoint; server PR xyte-io/server#8670 is merged."
+    ]
+  },
+  {
+    "key": "organization.users.deactivateUser",
+    "namespace": "organization",
+    "group": "users",
+    "action": "deactivateUser",
+    "title": "Deactivate User",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/users/:id/deactivate",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/deactivate-user",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/deactivate-user",
+      "Customer docs PR xyte-io/customer-docs-portal#2 documents this endpoint; server PR xyte-io/server#8670 is merged."
+    ]
+  },
+  {
+    "key": "organization.users.getUser",
+    "namespace": "organization",
+    "group": "users",
+    "action": "getUser",
+    "title": "Get User",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/users/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/get-user",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-user",
+      "Customer docs PR xyte-io/customer-docs-portal#2 documents this endpoint; server PR xyte-io/server#8670 is merged."
+    ]
+  },
+  {
+    "key": "organization.users.getUsers",
+    "namespace": "organization",
+    "group": "users",
+    "action": "getUsers",
+    "title": "Get Users",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/users",
+    "pathParams": [],
+    "queryParams": [
+      "page",
+      "per_page"
+    ],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/get-users",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-users",
+      "Customer docs PR xyte-io/customer-docs-portal#2 documents this endpoint; server PR xyte-io/server#8670 is merged.",
+      "Returns paginated active user records with { items, next_page }."
+    ]
+  },
+  {
+    "key": "organization.users.resendWelcome",
+    "namespace": "organization",
+    "group": "users",
+    "action": "resendWelcome",
+    "title": "Resend Welcome Email",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/users/:id/resend_welcome",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/resend-welcome-email",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/resend-welcome-email",
+      "Customer docs PR xyte-io/customer-docs-portal#2 documents this endpoint; server PR xyte-io/server#8670 is merged."
     ]
   },
   {
@@ -825,6 +1310,28 @@
     ]
   },
   {
+    "key": "partner.organizations.createOrganization",
+    "namespace": "partner",
+    "group": "organizations",
+    "action": "createOrganization",
+    "title": "Create Organization",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/organizations",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://dev.xyte.io/reference/partner-create-organization",
+    "bodyExample": "{\n  \"name\": \"Acme HQ\",\n  \"admin_contact_email\": \"admin@example.com\",\n  \"admin_contact_name\": \"Jane Doe\",\n  \"finance_contact_email\": \"finance@example.com\",\n  \"finance_contact_name\": \"Finance Team\"\n}",
+    "notes": [
+      "Docs page: https://dev.xyte.io/reference/partner-create-organization",
+      "Partner docs PR xyte-io/partner-docs-portal#1 documents this endpoint; server PR xyte-io/server#8666 is merged.",
+      "Response includes an organization API key for subsequent Organization API calls."
+    ]
+  },
+  {
     "key": "partner.tickets.addComment",
     "namespace": "partner",
     "group": "tickets",
@@ -880,7 +1387,7 @@
     "title": "Get Ticket",
     "method": "GET",
     "base": "hub",
-    "pathTemplate": "/core/v1/partner/tickets/:ticket_id (COPY)",
+    "pathTemplate": "/core/v1/partner/tickets/:ticket_id",
     "pathParams": [
       "ticket_id"
     ],
@@ -893,7 +1400,8 @@
       "Docs page: https://dev.xyte.io/reference/partner-tickets-get",
       "Docs category: /branches/1/categories/reference/Partner Core API",
       "Docs parent: /branches/1/reference/ticket",
-      "Docs raw path params: ticket_id"
+      "Docs raw path params: ticket_id",
+      "Docs OpenAPI path currently includes a ReadMe '(COPY)' suffix; the callable ticket route is /core/v1/partner/tickets/:ticket_id."
     ]
   },
   {

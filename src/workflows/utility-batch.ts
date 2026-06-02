@@ -1,11 +1,18 @@
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { appendFileSync, writeFileSync } from 'node:fs';
 
+import { z } from 'zod';
+
+import { ensureParentDir } from '../utils/fs';
 import { UTILITY_BATCH_SCHEMA_VERSION } from '../contracts/versions';
 import { errorMessage } from '../utils/error-format';
 import type { XyteClient, XyteCallResult } from '../types/client';
 
-export type UtilityBatchCommand = 'space.import-tree';
+export type UtilityBatchCommand = 'space.import-tree' | 'device.move';
+
+export interface UtilityBatchValidationOutcome {
+  skip: true;
+  reason: string;
+}
 
 export interface UtilityBatchOperation {
   rowIndex: number;
@@ -16,35 +23,39 @@ export interface UtilityBatchOperation {
     query?: Record<string, string | number | boolean | null | undefined>;
     body?: unknown;
   };
-  validate?: () => void;
+  validate?: (
+    client: XyteClient,
+    tenantId: string
+  ) => void | UtilityBatchValidationOutcome | Promise<void | UtilityBatchValidationOutcome>;
   execute: (client: XyteClient, tenantId: string) => Promise<XyteCallResult<unknown>>;
 }
 
-export interface UtilityBatchResult {
-  schemaVersion: typeof UTILITY_BATCH_SCHEMA_VERSION;
-  generatedAtUtc: string;
-  tenantId: string;
-  command: UtilityBatchCommand;
-  mode: 'dry-run' | 'apply';
-  totals: {
-    rows: number;
-    succeeded: number;
-    failed: number;
-    skipped: number;
-  };
-  stoppedEarly: boolean;
-  firstError?: {
-    rowIndex: number;
-    message: string;
-  };
-  reportPath?: string;
-}
+export const UtilityBatchResultSchema = z.object({
+  schemaVersion: z.literal(UTILITY_BATCH_SCHEMA_VERSION),
+  generatedAtUtc: z.string(),
+  tenantId: z.string(),
+  command: z.enum(['space.import-tree', 'device.move']),
+  mode: z.enum(['dry-run', 'apply']),
+  totals: z.object({
+    rows: z.number(),
+    planned: z.number(),
+    succeeded: z.number(),
+    failed: z.number(),
+    skipped: z.number()
+  }),
+  stoppedEarly: z.boolean(),
+  firstError: z
+    .object({
+      rowIndex: z.number(),
+      message: z.string()
+    })
+    .optional(),
+  reportPath: z.string().optional()
+});
 
-type UtilityRowStatus = 'dry-run' | 'succeeded' | 'failed' | 'skipped';
+export type UtilityBatchResult = z.infer<typeof UtilityBatchResultSchema>;
 
-function ensureParentDir(filePath: string): void {
-  mkdirSync(dirname(resolve(filePath)), { recursive: true });
-}
+type UtilityRowStatus = 'planned' | 'succeeded' | 'failed' | 'skipped';
 
 function writeReportLine(reportPath: string | undefined, payload: Record<string, unknown>): void {
   if (!reportPath) {
@@ -82,6 +93,7 @@ export async function runUtilityBatch(args: {
   const mode: UtilityBatchResult['mode'] = args.apply ? 'apply' : 'dry-run';
   const totals = {
     rows: args.operations.length,
+    planned: 0,
     succeeded: 0,
     failed: 0,
     skipped: 0
@@ -98,7 +110,12 @@ export async function runUtilityBatch(args: {
     const operation = args.operations[index];
 
     try {
-      operation.validate?.();
+      const validation = await operation.validate?.(args.client, args.tenantId);
+      if (validation?.skip) {
+        totals.skipped += 1;
+        writeReportLine(args.reportPath, reportLine(operation, 'skipped', { reason: validation.reason }));
+        continue;
+      }
       if (args.apply) {
         const response = await operation.execute(args.client, args.tenantId);
         totals.succeeded += 1;
@@ -114,8 +131,8 @@ export async function runUtilityBatch(args: {
           })
         );
       } else {
-        totals.skipped += 1;
-        writeReportLine(args.reportPath, reportLine(operation, 'dry-run'));
+        totals.planned += 1;
+        writeReportLine(args.reportPath, reportLine(operation, 'planned'));
       }
     } catch (error) {
       totals.failed += 1;

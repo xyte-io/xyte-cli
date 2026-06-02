@@ -75,8 +75,8 @@ describe('key wizard', () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();
     await profileStore.upsertTenant({ id: 'acme' });
-    const slot = await profileStore.addKeySlot('acme', {
-      provider: 'xyte-org',
+    const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
+      
       name: 'primary',
       fingerprint: 'sha256:old'
     });

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { parseCliOutputMode } from '../src/cli/cli-context';
 import { formatBytes } from '../src/cli/format-bytes';
-import { parseQueryJson, parsePositiveIntegerOption, parsePositiveNumberOption } from '../src/cli/parse-options';
+import { parseQueryJson, parseQueryString, parsePositiveIntegerOption, parsePositiveNumberOption } from '../src/cli/parse-options';
 
 describe('parseQueryJson', () => {
   it('returns empty object for undefined', () => {
@@ -20,6 +20,35 @@ describe('parseQueryJson', () => {
 
   it('throws on non-scalar values', () => {
     expect(() => parseQueryJson('{"a":[1,2]}')).toThrow('must be scalar');
+  });
+});
+
+describe('parseQueryString', () => {
+  it('returns empty object for undefined', () => {
+    expect(parseQueryString(undefined)).toEqual({});
+  });
+
+  it('parses repeated flags and ampersand-separated pairs as strings', () => {
+    expect(parseQueryString(['space_id=99592', 'path_includes=Regional Offices&name=South Wing'])).toEqual({
+      space_id: '99592',
+      path_includes: 'Regional Offices',
+      name: 'South Wing'
+    });
+  });
+
+  it('throws on duplicate keys', () => {
+    expect(() => parseQueryString(['space_id=1&space_id=2'])).toThrow('Duplicate query parameter');
+  });
+
+  it('uses a null-prototype object for parsed query output', () => {
+    const parsed = parseQueryString(['__proto__=polluted']);
+
+    expect(Object.getPrototypeOf(parsed)).toBeNull();
+    expect(parsed.__proto__).toBe('polluted');
+  });
+
+  it('throws on invalid segments', () => {
+    expect(() => parseQueryString(['space_id'])).toThrow('Use key=value');
   });
 });
 

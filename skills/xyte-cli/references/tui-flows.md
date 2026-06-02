@@ -8,6 +8,12 @@ Use `xyte-cli ops console --headless` as the visual/tooling interface for agents
 xyte-cli ops console --headless --screen <screen> --output json --once --tenant <tenant-id>
 ```
 
+## Credential Storage Notes
+
+- Persisted credentials default to secure OS-native storage under `auth.secretStoreBackend=auto`: macOS Keychain, Windows DPAPI, Linux Secret Service.
+- If native storage is unavailable under `auto`, setup/config/readiness commands may warn on `stderr` and fall back to file storage. Treat that warning alone as non-fatal when the exit code and `stdout` JSON are otherwise valid.
+- `xyte-cli config path --output json` reports backend diagnostics. `secretStore` may be a backend identifier, not always a filesystem path.
+
 ## Watch-First Triage Handoff
 
 For incident operations, run this sequence before any optional writes:
@@ -68,8 +74,9 @@ xyte-cli config key list --tenant <tenant-id> --output json
 xyte-cli config doctor --tenant <tenant-id> --output json
 ```
 
-For non-interactive automation, use `--key-file <path>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`.
+For non-interactive automation, use `--key-file <path>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`. To resolve the key from a secret manager, use `--key-command "<cmd>"` (e.g. `op read op://Employee/Xyte/credential`, `vault kv get -field=key secret/xyte`, `aws secretsmanager get-secret-value --secret-id xyte --query SecretString --output text`); xyte-cli runs the command and uses its stdout as the key.
 If `--provider` is omitted, setup probes `xyte-org` first and then `xyte-partner`. If `--connectivity never` is used, require `--provider`.
+Persisted credentials default to secure OS-native storage (macOS Keychain, Windows DPAPI, Linux Secret Service). If `xyte-cli` warns on stderr that secure storage was unavailable and it fell back to file storage, treat that as degraded-but-successful setup rather than command failure.
 
 3. Re-request the operational headless frame.
 

@@ -1,0 +1,44 @@
+{
+  "organization.commands.getCommands": {
+    "pathTemplate": "/core/v1/organization/devices/:device_id/commands",
+    "pathParams": [
+      "device_id"
+    ],
+    "bodyType": "none",
+    "hasBody": false,
+    "appendNotes": [
+      "Bruno doc path is stale; backend route is /core/v1/organization/devices/:device_id/commands.",
+      "Docs OpenAPI requestBody repeats device_id, but the verified route uses device_id as a path parameter and this GET request must not send a body."
+    ]
+  },
+  "organization.getOrganizationInfo": {
+    "bodyType": "none",
+    "hasBody": false,
+    "appendNotes": [
+      "Organization info endpoint is GET without request body."
+    ]
+  },
+  "organization.commands.cancelCommand": {
+    "bodyType": "none",
+    "hasBody": false,
+    "appendNotes": [
+      "Cancel command endpoint should not require a request body in SDK signatures."
+    ]
+  },
+  "organization.tickets.getTicket": {
+    "bodyType": "none",
+    "hasBody": false,
+    "appendNotes": [
+      "Docs OpenAPI requestBody is a response-shaped sample, but this GET request is path-parameter only and must not send a body."
+    ]
+  },
+  "partner.tickets.getTicket": {
+    "pathTemplate": "/core/v1/partner/tickets/:ticket_id",
+    "pathParams": [
+      "ticket_id"
+    ],
+    "appendNotes": [
+      "Docs OpenAPI path currently includes a ReadMe '(COPY)' suffix; the callable ticket route is /core/v1/partner/tickets/:ticket_id."
+    ]
+  }
+}

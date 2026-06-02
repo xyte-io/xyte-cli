@@ -1,14 +1,17 @@
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import type { Command } from 'commander';
 
 import { DEFAULT_WATCH_PROFILE, type WatchFrameV1, type WatchProfile } from '../../contracts/watch-frame';
 import { CliUserError } from '../../contracts/user-error';
+import { INSPECT_DEEP_DIVE_SCHEMA_VERSION } from '../../contracts/versions';
+import { ensureParentDir } from '../../utils/fs';
 import { errorMessage } from '../../utils/error-format';
 import { isRecord } from '../../utils/json';
 import { stringifyJsonOutput } from '../../utils/json-output';
-import { parseInspectProviderScope, type InspectProviderScope } from '../../types/settings-enums';
+import { type InspectProviderScope } from '../../types/settings-enums';
+import { parseInspectProviderScope } from '../../utils/parse-domain';
 import { TUI_SCREEN_IDS, type TuiScreenId } from '../../types/tui-screens';
 import { runTuiApp } from '../../tui/app';
 import {
@@ -17,10 +20,9 @@ import {
   collectFleetSnapshot,
   formatDeepDiveAscii,
   formatDeepDiveMarkdown,
-  formatFleetInspectAscii,
-  generateFleetReport,
-  parseDeepDiveForReport
+  formatFleetInspectAscii
 } from '../../workflows/fleet-insights';
+import { generateOpsReport, parseReportInput } from '../../workflows/ops-report';
 import { runWatch, WATCH_MIN_INTERVAL_MS, WATCH_MAX_POLLS } from '../../workflows/watch';
 import type { SettingKey } from '../../config/settings';
 import { parsePositiveIntegerOption, parseQueryJson } from '../parse-options';
@@ -31,16 +33,13 @@ import {
   getExplicitGlobalOutput,
   parseCliOutputMode,
   printJson,
+  requireTenantId,
   resolveStrictJson,
   resolveTextJsonOutput
 } from '../cli-context';
 
 function resolveOutPath(out: string | undefined): string | undefined {
   return out ? path.resolve(out) : undefined;
-}
-
-function ensureParentDir(filePath: string): void {
-  mkdirSync(path.dirname(filePath), { recursive: true });
 }
 
 function writeRenderedOutput(stream: OutputStream, text: string, outPath?: string): void {
@@ -59,21 +58,21 @@ function appendRenderedOutput(stream: OutputStream, text: string, outPath?: stri
   }
 }
 
-function resolveRenderMode(options: { render?: string; format?: string }, allowed: string[], fallback: string): string {
-  const render = (options.render ?? options.format ?? fallback).trim().toLowerCase();
-  if (!allowed.includes(render)) {
+function resolveRenderMode<T extends string>(options: { render?: string }, allowed: readonly T[], fallback: T): T {
+  const render = (options.render ?? fallback).trim().toLowerCase();
+  if (!allowed.includes(render as T)) {
     throw new CliUserError({
       summary: `Invalid render mode: "${render}".`,
       suggestedCommands: allowed.map((mode) => `Use --render ${mode}`)
     });
   }
-  return render;
+  return render as T;
 }
 
-function parseWatchProfile(value: string | undefined): WatchProfile {
-  const normalized = (value ?? DEFAULT_WATCH_PROFILE).trim().toLowerCase();
+function parseWatchProfile(value: string): WatchProfile {
+  const normalized = value.trim().toLowerCase();
   if (normalized !== DEFAULT_WATCH_PROFILE) {
-    throw new Error(`Invalid watch profile: ${value}. Use ${DEFAULT_WATCH_PROFILE}.`);
+    throw new CliUserError({ summary: `Invalid watch profile: "${value}". Use ${DEFAULT_WATCH_PROFILE}.` });
   }
   return normalized as WatchProfile;
 }
@@ -81,10 +80,10 @@ function parseWatchProfile(value: string | undefined): WatchProfile {
 function parseWatchIntervalMs(value: string | undefined): number {
   const parsed = Number.parseInt(value ?? '2000', 10);
   if (!Number.isFinite(parsed)) {
-    throw new Error(`Invalid interval: ${value}.`);
+    throw new CliUserError({ summary: `Invalid interval: "${value}".`, suggestedCommands: ['Use --interval <ms> with a positive integer'] });
   }
   if (parsed < WATCH_MIN_INTERVAL_MS) {
-    throw new Error(`Invalid interval: ${parsed}. Minimum is ${WATCH_MIN_INTERVAL_MS}ms.`);
+    throw new CliUserError({ summary: `Invalid interval: ${parsed}ms. Minimum is ${WATCH_MIN_INTERVAL_MS}ms.` });
   }
   return parsed;
 }
@@ -95,10 +94,10 @@ function parseWatchMaxPolls(value: string | undefined): number | undefined {
   }
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`Invalid max-polls: ${value}. Use a positive integer.`);
+    throw new CliUserError({ summary: `Invalid max-polls: "${value}". Use a positive integer.` });
   }
   if (parsed > WATCH_MAX_POLLS) {
-    throw new Error(`Invalid max-polls: ${value}. Maximum is ${WATCH_MAX_POLLS}.`);
+    throw new CliUserError({ summary: `Invalid max-polls: ${value}. Maximum is ${WATCH_MAX_POLLS}.` });
   }
   return parsed;
 }
@@ -157,13 +156,13 @@ function formatWatchFrameText(frame: WatchFrameV1): string {
     const previewEntries = [
       ...(frame.delta?.added ?? [])
         .slice(0, 3)
-        .map((entry) => `+ ${formatWatchIncidentText(entry.current ?? entry.after ?? entry.previous)}`),
+        .map((entry) => `+ ${formatWatchIncidentText(entry.after)}`),
       ...(frame.delta?.updated ?? [])
         .slice(0, 3)
-        .map((entry) => `~ ${formatWatchIncidentText(entry.after ?? entry.current ?? entry.before)}`),
+        .map((entry) => `~ ${formatWatchIncidentText(entry.after)}`),
       ...(frame.delta?.removed ?? [])
         .slice(0, 3)
-        .map((entry) => `- ${formatWatchIncidentText(entry.previous ?? entry.before ?? entry.current ?? entry.id)}`)
+        .map((entry) => `- ${formatWatchIncidentText(entry.before ?? entry.id)}`)
     ];
     if (previewEntries.length === 0) {
       lines.push('No incident detail changes captured.');
@@ -193,7 +192,8 @@ async function handleOpsWatchIncidents(
     output?: string;
     out?: string;
     strictJson?: boolean;
-  }
+  },
+  watchDelayFn?: (ms: number) => Promise<void>
 ): Promise<void> {
   const overrides: Partial<Record<SettingKey, unknown>> = {};
   if (options.tenant) {
@@ -210,6 +210,7 @@ async function handleOpsWatchIncidents(
   }
   const settings = await ctx.resolveSettings(overrides);
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
+  requireTenantId(tenantId, 'ops watch incidents');
   const query = parseQueryJson(options.queryJson);
   const output = resolveTextJsonOutput({
     output: options.output,
@@ -228,6 +229,7 @@ async function handleOpsWatchIncidents(
     intervalMs: settings.values.watch.intervalMs,
     once: options.once === true,
     maxPolls: settings.values.watch.maxPolls,
+    delayFn: watchDelayFn,
     onFrame: (frame) => {
       const renderFrame =
         output === 'text'
@@ -243,7 +245,7 @@ async function handleOpsWatchIncidents(
   });
 }
 
-async function resolveInspectContext(
+async function setupAndCollectInspect(
   ctx: CliContext,
   options: {
     tenant?: string;
@@ -260,21 +262,13 @@ async function resolveInspectContext(
   }
   const settings = await ctx.resolveSettings(overrides);
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
-  if (!tenantId) {
-    throw new CliUserError({
-      summary: `Missing tenant for ${options.commandLabel}.`,
-      suggestedCommands: [
-        'Use --tenant <tenant-id>',
-        'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>'
-      ]
-    });
-  }
+  requireTenantId(tenantId, options.commandLabel);
   const providerScope =
     (overrides['ops.providerScope'] as InspectProviderScope | undefined) ?? settings.values.ops.providerScope;
   const client = await ctx.withClient({ tenantId, flagOverrides: overrides });
   const tenantProfile = await ctx.profileStore.getTenant(tenantId);
   const snapshot = await collectFleetSnapshot({ client, tenantId, tenantName: tenantProfile?.name, providerScope });
-  return { settings, overrides, snapshot };
+  return { settings, snapshot };
 }
 
 async function handleOpsInspectFleet(
@@ -283,14 +277,13 @@ async function handleOpsInspectFleet(
     tenant?: string;
     providerScope?: string;
     render?: string;
-    format?: string;
     output?: string;
     out?: string;
     strictJson?: boolean;
   }
 ): Promise<void> {
   const render = resolveRenderMode(options, ['json', 'ascii'], 'json');
-  const { settings, snapshot } = await resolveInspectContext(ctx, {
+  const { settings, snapshot } = await setupAndCollectInspect(ctx, {
     tenant: options.tenant,
     providerScope: options.providerScope,
     commandLabel: 'ops inspect fleet'
@@ -321,14 +314,13 @@ async function handleOpsInspectDeepDive(
     providerScope?: string;
     window?: string;
     render?: string;
-    format?: string;
     output?: string;
     out?: string;
     strictJson?: boolean;
   }
 ): Promise<void> {
   const render = resolveRenderMode(options, ['json', 'ascii', 'markdown'], 'json');
-  const { settings, snapshot } = await resolveInspectContext(ctx, {
+  const { settings, snapshot } = await setupAndCollectInspect(ctx, {
     tenant: options.tenant,
     providerScope: options.providerScope,
     commandLabel: 'ops inspect deep-dive'
@@ -379,16 +371,13 @@ async function handleOpsReportGenerate(
   }
   const settings = await ctx.resolveSettings(overrides);
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
-  if (!tenantId) {
-    throw new CliUserError({
-      summary: 'Missing tenant for ops report generate.',
-      suggestedCommands: [
-        'Use --tenant <tenant-id>',
-        'Set defaults.tenant via xyte-cli config set defaults.tenant <tenant-id>'
-      ]
-    });
-  }
+  requireTenantId(tenantId, 'ops report generate');
   const inputPath = path.resolve(options.input);
+  const inputHints = [
+    'Generate fresh input with xyte-cli ops inspect deep-dive --output json',
+    'Generate fresh input with xyte-cli util match',
+    'Generate fresh input with xyte-cli util move-devices'
+  ];
   let raw: unknown;
   try {
     raw = JSON.parse(readFileSync(inputPath, 'utf8')) as unknown;
@@ -397,30 +386,45 @@ async function handleOpsReportGenerate(
     const detail = isSyntax ? `: ${error.message}` : `: ${errorMessage(error)}`;
     throw new CliUserError({
       summary: isSyntax ? `Input JSON is invalid${detail}` : `Cannot read input file${detail}`,
-      cause: `Failed to ${isSyntax ? 'parse' : 'read'} ${inputPath}.`,
-      suggestedCommands: ['Generate fresh input with xyte-cli ops inspect deep-dive --output json']
+      detail: `Failed to ${isSyntax ? 'parse' : 'read'} ${inputPath}.`,
+      suggestedCommands: inputHints
     });
   }
 
-  const render = resolveRenderMode(options, ['markdown', 'pdf'], 'pdf');
-
-  let deepDive = parseDeepDiveForReport(raw, tenantId);
-  if (!deepDive.tenantName) {
+  let reportInput: ReturnType<typeof parseReportInput>;
+  try {
+    reportInput = parseReportInput(raw, tenantId);
+  } catch (err) {
+    if (err instanceof CliUserError) {
+      throw new CliUserError({ ...err, suggestedCommands: [...(err.suggestedCommands ?? []), ...inputHints] });
+    }
+    const wrapped = new CliUserError({
+      summary: err instanceof Error ? err.message : 'Invalid report input format.',
+      suggestedCommands: inputHints
+    });
+    if (err instanceof Error) {
+      wrapped.cause = err;
+    }
+    throw wrapped;
+  }
+  if (reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION && !reportInput.tenantName) {
     const tenantProfile = await ctx.profileStore.getTenant(tenantId);
     if (tenantProfile?.name) {
-      deepDive = {
-        ...deepDive,
+      reportInput = {
+        ...reportInput,
         tenantName: tenantProfile.name
       };
     }
   }
-
-  const generated = await generateFleetReport({
-    deepDive,
-    format: render as 'markdown' | 'pdf',
-    outPath: options.out,
-    includeSensitive: options.includeSensitive === true || settings.values.report.includeSensitive
-  });
+  const includeSensitive = options.includeSensitive === true || settings.values.report.includeSensitive;
+  let generated: Awaited<ReturnType<typeof generateOpsReport>>;
+  if (reportInput.schemaVersion === INSPECT_DEEP_DIVE_SCHEMA_VERSION) {
+    const render = resolveRenderMode(options, ['markdown', 'pdf'], 'pdf');
+    generated = await generateOpsReport({ input: reportInput, tenantId, format: render, outPath: options.out, includeSensitive });
+  } else {
+    const render = resolveRenderMode(options, ['markdown'], 'markdown');
+    generated = await generateOpsReport({ input: reportInput, tenantId, format: render, outPath: options.out, includeSensitive });
+  }
   printJson(ctx.stdout, generated, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
 }
 
@@ -430,7 +434,6 @@ async function handleOpsConsole(
   options: {
     headless?: boolean;
     screen?: string;
-    format?: string;
     output?: string;
     once?: boolean;
     follow?: boolean;
@@ -457,23 +460,8 @@ async function handleOpsConsole(
   if (options.debugLog) {
     overrides['console.debugLogPath'] = options.debugLog;
   }
-  const settings = await ctx.resolveSettings(overrides);
-  const secretStore = ctx.getSecretStore();
-  const client = await ctx.withClient({
-    tenantId: options.tenant ?? settings.values.defaults.tenant,
-    flagOverrides: overrides
-  });
-  const screenRaw = options.screen ?? settings.values.console.screen ?? 'dashboard';
-  if (!(TUI_SCREEN_IDS as readonly string[]).includes(screenRaw)) {
-    throw new CliUserError({
-      summary: 'Invalid console screen.',
-      cause: `Received "${screenRaw}".`,
-      suggestedCommands: [`Use one of: ${TUI_SCREEN_IDS.join(', ')}`]
-    });
-  }
-  const screen = screenRaw as TuiScreenId;
   const requestedOutput = parseCliOutputMode(
-    options.output ?? options.format ?? (options.headless ? 'json' : undefined)
+    options.output ?? (options.headless ? 'json' : undefined)
   );
   if (Boolean(options.headless) && requestedOutput && requestedOutput !== 'json') {
     throw new CliUserError({
@@ -481,6 +469,23 @@ async function handleOpsConsole(
       suggestedCommands: ['Use xyte-cli ops console --headless --output json']
     });
   }
+  const settings = await ctx.resolveSettings(overrides);
+  const tenantId = options.tenant ?? settings.values.defaults.tenant;
+  requireTenantId(tenantId, 'ops console');
+  const secretStore = ctx.getSecretStore();
+  const client = await ctx.withClient({
+    tenantId,
+    flagOverrides: overrides
+  });
+  const screenRaw = options.screen ?? settings.values.console.screen ?? 'dashboard';
+  if (!(TUI_SCREEN_IDS as readonly string[]).includes(screenRaw)) {
+    throw new CliUserError({
+      summary: 'Invalid console screen.',
+      detail: `Received "${screenRaw}".`,
+      suggestedCommands: [`Use one of: ${TUI_SCREEN_IDS.join(', ')}`]
+    });
+  }
+  const screen = screenRaw as TuiScreenId;
   const follow = options.once ? false : (options.follow ?? settings.values.console.follow);
   const intervalMs = settings.values.console.intervalMs;
   const motionEnabled = options.motion === false ? false : settings.values.console.motion;
@@ -491,18 +496,23 @@ async function handleOpsConsole(
     secretStore,
     initialScreen: screen,
     headless: Boolean(options.headless),
-    format: (options.headless ? 'json' : requestedOutput === 'text' ? 'text' : 'json') as OutputFormat,
+    format: (requestedOutput === 'text' ? 'text' : 'json') as OutputFormat,
     motionEnabled,
     follow,
     intervalMs,
-    tenantId: options.tenant ?? settings.values.defaults.tenant,
+    tenantId,
     output: ctx.stdout,
     debug: options.debug,
     debugLogPath: options.debugLog ?? settings.values.console.debugLogPath
   });
 }
 
-export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: typeof runTuiApp = runTuiApp): void {
+export function registerOpsCommands(
+  parent: Command,
+  ctx: CliContext,
+  runTui: typeof runTuiApp = runTuiApp,
+  watchDelayFn?: (ms: number) => Promise<void>
+): void {
   const ops = parent.command('ops').description('Operator-focused console, watch, inspect, and report workflows');
   ops.addHelpText(
     'after',
@@ -527,11 +537,20 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
     .option('--once', 'Run one poll and exit')
     .option('--out <path>', 'Write the rendered output to a UTF-8 file')
     .option('--strict-json', 'Fail on non-serializable output')
-    .action(async function (options: Record<string, unknown>) {
+    .action(async function (options: {
+      tenant?: string;
+      profile?: string;
+      queryJson?: string;
+      intervalMs?: string;
+      maxPolls?: string;
+      once?: boolean;
+      out?: string;
+      strictJson?: boolean;
+    }) {
       await handleOpsWatchIncidents(ctx, {
         ...options,
         output: getExplicitGlobalOutput(this)
-      });
+      }, watchDelayFn);
     });
 
   const opsInspect = ops.command('inspect').description('Deterministic fleet insights');
@@ -540,7 +559,7 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
     .description('Build a fleet summary snapshot')
     .option('--tenant <tenantId>', 'Tenant id override')
     .option('--provider-scope <scope>', 'organization|partner|auto')
-    .option('--render <render>', 'json|ascii', 'json')
+    .option('--render <render>', 'Output format: json|ascii', 'json')
     .option('--out <path>', 'Write the rendered output to a UTF-8 file')
     .option('--strict-json', 'Fail on non-serializable output')
     .action(async function (options: {
@@ -562,7 +581,7 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
     .option('--tenant <tenantId>', 'Tenant id override')
     .option('--provider-scope <scope>', 'organization|partner|auto')
     .option('--window <hours>', 'Window in hours', '24')
-    .option('--render <render>', 'json|ascii|markdown', 'json')
+    .option('--render <render>', 'Output format: json|ascii|markdown', 'json')
     .option('--out <path>', 'Write the rendered output to a UTF-8 file')
     .option('--strict-json', 'Fail on non-serializable output')
     .action(async function (options: {
@@ -582,11 +601,11 @@ export function registerOpsCommands(parent: Command, ctx: CliContext, runTui: ty
   const opsReport = ops.command('report').description('Generate reports from inspect outputs');
   opsReport
     .command('generate')
-    .description('Generate report from deep-dive JSON input')
-    .requiredOption('--input <path>', 'Path to deep-dive JSON input')
+    .description('Generate report from inspect or migration JSON input')
+    .requiredOption('--input <path>', 'Path to report input JSON')
     .requiredOption('--out <path>', 'Output path')
     .option('--tenant <tenantId>', 'Tenant id override')
-    .option('--render <render>', 'markdown|pdf', 'pdf')
+    .option('--render <render>', 'markdown|pdf')
     .option('--include-sensitive', 'Include full ticket/device IDs in report')
     .option('--strict-json', 'Fail on non-serializable output')
     .action(async function (options: {
