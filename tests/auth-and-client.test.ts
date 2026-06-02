@@ -121,6 +121,42 @@ describe('client auth behavior', () => {
     expect(sent.body).toBeUndefined();
   });
 
+  it('renders organization merge and split device requests', async () => {
+    const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } });
+    const transport = { request } as unknown as HttpTransport;
+
+    const client = createXyteClient({
+      auth: { organization: 'org-key-123' },
+      hubBaseUrl: 'https://hub.example.test',
+      transport
+    });
+
+    await client.organization.mergeDevice({
+      path: { device_id: 'primary/one' },
+      body: { with_device_ids: ['shadow-1', 'shadow-2'] }
+    });
+    await client.organization.splitDevice({
+      path: { device_id: 'primary/one' },
+      body: { shadow_device_id: 'shadow-1' }
+    });
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls[0][0]).toMatchObject({
+      method: 'POST',
+      url: 'https://hub.example.test/core/v1/organization/devices/primary%2Fone/merge',
+      body: JSON.stringify({ with_device_ids: ['shadow-1', 'shadow-2'] })
+    });
+    expect(request.mock.calls[0][0].headers.Authorization).toBe('org-key-123');
+    expect(request.mock.calls[0][0].headers['Content-Type']).toBe('application/json');
+    expect(request.mock.calls[1][0]).toMatchObject({
+      method: 'POST',
+      url: 'https://hub.example.test/core/v1/organization/devices/primary%2Fone/split',
+      body: JSON.stringify({ shadow_device_id: 'shadow-1' })
+    });
+    expect(request.mock.calls[1][0].headers.Authorization).toBe('org-key-123');
+    expect(request.mock.calls[1][0].headers['Content-Type']).toBe('application/json');
+  });
+
   it('uses active slot secret when multiple slots exist', async () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });

@@ -50,6 +50,29 @@ describe('namespace endpoint mappings', () => {
     });
   });
 
+  it('maps organization merge and split device methods', async () => {
+    const call = vi.fn().mockResolvedValue({ ok: true });
+    const organization = createOrganizationNamespace(call);
+
+    await organization.mergeDevice({
+      path: { device_id: 'primary-1' },
+      body: { with_device_ids: ['shadow-1'] }
+    });
+    await organization.splitDevice({
+      path: { device_id: 'primary-1' },
+      body: { shadow_device_id: 'shadow-1' }
+    });
+
+    expect(call).toHaveBeenNthCalledWith(1, 'organization.devices.mergeDevice', {
+      path: { device_id: 'primary-1' },
+      body: { with_device_ids: ['shadow-1'] }
+    });
+    expect(call).toHaveBeenNthCalledWith(2, 'organization.devices.splitDevice', {
+      path: { device_id: 'primary-1' },
+      body: { shadow_device_id: 'shadow-1' }
+    });
+  });
+
   it('maps new organization device incident controls', async () => {
     const call = vi.fn().mockResolvedValue({ ok: true });
     const organization = createOrganizationNamespace(call);
