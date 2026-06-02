@@ -97,7 +97,8 @@
     "notes": [
       "Docs page: https://docs.xyte.io/reference/claim-device",
       "Docs category: /branches/2.0/categories/reference/API Access",
-      "Docs parent: /branches/2.0/reference/devices-2"
+      "Docs parent: /branches/2.0/reference/devices-2",
+      "Response includes effective_status (nullable string): one of ok, warning, error, offline, disconnected, never_seen. Computed device status reflecting incident priority, connectivity, telemetry-seen state, and raw device status."
     ]
   },
   {
@@ -139,9 +140,9 @@
     "bodyType": "json",
     "hasBody": true,
     "sourceFile": "https://docs.xyte.io/reference/merge-device",
+    "bodyExample": "{\n  \"with_device_ids\": [\n    \"shadow-device-id\"\n  ]\n}",
     "notes": [
       "Merges one or more shadow devices under this primary device.",
-      "Body: { \"with_device_ids\": [\"<shadow_id>\", ...] }",
       "Merge group capped at 4 devices (1 primary + up to 3 shadows)."
     ]
   },
@@ -162,9 +163,9 @@
     "bodyType": "json",
     "hasBody": true,
     "sourceFile": "https://docs.xyte.io/reference/split-device",
+    "bodyExample": "{\n  \"shadow_device_id\": \"shadow-device-id\"\n}",
     "notes": [
-      "Detaches a shadow device from its primary.",
-      "Body: { \"shadow_device_id\": \"<shadow_id>\" }"
+      "Detaches a shadow device from its primary."
     ]
   },
   {
@@ -283,7 +284,8 @@
       "Docs page: https://docs.xyte.io/reference/get-device",
       "Docs category: /branches/2.0/categories/reference/API Access",
       "Docs parent: /branches/2.0/reference/devices-2",
-      "Docs raw path params: device_id"
+      "Docs raw path params: device_id",
+      "Response includes effective_status (nullable string): one of ok, warning, error, offline, disconnected, never_seen. Computed device status reflecting incident priority, connectivity, telemetry-seen state, and raw device status."
     ]
   },
   {
@@ -306,7 +308,8 @@
     "notes": [
       "Docs page: https://docs.xyte.io/reference/get-devices",
       "Docs category: /branches/2.0/categories/reference/API Access",
-      "Docs parent: /branches/2.0/reference/devices-2"
+      "Docs parent: /branches/2.0/reference/devices-2",
+      "Response includes effective_status (nullable string): one of ok, warning, error, offline, disconnected, never_seen. Computed device status reflecting incident priority, connectivity, telemetry-seen state, and raw device status."
     ]
   },
   {

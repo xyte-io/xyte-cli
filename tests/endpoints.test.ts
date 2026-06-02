@@ -76,6 +76,32 @@ describe('public endpoint catalog', () => {
     expect(endpoint?.sourceFile).toBe('https://docs.xyte.io/reference/move-device');
   });
 
+  it('includes organization merge and split device endpoint metadata', () => {
+    const merge = endpoints.find((item) => item.key === 'organization.devices.mergeDevice');
+    expect(merge).toBeDefined();
+    expect(merge?.method).toBe('POST');
+    expect(merge?.pathTemplate).toBe('/core/v1/organization/devices/:device_id/merge');
+    expect(merge?.authScope).toBe('organization');
+    expect(merge?.bodyType).toBe('json');
+    expect(merge?.hasBody).toBe(true);
+    expect(merge?.pathParams).toEqual(['device_id']);
+    expect(merge?.queryParams).toEqual([]);
+    expect(merge?.bodyExample).toContain('with_device_ids');
+    expect(merge?.sourceFile).toBe('https://docs.xyte.io/reference/merge-device');
+
+    const split = endpoints.find((item) => item.key === 'organization.devices.splitDevice');
+    expect(split).toBeDefined();
+    expect(split?.method).toBe('POST');
+    expect(split?.pathTemplate).toBe('/core/v1/organization/devices/:device_id/split');
+    expect(split?.authScope).toBe('organization');
+    expect(split?.bodyType).toBe('json');
+    expect(split?.hasBody).toBe(true);
+    expect(split?.pathParams).toEqual(['device_id']);
+    expect(split?.queryParams).toEqual([]);
+    expect(split?.bodyExample).toContain('shadow_device_id');
+    expect(split?.sourceFile).toBe('https://docs.xyte.io/reference/split-device');
+  });
+
   it('includes newly supported organization device incident controls', () => {
     const suspend = endpoints.find((item) => item.key === 'organization.devices.suspendIncidents');
     expect(suspend).toBeDefined();
