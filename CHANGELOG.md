@@ -6,6 +6,11 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.10.7] - 2026-06-01
+
+### Added
+- BE-1529: Documented the new `effective_status` response field on `organization.devices.getDevices`, `organization.devices.getDevice`, and `organization.devices.claimDevice` in the public endpoint catalog. The field is a nullable string with one of `ok`, `warning`, `error`, `offline`, `disconnected`, `never_seen`, computed from incident priority, connectivity, telemetry-seen state, and raw device status. Visible via `xyte-cli api endpoints describe <key>`.
+
 ## [0.10.6] - 2026-05-28
 
 ### Added
