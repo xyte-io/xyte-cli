@@ -194,6 +194,13 @@ function isPathInside(child: string, parent: string, platform: NodeJS.Platform):
   return relative === '' || (!relative.startsWith('..') && !pathApi.isAbsolute(relative));
 }
 
+function runnableCommandPrefix(commandPath: string | undefined): string | undefined {
+  if (!commandPath) {
+    return undefined;
+  }
+  return /\.[cm]?js$/i.test(commandPath) ? `node ${commandPath}` : commandPath;
+}
+
 function isNpxEphemeralPath(commandPath: string | undefined): boolean {
   if (!commandPath) {
     return false;
@@ -397,7 +404,7 @@ export async function buildEnvironmentDoctorReport(
     recommendations: buildRecommendations({
       mode,
       platform,
-      existingPrefix: resolvedXyteCliIsDurable ? 'xyte-cli' : options.currentCommandPath,
+      existingPrefix: resolvedXyteCliIsDurable ? 'xyte-cli' : runnableCommandPrefix(options.currentCommandPath),
       notes
     })
   };

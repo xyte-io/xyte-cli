@@ -148,6 +148,21 @@ describe('environment doctor', () => {
     expect(report.recommendations.commandPrefix).toBe('/opt/tools/xyte-cli');
   });
 
+  it('prefixes a script-file currentCommandPath with node so the recommendation is runnable', async () => {
+    const report = await buildEnvironmentDoctorReport(
+      baseOptions({
+        currentCommandPath: '/opt/tools/dist/bin/xyte-cli.js',
+        commandResolver: (command) => ({ npm: '/usr/bin/npm', npx: '/usr/bin/npx' })[command]
+      })
+    );
+
+    expect(report.recommendations.mode).toBe('existing');
+    expect(report.recommendations.commandPrefix).toBe('node /opt/tools/dist/bin/xyte-cli.js');
+    expect(report.recommendations.nextCommand).toBe(
+      'node /opt/tools/dist/bin/xyte-cli.js doctor environment --format json'
+    );
+  });
+
   it('treats a relative config directory as inside the workspace', async () => {
     const report = await buildEnvironmentDoctorReport(baseOptions({ configDir: './xyte-config' }));
 
