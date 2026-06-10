@@ -23,7 +23,7 @@ Other platforms: download from [nodejs.org](https://nodejs.org/en/download).
 
 ## Install
 
-### AI agent terminal
+### AI agent
 
 Use this path when Codex, Claude Code/Desktop, GitHub Copilot CLI, VS Code Copilot Agent, or another shell-capable agent is operating the terminal. Chat-only assistants can explain commands, but they cannot install the CLI.
 
@@ -60,6 +60,8 @@ Before you start: in Xyte, open **Settings → API Keys** and create a key. Save
 xyte-cli setup run --non-interactive --tenant acme --key-file <path-outside-workspace> --output json
 xyte-cli setup status --tenant acme --field tenantId
 ```
+
+`acme` is just a name for this connection — use your company name.
 
 ### CI / headless
 

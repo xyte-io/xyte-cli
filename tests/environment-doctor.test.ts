@@ -148,6 +148,35 @@ describe('environment doctor', () => {
     expect(report.recommendations.commandPrefix).toBe('/opt/tools/xyte-cli');
   });
 
+  it('treats a Windows npx cache entry point as ephemeral, not an existing install', async () => {
+    const report = await buildEnvironmentDoctorReport(
+      baseOptions({
+        platform: 'win32',
+        cwd: 'C:\\workspace',
+        homeDir: 'C:\\Users\\john doe',
+        tempDir: 'C:\\Temp',
+        configDir: 'C:\\Users\\john doe\\AppData\\Roaming\\xyte-cli',
+        currentCommandPath:
+          'C:\\Users\\john doe\\AppData\\Local\\npm-cache\\_npx\\abc123\\node_modules\\@xyteai\\cli\\dist\\bin\\xyte-cli.js',
+        commandResolver: (command) => ({ npm: 'C:\\nodejs\\npm.cmd', npx: 'C:\\nodejs\\npx.cmd' })[command]
+      })
+    );
+
+    expect(report.recommendations.mode).toBe('npx');
+  });
+
+  it('quotes script paths containing spaces so the recommendation is runnable', async () => {
+    const report = await buildEnvironmentDoctorReport(
+      baseOptions({
+        currentCommandPath: '/opt/my tools/dist/bin/xyte-cli.js',
+        commandResolver: (command) => ({ npm: '/usr/bin/npm', npx: '/usr/bin/npx' })[command]
+      })
+    );
+
+    expect(report.recommendations.mode).toBe('existing');
+    expect(report.recommendations.commandPrefix).toBe('node "/opt/my tools/dist/bin/xyte-cli.js"');
+  });
+
   it('prefixes a script-file currentCommandPath with node so the recommendation is runnable', async () => {
     const report = await buildEnvironmentDoctorReport(
       baseOptions({

@@ -11,7 +11,7 @@ Manual terminal use is supported for setup, debugging, and local testing.
 
 ## Install Flow
 
-### AI agent terminal
+### AI agent
 
 Use this path for Codex, Claude Code/Desktop, GitHub Copilot CLI, VS Code Copilot Agent, and other shell-capable agents. Chat-only assistants can explain commands, but they cannot install the CLI.
 

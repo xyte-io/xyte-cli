@@ -198,15 +198,15 @@ function runnableCommandPrefix(commandPath: string | undefined): string | undefi
   if (!commandPath) {
     return undefined;
   }
-  return /\.[cm]?js$/i.test(commandPath) ? `node ${commandPath}` : commandPath;
+  const quoted = /\s/.test(commandPath) ? `"${commandPath}"` : commandPath;
+  return /\.[cm]?js$/i.test(commandPath) ? `node ${quoted}` : quoted;
 }
 
 function isNpxEphemeralPath(commandPath: string | undefined): boolean {
   if (!commandPath) {
     return false;
   }
-  const normalized = commandPath.replaceAll('\\', '/').toLowerCase();
-  return /\/_npx\/[^/]+\/node_modules\/\.bin\/xyte-cli(?:\.cmd)?$/.test(normalized);
+  return commandPath.replaceAll('\\', '/').toLowerCase().includes('/_npx/');
 }
 
 function buildRecommendations(args: {
