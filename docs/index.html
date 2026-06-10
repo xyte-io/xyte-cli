@@ -1739,6 +1739,7 @@
               <ol class="panel-steps">
                 <li>In Xyte, open <strong>Settings &rarr; API Keys</strong> and create a key.</li>
                 <li>In your CI tool (GitHub Actions, GitLab CI, Jenkins), add a secret named <code>XYTE_CLI_KEY</code> and paste the key as its value.</li>
+                <li>Make sure the job receives the secret as an environment variable &mdash; in GitHub Actions add <code>env: XYTE_CLI_KEY: ${{ secrets.XYTE_CLI_KEY }}</code> to the step; GitLab CI passes variables automatically.</li>
                 <li>Add these commands to your pipeline (<code>acme</code> is just a name for this connection &mdash; use your company name):</li>
               </ol>
               <div class="command-shell shell-lines">

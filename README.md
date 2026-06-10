@@ -66,7 +66,8 @@ Detailed agent guidance: [docs/agents.md](./docs/agents.md).
 
 1. In Xyte, open **Settings → API Keys** and create a key.
 2. In your CI tool (GitHub Actions, GitLab CI, Jenkins), add a secret named `XYTE_CLI_KEY` and paste the key as its value.
-3. Add these commands to your pipeline (`acme` is just a name for this connection — use your company name):
+3. Make sure the job receives the secret as an environment variable — in GitHub Actions add `env: XYTE_CLI_KEY: ${{ secrets.XYTE_CLI_KEY }}` to the step; GitLab CI passes variables automatically.
+4. Add these commands to your pipeline (`acme` is just a name for this connection — use your company name):
 
 ```sh
 npx -y @xyteai/cli@latest setup run --non-interactive --tenant acme --output json
