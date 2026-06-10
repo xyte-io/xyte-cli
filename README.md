@@ -53,6 +53,7 @@ Follow the report's recommendations.nextCommand and recommendations.commands.
 Set up credentials with the report's setupKeyFile, setupStdin, or setupKeyCommand recipe.
 Do not ask me to paste API keys into chat.
 Do not store API keys inside the repo.
+After setup succeeds, run `xyte-cli init --scope project --agents all --force --no-setup`.
 If this surface cannot run shell commands, stop and say I need a shell-capable terminal or agent.
 ```
 

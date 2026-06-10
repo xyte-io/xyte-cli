@@ -5,7 +5,7 @@ description: "Use for @xyteai/cli operations: first-run setup, config/tenant/key
 
 # XYTE Skill Router (One-Stop, Agent-Native)
 
-Last updated: 2026-04-17
+Last updated: 2026-06-10
 
 This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
 
@@ -21,8 +21,9 @@ This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
   - `xyte-cli ops inspect fleet|deep-dive` and `xyte-cli ops watch incidents` support `--out <path>`.
   - `xyte-cli flow run` supports `--inspect-provider-scope organization|partner|auto`.
 - For fresh users in a new environment, verify readiness with:
+  - `xyte-cli doctor environment --format json`
   - `xyte-cli status --mode fast --output json`
-  - `xyte-cli init --scope both --agents all --force --no-setup`
+  - `xyte-cli init --scope project --agents all --force --no-setup`
 - for humans: `xyte-cli setup run --tenant <tenant-id> [--provider <xyte-org|xyte-partner>]`
 - for automation: use `--key-file <path-outside-workspace>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`
 - for secret managers: use `--key-command "<cmd>"` to resolve the API key from any CLI that prints it on stdout, e.g. `--key-command "op read op://Employee/Xyte/credential"` (1Password), `--key-command "vault kv get -field=key secret/xyte"` (Vault), `--key-command "aws secretsmanager get-secret-value --secret-id xyte --query SecretString --output text"` (AWS Secrets Manager). xyte-cli trims leading and trailing whitespace; the command must exit 0 and print only the key on stdout.
@@ -127,13 +128,13 @@ Rules:
 ## Deterministic Execution Order
 
 1. Setup/readiness:
+- `xyte-cli doctor environment --format json` (install/setup environment diagnostics with a recommended install mode)
 - `xyte-cli status --mode fast --output json`
-- `xyte-cli init --scope both --agents all --force --no-setup`
+- `xyte-cli init --scope project --agents all --force --no-setup`
 - `xyte-cli setup status --tenant <tenant-id> --output json`
 - `xyte-cli config doctor --tenant <tenant-id> --output json`
 - `xyte-cli config show --scope resolved`
 - `xyte-cli doctor install --format json`
-- `xyte-cli doctor environment --format json` (install/setup environment diagnostics with a recommended install mode)
 
 2. Auth/tenant (if missing or incomplete):
 - human-guided setup: `xyte-cli setup run --tenant <tenant-id> [--provider <xyte-org|xyte-partner>]`
@@ -346,6 +347,7 @@ Schema/version IDs:
 - call envelope: `xyte.call.envelope.v1`
 - device match: `xyte.device.match.v1`
 - device move verification: `xyte.device.move-verification.v1`
+- doctor environment: `xyte.doctor.environment.v1`
 - flow catalog: `xyte.flow.catalog.v1`
 - flow definition: `xyte.flow.definition.v1`
 - flow run summary: `xyte.flow.run.v1`
@@ -362,6 +364,7 @@ Schema/version IDs:
 
 Canonical schemas:
 - `schemas/call-envelope.v1.schema.json`
+- `schemas/doctor-environment.v1.schema.json`
 - `schemas/headless-frame.v1.schema.json`
 - `schemas/inspect-fleet.v1.schema.json`
 - `schemas/inspect-deep-dive.v1.schema.json`

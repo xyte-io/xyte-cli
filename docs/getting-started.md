@@ -93,6 +93,8 @@ Interactive manual terminal setup:
 xyte-cli setup run
 ```
 
+The API key prompt hides input: paste the key, press Enter, and confirm the `Received <N> characters.` line matches your key length.
+
 Non-interactive:
 
 Primary automation contract:
@@ -129,19 +131,19 @@ Shell-specific non-interactive examples:
 PowerShell:
 
 ```powershell
-"<your-key>" | xyte-cli setup run --non-interactive --tenant acme --key-stdin
+Get-Content <path-outside-workspace> | xyte-cli setup run --non-interactive --tenant acme --key-stdin
 ```
 
 CMD:
 
 ```bat
-echo <your-key>| xyte-cli setup run --non-interactive --tenant acme --key-stdin
+type <path-outside-workspace> | xyte-cli setup run --non-interactive --tenant acme --key-stdin
 ```
 
 Bash/zsh:
 
 ```bash
-printf '%s\n' '<your-key>' | xyte-cli setup run --non-interactive --tenant acme --key-stdin
+<secret-command> | xyte-cli setup run --non-interactive --tenant acme --key-stdin
 ```
 
 Key file:
