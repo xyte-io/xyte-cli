@@ -3,6 +3,7 @@ video/node_modules/
 dist/
 coverage/
 .venv/
+.env
 *.log
 .DS_Store
 .idea/

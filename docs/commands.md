@@ -46,13 +46,14 @@ xyte-cli flow import --file <path> [--force]
 xyte-cli init [--target <path>] [--scope project|user|both] [--agents all|claude|copilot|codex] [--force] [--no-setup] [--require-setup]
 xyte-cli status [--tenant <tenant-id>] [--mode fast|full] [--output json|text]
 xyte-cli setup status [--tenant <tenant-id>] [--output json] [--field tenantId]
-xyte-cli setup run [--non-interactive] [--advanced] [--tenant <tenant-id>] [--name <display-name>] [--provider xyte-org|xyte-partner] [--key <value>|--key-file <path>|--key-stdin|--key-command <cmd>] [--connectivity auto|always|never]
+xyte-cli setup run [--non-interactive] [--advanced] [--tenant <tenant-id>] [--name <display-name>] [--provider xyte-org|xyte-partner] [--key <value>|--key-file <path-outside-workspace>|--key-stdin|--key-command <cmd>] [--connectivity auto|always|never]
 xyte-cli config show [--scope user|workspace|resolved] [--output json|text]
 xyte-cli config path [--output json|text]
 xyte-cli config set <key> <value> [--scope user|workspace]
 xyte-cli config unset <key> [--scope user|workspace]
 xyte-cli config doctor --tenant <tenant-id> --output json
 xyte-cli doctor install [--format json|text]
+xyte-cli doctor environment [--format json|text] [--check-network]
 xyte-cli upgrade --check --output json
 xyte-cli upgrade --yes --output json
 xyte-cli --log-actions [--log-actions-verbose] status --tenant <tenant-id>
@@ -69,8 +70,9 @@ Log lookup notes:
 - Use `logs show --request-id <id>` to correlate API request logs; the command fails if the request id is missing or matches more than one entry.
 
 Setup notes:
-- Interactive `xyte-cli setup run` is the primary human onboarding path.
-- `--key-file <path>` is the primary file-based automation path when the key already exists on disk.
+- Interactive `xyte-cli setup run` is the manual terminal setup path.
+- `--key-file <path-outside-workspace>` is the primary file-based automation path when the key already exists on disk outside the repo.
+- Do not paste API keys into chat. Do not store API keys inside the repo.
 - Piping a key on stdin into `xyte-cli setup run --key-stdin` is the primary shell-neutral automation path.
 - `--key-command "<cmd>"` runs a shell command and uses its stdout as the API key. Use this to resolve keys from secret managers without shell glue — for example `--key-command "op read op://Employee/Xyte/credential"` (1Password), `--key-command "vault kv get -field=key secret/xyte"` (Vault), `--key-command "aws secretsmanager get-secret-value --secret-id xyte --query SecretString --output text"` (AWS Secrets Manager), or `--key-command "pass show xyte/api-key"` (pass). The command must print only the key on stdout and exit 0; non-zero exits surface as `CliUserError` with the exit code only.
 - `xyte-cli setup status --field tenantId` is the primary shell-neutral extractor for follow-up commands.
@@ -84,6 +86,13 @@ Setup notes:
 - Advanced override: `auth.secretStoreBackend=auto|native|file`.
 - `xyte-cli config set auth.secretStoreBackend native` requires native secure storage; `xyte-cli config set auth.secretStoreBackend file` uses file storage intentionally.
 - `xyte-cli config path` reports `secretStoreBackend`, `secretStore`, and `legacySecretStore`. `secretStore` is the effective location for the selected backend: a filesystem path when `secretStoreBackend` is `file`, and the service name used in the OS keychain (e.g. `xyte-cli`) when it is `keychain`, `dpapi`, or `secret-service`.
+
+Environment doctor notes:
+- `xyte-cli doctor environment --format json` reports the `xyte.doctor.environment.v1` contract: environment facts, checks, and a recommended install mode (`existing`, `npx`, `workspace-local`, or `blocked`) with copy-pasteable command recipes for this platform.
+- Default diagnostics never call external network or Xyte APIs; pass `--check-network` to probe npm registry reachability.
+- Use `npx -y @xyteai/cli@latest doctor environment --format json` when `xyte-cli` is missing.
+- If global install or persistent `PATH` changes are blocked, use `npm install --prefix ./.xyte-cli/runtime @xyteai/cli@latest`, then `./.xyte-cli/runtime/node_modules/.bin/xyte-cli <command>` or PowerShell `.\.xyte-cli\runtime\node_modules\.bin\xyte-cli.cmd <command>`.
+- Chat-only assistants cannot install the CLI; use a shell-capable terminal or agent (Terminal, PowerShell, Codex, Claude Code/Desktop, GitHub Copilot CLI, VS Code Copilot Agent).
 
 ## Tenant And Auth Slots
 

@@ -1,14 +1,78 @@
 # Getting Started
 
+Built for shell-capable AI agents and automated terminal workflows.
+Manual terminal use is supported for setup, debugging, and local testing.
+
 ## Requirements
 
-- Node.js 22+
+- [Node.js 22+](https://nodejs.org/en/download) (npm/npx come with the Node.js install)
 - A valid Xyte API key
 - Writable local config directory (override with `XYTE_CLI_CONFIG_DIR` if needed)
 
+If `node --version` is missing or below 22:
+
+```sh
+# macOS
+brew install node@22
+
+# Windows
+winget install OpenJS.NodeJS.LTS
+```
+
+Other platforms: download from [nodejs.org](https://nodejs.org/en/download).
+
 ## Install
 
-```bash
+### AI agent terminal
+
+Use this path when Codex, Claude Code/Desktop, GitHub Copilot CLI, VS Code Copilot Agent, or another shell-capable agent is operating the terminal. Chat-only assistants can explain commands, but they cannot install the CLI.
+
+Start with environment diagnostics. The report picks the right install mode for this environment and returns copy-pasteable commands in `recommendations`:
+
+```sh
+xyte-cli doctor environment --format json
+```
+
+If `xyte-cli` is missing:
+
+```sh
+npx -y @xyteai/cli@latest doctor environment --format json
+```
+
+If the report recommends `workspace-local` mode:
+
+```sh
+npm install --prefix ./.xyte-cli/runtime @xyteai/cli@latest
+./.xyte-cli/runtime/node_modules/.bin/xyte-cli <command>
+```
+
+PowerShell command path:
+
+```powershell
+.\.xyte-cli\runtime\node_modules\.bin\xyte-cli.cmd <command>
+```
+
+If the report returns `"mode": "blocked"`, install Node.js 22+, preinstall `@xyteai/cli`, provide `xyte-cli` on `PATH`, or move to an environment with Node/npm and package network access.
+
+Agents must keep setup non-interactive and use `--key-stdin`, `--key-command`, or `--key-file <path-outside-workspace>`. Do not paste API keys into chat. Do not store API keys inside the repo.
+
+```sh
+xyte-cli setup run --non-interactive --tenant acme --key-file <path-outside-workspace> --output json
+xyte-cli setup status --tenant acme --field tenantId
+```
+
+### CI / headless
+
+Pin the CLI version and use non-interactive setup:
+
+```sh
+npx -y @xyteai/cli@<version> setup run --non-interactive --tenant acme --key-command "<cmd>" --output json
+npx -y @xyteai/cli@<version> setup status --tenant acme --field tenantId
+```
+
+### Manual terminal
+
+```sh
 npm install -g @xyteai/cli@latest
 xyte-cli --help
 xyte-cli status --mode fast --output json
@@ -16,14 +80,14 @@ xyte-cli status --mode fast --output json
 
 If your global npm bin is not on `PATH`, replace `xyte-cli` in the commands below with one of these published-package fallbacks:
 
-```bash
-npx @xyteai/cli@latest <command>
+```sh
+npx -y @xyteai/cli@latest <command>
 npm exec -- @xyteai/cli@latest <command>
 ```
 
 ## First-Time Setup
 
-Interactive:
+Interactive manual terminal setup:
 
 ```bash
 xyte-cli setup run
@@ -33,7 +97,7 @@ Non-interactive:
 
 Primary automation contract:
 
-Use `--key-file <path>` when the key already lives on disk, or pipe the API key on stdin into `xyte-cli setup run --non-interactive --tenant acme --key-stdin`. `--key-stdin` alone waits for stdin; it does not fetch a key by itself.
+Use `--key-file <path-outside-workspace>` when the key already lives on disk outside the repo, or pipe the API key on stdin into `xyte-cli setup run --non-interactive --tenant acme --key-stdin`. `--key-stdin` alone waits for stdin; it does not fetch a key by itself.
 
 If the key lives in a secret manager, use `--key-command "<cmd>"`: xyte-cli runs the command, trims leading and trailing whitespace from stdout, and uses the result as the API key. The command must print only the key on stdout and exit 0.
 

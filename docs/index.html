@@ -1423,8 +1423,10 @@
             <p class="eyebrow">AI-powered orchestration in the terminal</p>
             <h1>Operate Xyte with <span class="gradient-text">command-line clarity.</span></h1>
             <p class="hero-lead">
-              <code>@xyteai/cli</code> exposes the real commands from install to tenant setup, fleet inspection,
-              console workflows, and exportable PDF or JSON handoff artifacts.
+              <code>@xyteai/cli</code> is built for shell-capable AI agents and automated terminal workflows,
+              with manual terminal use supported for setup, debugging, and local testing. It exposes the real
+              commands from install to tenant setup, fleet inspection, console workflows, and exportable PDF or
+              JSON handoff artifacts.
             </p>
 
             <div class="hero-actions">
@@ -1449,14 +1451,15 @@
                 </span>
                 <span>First-run path</span>
               </div>
-              <span class="shell-tag">Install-first</span>
+              <span class="shell-tag">Diagnose-first</span>
             </div>
 
             <div class="command-shell">
-              <pre id="hero-shell"><code><span class="prompt">$</span> npm install -g @xyteai/cli@latest
-<span class="prompt">$</span> xyte-cli init --no-setup
+              <pre id="hero-shell"><code><span class="prompt">$</span> xyte-cli doctor environment --format json
+<span class="comment"># or: npx -y @xyteai/cli@latest doctor environment --format json</span>
 <span class="prompt">$</span> xyte-cli setup run
 <span class="prompt">$</span> xyte-cli setup status --field tenantId
+<span class="prompt">$</span> xyte-cli init --no-setup
 <span class="comment"># inspect, watch, console, or generate report artifacts next</span></code></pre>
             </div>
 
@@ -1503,8 +1506,9 @@
             <p class="eyebrow">Install</p>
             <h2 id="install-title">Get running in three steps.</h2>
             <p>
-              Install the package globally, initialize your workspace, connect a tenant key, and verify readiness.
-              Then move into fleet inspection, incident watch, or report generation.
+              Shell-capable AI agents start with <code>xyte-cli doctor environment --format json</code> and follow
+              the recommended install mode from the report. Manual terminals install the package globally, connect a
+              tenant key, and verify readiness. Then move into fleet inspection, incident watch, or report generation.
             </p>
           </header>
 
@@ -1512,7 +1516,11 @@
             <article class="card surface">
               <p class="card-label">Step 1 · Core install</p>
               <div class="command-shell">
-                <pre id="install-snippet"><code>npm install -g @xyteai/cli@latest
+                <pre id="install-snippet"><code># AI agent terminal: diagnose first, follow the report
+npx -y @xyteai/cli@latest doctor environment --format json
+
+# Manual terminal: global install
+npm install -g @xyteai/cli@latest
 xyte-cli init --no-setup
 xyte-cli --version</code></pre>
               </div>
@@ -1587,7 +1595,8 @@ xyte-cli --version</code></pre>
             <h2 id="agents-title">First-class support for AI coding agents.</h2>
             <p>
               Drop a structured prompt into Codex, Claude, or Copilot. The CLI provides deterministic,
-              machine-readable outputs that agents can parse and act on.
+              machine-readable outputs that agents can parse and act on. Chat-only assistants can explain
+              commands, but they cannot install the CLI &mdash; use a shell-capable terminal or agent.
             </p>
           </header>
 
@@ -1595,24 +1604,16 @@ xyte-cli --version</code></pre>
             <article class="card surface">
               <p class="card-label">Copyable prompt</p>
               <div class="command-shell">
-                <pre id="agent-prompt"><code>Use @xyteai/cli in this workspace. Keep it concise and safe.
-
-Rules:
-- Never print secrets.
-- Do not invent IDs or outputs.
-
-Run:
-npm install -g @xyteai/cli@latest
-xyte-cli init --no-setup
-
-Then connect the tenant:
-xyte-cli setup run
-xyte-cli setup status --field tenantId
-
-Read tenantId from setup status and continue:
-xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-active --once --output json --strict-json
-xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json --out ./artifacts/deep-dive.json
-xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input ./artifacts/deep-dive.json --out ./reports/fleet-report.pdf</code></pre>
+                <pre id="agent-prompt"><code>Use @xyteai/cli in this workspace.
+Never print secrets. Do not invent IDs or outputs.
+First run `xyte-cli doctor environment --format json`.
+If `xyte-cli` is missing, run `npx -y @xyteai/cli@latest doctor environment --format json`.
+Follow the report's recommendations.nextCommand and recommendations.commands.
+Set up credentials with the report's setupKeyFile, setupStdin, or setupKeyCommand recipe.
+Do not ask me to paste API keys into chat.
+Do not store API keys inside the repo.
+After setup succeeds, run `xyte-cli init --scope project --agents all --force --no-setup`.
+If this surface cannot run shell commands, stop and say I need a shell-capable terminal or agent.</code></pre>
               </div>
               <div class="action-row">
                 <button

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import Ajv2020 from 'ajv/dist/2020';
 
 import callEnvelopeSchema from '../docs/schemas/call-envelope.v1.schema.json';
 import deepDiveSchema from '../docs/schemas/inspect-deep-dive.v1.schema.json';
+import doctorEnvironmentSchema from '../docs/schemas/doctor-environment.v1.schema.json';
 import fleetSchema from '../docs/schemas/inspect-fleet.v1.schema.json';
 import flowRunSchema from '../docs/schemas/flow-run.v1.schema.json';
 import headlessSchema from '../docs/schemas/headless-frame.v1.schema.json';
@@ -17,6 +20,7 @@ import { buildStatusContract } from '../src/contracts/status';
 import { buildWatchFrame } from '../src/contracts/watch-frame';
 import { buildUpgradeCheck } from '../src/contracts/upgrade';
 import { buildDeepDive, buildFleetInspect, generateFleetReport } from '../src/workflows/fleet-insights';
+import { buildEnvironmentDoctorReport, type EnvironmentDoctorOptions } from '../src/workflows/environment-doctor';
 import { generateOpsReport } from '../src/workflows/ops-report';
 import { runHeadlessRenderer } from '../src/tui/headless-renderer';
 import { MemorySecretStore } from '../src/secure/secret-store';
@@ -33,8 +37,50 @@ const validateStatus = ajv.compile(statusSchema);
 const validateUpgradeCheck = ajv.compile(upgradeCheckSchema);
 const validateUpgradeResult = ajv.compile(upgradeResultSchema);
 const validateWatchFrame = ajv.compile(watchFrameSchema);
+const validateDoctorEnvironment = ajv.compile(doctorEnvironmentSchema);
 
 describe('schema contracts', () => {
+  it('validates environment doctor payloads across modes', async () => {
+    const baseOptions: EnvironmentDoctorOptions = {
+      platform: 'linux',
+      arch: 'x64',
+      cwd: '/workspace',
+      homeDir: '/home/user',
+      tempDir: '/tmp',
+      configDir: '/home/user/.config/xyte-cli',
+      nodePath: '/usr/bin/node',
+      nodeVersion: 'v22.13.0',
+      writableProbe: async (dirPath) => ({ status: 'ok', path: dirPath, message: 'Writable.' }),
+      secretStoreDiagnostics: async () => ({
+        selector: 'auto',
+        backend: 'keychain',
+        secretStore: 'xyte-cli',
+        legacySecretStore: ''
+      })
+    };
+
+    const scenarios: EnvironmentDoctorOptions[] = [
+      { ...baseOptions, commandResolver: (command) => `/usr/bin/${command}` },
+      { ...baseOptions, commandResolver: (command) => ({ npm: '/usr/bin/npm', npx: '/usr/bin/npx' })[command] },
+      { ...baseOptions, commandResolver: (command) => ({ npm: '/usr/bin/npm' })[command] },
+      { ...baseOptions, commandResolver: () => undefined, nodeVersion: 'v18.0.0' }
+    ];
+
+    for (const scenario of scenarios) {
+      const report = await buildEnvironmentDoctorReport(scenario);
+      const serialized = JSON.parse(JSON.stringify(report));
+      const valid = validateDoctorEnvironment(serialized);
+      expect(validateDoctorEnvironment.errors ?? []).toEqual([]);
+      expect(valid).toBe(true);
+    }
+  });
+
+  it('keeps the skill bundle copy of the environment doctor schema in sync', () => {
+    const skillSchema = JSON.parse(
+      readFileSync(join(__dirname, '../skills/xyte-cli/schemas/doctor-environment.v1.schema.json'), 'utf8')
+    ) as Record<string, unknown>;
+    expect(skillSchema).toEqual(doctorEnvironmentSchema);
+  });
   it('validates call envelope payload', () => {
     const envelope = buildCallEnvelope({
       requestId: 'req-1',

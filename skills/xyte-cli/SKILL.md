@@ -13,7 +13,7 @@ This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
 
 - Use `xyte-cli` commands directly.
 - Do not use source/dev entrypoints (`tsx`, `src/*`, `dist/*`, `bin/*`).
-- If `xyte-cli` is unavailable on `PATH`, use `npx @xyteai/cli@latest <command>` or `npm exec -- @xyteai/cli@latest <command>` until `PATH` is fixed.
+- If `xyte-cli` is unavailable on `PATH`, run `npx -y @xyteai/cli@latest doctor environment --format json` and use the command prefix from `recommendations`; `npm exec -- @xyteai/cli@latest <command>` also works until `PATH` is fixed.
 - Command option correctness:
   - `xyte-cli config tenant list` has no `--output`.
   - `xyte-cli setup status`, `xyte-cli config doctor`, `xyte-cli status`, `xyte-cli ops inspect`, and `xyte-cli ops console --headless` accept `--output json|text` where relevant.
@@ -24,7 +24,7 @@ This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
   - `xyte-cli status --mode fast --output json`
   - `xyte-cli init --scope both --agents all --force --no-setup`
 - for humans: `xyte-cli setup run --tenant <tenant-id> [--provider <xyte-org|xyte-partner>]`
-- for automation: use `--key-file <path>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`
+- for automation: use `--key-file <path-outside-workspace>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`
 - for secret managers: use `--key-command "<cmd>"` to resolve the API key from any CLI that prints it on stdout, e.g. `--key-command "op read op://Employee/Xyte/credential"` (1Password), `--key-command "vault kv get -field=key secret/xyte"` (Vault), `--key-command "aws secretsmanager get-secret-value --secret-id xyte --query SecretString --output text"` (AWS Secrets Manager). xyte-cli trims leading and trailing whitespace; the command must exit 0 and print only the key on stdout.
 - If `--provider` is omitted, setup probes `xyte-org` first and then `xyte-partner`.
 - If `--connectivity never` is used, require `--provider`.
@@ -133,10 +133,11 @@ Rules:
 - `xyte-cli config doctor --tenant <tenant-id> --output json`
 - `xyte-cli config show --scope resolved`
 - `xyte-cli doctor install --format json`
+- `xyte-cli doctor environment --format json` (install/setup environment diagnostics with a recommended install mode)
 
 2. Auth/tenant (if missing or incomplete):
 - human-guided setup: `xyte-cli setup run --tenant <tenant-id> [--provider <xyte-org|xyte-partner>]`
-- automation setup: use `--key-file <path>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`
+- automation setup: use `--key-file <path-outside-workspace>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`
 - secret-manager setup: use `--key-command "<cmd>"`, e.g. `xyte-cli setup run --non-interactive --tenant <tenant-id> --key-command "op read op://Employee/Xyte/credential"`
 - `xyte-cli setup status --tenant <tenant-id> --field tenantId`
 - `xyte-cli config tenant use <tenant-id>`
@@ -176,7 +177,7 @@ Provider/report behavior:
 | Deterministic multi-step ops | `xyte-cli flow run <flow-id> --tenant <tenant-id> --plan` |
 | First-time onboarding (interactive) | `xyte-cli` |
 | Setup interactive | `xyte-cli setup run --tenant <tenant-id> [--provider <xyte-org\|xyte-partner>]` |
-| Setup non-interactive | `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org\|xyte-partner>] --key-file <path>` or pipe to `--key-stdin` |
+| Setup non-interactive | `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org\|xyte-partner>] --key-file <path-outside-workspace>` or pipe to `--key-stdin` |
 | Setup from secret manager | `xyte-cli setup run --non-interactive --tenant <tenant-id> --key-command "op read op://Vault/Item/field"` (works with any CLI that prints the key on stdout: `op`, `vault`, `aws secretsmanager`, `pass`, …) |
 | Readiness snapshot | `xyte-cli setup status --tenant <tenant-id> --output json` |
 | Tenant ID extraction | `xyte-cli setup status --tenant <tenant-id> --field tenantId` |
@@ -201,6 +202,7 @@ Provider/report behavior:
 | Edge connectivity probe | `xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip> --plan` |
 | Edge ping status | `xyte-cli edge ping-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip>` |
 | Install diagnostics | `xyte-cli doctor install --format json` |
+| Environment diagnostics | `xyte-cli doctor environment --format json` (add `--check-network` to probe npm registry reachability) |
 | Settings introspection | `xyte-cli config show --scope resolved` |
 | Interactive console | `xyte-cli ops console` |
 | Headless snapshot | `xyte-cli ops console --headless --screen <screen> --output json --once --tenant <tenant-id>` |
@@ -372,7 +374,7 @@ Canonical schemas:
 - First-run/setup issues:
   - `xyte-cli`
   - `xyte-cli setup run --tenant <tenant-id> [--provider <xyte-org|xyte-partner>]`
-  - for automation, use `--key-file <path>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`
+  - for automation, use `--key-file <path-outside-workspace>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`
   - for secret managers, use `--key-command "<cmd>"`, e.g. `--key-command "op read op://Employee/Xyte/credential"` — xyte-cli runs the command and uses its stdout as the key
 - Install wiring diagnostics:
   - `xyte-cli doctor install --format json`

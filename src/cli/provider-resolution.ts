@@ -49,7 +49,12 @@ export async function fetchProviderForKey(args: {
     const partnerMsg = partnerError instanceof Error ? partnerError.message : String(partnerError);
     throw new CliUserError({
       summary: 'Provider auto-detection failed for both org and partner.',
-      detail: `Org: ${orgMsg}; Partner: ${partnerMsg}`
+      detail: `Org: ${orgMsg}; Partner: ${partnerMsg}`,
+      suggestedCommands: [
+        'Verify the API key in the Xyte tenant under Settings -> API Keys',
+        '<secret-command> | xyte-cli setup run --non-interactive --tenant <tenant-id> --key-stdin --output json',
+        'xyte-cli setup run --non-interactive --tenant <tenant-id> --key-file <path-outside-workspace> --output json'
+      ]
     });
   }
 }

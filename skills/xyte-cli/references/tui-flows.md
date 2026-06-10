@@ -74,7 +74,7 @@ xyte-cli config key list --tenant <tenant-id> --output json
 xyte-cli config doctor --tenant <tenant-id> --output json
 ```
 
-For non-interactive automation, use `--key-file <path>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`. To resolve the key from a secret manager, use `--key-command "<cmd>"` (e.g. `op read op://Employee/Xyte/credential`, `vault kv get -field=key secret/xyte`, `aws secretsmanager get-secret-value --secret-id xyte --query SecretString --output text`); xyte-cli runs the command and uses its stdout as the key.
+For non-interactive automation, use `--key-file <path-outside-workspace>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`. To resolve the key from a secret manager, use `--key-command "<cmd>"` (e.g. `op read op://Employee/Xyte/credential`, `vault kv get -field=key secret/xyte`, `aws secretsmanager get-secret-value --secret-id xyte --query SecretString --output text`); xyte-cli runs the command and uses its stdout as the key.
 If `--provider` is omitted, setup probes `xyte-org` first and then `xyte-partner`. If `--connectivity never` is used, require `--provider`.
 Persisted credentials default to secure OS-native storage (macOS Keychain, Windows DPAPI, Linux Secret Service). If `xyte-cli` warns on stderr that secure storage was unavailable and it fell back to file storage, treat that as degraded-but-successful setup rather than command failure.
 
