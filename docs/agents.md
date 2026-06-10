@@ -1,27 +1,70 @@
 # Agent Usage
 
+Built for shell-capable AI agents and automated terminal workflows.
+Manual terminal use is supported for setup, debugging, and local testing.
+
 ## Fast Path
 
-1. Install skill bundle once in your workspace:
+Use an agent surface that can execute shell commands: Codex, Claude Code/Desktop, GitHub Copilot CLI, VS Code Copilot Agent, or another shell-capable agent. Chat-only assistants can explain commands, but they cannot install the CLI.
 
-```bash
-xyte-cli init --no-setup
+1. Start with environment diagnostics. The report picks the right install mode and returns copy-pasteable commands in `recommendations`:
+
+```sh
+xyte-cli doctor environment --format json
 ```
 
-If your global npm bin is not on `PATH`, replace `xyte-cli` in the commands below with:
+If `xyte-cli` is missing:
 
-```bash
-npx @xyteai/cli@latest <command>
-npm exec -- @xyteai/cli@latest <command>
+```sh
+npx -y @xyteai/cli@latest doctor environment --format json
 ```
 
-2. Prompt your coding agent to run `xyte-cli` commands directly.
+If the report recommends `workspace-local` mode:
 
-Example prompt:
+```sh
+npm install --prefix ./.xyte-cli/runtime @xyteai/cli@latest
+./.xyte-cli/runtime/node_modules/.bin/xyte-cli doctor environment --format json
+```
+
+PowerShell command path:
+
+```powershell
+.\.xyte-cli\runtime\node_modules\.bin\xyte-cli.cmd doctor environment --format json
+```
+
+2. Create an API key in Xyte under **Settings → API Keys** and save it in a plain text file outside the workspace. Use the report's command prefix for non-interactive setup. Do not paste API keys into chat. Do not store API keys inside the repo.
+
+```sh
+xyte-cli setup run --non-interactive --tenant <tenant-id> --key-file <path-outside-workspace> --output json
+xyte-cli setup status --tenant <tenant-id> --field tenantId
+```
+
+3. Install the skill bundle once in your workspace:
+
+```sh
+xyte-cli init --scope project --agents all --force --no-setup
+```
+
+## Agent Prompt
+
+Before you start: in Xyte, open **Settings → API Keys** and create a key. Save it in a plain text file outside your project folder (for example `xyte-api-key.txt` on your Desktop) — any text editor works. Your agent will ask for the file's path.
+
+Copy this into a shell-capable agent:
 
 ```text
-Inspect tenant acme and generate a report.
-Use xyte-cli commands directly and keep outputs JSON-first.
+Use @xyteai/cli in this workspace.
+Never print secrets. Do not invent IDs or outputs.
+
+First run `xyte-cli doctor environment --format json`.
+If `xyte-cli` is missing, run `npx -y @xyteai/cli@latest doctor environment --format json`.
+Follow the report's recommendations.nextCommand and recommendations.commands.
+
+If `xyte-cli setup status` shows no connected tenant, ask me for the path to my API key file (never the key itself) and connect it with the report's setupKeyFile recipe.
+Do not ask me to paste API keys into chat.
+Do not store API keys inside the repo.
+After setup succeeds, offer to delete the key file, then run `xyte-cli init --scope project --agents all --force --no-setup`.
+
+If this surface cannot run shell commands, stop and say I need a shell-capable terminal or agent.
 ```
 
 ## Flow-First Agent Operations
@@ -59,23 +102,30 @@ Full playbook for the agent: skill reference `references/claim-playbook.md`. Use
 
 ### Claude
 
-```bash
+Claude Code (terminal CLI or desktop app) is shell-capable. Claude chat on the web is not.
+
+```sh
 xyte-cli init --no-setup
 claude
+# paste the agent prompt from this doc
 ```
 
 ### Codex
 
-```bash
+The Codex CLI and IDE integrations are shell-capable. ChatGPT chat without Codex is not.
+
+```sh
 xyte-cli init --no-setup
-# in prompts, ask Codex to run xyte-cli commands directly
+# paste the agent prompt from this doc into Codex
 ```
 
 ### GitHub Copilot
 
-```bash
+The Copilot surface that can run commands is VS Code Copilot in **Agent mode** (switch the chat panel picker from "Ask" to "Agent") or GitHub Copilot CLI in a terminal. Copilot Chat surfaces only explain commands. For Copilot cloud agents, preinstall Node.js 22+ and `@xyteai/cli` in `.github/workflows/copilot-setup-steps.yml` when the environment does not already provide them.
+
+```sh
 xyte-cli init --no-setup
-# in prompts, ask Copilot to run xyte-cli commands directly
+# paste the agent prompt from this doc into Copilot Agent mode
 ```
 
 ## Skills-Less Mode

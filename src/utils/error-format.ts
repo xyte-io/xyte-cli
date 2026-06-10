@@ -51,6 +51,24 @@ export function errorMessage(error: unknown): string {
   return String(error);
 }
 
+export function formatErrorText(error: unknown): string {
+  if (!(error instanceof CliUserError)) {
+    return errorMessage(error);
+  }
+
+  const lines = [error.summary];
+  if (error.detail) {
+    lines.push(error.detail);
+  }
+  if (error.suggestedCommands.length > 0) {
+    lines.push('Try:');
+    for (const command of error.suggestedCommands) {
+      lines.push(`- ${command}`);
+    }
+  }
+  return lines.join('\n');
+}
+
 export function resolveCliErrorFormat(argv: string[], envValue?: string): CliErrorFormat {
   const fromArg = parseErrorFormatArg(argv);
   if (fromArg) {

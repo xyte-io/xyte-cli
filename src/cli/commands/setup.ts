@@ -580,7 +580,7 @@ export function registerSetupCommands(parent: Command, ctx: CliContext): void {
     .option('--provider <provider>', 'Primary provider for key setup')
     .option('--slot-name <name>', 'Key slot name', 'primary')
     .option('--key <value>', 'API key value')
-    .option('--key-file <path>', 'Read API key value from a file')
+    .option('--key-file <path-outside-workspace>', 'Read API key value from a file outside the workspace')
     .option('--key-stdin', 'Read API key value from stdin')
     .option('--key-command <command>', 'Run a shell command and use its stdout as the API key (for secret managers)')
     .option('--set-active', 'Set slot active (default true in setup flow)')

@@ -4,12 +4,54 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { createCli } from '../src/cli/index';
+import type { EnvironmentDoctorReport } from '../src/workflows/environment-doctor';
 import { MemorySecretStore } from '../src/secure/secret-store';
 import { MemoryProfileStore } from './support/memory-profile-store';
 import { buildDeepDive } from '../src/workflows/fleet-insights';
 
 function nodeEvalCommand(script: string): string {
   return `"${process.execPath}" -e ${JSON.stringify(script)}`;
+}
+
+function makeEnvironmentDoctorReport(): EnvironmentDoctorReport {
+  return {
+    schemaVersion: 'xyte.doctor.environment.v1',
+    generatedAtUtc: '2026-06-09T00:00:00.000Z',
+    status: 'ok',
+    environment: {
+      platform: 'linux',
+      arch: 'x64',
+      cwd: '/workspace',
+      home: '/home/user',
+      tempDir: '/tmp',
+      configDir: '/home/user/.config/xyte-cli',
+      node: { available: true, path: '/usr/bin/node', version: 'v22.13.0', required: '>=22' },
+      npm: { available: true, path: '/usr/bin/npm' },
+      npx: { available: true, path: '/usr/bin/npx' },
+      xyteCli: { available: true, path: '/usr/local/bin/xyte-cli' }
+    },
+    checks: {
+      nodeVersion: { status: 'ok', message: 'Node v22.13.0 satisfies >=22.' },
+      cwdWritable: { status: 'ok', path: '/workspace', message: 'Writable.' },
+      homeWritable: { status: 'ok', path: '/home/user', message: 'Writable.' },
+      tempWritable: { status: 'ok', path: '/tmp', message: 'Writable.' },
+      configDirWritable: { status: 'ok', path: '/home/user/.config/xyte-cli', message: 'Writable.' },
+      workspaceRuntimeWritable: { status: 'ok', path: '/workspace/.xyte-cli/runtime', message: 'Writable.' },
+      configDirOutsideWorkspace: { status: 'ok', message: 'Config directory is outside the workspace.' },
+      secretStore: { status: 'ok', backend: 'keychain', message: 'Native secret storage is available.' },
+      network: {
+        status: 'skipped',
+        url: 'https://registry.npmjs.org/@xyteai%2fcli/latest',
+        message: 'Network check skipped.'
+      }
+    },
+    recommendations: {
+      mode: 'existing',
+      nextCommand: 'xyte-cli doctor environment --format json',
+      commandPrefix: 'xyte-cli',
+      notes: ['Do not paste API keys into AI chat or store API keys inside the repo.']
+    }
+  };
 }
 
 describe('cli integration', () => {
@@ -1847,6 +1889,60 @@ describe('cli integration', () => {
     const parsed = JSON.parse(output);
     expect(['ok', 'missing', 'mismatch']).toContain(parsed.status);
     expect(String(parsed.expectedPath).replaceAll('\\', '/')).toContain('dist/bin/xyte-cli.js');
+  });
+
+  it('reports environment diagnostics as json via the injected builder', async () => {
+    const stdout = { write: vi.fn() };
+    const environmentDoctor = vi.fn(async () => makeEnvironmentDoctorReport());
+    const program = createCli({
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout,
+      stderr: { write: vi.fn() },
+      environmentDoctor
+    });
+
+    await program.parseAsync(['node', 'xyte-cli', 'doctor', 'environment']);
+
+    expect(environmentDoctor).toHaveBeenCalledWith(
+      expect.objectContaining({ checkNetwork: false, currentCommandPath: 'xyte-cli' })
+    );
+    const parsed = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(parsed.schemaVersion).toBe('xyte.doctor.environment.v1');
+    expect(parsed.recommendations.mode).toBe('existing');
+  });
+
+  it('renders environment diagnostics as text with --format text', async () => {
+    const stdout = { write: vi.fn() };
+    const program = createCli({
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout,
+      stderr: { write: vi.fn() },
+      environmentDoctor: async () => makeEnvironmentDoctorReport()
+    });
+
+    await program.parseAsync(['node', 'xyte-cli', 'doctor', 'environment', '--format', 'text']);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(output).toContain('Status: ok');
+    expect(output).toContain('Mode: existing');
+    expect(output).toContain('Next command: xyte-cli doctor environment --format json');
+  });
+
+  it('passes --check-network through to the environment doctor', async () => {
+    const environmentDoctor = vi.fn(async () => makeEnvironmentDoctorReport());
+    const program = createCli({
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout: { write: vi.fn() },
+      stderr: { write: vi.fn() },
+      environmentDoctor
+    });
+
+    await program.parseAsync(['node', 'xyte-cli', 'doctor', 'environment', '--check-network']);
+
+    expect(environmentDoctor).toHaveBeenCalledWith(expect.objectContaining({ checkNetwork: true }));
   });
 
   it('emits call envelope when output-mode is envelope', async () => {
@@ -3970,6 +4066,90 @@ describe('cli integration', () => {
     expect(parsed.currentVersion).toBe('0.4.0');
     expect(parsed.latestVersion).toBe('0.5.0');
     expect(commandRunner).not.toHaveBeenCalled();
+  });
+
+  it('force-installs all skill bundles with skills refresh', async () => {
+    const ws = mkdtempSync(join(tmpdir(), 'xyte-skills-ws-'));
+    const home = mkdtempSync(join(tmpdir(), 'xyte-skills-home-'));
+    const stdout = { write: vi.fn() };
+    const program = createCli({
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout,
+      stderr: { write: vi.fn() },
+      cwd: ws,
+      homeDir: home
+    });
+
+    await program.parseAsync(['node', 'xyte-cli', 'skills', 'refresh']);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(output).toContain('project/claude: installed');
+    expect(output).toContain('user/codex: installed');
+    expect(existsSync(join(ws, '.claude/skills/xyte-cli/SKILL.md'))).toBe(true);
+    expect(existsSync(join(home, '.copilot/skills/xyte-cli/SKILL.md'))).toBe(true);
+
+    const stdout2 = { write: vi.fn() };
+    const program2 = createCli({
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout: stdout2,
+      stderr: { write: vi.fn() },
+      cwd: ws,
+      homeDir: home
+    });
+    await program2.parseAsync(['node', 'xyte-cli', 'skills', 'refresh']);
+    const output2 = stdout2.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(output2).toContain('project/claude: overwritten');
+    expect(output2).toContain('user/codex: overwritten');
+  });
+
+  it('suggests skills refresh after a successful upgrade in text mode', async () => {
+    const stdout = { write: vi.fn() };
+    const commandRunner = vi.fn(async (command: string) => {
+      if (/^xyte-cli(?:\.cmd)?$/.test(command)) {
+        return { code: 0, stdout: 'xyte-cli 0.5.0\n', stderr: '' };
+      }
+      return { code: 0, stdout: '', stderr: '' };
+    });
+    const installSkillsImpl = vi.fn().mockResolvedValue({
+      workspaceRoot: '/tmp/workspace',
+      homeRoot: '/tmp/home',
+      sourceDir: '/tmp/skills/xyte-cli',
+      outcomes: [
+        {
+          scope: 'user',
+          agent: 'claude',
+          rootDir: '/tmp/home/.claude/skills',
+          targetDir: '/tmp/home/.claude/skills/xyte-cli',
+          status: 'overwritten'
+        }
+      ],
+      createdRoots: []
+    });
+    const program = createCli({
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout,
+      stderr: { write: vi.fn() },
+      upgradeDependencies: {
+        fetchImpl: vi.fn().mockImplementation(
+          async () =>
+            new Response(JSON.stringify({ version: '0.5.0' }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' }
+            })
+        ),
+        commandRunner,
+        installSkillsImpl,
+        getCurrentVersion: () => '0.4.0'
+      }
+    });
+
+    await program.parseAsync(['node', 'xyte-cli', 'upgrade', '--yes', '--format', 'text']);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(output).toContain('xyte-cli skills refresh');
   });
 
   it('warns and succeeds when upgrade skill refresh partially fails', async () => {

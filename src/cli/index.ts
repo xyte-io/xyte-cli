@@ -1,6 +1,4 @@
-import { createInterface } from 'node:readline/promises';
 import path from 'node:path';
-import { Writable } from 'node:stream';
 
 import { Command } from 'commander';
 
@@ -18,6 +16,7 @@ import {
 import { createSecretStore, type SecretStore } from '../secure/secret-store';
 import { createProfileStore, type ProfileStore } from '../secure/profile-store';
 import { buildInstallDoctorReport, type InstallDoctorResult } from '../workflows/install-doctor';
+import { buildEnvironmentDoctorReport, formatEnvironmentDoctorText } from '../workflows/environment-doctor';
 import { getCliVersion } from '../utils/version';
 import {
   installSkills,
@@ -26,6 +25,7 @@ import {
   type SkillInstallScope
 } from './install-skills';
 import { applyUpgrade, checkForUpgrade, type UpgradeDependencies } from './upgrade';
+import { promptValue } from './prompt-value';
 import { runTuiApp } from '../tui/app';
 import { CliUserError } from '../contracts/user-error';
 import { errorMessage, parseCliErrorFormat } from '../utils/error-format';
@@ -96,6 +96,8 @@ interface CliRuntime {
   watchDelayFn?: (ms: number) => Promise<void>;
   cwd?: string;
   env?: NodeJS.ProcessEnv;
+  homeDir?: string;
+  environmentDoctor?: typeof buildEnvironmentDoctorReport;
 }
 
 const SKILL_AGENTS: SkillAgent[] = ['claude', 'copilot', 'codex'];
@@ -114,18 +116,24 @@ function commandPathFor(command: Command): string {
   return names.join(' ');
 }
 
-function argvForCommand(command: Command): string[] {
+function rawArgsForCommand(command: Command): string[] {
   let root: Command = command;
   while (root.parent) {
     root = root.parent;
   }
 
   const rootWithRawArgs = root as Command & { rawArgs?: string[] };
-  const rawArgs = Array.isArray(rootWithRawArgs.rawArgs) ? rootWithRawArgs.rawArgs : process.argv;
-  if (!Array.isArray(rawArgs) || rawArgs.length <= 2) {
-    return [];
-  }
-  return rawArgs.slice(2);
+  return Array.isArray(rootWithRawArgs.rawArgs) ? rootWithRawArgs.rawArgs : process.argv;
+}
+
+function argvForCommand(command: Command): string[] {
+  const rawArgs = rawArgsForCommand(command);
+  return rawArgs.length > 2 ? rawArgs.slice(2) : [];
+}
+
+function executableArgForCommand(command: Command): string | undefined {
+  const rawArgs = rawArgsForCommand(command);
+  return rawArgs.length > 1 ? rawArgs[1] : undefined;
 }
 
 function inferCommandPathFromArgv(argv: string[]): string {
@@ -217,37 +225,6 @@ function parseStatusMode(value: string | undefined): StatusMode {
 function runInstallDoctor(): InstallDoctorResult {
   const expectedPath = path.resolve(__dirname, '../../dist/bin/xyte-cli.js');
   return buildInstallDoctorReport(expectedPath);
-}
-
-async function promptValue(args: {
-  question: string;
-  initial?: string;
-  stdout: OutputStream;
-  secret?: boolean;
-}): Promise<string> {
-  const mutedOutput = new Writable({
-    write(_chunk, _encoding, callback) {
-      callback();
-    }
-  });
-  const rl = createInterface({
-    input: process.stdin,
-    output: args.secret ? mutedOutput : process.stdout,
-    terminal: true
-  });
-  try {
-    const suffix = args.initial ? ` [${args.initial}]` : '';
-    if (args.secret) {
-      args.stdout.write(`${args.question}${suffix}: `);
-    }
-    const answer = (await rl.question(args.secret ? '' : `${args.question}${suffix}: `)).trim();
-    if (args.secret) {
-      args.stdout.write('\n');
-    }
-    return answer || args.initial || '';
-  } finally {
-    rl.close();
-  }
 }
 
 async function readStdinValue(): Promise<string> {
@@ -422,6 +399,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
   const runTui = runtime.runTui ?? runTuiApp;
   const cwd = runtime.cwd ?? process.cwd();
   const env = runtime.env ?? process.env;
+  const environmentDoctor = runtime.environmentDoctor ?? buildEnvironmentDoctorReport;
 
   let cachedSecretStore: SecretStore | undefined;
   const getSecretStore = () => {
@@ -669,8 +647,9 @@ export function createCli(runtime: CliRuntime = {}): Command {
     [
       '',
       'Setup:',
+      '  xyte-cli doctor environment --format json',
       '  xyte-cli init --scope both --agents all',
-      '  xyte-cli setup run --non-interactive --tenant <tenant-id> --key-file <path>',
+      '  xyte-cli setup run --non-interactive --tenant <tenant-id> --key-file <path-outside-workspace> --output json',
       '',
       'Everyday Ops:',
       '  xyte-cli ops watch incidents --tenant <tenant-id> --once --output json --strict-json',
@@ -778,6 +757,56 @@ export function createCli(runtime: CliRuntime = {}): Command {
         return;
       }
       printJson(stdout, report, { strictJson: resolveStrictJson({ settings }) });
+    });
+
+  doctor
+    .command('environment')
+    .description('Diagnose this environment for xyte-cli install and setup')
+    .option('--format <format>', 'json|text', 'json')
+    .option('--check-network', 'Probe npm registry reachability')
+    .action(async (options: { format?: OutputFormat; checkNetwork?: boolean }, command: Command) => {
+      const report = await environmentDoctor({
+        cwd,
+        env,
+        checkNetwork: options.checkNetwork === true,
+        currentCommandPath: executableArgForCommand(command)
+      });
+      const settings = await resolveSettings();
+      if (
+        resolveTextJsonOutput({
+          output: options.format ?? getExplicitGlobalOutput(command),
+          stdoutIsTTY,
+          settings
+        }) === 'text'
+      ) {
+        stdout.write(formatEnvironmentDoctorText(report));
+        return;
+      }
+      printJson(stdout, report, { strictJson: resolveStrictJson({ settings }) });
+    });
+
+  const skillsCommand = program.command('skills').description('Manage installed agent skill bundles');
+
+  skillsCommand
+    .command('refresh')
+    .description('Force-install all agent skill bundles (project and user scope); run after upgrading')
+    .option('--target <path>', 'Workspace root for project scope (defaults to current directory)')
+    .action(async (options: { target?: string }) => {
+      const result = await installSkills({
+        skillName: 'xyte-cli',
+        sourceDir: resolveSkillSourceDir(),
+        scope: 'both',
+        agents: [...SKILL_AGENTS],
+        targetWorkspace: options.target ?? cwd,
+        homeDir: runtime.homeDir,
+        force: true
+      });
+      stdout.write('Skill refresh summary:\n');
+      result.outcomes.forEach((outcome) => stdout.write(`${formatInstallOutcome(outcome)}\n`));
+      const failed = result.outcomes.filter((outcome) => outcome.status === 'failed');
+      if (failed.length > 0) {
+        throw new CliUserError({ summary: `Skill refresh failed for ${failed.length} destination(s).` });
+      }
     });
 
   program
@@ -912,6 +941,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
           stdout.write('Warnings:\n');
           result.warnings.forEach((warning) => stdout.write(`- ${warning}\n`));
         }
+        stdout.write('Workspace skill copies are not auto-updated. Run: xyte-cli skills refresh\n');
         return;
       }
 

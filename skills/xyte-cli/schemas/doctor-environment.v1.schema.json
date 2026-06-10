@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xyte.dev/schemas/doctor-environment.v1.schema.json",
+  "title": "Xyte Doctor Environment V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generatedAtUtc",
+    "status",
+    "environment",
+    "checks",
+    "recommendations"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "xyte.doctor.environment.v1"
+    },
+    "generatedAtUtc": {
+      "type": "string"
+    },
+    "status": {
+      "enum": ["ok", "restricted", "blocked"]
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "arch", "cwd", "home", "tempDir", "configDir", "node", "npm", "npx", "xyteCli"],
+      "properties": {
+        "platform": { "type": "string" },
+        "arch": { "type": "string" },
+        "cwd": { "type": "string" },
+        "home": { "type": ["string", "null"] },
+        "tempDir": { "type": "string" },
+        "configDir": { "type": "string" },
+        "currentCommandPath": { "type": "string" },
+        "node": { "$ref": "#/$defs/tool" },
+        "npm": { "$ref": "#/$defs/tool" },
+        "npx": { "$ref": "#/$defs/tool" },
+        "xyteCli": { "$ref": "#/$defs/tool" }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeVersion",
+        "cwdWritable",
+        "homeWritable",
+        "tempWritable",
+        "configDirWritable",
+        "workspaceRuntimeWritable",
+        "configDirOutsideWorkspace",
+        "secretStore",
+        "network"
+      ],
+      "properties": {
+        "nodeVersion": { "$ref": "#/$defs/check" },
+        "cwdWritable": { "$ref": "#/$defs/pathCheck" },
+        "homeWritable": { "$ref": "#/$defs/pathCheck" },
+        "tempWritable": { "$ref": "#/$defs/pathCheck" },
+        "configDirWritable": { "$ref": "#/$defs/pathCheck" },
+        "workspaceRuntimeWritable": { "$ref": "#/$defs/pathCheck" },
+        "configDirOutsideWorkspace": { "$ref": "#/$defs/check" },
+        "secretStore": { "$ref": "#/$defs/secretStoreCheck" },
+        "network": { "$ref": "#/$defs/networkCheck" }
+      }
+    },
+    "recommendations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "nextCommand", "notes"],
+      "properties": {
+        "mode": { "enum": ["existing", "npx", "workspace-local", "blocked"] },
+        "nextCommand": { "type": "string" },
+        "commandPrefix": { "type": "string" },
+        "installCommand": { "type": "string" },
+        "commands": { "$ref": "#/$defs/commands" },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "message"],
+      "properties": {
+        "status": { "enum": ["ok", "restricted", "blocked"] },
+        "message": { "type": "string" }
+      }
+    },
+    "pathCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "path", "message"],
+      "properties": {
+        "status": { "enum": ["ok", "blocked"] },
+        "path": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["available"],
+      "properties": {
+        "available": { "type": "boolean" },
+        "path": { "type": "string" },
+        "version": { "type": "string" },
+        "required": { "type": "string" }
+      }
+    },
+    "secretStoreCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "message"],
+      "properties": {
+        "status": { "enum": ["ok", "restricted"] },
+        "selector": { "type": "string" },
+        "backend": { "type": "string" },
+        "location": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    },
+    "networkCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "url", "message"],
+      "properties": {
+        "status": { "enum": ["ok", "blocked", "skipped"] },
+        "url": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    },
+    "commands": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["doctor", "setupKeyFile", "setupStdin", "setupKeyCommand", "initAgentSkills"],
+      "properties": {
+        "doctor": { "type": "string" },
+        "setupKeyFile": { "type": "string" },
+        "setupStdin": { "type": "string" },
+        "setupKeyCommand": { "type": "string" },
+        "initAgentSkills": { "type": "string" }
+      }
+    }
+  }
+}

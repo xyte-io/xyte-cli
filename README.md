@@ -1,6 +1,7 @@
 # xyte-cli
 
-Deterministic Xyte operations for humans and AI agents.
+Built for shell-capable AI agents and automated terminal workflows.
+Manual terminal use is supported for setup, debugging, and local testing.
 
 - npm: [@xyteai/cli](https://www.npmjs.com/package/@xyteai/cli)
 - GitHub Page: [docs/index.html](./docs/index.html)
@@ -8,66 +9,93 @@ Deterministic Xyte operations for humans and AI agents.
 - Flows: [docs/flows/agent-ops.md](./docs/flows/agent-ops.md)
 - Schemas: [docs/schemas](./docs/schemas)
 
-## AI Agent Prompt (Copy/Paste)
-
-```text
-Use @xyteai/cli in this workspace. Keep it concise and safe.
-
-Rules:
-- Never print secrets.
-- Do not invent IDs or outputs.
-
-Run:
-npm install -g @xyteai/cli@latest
-xyte-cli --version
-xyte-cli init --no-setup
-
-Then connect the tenant:
-xyte-cli setup run
-xyte-cli setup status --field tenantId
-
-Read tenantId from setup status and continue:
-xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json
-xyte-cli ops inspect deep-dive --tenant <tenant-id> --window 24 --output json --out ./artifacts/deep-dive.json
-xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/deep-dive.json --out ./reports/fleet-report.pdf
-
-Finish with:
-- concise success/failure summary
-- exact failing command (if any)
-```
-
----
-
 ## Install Flow
 
-### 1) Install CLI
+### AI agent
 
-```bash
+Use this path for Codex, Claude Code/Desktop, GitHub Copilot CLI, VS Code Copilot Agent, and other shell-capable agents. Chat-only assistants can explain commands, but they cannot install the CLI.
+
+Start with environment diagnostics. The report picks the right install mode for this environment and returns copy-pasteable commands in `recommendations`:
+
+```sh
+xyte-cli doctor environment --format json
+```
+
+If `xyte-cli` is missing:
+
+```sh
+npx -y @xyteai/cli@latest doctor environment --format json
+```
+
+If the report recommends `workspace-local` mode:
+
+```sh
+npm install --prefix ./.xyte-cli/runtime @xyteai/cli@latest
+./.xyte-cli/runtime/node_modules/.bin/xyte-cli <command>
+```
+
+PowerShell command path:
+
+```powershell
+.\.xyte-cli\runtime\node_modules\.bin\xyte-cli.cmd <command>
+```
+
+Before you start: in Xyte, open **Settings → API Keys** and create a key. Save it in a plain text file outside your project folder (for example `xyte-api-key.txt` on your Desktop) — any text editor works. Your agent will ask for the file's path. Do not paste API keys into chat. Do not store API keys inside the repo.
+
+Agent prompt (copy/paste):
+
+```text
+Use @xyteai/cli in this workspace.
+Never print secrets. Do not invent IDs or outputs.
+
+First run `xyte-cli doctor environment --format json`.
+If `xyte-cli` is missing, run `npx -y @xyteai/cli@latest doctor environment --format json`.
+Follow the report's recommendations.nextCommand and recommendations.commands.
+
+If `xyte-cli setup status` shows no connected tenant, ask me for the path to my API key file (never the key itself) and connect it with the report's setupKeyFile recipe.
+Do not ask me to paste API keys into chat.
+Do not store API keys inside the repo.
+After setup succeeds, offer to delete the key file, then run `xyte-cli init --scope project --agents all --force --no-setup`.
+
+If this surface cannot run shell commands, stop and say I need a shell-capable terminal or agent.
+```
+
+Detailed agent guidance: [docs/agents.md](./docs/agents.md).
+
+### CI / headless
+
+1. In Xyte, open **Settings → API Keys** and create a key.
+2. In your CI tool (GitHub Actions, GitLab CI, Jenkins), add a secret named `XYTE_CLI_KEY` and paste the key as its value.
+3. Make sure the job receives the secret as an environment variable — in GitHub Actions add `env: XYTE_CLI_KEY: ${{ secrets.XYTE_CLI_KEY }}` to the step; GitLab CI passes variables automatically.
+4. Add these commands to your pipeline (`acme` is just a name for this connection — use your company name):
+
+```sh
+npx -y @xyteai/cli@latest setup run --non-interactive --tenant acme --output json
+npx -y @xyteai/cli@latest setup status --tenant acme --field tenantId
+```
+
+For reproducible pipelines, replace `@latest` with a pinned version (e.g. `@0.10.7`).
+
+### Manual terminal
+
+Install [Node.js 22+](https://nodejs.org/en/download) first if `node --version` is missing or below 22 (macOS: `brew install node@22`, Windows: `winget install OpenJS.NodeJS.LTS`).
+
+```sh
 npm install -g @xyteai/cli@latest
 xyte-cli --version
+xyte-cli setup run
+xyte-cli setup status --field tenantId
+xyte-cli init --no-setup
 ```
 
 If your global npm bin is not on `PATH`, replace `xyte-cli` in the commands below with one of these published-package fallbacks:
 
-```bash
-npx @xyteai/cli@latest <command>
+```sh
+npx -y @xyteai/cli@latest <command>
 npm exec -- @xyteai/cli@latest <command>
 ```
 
-### 2) Install agent skills
-
-```bash
-xyte-cli init --no-setup
-```
-
-### 3) Connect with tenant-bound API key
-
-```bash
-xyte-cli setup run
-xyte-cli setup status --field tenantId
-```
-
-Use that value as `<tenant-id>` in the examples below. Persisted credentials default to secure OS-native storage: macOS Keychain, Windows DPAPI, Linux Secret Service. If native storage is unavailable, `xyte-cli` warns and falls back to file storage. For non-interactive automation and backend details, use the setup guidance in [`docs/getting-started.md`](./docs/getting-started.md).
+Use the `setup status` tenant value as `<tenant-id>` in the examples below. Persisted credentials default to secure OS-native storage: macOS Keychain, Windows DPAPI, Linux Secret Service. If native storage is unavailable, `xyte-cli` warns and falls back to file storage. For non-interactive automation and backend details, use the setup guidance in [`docs/getting-started.md`](./docs/getting-started.md).
 
 ---
 

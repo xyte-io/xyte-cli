@@ -78,4 +78,26 @@ describe('fetchProviderForKey', () => {
       })
     ).rejects.toThrow(CliUserError);
   });
+
+  it('suggests recovery commands when both probes fail', async () => {
+    mockRunSlot.mockRejectedValueOnce(new Error('org failed'));
+    mockRunSlot.mockRejectedValueOnce(new Error('partner failed'));
+
+    const error = await fetchProviderForKey({
+      profileStore: fakeProfileStore,
+      tenantId: 'tenant-1',
+      keyValue: 'key',
+      allowProbe: true
+    }).catch((caught: unknown) => caught as CliUserError);
+
+    expect(error).toBeInstanceOf(CliUserError);
+    const suggestions = (error as CliUserError).suggestedCommands ?? [];
+    expect(suggestions.join('\n')).toContain('Settings -> API Keys');
+    expect(suggestions.join('\n')).toContain('--key-stdin');
+    expect(suggestions.join('\n')).toContain('--key-file <path-outside-workspace>');
+    expect(suggestions.join('\n')).toContain('re-run the same setup command');
+    for (const suggestion of suggestions) {
+      expect(suggestion).not.toMatch(/(^|\| )xyte-cli /);
+    }
+  });
 });
