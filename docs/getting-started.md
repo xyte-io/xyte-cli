@@ -63,12 +63,12 @@ xyte-cli setup status --tenant acme --field tenantId
 
 ### CI / headless
 
-Pin the CLI version and use non-interactive setup:
-
 ```sh
-npx -y @xyteai/cli@<version> setup run --non-interactive --tenant acme --key-command "<cmd>" --output json
-npx -y @xyteai/cli@<version> setup status --tenant acme --field tenantId
+npx -y @xyteai/cli@latest setup run --non-interactive --tenant acme --key-command "<cmd>" --output json
+npx -y @xyteai/cli@latest setup status --tenant acme --field tenantId
 ```
+
+For reproducible pipelines, replace `@latest` with a pinned version (e.g. `@0.10.7`).
 
 ### Manual terminal
 

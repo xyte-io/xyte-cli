@@ -61,12 +61,12 @@ Detailed agent guidance: [docs/agents.md](./docs/agents.md).
 
 ### CI / headless
 
-Pin the package version and use non-interactive setup:
-
 ```sh
-npx -y @xyteai/cli@<version> setup run --non-interactive --tenant <tenant-id> --key-command "<cmd>" --output json
-npx -y @xyteai/cli@<version> setup status --tenant <tenant-id> --field tenantId
+npx -y @xyteai/cli@latest setup run --non-interactive --tenant <tenant-id> --key-command "<cmd>" --output json
+npx -y @xyteai/cli@latest setup status --tenant <tenant-id> --field tenantId
 ```
+
+For reproducible pipelines, replace `@latest` with a pinned version (e.g. `@0.10.7`).
 
 ### Manual terminal
 
