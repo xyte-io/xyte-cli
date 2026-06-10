@@ -15,6 +15,7 @@
       href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
+    <script>document.documentElement.classList.add("js");</script>
     <style>
       :root {
         --bg: #05020b;
@@ -299,7 +300,7 @@
       /* ─── Hero ─── */
 
       .hero {
-        padding: 64px 0 40px;
+        padding: 96px 0 64px;
         position: relative;
       }
 
@@ -380,16 +381,12 @@
         text-wrap: pretty;
       }
 
-      .hero-logo {
-        width: min(220px, 56%);
-        margin-bottom: 18px;
-      }
-
       .hero-lead {
-        margin: 18px 0 0;
+        margin: 22px 0 0;
         max-width: 54ch;
         color: var(--text-soft);
-        font-size: 16px;
+        font-size: 17px;
+        line-height: 1.7;
       }
 
       .hero-actions {
@@ -447,26 +444,6 @@
         border-color: rgba(255, 255, 255, 0.2);
       }
 
-      .hero-meta {
-        margin-top: 26px;
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-      }
-
-      .hero-meta span {
-        min-height: 38px;
-        padding: 0 14px;
-        display: inline-flex;
-        align-items: center;
-        border-radius: 999px;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        color: var(--text-soft);
-        font-size: 13px;
-        font-weight: 600;
-      }
-
       .hero-panel {
         padding: 28px;
         border-radius: var(--radius-l);
@@ -479,7 +456,7 @@
       /* ─── Video ─── */
 
       .video-showcase {
-        padding: 4px 0 36px;
+        padding: 12px 0 56px;
         position: relative;
         z-index: 1;
       }
@@ -530,18 +507,6 @@
         background: rgba(255, 255, 255, 0.18);
       }
 
-      .shell-tag {
-        min-height: 30px;
-        padding: 0 10px;
-        display: inline-flex;
-        align-items: center;
-        border-radius: 999px;
-        background: rgba(255, 193, 7, 0.12);
-        color: #ffe183;
-        font-size: 12px;
-        font-weight: 800;
-      }
-
       .command-shell {
         padding: 20px 22px;
         border-radius: var(--radius-m);
@@ -568,55 +533,59 @@
         color: #93bfff;
       }
 
-      .panel-grid {
-        margin-top: 18px;
+      /* ─── Fact strip ─── */
+
+      .fact-strip {
+        padding: 12px 0 36px;
+        position: relative;
+        z-index: 1;
+      }
+
+      .fact-row {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 16px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        border-top: 1px solid rgba(255, 255, 255, 0.07);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
       }
 
-      .panel-card {
-        padding: 18px;
-        border-radius: 22px;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        transition:
-          background 240ms ease,
-          border-color 240ms ease;
+      .fact {
+        padding: 24px 26px;
       }
 
-      .panel-card:hover {
-        background: rgba(255, 255, 255, 0.06);
-        border-color: rgba(255, 255, 255, 0.12);
+      .fact + .fact {
+        border-left: 1px solid rgba(255, 255, 255, 0.07);
       }
 
-      .panel-card strong {
+      .fact strong {
         display: block;
         font-size: 15px;
       }
 
-      .panel-card span {
+      .fact span {
         display: block;
         margin-top: 6px;
         color: var(--text-faint);
         font-size: 13px;
+        line-height: 1.6;
       }
 
       /* ─── Sections ─── */
 
       .section {
-        padding: 56px 0;
+        padding: 92px 0;
         scroll-margin-top: 88px;
       }
 
       .section-head {
-        max-width: 70ch;
-        margin-bottom: 30px;
+        max-width: 64ch;
+        margin-bottom: 44px;
       }
 
       .section-head p {
-        margin: 12px 0 0;
+        margin: 16px 0 0;
         color: var(--text-soft);
+        font-size: 17px;
+        line-height: 1.7;
       }
 
       .section-grid {
@@ -626,118 +595,112 @@
         align-items: start;
       }
 
-      /* ─── Install flow ─── */
+      /* ─── Install: persona chooser ─── */
 
-      .install-flow {
-        position: relative;
-        display: grid;
-        gap: 24px;
-        padding-left: 68px;
-      }
-
-      .install-flow::before {
-        content: "";
-        position: absolute;
-        left: 21px;
-        top: 28px;
-        bottom: 28px;
-        width: 2px;
-        border-radius: 1px;
-        background: linear-gradient(
-          180deg,
-          rgba(255, 193, 7, 0.45),
-          rgba(124, 77, 255, 0.35) 45%,
-          rgba(124, 77, 255, 0.08)
-        );
-      }
-
-      .flow-step {
-        position: relative;
-      }
-
-      .flow-step .card-label {
+      .persona-tabs {
         display: flex;
-        align-items: center;
-        gap: 10px;
+        gap: 6px;
+        padding: 6px;
+        width: fit-content;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        margin-bottom: 26px;
       }
 
-      .flow-marker {
-        position: absolute;
-        left: -68px;
-        top: 20px;
-        width: 44px;
-        height: 44px;
+      .persona-tab {
+        min-height: 46px;
+        padding: 0 22px;
         display: inline-flex;
         align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        border-radius: 14px;
-        background:
-          linear-gradient(180deg, rgba(124, 77, 255, 0.24), rgba(124, 77, 255, 0.06)),
-          rgba(10, 5, 18, 0.9);
-        border: 1px solid rgba(124, 77, 255, 0.32);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-        color: #d7d0ff;
-        font-family: var(--font-mono);
-        font-size: 15px;
-        font-weight: 800;
-        font-variant-numeric: tabular-nums;
-        line-height: 1;
-      }
-
-      .path-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 14px;
-      }
-
-      .path-grid .command-shell {
-        position: relative;
-        padding-top: 50px;
-      }
-
-      .path-grid .command-shell::before {
-        content: attr(data-path);
-        position: absolute;
-        top: 19px;
-        left: 22px;
-        color: var(--text-faint);
-        font-family: var(--font-body);
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        line-height: 1;
-      }
-
-      .path-primary {
-        border-color: rgba(255, 193, 7, 0.24);
-        box-shadow:
-          inset 0 1px 0 rgba(255, 255, 255, 0.04),
-          0 0 0 1px rgba(255, 193, 7, 0.06),
-          0 12px 32px rgba(0, 0, 0, 0.28);
-      }
-
-      .path-primary::before {
-        color: #ffe183;
-      }
-
-      .path-primary::after {
-        content: "Recommended";
-        position: absolute;
-        top: 12px;
-        right: 46px;
-        padding: 5px 9px;
+        gap: 9px;
+        border: 0;
         border-radius: 999px;
-        background: rgba(255, 193, 7, 0.12);
-        border: 1px solid rgba(255, 193, 7, 0.22);
+        background: transparent;
+        color: var(--text-soft);
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition:
+          background 200ms ease,
+          color 200ms ease;
+      }
+
+      .persona-tab:hover {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .persona-tab[aria-selected="true"] {
+        background: var(--gold);
+        color: #10090a;
+      }
+
+      .persona-tab[aria-selected="true"]:hover {
+        background: var(--gold);
+      }
+
+      .tab-badge {
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: rgba(255, 193, 7, 0.14);
         color: #ffe183;
-        font-family: var(--font-body);
         font-size: 10px;
         font-weight: 800;
-        letter-spacing: 0.1em;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
         line-height: 1;
+      }
+
+      .persona-tab[aria-selected="true"] .tab-badge {
+        background: rgba(16, 9, 10, 0.14);
+        color: inherit;
+      }
+
+      .persona-panel {
+        padding: 30px;
+        border-radius: var(--radius-m);
+      }
+
+      .panel-note {
+        margin: 0 0 18px;
+        color: var(--text-soft);
+        font-size: 15px;
+      }
+
+      .panel-note-after {
+        margin: 16px 0 0;
+        font-size: 14px;
+        color: var(--text-faint);
+      }
+
+      .panel-note code {
+        font-size: 13px;
+        color: #d8e8ff;
+      }
+
+      .panel-sublabel {
+        margin-top: 30px;
+      }
+
+      .panel-next {
+        margin-top: 24px;
+        display: inline-flex;
+      }
+
+      .next-commands {
+        margin-top: 52px;
+      }
+
+      .next-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 28px;
+      }
+
+      .next-grid li,
+      .next-grid li:first-child {
+        padding-top: 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
       }
 
       .install-sheet {
@@ -970,6 +933,10 @@
         border-radius: var(--radius-m);
       }
 
+      .card-quiet {
+        padding: 24px 0;
+      }
+
       .card-label {
         margin: 0 0 14px;
         color: rgba(255, 255, 255, 0.62);
@@ -1055,35 +1022,12 @@
       .workflow-grid {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 16px;
+        gap: 36px 28px;
       }
 
       .workflow-card {
-        padding: 22px;
-        border-radius: 24px;
-        position: relative;
-        overflow: hidden;
-      }
-
-      .workflow-card::before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 2px;
-        background: linear-gradient(90deg, transparent, rgba(124, 77, 255, 0.4), transparent);
-        opacity: 0;
-        transition: opacity 300ms ease;
-      }
-
-      .workflow-card:hover {
-        transform: translateY(-3px);
-        border-color: var(--line-strong);
-      }
-
-      .workflow-card:hover::before {
-        opacity: 1;
+        padding: 26px 0 0;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
       }
 
       .workflow-index {
@@ -1104,8 +1048,8 @@
       }
 
       .workflow-card h3 {
-        margin-top: 16px;
-        font-size: 22px;
+        margin-top: 18px;
+        font-size: 21px;
       }
 
       .workflow-card p {
@@ -1338,12 +1282,12 @@
 
       /* ─── Scroll reveal ─── */
 
-      .reveal {
+      html.js .reveal {
         opacity: 0;
         transform: translateY(18px);
       }
 
-      .reveal.in-view {
+      html.js .reveal.in-view {
         animation: rise-in 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
       }
 
@@ -1397,8 +1341,16 @@
 
         .workflow-grid,
         .docs-grid,
-        .panel-grid {
+        .fact-row {
           grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .fact:nth-child(odd) {
+          border-left: 0;
+        }
+
+        .fact:nth-child(n + 3) {
+          border-top: 1px solid rgba(255, 255, 255, 0.07);
         }
       }
 
@@ -1434,16 +1386,12 @@
         }
 
         .hero {
-          padding: 34px 0 26px;
+          padding: 48px 0 32px;
         }
 
         h1 {
           max-width: 11ch;
           font-size: clamp(2.2rem, 9.6vw, 3.2rem);
-        }
-
-        .hero-logo {
-          width: min(176px, 54%);
         }
 
         .hero-glow {
@@ -1455,9 +1403,9 @@
 
         .hero-panel,
         .card,
-        .workflow-card,
         .docs-card,
-        .final-card {
+        .final-card,
+        .persona-panel {
           padding: 20px;
         }
 
@@ -1467,8 +1415,33 @@
 
         .workflow-grid,
         .docs-grid,
-        .panel-grid {
+        .fact-row,
+        .next-grid {
           grid-template-columns: 1fr;
+        }
+
+        .fact {
+          padding: 16px 4px;
+        }
+
+        .fact + .fact {
+          border-left: 0;
+          border-top: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        .persona-tabs {
+          width: 100%;
+        }
+
+        .persona-tab {
+          flex: 1 1 auto;
+          justify-content: center;
+          padding: 0 12px;
+          font-size: 13px;
+        }
+
+        .tab-badge {
+          display: none;
         }
 
         .install-sheet-head,
@@ -1507,29 +1480,8 @@
           gap: 12px;
         }
 
-        .install-flow {
-          padding-left: 0;
-        }
-
-        .install-flow::before {
-          content: none;
-        }
-
-        .flow-marker {
-          position: static;
-          width: 34px;
-          height: 34px;
-          border-radius: 11px;
-          font-size: 13px;
-          box-shadow: none;
-        }
-
-        .path-grid {
-          grid-template-columns: 1fr;
-        }
-
         .section {
-          padding: 36px 0;
+          padding: 52px 0;
         }
       }
 
@@ -1545,7 +1497,7 @@
           transition: none !important;
         }
 
-        .reveal {
+        html.js .reveal {
           opacity: 1;
           transform: none;
         }
@@ -1583,7 +1535,6 @@
         <div class="hero-glow" aria-hidden="true"></div>
         <div class="wrap hero-grid">
           <div class="hero-copy reveal">
-            <img class="hero-logo" src="./media/xyte-ai-logo-white-color.svg" alt="XYTE AI" />
             <p class="eyebrow">AI-powered orchestration in the terminal</p>
             <h1>Operate Xyte with <span class="gradient-text">command-line clarity.</span></h1>
             <p class="hero-lead">
@@ -1597,12 +1548,6 @@
               <a class="btn btn-primary" href="#install">Start installation</a>
               <a class="btn btn-secondary" href="https://github.com/xyte-io/xyte-cli">View on GitHub</a>
             </div>
-
-            <div class="hero-meta" aria-label="Quick facts">
-              <span>Node 22+</span>
-              <span>Read-first operator flows</span>
-              <span>CLI, JSON, and PDF outputs</span>
-            </div>
           </div>
 
           <aside class="hero-panel surface reveal" aria-label="CLI overview">
@@ -1615,7 +1560,6 @@
                 </span>
                 <span>First-run path</span>
               </div>
-              <span class="shell-tag">Diagnose-first</span>
             </div>
 
             <div class="command-shell">
@@ -1626,26 +1570,30 @@
 <span class="prompt">$</span> xyte-cli init --no-setup
 <span class="comment"># inspect, watch, console, or generate report artifacts next</span></code></pre>
             </div>
-
-            <div class="panel-grid">
-              <div class="panel-card">
-                <strong>Visible commands</strong>
-                <span>Every step is a real command you can copy and run. No hidden abstractions.</span>
-              </div>
-              <div class="panel-card">
-                <strong>Read-first</strong>
-                <span>Inspect fleet state before changing anything. Watch incidents, then act.</span>
-              </div>
-              <div class="panel-card">
-                <strong>Agent-ready</strong>
-                <span>Built-in scaffolding for Codex, Claude, and Copilot agent workflows.</span>
-              </div>
-              <div class="panel-card">
-                <strong>Portable outputs</strong>
-                <span>Export fleet data as schema-backed JSON or formatted PDF reports.</span>
-              </div>
-            </div>
           </aside>
+        </div>
+      </section>
+
+      <section class="fact-strip" aria-label="Why xyte-cli">
+        <div class="wrap">
+          <div class="fact-row reveal">
+            <div class="fact">
+              <strong>Visible commands</strong>
+              <span>Every step is a real command you can copy and run. No hidden abstractions.</span>
+            </div>
+            <div class="fact">
+              <strong>Read-first</strong>
+              <span>Inspect fleet state before changing anything. Watch incidents, then act.</span>
+            </div>
+            <div class="fact">
+              <strong>Agent-ready</strong>
+              <span>Built-in scaffolding for Codex, Claude, and Copilot agent workflows.</span>
+            </div>
+            <div class="fact">
+              <strong>Portable outputs</strong>
+              <span>Export fleet data as schema-backed JSON or formatted PDF reports.</span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1676,21 +1624,24 @@
             </p>
           </header>
 
-          <div class="install-flow reveal">
-            <article class="card surface flow-step">
-              <p class="card-label"><span class="flow-marker" aria-hidden="true">1</span>Diagnose &amp; install</p>
-              <div class="path-grid" id="install-snippet">
-                <div class="command-shell path-primary" data-path="AI agent terminal">
-                  <pre><code><span class="comment"># AI agent terminal: diagnose first, follow the report</span>
-npx -y @xyteai/cli@latest doctor environment --format json
-</code></pre>
-                </div>
-                <div class="command-shell" data-path="Manual terminal">
-                  <pre><code><span class="comment"># Manual terminal: global install</span>
-npm install -g @xyteai/cli@latest
-xyte-cli init --no-setup
-xyte-cli --version</code></pre>
-                </div>
+          <div class="persona-tabs reveal" role="tablist" aria-label="Install paths">
+            <button type="button" class="persona-tab" id="tab-agent" role="tab" aria-selected="true" aria-controls="panel-agent">
+              AI agent terminal
+              <span class="tab-badge">Recommended</span>
+            </button>
+            <button type="button" class="persona-tab" id="tab-ci" role="tab" aria-selected="false" aria-controls="panel-ci" tabindex="-1">
+              CI / headless
+            </button>
+            <button type="button" class="persona-tab" id="tab-manual" role="tab" aria-selected="false" aria-controls="panel-manual" tabindex="-1">
+              Manual terminal
+            </button>
+          </div>
+
+          <div class="reveal">
+            <div class="persona-panel surface" id="panel-agent" role="tabpanel" aria-labelledby="tab-agent">
+              <div class="command-shell">
+                <pre id="install-snippet"><code><span class="comment"># AI agent terminal: diagnose first, follow the report</span>
+npx -y @xyteai/cli@latest doctor environment --format json</code></pre>
               </div>
               <div class="action-row">
                 <button
@@ -1702,18 +1653,58 @@ xyte-cli --version</code></pre>
                   Copy install commands
                 </button>
                 <a class="inline-link" href="https://www.npmjs.com/package/@xyteai/cli">Open npm package</a>
+                <a class="inline-link" href="#agents">Get the AI prompt</a>
                 <span class="toast" id="install-toast" role="status" aria-live="polite"></span>
               </div>
-            </article>
+            </div>
 
-            <article class="card surface flow-step">
-              <p class="card-label"><span class="flow-marker" aria-hidden="true">2</span>Connect and verify</p>
+            <div class="persona-panel surface" id="panel-ci" role="tabpanel" aria-labelledby="tab-ci" hidden>
+              <p class="panel-note">Add your API key (Xyte tenant &rarr; <strong>Settings &rarr; API Keys</strong>) as a CI secret named <code>XYTE_CLI_KEY</code>, then:</p>
+              <div class="command-shell">
+                <pre id="ci-snippet"><code>npx -y @xyteai/cli@latest setup run --non-interactive --tenant &lt;tenant-id&gt; --output json
+npx -y @xyteai/cli@latest setup status --tenant &lt;tenant-id&gt; --field tenantId</code></pre>
+              </div>
+              <p class="panel-note panel-note-after">For reproducible pipelines, replace <code>@latest</code> with a pinned version (e.g. <code>@0.10.7</code>).</p>
+              <div class="action-row">
+                <button
+                  type="button"
+                  class="copy-btn"
+                  data-copy-target="ci-snippet"
+                  data-copy-feedback="ci-toast"
+                >
+                  Copy CI commands
+                </button>
+                <a class="inline-link" href="./getting-started.md">Open setup guidance</a>
+                <span class="toast" id="ci-toast" role="status" aria-live="polite"></span>
+              </div>
+            </div>
+
+            <div class="persona-panel surface" id="panel-manual" role="tabpanel" aria-labelledby="tab-manual" hidden>
+              <div class="command-shell">
+                <pre id="manual-snippet"><code><span class="comment"># Manual terminal: global install</span>
+npm install -g @xyteai/cli@latest
+xyte-cli init --no-setup
+xyte-cli --version</code></pre>
+              </div>
+              <div class="action-row">
+                <button
+                  type="button"
+                  class="copy-btn"
+                  data-copy-target="manual-snippet"
+                  data-copy-feedback="manual-toast"
+                >
+                  Copy install commands
+                </button>
+                <span class="toast" id="manual-toast" role="status" aria-live="polite"></span>
+              </div>
+
+              <p class="card-label panel-sublabel">Connect and verify</p>
               <ol class="steps">
                 <li>
                   <span class="step-index">01</span>
                   <span class="step-copy">
                     <strong>Connect the tenant key once</strong>
-                    <span>Run interactive setup once, or use the documented stdin flow for automation. The key prompt hides input and confirms with a <code>Received N characters.</code> line. Persisted credentials default to macOS Keychain, Windows DPAPI, or Linux Secret Service.</span>
+                    <span>Create an API key in your Xyte tenant under <strong>Settings &rarr; API Keys</strong> and save it in a file outside your project folder. Run interactive setup once, or use the documented stdin flow for automation. The key prompt hides input and confirms with a <code>Received N characters.</code> line. Persisted credentials default to macOS Keychain, Windows DPAPI, or Linux Secret Service.</span>
                     <span class="detail-code">xyte-cli setup run</span>
                   </span>
                 </li>
@@ -1733,25 +1724,26 @@ xyte-cli --version</code></pre>
                   </span>
                 </li>
               </ol>
-            </article>
+              <a class="inline-link panel-next" href="#agents">Then use it with an agent →</a>
+            </div>
+          </div>
 
-            <article class="card surface flow-step">
-              <p class="card-label"><span class="flow-marker" aria-hidden="true">3</span>Operate: next commands</p>
-              <ul class="mini-list">
-                <li>
-                  <strong>Watch incidents once</strong>
-                  <span><code>xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-active --once</code></span>
-                </li>
-                <li>
-                  <strong>Export a deep-dive snapshot</strong>
-                  <span><code>xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json --out ./artifacts/deep-dive.json</code></span>
-                </li>
-                <li>
-                  <strong>Generate a report artifact</strong>
-                  <span><code>xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input ./artifacts/deep-dive.json --out ./reports/fleet-report.pdf</code></span>
-                </li>
-              </ul>
-            </article>
+          <div class="next-commands reveal">
+            <p class="card-label">Operate: next commands</p>
+            <ul class="mini-list next-grid">
+              <li>
+                <strong>Watch incidents once</strong>
+                <span><code>xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-active --once</code></span>
+              </li>
+              <li>
+                <strong>Export a deep-dive snapshot</strong>
+                <span><code>xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json --out ./artifacts/deep-dive.json</code></span>
+              </li>
+              <li>
+                <strong>Generate a report artifact</strong>
+                <span><code>xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input ./artifacts/deep-dive.json --out ./reports/fleet-report.pdf</code></span>
+              </li>
+            </ul>
           </div>
         </div>
       </section>
@@ -1797,7 +1789,7 @@ If this surface cannot run shell commands, stop and say I need a shell-capable t
               </div>
             </article>
 
-            <article class="card surface">
+            <article class="card-quiet">
               <p class="card-label">Operator defaults</p>
               <ul class="mini-list">
                 <li>
@@ -1830,25 +1822,25 @@ If this surface cannot run shell commands, stop and say I need a shell-capable t
           </header>
 
           <div class="workflow-grid reveal">
-            <article class="workflow-card surface">
+            <article class="workflow-card">
               <span class="workflow-index">01</span>
               <h3>Install and init</h3>
               <p>Install from npm, then scaffold agent configs for Codex, Claude, and Copilot.</p>
               <code>xyte-cli init --no-setup</code>
             </article>
-            <article class="workflow-card surface">
+            <article class="workflow-card">
               <span class="workflow-index">02</span>
               <h3>Connect tenant</h3>
               <p>Provide your API key once. If native secure storage is unavailable, <code>auto</code> warns and falls back to file storage. Verify with <code>setup status</code> before running operational commands.</p>
               <code>xyte-cli setup run</code>
             </article>
-            <article class="workflow-card surface">
+            <article class="workflow-card">
               <span class="workflow-index">03</span>
               <h3>Inspect fleet state</h3>
               <p>Watch incidents, inspect devices, and browse console screens before making changes.</p>
               <code>xyte-cli ops inspect fleet --output json</code>
             </article>
-            <article class="workflow-card surface">
+            <article class="workflow-card">
               <span class="workflow-index">04</span>
               <h3>Export artifacts</h3>
               <p>Generate deep-dive JSON snapshots and PDF reports you can share or feed into other tools.</p>
@@ -1984,6 +1976,36 @@ If this surface cannot run shell commands, stop and say I need a shell-capable t
           });
         }
 
+        /* ── Install persona tabs ── */
+        function wireTabs() {
+          var tablist = document.querySelector('[role="tablist"]');
+          if (!tablist) return;
+          var tabs = Array.prototype.slice.call(tablist.querySelectorAll('[role="tab"]'));
+
+          function select(tab, focus) {
+            tabs.forEach(function (t) {
+              var on = t === tab;
+              t.setAttribute("aria-selected", on ? "true" : "false");
+              t.tabIndex = on ? 0 : -1;
+              var panel = document.getElementById(t.getAttribute("aria-controls"));
+              if (panel) panel.hidden = !on;
+            });
+            if (focus) tab.focus();
+          }
+
+          tabs.forEach(function (tab, i) {
+            tab.addEventListener("click", function () {
+              select(tab, false);
+            });
+            tab.addEventListener("keydown", function (e) {
+              var dir = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+              if (!dir) return;
+              e.preventDefault();
+              select(tabs[(i + dir + tabs.length) % tabs.length], true);
+            });
+          });
+        }
+
         /* ── Scroll-triggered reveal ── */
         function wireReveal() {
           var els = document.querySelectorAll(".reveal");
@@ -2008,6 +2030,7 @@ If this surface cannot run shell commands, stop and say I need a shell-capable t
 
         wireCopyIcons();
         wireCopyButtons();
+        wireTabs();
         wireReveal();
       })();
     </script>
