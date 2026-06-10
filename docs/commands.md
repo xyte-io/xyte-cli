@@ -54,6 +54,7 @@ xyte-cli config unset <key> [--scope user|workspace]
 xyte-cli config doctor --tenant <tenant-id> --output json
 xyte-cli doctor install [--format json|text]
 xyte-cli doctor environment [--format json|text] [--check-network]
+xyte-cli skills refresh [--target <path>]
 xyte-cli upgrade --check --output json
 xyte-cli upgrade --yes --output json
 xyte-cli --log-actions [--log-actions-verbose] status --tenant <tenant-id>
@@ -93,6 +94,10 @@ Environment doctor notes:
 - Use `npx -y @xyteai/cli@latest doctor environment --format json` when `xyte-cli` is missing.
 - If global install or persistent `PATH` changes are blocked, use `npm install --prefix ./.xyte-cli/runtime @xyteai/cli@latest`, then `./.xyte-cli/runtime/node_modules/.bin/xyte-cli <command>` or PowerShell `.\.xyte-cli\runtime\node_modules\.bin\xyte-cli.cmd <command>`.
 - Chat-only assistants cannot install the CLI; use a shell-capable terminal or agent (Terminal, PowerShell, Codex, Claude Code/Desktop, GitHub Copilot CLI, VS Code Copilot Agent).
+
+Skill bundle notes:
+- `xyte-cli skills refresh` force-installs all agent skill bundles (project and user scope).
+- `xyte-cli upgrade` refreshes user-scope skills automatically; workspace copies are not auto-updated — run `xyte-cli skills refresh` in each workspace after upgrading.
 
 ## Tenant And Auth Slots
 

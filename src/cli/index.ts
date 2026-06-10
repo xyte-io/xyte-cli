@@ -96,6 +96,7 @@ interface CliRuntime {
   watchDelayFn?: (ms: number) => Promise<void>;
   cwd?: string;
   env?: NodeJS.ProcessEnv;
+  homeDir?: string;
   environmentDoctor?: typeof buildEnvironmentDoctorReport;
 }
 
@@ -784,6 +785,30 @@ export function createCli(runtime: CliRuntime = {}): Command {
       printJson(stdout, report, { strictJson: resolveStrictJson({ settings }) });
     });
 
+  const skillsCommand = program.command('skills').description('Manage installed agent skill bundles');
+
+  skillsCommand
+    .command('refresh')
+    .description('Force-install all agent skill bundles (project and user scope); run after upgrading')
+    .option('--target <path>', 'Workspace root for project scope (defaults to current directory)')
+    .action(async (options: { target?: string }) => {
+      const result = await installSkills({
+        skillName: 'xyte-cli',
+        sourceDir: resolveSkillSourceDir(),
+        scope: 'both',
+        agents: [...SKILL_AGENTS],
+        targetWorkspace: options.target ?? cwd,
+        homeDir: runtime.homeDir,
+        force: true
+      });
+      stdout.write('Skill refresh summary:\n');
+      result.outcomes.forEach((outcome) => stdout.write(`${formatInstallOutcome(outcome)}\n`));
+      const failed = result.outcomes.filter((outcome) => outcome.status === 'failed');
+      if (failed.length > 0) {
+        throw new CliUserError({ summary: `Skill refresh failed for ${failed.length} destination(s).` });
+      }
+    });
+
   program
     .command('status')
     .description('Fast readiness status for operators and agents')
@@ -916,6 +941,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
           stdout.write('Warnings:\n');
           result.warnings.forEach((warning) => stdout.write(`- ${warning}\n`));
         }
+        stdout.write('Workspace skill copies are not auto-updated. Run: xyte-cli skills refresh\n');
         return;
       }
 

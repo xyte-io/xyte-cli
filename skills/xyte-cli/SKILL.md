@@ -207,6 +207,7 @@ Provider/report behavior:
 | Edge ping status | `xyte-cli edge ping-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip>` |
 | Install diagnostics | `xyte-cli doctor install --format json` |
 | Environment diagnostics | `xyte-cli doctor environment --format json` (add `--check-network` to probe npm registry reachability) |
+| Refresh installed skills | `xyte-cli skills refresh` (run in each workspace after `xyte-cli upgrade`) |
 | Settings introspection | `xyte-cli config show --scope resolved` |
 | Interactive console | `xyte-cli ops console` |
 | Headless snapshot | `xyte-cli ops console --headless --screen <screen> --output json --once --tenant <tenant-id>` |

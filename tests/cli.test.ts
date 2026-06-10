@@ -4068,6 +4068,90 @@ describe('cli integration', () => {
     expect(commandRunner).not.toHaveBeenCalled();
   });
 
+  it('force-installs all skill bundles with skills refresh', async () => {
+    const ws = mkdtempSync(join(tmpdir(), 'xyte-skills-ws-'));
+    const home = mkdtempSync(join(tmpdir(), 'xyte-skills-home-'));
+    const stdout = { write: vi.fn() };
+    const program = createCli({
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout,
+      stderr: { write: vi.fn() },
+      cwd: ws,
+      homeDir: home
+    });
+
+    await program.parseAsync(['node', 'xyte-cli', 'skills', 'refresh']);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(output).toContain('project/claude: installed');
+    expect(output).toContain('user/codex: installed');
+    expect(existsSync(join(ws, '.claude/skills/xyte-cli/SKILL.md'))).toBe(true);
+    expect(existsSync(join(home, '.copilot/skills/xyte-cli/SKILL.md'))).toBe(true);
+
+    const stdout2 = { write: vi.fn() };
+    const program2 = createCli({
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout: stdout2,
+      stderr: { write: vi.fn() },
+      cwd: ws,
+      homeDir: home
+    });
+    await program2.parseAsync(['node', 'xyte-cli', 'skills', 'refresh']);
+    const output2 = stdout2.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(output2).toContain('project/claude: overwritten');
+    expect(output2).toContain('user/codex: overwritten');
+  });
+
+  it('suggests skills refresh after a successful upgrade in text mode', async () => {
+    const stdout = { write: vi.fn() };
+    const commandRunner = vi.fn(async (command: string) => {
+      if (/^xyte-cli(?:\.cmd)?$/.test(command)) {
+        return { code: 0, stdout: 'xyte-cli 0.5.0\n', stderr: '' };
+      }
+      return { code: 0, stdout: '', stderr: '' };
+    });
+    const installSkillsImpl = vi.fn().mockResolvedValue({
+      workspaceRoot: '/tmp/workspace',
+      homeRoot: '/tmp/home',
+      sourceDir: '/tmp/skills/xyte-cli',
+      outcomes: [
+        {
+          scope: 'user',
+          agent: 'claude',
+          rootDir: '/tmp/home/.claude/skills',
+          targetDir: '/tmp/home/.claude/skills/xyte-cli',
+          status: 'overwritten'
+        }
+      ],
+      createdRoots: []
+    });
+    const program = createCli({
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout,
+      stderr: { write: vi.fn() },
+      upgradeDependencies: {
+        fetchImpl: vi.fn().mockImplementation(
+          async () =>
+            new Response(JSON.stringify({ version: '0.5.0' }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' }
+            })
+        ),
+        commandRunner,
+        installSkillsImpl,
+        getCurrentVersion: () => '0.4.0'
+      }
+    });
+
+    await program.parseAsync(['node', 'xyte-cli', 'upgrade', '--yes', '--format', 'text']);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(output).toContain('xyte-cli skills refresh');
+  });
+
   it('warns and succeeds when upgrade skill refresh partially fails', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();

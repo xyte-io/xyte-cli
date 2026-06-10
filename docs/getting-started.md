@@ -200,6 +200,12 @@ xyte-cli init --scope both --agents all --force --no-setup
 xyte-cli init --target /path/to/workspace --no-setup
 ```
 
+After upgrading the CLI, refresh installed bundles (upgrade only refreshes user scope automatically):
+
+```bash
+xyte-cli skills refresh
+```
+
 Default non-interactive behavior:
 
 - scope: `project`
