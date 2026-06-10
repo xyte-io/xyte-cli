@@ -39,7 +39,7 @@
         --radius-s: 18px;
         --radius-m: 26px;
         --radius-l: 36px;
-        --shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+        --shadow: 0 16px 40px rgba(0, 0, 0, 0.26), 0 2px 10px rgba(0, 0, 0, 0.18);
         --font-body: "Manrope", "Segoe UI", sans-serif;
         --font-mono: "JetBrains Mono", "SFMono-Regular", monospace;
       }
@@ -173,7 +173,8 @@
       .surface:hover {
         border-color: rgba(255, 255, 255, 0.14);
         box-shadow:
-          0 24px 60px rgba(0, 0, 0, 0.3),
+          0 16px 40px rgba(0, 0, 0, 0.26),
+          0 2px 10px rgba(0, 0, 0, 0.18),
           0 0 0 1px rgba(124, 77, 255, 0.06);
       }
 
@@ -478,7 +479,7 @@
       /* ─── Video ─── */
 
       .video-showcase {
-        padding: 0 0 20px;
+        padding: 4px 0 36px;
         position: relative;
         z-index: 1;
       }
@@ -548,13 +549,14 @@
           radial-gradient(ellipse 60% 50% at 100% 0%, rgba(124, 77, 255, 0.1), transparent),
           linear-gradient(180deg, rgba(6, 2, 13, 0.78), rgba(4, 1, 10, 0.94));
         border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
       }
 
       .command-shell pre {
         margin: 0;
         color: #fbf7ff;
         font-size: 13px;
-        line-height: 1.72;
+        line-height: 1.75;
         white-space: pre-wrap;
       }
 
@@ -603,12 +605,13 @@
       /* ─── Sections ─── */
 
       .section {
-        padding: 40px 0;
+        padding: 56px 0;
+        scroll-margin-top: 88px;
       }
 
       .section-head {
         max-width: 70ch;
-        margin-bottom: 22px;
+        margin-bottom: 30px;
       }
 
       .section-head p {
@@ -626,8 +629,115 @@
       /* ─── Install flow ─── */
 
       .install-flow {
+        position: relative;
         display: grid;
-        gap: 20px;
+        gap: 24px;
+        padding-left: 68px;
+      }
+
+      .install-flow::before {
+        content: "";
+        position: absolute;
+        left: 21px;
+        top: 28px;
+        bottom: 28px;
+        width: 2px;
+        border-radius: 1px;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 193, 7, 0.45),
+          rgba(124, 77, 255, 0.35) 45%,
+          rgba(124, 77, 255, 0.08)
+        );
+      }
+
+      .flow-step {
+        position: relative;
+      }
+
+      .flow-step .card-label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .flow-marker {
+        position: absolute;
+        left: -68px;
+        top: 20px;
+        width: 44px;
+        height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        border-radius: 14px;
+        background:
+          linear-gradient(180deg, rgba(124, 77, 255, 0.24), rgba(124, 77, 255, 0.06)),
+          rgba(10, 5, 18, 0.9);
+        border: 1px solid rgba(124, 77, 255, 0.32);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+        color: #d7d0ff;
+        font-family: var(--font-mono);
+        font-size: 15px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+      }
+
+      .path-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .path-grid .command-shell {
+        position: relative;
+        padding-top: 50px;
+      }
+
+      .path-grid .command-shell::before {
+        content: attr(data-path);
+        position: absolute;
+        top: 19px;
+        left: 22px;
+        color: var(--text-faint);
+        font-family: var(--font-body);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        line-height: 1;
+      }
+
+      .path-primary {
+        border-color: rgba(255, 193, 7, 0.24);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.04),
+          0 0 0 1px rgba(255, 193, 7, 0.06),
+          0 12px 32px rgba(0, 0, 0, 0.28);
+      }
+
+      .path-primary::before {
+        color: #ffe183;
+      }
+
+      .path-primary::after {
+        content: "Recommended";
+        position: absolute;
+        top: 12px;
+        right: 46px;
+        padding: 5px 9px;
+        border-radius: 999px;
+        background: rgba(255, 193, 7, 0.12);
+        border: 1px solid rgba(255, 193, 7, 0.22);
+        color: #ffe183;
+        font-family: var(--font-body);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        line-height: 1;
       }
 
       .install-sheet {
@@ -967,6 +1077,11 @@
         transition: opacity 300ms ease;
       }
 
+      .workflow-card:hover {
+        transform: translateY(-3px);
+        border-color: var(--line-strong);
+      }
+
       .workflow-card:hover::before {
         opacity: 1;
       }
@@ -1067,12 +1182,24 @@
 
       .docs-card span {
         display: inline-flex;
+        align-items: center;
         margin-top: 16px;
         color: #ffe183;
         font-size: 12px;
         font-weight: 800;
         letter-spacing: 0.12em;
         text-transform: uppercase;
+      }
+
+      .docs-card span::after {
+        content: "→";
+        display: inline-block;
+        margin-left: 8px;
+        transition: transform 240ms ease;
+      }
+
+      .docs-card:hover span::after {
+        transform: translateX(3px);
       }
 
       /* ─── Final CTA ─── */
@@ -1166,7 +1293,7 @@
         backdrop-filter: blur(8px);
         color: var(--text-faint);
         cursor: pointer;
-        opacity: 0;
+        opacity: 0.45;
         transition:
           opacity 180ms ease,
           color 180ms ease,
@@ -1201,6 +1328,12 @@
       .cp.copied {
         color: var(--teal);
         opacity: 1;
+      }
+
+      @media (hover: none) {
+        .cp {
+          opacity: 0.8;
+        }
       }
 
       /* ─── Scroll reveal ─── */
@@ -1276,18 +1409,28 @@
 
         .nav-row {
           min-height: auto;
-          padding: 14px 0;
+          padding: 12px 0;
           flex-wrap: wrap;
+          row-gap: 4px;
         }
 
-        .brand {
-          width: 100%;
+        .nav-cta {
+          order: 1;
+        }
+
+        .brand-copy span {
+          display: none;
         }
 
         .nav-links {
+          order: 2;
           width: 100%;
           gap: 16px;
           flex-wrap: wrap;
+        }
+
+        .section {
+          scroll-margin-top: 124px;
         }
 
         .hero {
@@ -1364,8 +1507,29 @@
           gap: 12px;
         }
 
+        .install-flow {
+          padding-left: 0;
+        }
+
+        .install-flow::before {
+          content: none;
+        }
+
+        .flow-marker {
+          position: static;
+          width: 34px;
+          height: 34px;
+          border-radius: 11px;
+          font-size: 13px;
+          box-shadow: none;
+        }
+
+        .path-grid {
+          grid-template-columns: 1fr;
+        }
+
         .section {
-          padding: 24px 0;
+          padding: 36px 0;
         }
       }
 
@@ -1513,16 +1677,20 @@
           </header>
 
           <div class="install-flow reveal">
-            <article class="card surface">
-              <p class="card-label">Step 1 · Core install</p>
-              <div class="command-shell">
-                <pre id="install-snippet"><code># AI agent terminal: diagnose first, follow the report
+            <article class="card surface flow-step">
+              <p class="card-label"><span class="flow-marker" aria-hidden="true">1</span>Diagnose &amp; install</p>
+              <div class="path-grid" id="install-snippet">
+                <div class="command-shell path-primary" data-path="AI agent terminal">
+                  <pre><code><span class="comment"># AI agent terminal: diagnose first, follow the report</span>
 npx -y @xyteai/cli@latest doctor environment --format json
-
-# Manual terminal: global install
+</code></pre>
+                </div>
+                <div class="command-shell" data-path="Manual terminal">
+                  <pre><code><span class="comment"># Manual terminal: global install</span>
 npm install -g @xyteai/cli@latest
 xyte-cli init --no-setup
 xyte-cli --version</code></pre>
+                </div>
               </div>
               <div class="action-row">
                 <button
@@ -1538,14 +1706,14 @@ xyte-cli --version</code></pre>
               </div>
             </article>
 
-            <article class="card surface">
-              <p class="card-label">Step 2 · Connect and verify</p>
+            <article class="card surface flow-step">
+              <p class="card-label"><span class="flow-marker" aria-hidden="true">2</span>Connect and verify</p>
               <ol class="steps">
                 <li>
                   <span class="step-index">01</span>
                   <span class="step-copy">
                     <strong>Connect the tenant key once</strong>
-                    <span>Run interactive setup once, or use the documented stdin flow for automation. Persisted credentials default to macOS Keychain, Windows DPAPI, or Linux Secret Service.</span>
+                    <span>Run interactive setup once, or use the documented stdin flow for automation. The key prompt hides input and confirms with a <code>Received N characters.</code> line. Persisted credentials default to macOS Keychain, Windows DPAPI, or Linux Secret Service.</span>
                     <span class="detail-code">xyte-cli setup run</span>
                   </span>
                 </li>
@@ -1567,8 +1735,8 @@ xyte-cli --version</code></pre>
               </ol>
             </article>
 
-            <article class="card surface">
-              <p class="card-label">Step 3 · Next commands</p>
+            <article class="card surface flow-step">
+              <p class="card-label"><span class="flow-marker" aria-hidden="true">3</span>Operate: next commands</p>
               <ul class="mini-list">
                 <li>
                   <strong>Watch incidents once</strong>
