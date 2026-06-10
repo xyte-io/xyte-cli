@@ -144,9 +144,17 @@ async function defaultWritableProbe(dirPath: string): Promise<EnvironmentPathChe
       }
       ancestor = parent;
     }
-    if (missing.length > 0) {
-      await fs.mkdir(path.resolve(dirPath), { recursive: true });
-      createdDirs.push(...missing);
+    for (const dir of missing) {
+      try {
+        await fs.mkdir(dir);
+        createdDirs.push(dir);
+      } catch (error) {
+        // EEXIST means another process created it since the scan; it is not
+        // ours to remove. Anything else is a real failure for the probe below.
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+          throw error;
+        }
+      }
     }
 
     const probePath = path.join(dirPath, `.xyte-cli-doctor-${randomUUID()}.tmp`);
