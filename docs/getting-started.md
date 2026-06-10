@@ -6,7 +6,7 @@ Manual terminal use is supported for setup, debugging, and local testing.
 ## Requirements
 
 - [Node.js 22+](https://nodejs.org/en/download) (npm/npx come with the Node.js install)
-- A valid Xyte API key
+- A Xyte API key (create one in your tenant under **Settings → API Keys**)
 - Writable local config directory (override with `XYTE_CLI_CONFIG_DIR` if needed)
 
 If `node --version` is missing or below 22:
@@ -63,8 +63,10 @@ xyte-cli setup status --tenant acme --field tenantId
 
 ### CI / headless
 
+Add your API key (Xyte tenant → **Settings → API Keys**) as a CI secret named `XYTE_CLI_KEY`, then:
+
 ```sh
-npx -y @xyteai/cli@latest setup run --non-interactive --tenant acme --key-command "<cmd>" --output json
+npx -y @xyteai/cli@latest setup run --non-interactive --tenant acme --output json
 npx -y @xyteai/cli@latest setup status --tenant acme --field tenantId
 ```
 
@@ -86,6 +88,8 @@ npm exec -- @xyteai/cli@latest <command>
 ```
 
 ## First-Time Setup
+
+Create the API key first: in your Xyte tenant, open **Settings → API Keys** and create a key. Save it in a file outside your project folder (for example `~/.config/xyte/acme.key`), or paste it when the interactive prompt asks.
 
 Interactive manual terminal setup:
 

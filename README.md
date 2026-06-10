@@ -40,7 +40,7 @@ PowerShell command path:
 .\.xyte-cli\runtime\node_modules\.bin\xyte-cli.cmd <command>
 ```
 
-Agents must use non-interactive setup with `--key-stdin`, `--key-command`, or `--key-file <path-outside-workspace>`. Do not paste API keys into chat. Do not store API keys inside the repo.
+Create an API key in your Xyte tenant under **Settings → API Keys** and save it in a file outside your project folder. Agents connect it non-interactively with `--key-file` (or `--key-stdin` / `--key-command` if you use a secret manager). Do not paste API keys into chat. Do not store API keys inside the repo.
 
 Agent prompt (copy/paste):
 
@@ -61,8 +61,10 @@ Detailed agent guidance: [docs/agents.md](./docs/agents.md).
 
 ### CI / headless
 
+Add your API key (Xyte tenant → **Settings → API Keys**) as a CI secret named `XYTE_CLI_KEY`, then:
+
 ```sh
-npx -y @xyteai/cli@latest setup run --non-interactive --tenant <tenant-id> --key-command "<cmd>" --output json
+npx -y @xyteai/cli@latest setup run --non-interactive --tenant <tenant-id> --output json
 npx -y @xyteai/cli@latest setup status --tenant <tenant-id> --field tenantId
 ```
 
