@@ -63,7 +63,9 @@ xyte-cli setup status --tenant acme --field tenantId
 
 ### CI / headless
 
-Add your API key (Xyte tenant → **Settings → API Keys**) as a CI secret named `XYTE_CLI_KEY`, then:
+1. In Xyte, open **Settings → API Keys** and create a key.
+2. In your CI tool (GitHub Actions, GitLab CI, Jenkins), add a secret named `XYTE_CLI_KEY` and paste the key as its value.
+3. Add these commands to your pipeline (`acme` is just a name for this connection — use your company name):
 
 ```sh
 npx -y @xyteai/cli@latest setup run --non-interactive --tenant acme --output json
