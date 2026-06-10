@@ -533,6 +533,42 @@
         color: #93bfff;
       }
 
+      /* ─── Per-line command rows ─── */
+
+      .cmd-line,
+      .cmd-note {
+        display: block;
+        position: relative;
+        padding: 2px 44px 2px 18px;
+        text-indent: -18px;
+        border-radius: 10px;
+      }
+
+      .cmd-line:hover {
+        background: rgba(255, 255, 255, 0.045);
+      }
+
+      /* ─── Agent prompt formatting ─── */
+
+      #agent-prompt {
+        line-height: 1.7;
+      }
+
+      #agent-prompt .p-line {
+        display: block;
+        padding: 3px 0 3px 20px;
+        text-indent: -20px;
+        color: var(--text-soft);
+      }
+
+      #agent-prompt .p-cmd {
+        color: #fbf7ff;
+      }
+
+      #agent-prompt .p-end {
+        margin-bottom: 14px;
+      }
+
       /* ─── Fact strip ─── */
 
       .fact-strip {
@@ -586,13 +622,6 @@
         color: var(--text-soft);
         font-size: 17px;
         line-height: 1.7;
-      }
-
-      .section-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 24px;
-        align-items: start;
       }
 
       /* ─── Install: persona chooser ─── */
@@ -679,6 +708,21 @@
         color: #d8e8ff;
       }
 
+      .panel-steps {
+        margin: 0 0 18px;
+        padding-left: 22px;
+        display: grid;
+        gap: 8px;
+        color: var(--text-soft);
+        font-size: 15px;
+        line-height: 1.6;
+      }
+
+      .panel-steps code {
+        font-size: 13px;
+        color: #d8e8ff;
+      }
+
       .panel-sublabel {
         margin-top: 30px;
       }
@@ -692,13 +736,16 @@
         margin-top: 52px;
       }
 
-      .next-grid {
+      .next-grid,
+      .defaults-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 28px;
       }
 
       .next-grid li,
-      .next-grid li:first-child {
+      .next-grid li:first-child,
+      .defaults-grid li,
+      .defaults-grid li:first-child {
         padding-top: 16px;
         border-top: 1px solid rgba(255, 255, 255, 0.1);
       }
@@ -1274,6 +1321,27 @@
         opacity: 1;
       }
 
+      .cp-line {
+        top: 50%;
+        right: 6px;
+        transform: translateY(-50%);
+        width: 26px;
+        height: 26px;
+        border-radius: 7px;
+        opacity: 0.35;
+      }
+
+      .cp-line svg {
+        width: 12px;
+        height: 12px;
+      }
+
+      .cmd-line:hover .cp-line,
+      .cp-line:focus-visible,
+      .cp-line.copied {
+        opacity: 1;
+      }
+
       @media (hover: none) {
         .cp {
           opacity: 0.8;
@@ -1334,8 +1402,7 @@
       /* ─── Responsive ─── */
 
       @media (max-width: 1100px) {
-        .hero-grid,
-        .section-grid {
+        .hero-grid {
           grid-template-columns: 1fr;
         }
 
@@ -1416,7 +1483,8 @@
         .workflow-grid,
         .docs-grid,
         .fact-row,
-        .next-grid {
+        .next-grid,
+        .defaults-grid {
           grid-template-columns: 1fr;
         }
 
@@ -1562,13 +1630,8 @@
               </div>
             </div>
 
-            <div class="command-shell">
-              <pre id="hero-shell"><code><span class="prompt">$</span> xyte-cli doctor environment --format json
-<span class="comment"># or: npx -y @xyteai/cli@latest doctor environment --format json</span>
-<span class="prompt">$</span> xyte-cli setup run
-<span class="prompt">$</span> xyte-cli setup status --field tenantId
-<span class="prompt">$</span> xyte-cli init --no-setup
-<span class="comment"># inspect, watch, console, or generate report artifacts next</span></code></pre>
+            <div class="command-shell shell-lines">
+              <pre id="hero-shell"><code><span class="cmd-line"><span class="prompt">$</span> xyte-cli doctor environment --format json</span><span class="cmd-note"><span class="comment"># or: npx -y @xyteai/cli@latest doctor environment --format json</span></span><span class="cmd-line"><span class="prompt">$</span> xyte-cli setup run</span><span class="cmd-line"><span class="prompt">$</span> xyte-cli setup status --field tenantId</span><span class="cmd-line"><span class="prompt">$</span> xyte-cli init --no-setup</span><span class="cmd-note"><span class="comment"># inspect, watch, console, or generate report artifacts next</span></span></code></pre>
             </div>
           </aside>
         </div>
@@ -1618,15 +1681,15 @@
             <p class="eyebrow">Install</p>
             <h2 id="install-title">Get running in three steps.</h2>
             <p>
-              Shell-capable AI agents start with <code>xyte-cli doctor environment --format json</code> and follow
-              the recommended install mode from the report. Manual terminals install the package globally, connect a
+              Using an AI agent? Hand it the prompt &mdash; it runs <code>xyte-cli doctor environment --format json</code>
+              and follows the recommended install mode from the report. Manual terminals install the package globally, connect a
               tenant key, and verify readiness. Then move into fleet inspection, incident watch, or report generation.
             </p>
           </header>
 
           <div class="persona-tabs reveal" role="tablist" aria-label="Install paths">
             <button type="button" class="persona-tab" id="tab-agent" role="tab" aria-selected="true" aria-controls="panel-agent">
-              AI agent terminal
+              AI agent
               <span class="tab-badge">Recommended</span>
             </button>
             <button type="button" class="persona-tab" id="tab-ci" role="tab" aria-selected="false" aria-controls="panel-ci" tabindex="-1">
@@ -1639,62 +1702,48 @@
 
           <div class="reveal">
             <div class="persona-panel surface" id="panel-agent" role="tabpanel" aria-labelledby="tab-agent">
+              <p class="panel-note">Paste this into Claude Code, Codex, or Copilot Agent mode:</p>
               <div class="command-shell">
-                <pre id="install-snippet"><code><span class="comment"># AI agent terminal: diagnose first, follow the report</span>
-npx -y @xyteai/cli@latest doctor environment --format json</code></pre>
+                <pre id="agent-prompt"><code><span class="p-line">Use @xyteai/cli in this workspace.</span><span class="p-line p-end">Never print secrets. Do not invent IDs or outputs.
+</span><span class="p-line p-cmd">First run `xyte-cli doctor environment --format json`.</span><span class="p-line p-cmd">If `xyte-cli` is missing, run `npx -y @xyteai/cli@latest doctor environment --format json`.</span><span class="p-line p-end">Follow the report's recommendations.nextCommand and recommendations.commands.
+</span><span class="p-line">Set up credentials with the report's setupKeyFile, setupStdin, or setupKeyCommand recipe.</span><span class="p-line">Do not ask me to paste API keys into chat.</span><span class="p-line">Do not store API keys inside the repo.</span><span class="p-line p-cmd p-end">After setup succeeds, run `xyte-cli init --scope project --agents all --force --no-setup`.
+</span><span class="p-line">If this surface cannot run shell commands, stop and say I need a shell-capable terminal or agent.</span></code></pre>
               </div>
               <div class="action-row">
                 <button
                   type="button"
                   class="copy-btn"
-                  data-copy-target="install-snippet"
-                  data-copy-feedback="install-toast"
+                  data-copy-target="agent-prompt"
+                  data-copy-feedback="prompt-toast"
                 >
-                  Copy install commands
+                  Copy AI prompt
                 </button>
-                <a class="inline-link" href="https://www.npmjs.com/package/@xyteai/cli">Open npm package</a>
-                <a class="inline-link" href="#agents">Get the AI prompt</a>
-                <span class="toast" id="install-toast" role="status" aria-live="polite"></span>
+                <a class="inline-link" href="./agents.md">Open agent guidance</a>
+                <span class="toast" id="prompt-toast" role="status" aria-live="polite"></span>
               </div>
             </div>
 
             <div class="persona-panel surface" id="panel-ci" role="tabpanel" aria-labelledby="tab-ci" hidden>
-              <p class="panel-note">Add your API key (Xyte tenant &rarr; <strong>Settings &rarr; API Keys</strong>) as a CI secret named <code>XYTE_CLI_KEY</code>, then:</p>
-              <div class="command-shell">
-                <pre id="ci-snippet"><code>npx -y @xyteai/cli@latest setup run --non-interactive --tenant &lt;tenant-id&gt; --output json
-npx -y @xyteai/cli@latest setup status --tenant &lt;tenant-id&gt; --field tenantId</code></pre>
+              <ol class="panel-steps">
+                <li>In Xyte, open <strong>Settings &rarr; API Keys</strong> and create a key.</li>
+                <li>In your CI tool (GitHub Actions, GitLab CI, Jenkins), add a secret named <code>XYTE_CLI_KEY</code> and paste the key as its value.</li>
+                <li>Add these commands to your pipeline (<code>acme</code> is just a name for this connection &mdash; use your company name):</li>
+              </ol>
+              <div class="command-shell shell-lines">
+                <pre id="ci-snippet"><code><span class="cmd-line">npx -y @xyteai/cli@latest setup run --non-interactive --tenant acme --output json</span><span class="cmd-line">npx -y @xyteai/cli@latest setup status --tenant acme --field tenantId</span></code></pre>
               </div>
               <p class="panel-note panel-note-after">For reproducible pipelines, replace <code>@latest</code> with a pinned version (e.g. <code>@0.10.7</code>).</p>
               <div class="action-row">
-                <button
-                  type="button"
-                  class="copy-btn"
-                  data-copy-target="ci-snippet"
-                  data-copy-feedback="ci-toast"
-                >
-                  Copy CI commands
-                </button>
                 <a class="inline-link" href="./getting-started.md">Open setup guidance</a>
                 <span class="toast" id="ci-toast" role="status" aria-live="polite"></span>
               </div>
             </div>
 
             <div class="persona-panel surface" id="panel-manual" role="tabpanel" aria-labelledby="tab-manual" hidden>
-              <div class="command-shell">
-                <pre id="manual-snippet"><code><span class="comment"># Manual terminal: global install</span>
-npm install -g @xyteai/cli@latest
-xyte-cli init --no-setup
-xyte-cli --version</code></pre>
+              <div class="command-shell shell-lines">
+                <pre id="manual-snippet"><code><span class="cmd-note"><span class="comment"># Manual terminal: global install</span></span><span class="cmd-line">npm install -g @xyteai/cli@latest</span><span class="cmd-line">xyte-cli init --no-setup</span><span class="cmd-line">xyte-cli --version</span></code></pre>
               </div>
               <div class="action-row">
-                <button
-                  type="button"
-                  class="copy-btn"
-                  data-copy-target="manual-snippet"
-                  data-copy-feedback="manual-toast"
-                >
-                  Copy install commands
-                </button>
                 <span class="toast" id="manual-toast" role="status" aria-live="polite"></span>
               </div>
 
@@ -1724,7 +1773,7 @@ xyte-cli --version</code></pre>
                   </span>
                 </li>
               </ol>
-              <a class="inline-link panel-next" href="#agents">Then use it with an agent →</a>
+              <button type="button" class="inline-link panel-next" data-select-tab="tab-agent">Then use it with an agent →</button>
             </div>
           </div>
 
@@ -1760,38 +1809,10 @@ xyte-cli --version</code></pre>
             </p>
           </header>
 
-          <div class="section-grid reveal">
-            <article class="card surface">
-              <p class="card-label">Copyable prompt</p>
-              <div class="command-shell">
-                <pre id="agent-prompt"><code>Use @xyteai/cli in this workspace.
-Never print secrets. Do not invent IDs or outputs.
-First run `xyte-cli doctor environment --format json`.
-If `xyte-cli` is missing, run `npx -y @xyteai/cli@latest doctor environment --format json`.
-Follow the report's recommendations.nextCommand and recommendations.commands.
-Set up credentials with the report's setupKeyFile, setupStdin, or setupKeyCommand recipe.
-Do not ask me to paste API keys into chat.
-Do not store API keys inside the repo.
-After setup succeeds, run `xyte-cli init --scope project --agents all --force --no-setup`.
-If this surface cannot run shell commands, stop and say I need a shell-capable terminal or agent.</code></pre>
-              </div>
-              <div class="action-row">
-                <button
-                  type="button"
-                  class="copy-btn"
-                  data-copy-target="agent-prompt"
-                  data-copy-feedback="prompt-toast"
-                >
-                  Copy AI prompt
-                </button>
-                <a class="inline-link" href="./agents.md">Open agent guidance</a>
-                <span class="toast" id="prompt-toast" role="status" aria-live="polite"></span>
-              </div>
-            </article>
-
+          <div class="reveal">
             <article class="card-quiet">
               <p class="card-label">Operator defaults</p>
-              <ul class="mini-list">
+              <ul class="mini-list defaults-grid">
                 <li>
                   <strong>Read-first by default</strong>
                   <span>Human operators see readable terminal output. Agents add <code>--output json --strict-json</code> when they need machine-parseable results.</span>
@@ -1806,6 +1827,10 @@ If this surface cannot run shell commands, stop and say I need a shell-capable t
                 </li>
               </ul>
             </article>
+            <div class="action-row">
+              <a class="inline-link" href="#install">Get the AI prompt</a>
+              <a class="inline-link" href="./agents.md">Open agent guidance</a>
+            </div>
           </div>
         </div>
       </section>
@@ -1933,7 +1958,7 @@ If this surface cannot run shell commands, stop and say I need a shell-capable t
 
         /* ── Floating copy icons on every code block ── */
         function wireCopyIcons() {
-          var targets = document.querySelectorAll(".command-shell, .detail-code, .mini-list code");
+          var targets = document.querySelectorAll(".command-shell:not(.shell-lines), .detail-code, .mini-list code");
           targets.forEach(function (el) {
             el.classList.add("has-copy");
 
@@ -1950,6 +1975,37 @@ If this surface cannot run shell commands, stop and say I need a shell-capable t
               navigator.clipboard.writeText(text).then(function () {
                 btn.innerHTML = checkSVG;
                 btn.classList.add("copied");
+                setTimeout(function () {
+                  btn.innerHTML = clipSVG;
+                  btn.classList.remove("copied");
+                }, 1400);
+              });
+            });
+          });
+        }
+
+        /* ── Per-line copy for sequential commands ── */
+        function wireLineCopy() {
+          document.querySelectorAll(".cmd-line").forEach(function (line) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "cp cp-line";
+            btn.setAttribute("aria-label", "Copy command");
+            btn.innerHTML = clipSVG;
+            line.appendChild(btn);
+
+            btn.addEventListener("click", function (e) {
+              e.stopPropagation();
+              var text = (line.innerText || "").replace(/^\$\s+/, "");
+              navigator.clipboard.writeText(text).then(function () {
+                btn.innerHTML = checkSVG;
+                btn.classList.add("copied");
+                var panel = line.closest('[role="tabpanel"]');
+                var toast = panel ? panel.querySelector(".toast") : null;
+                if (toast) {
+                  toast.textContent = "Copied.";
+                  setTimeout(function () { toast.textContent = ""; }, 2200);
+                }
                 setTimeout(function () {
                   btn.innerHTML = clipSVG;
                   btn.classList.remove("copied");
@@ -2004,6 +2060,13 @@ If this surface cannot run shell commands, stop and say I need a shell-capable t
               select(tabs[(i + dir + tabs.length) % tabs.length], true);
             });
           });
+
+          document.querySelectorAll("[data-select-tab]").forEach(function (el) {
+            el.addEventListener("click", function () {
+              var tab = document.getElementById(el.getAttribute("data-select-tab"));
+              if (tab) select(tab, true);
+            });
+          });
         }
 
         /* ── Scroll-triggered reveal ── */
@@ -2029,6 +2092,7 @@ If this surface cannot run shell commands, stop and say I need a shell-capable t
         }
 
         wireCopyIcons();
+        wireLineCopy();
         wireCopyButtons();
         wireTabs();
         wireReveal();
