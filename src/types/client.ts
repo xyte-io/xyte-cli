@@ -45,12 +45,23 @@ export interface OrganizationNamespace {
   sendCommand: NamespaceCall;
   claimDevice: NamespaceCall;
   moveDevice: NamespaceCall;
+  suspendIncidents: NamespaceCall;
+  resumeIncidents: NamespaceCall;
   updateDevice: NamespaceCall;
   deleteDevice: NamespaceCall;
   getDevice: NamespaceCall;
   getDevices: NamespaceCall;
   getHistories: NamespaceCall;
+  getEdges: NamespaceCall;
   getOrganizationInfo: NamespaceCall;
+  addExternalUser: NamespaceCall;
+  addUsers: NamespaceCall;
+  createGroup: NamespaceCall;
+  deleteGroup: NamespaceCall;
+  getGroup: NamespaceCall;
+  getGroups: NamespaceCall;
+  removeUsers: NamespaceCall;
+  updateGroup: NamespaceCall;
   getIncidents: NamespaceCall;
   createSpace: NamespaceCall;
   deleteSpace: NamespaceCall;
@@ -67,6 +78,11 @@ export interface OrganizationNamespace {
   getEdgeClaimStatus: NamespaceCall;
   startEdgePing: NamespaceCall;
   getEdgePingStatus: NamespaceCall;
+  createUser: NamespaceCall;
+  deactivateUser: NamespaceCall;
+  getUser: NamespaceCall;
+  getUsers: NamespaceCall;
+  resendWelcome: NamespaceCall;
 }
 
 export interface PartnerNamespace {
@@ -78,13 +94,13 @@ export interface PartnerNamespace {
   getStateHistory: NamespaceCall;
   getStateHistoryMultiDevices: NamespaceCall;
   getTelemetries: NamespaceCall;
+  createOrganization: NamespaceCall;
   addComment: NamespaceCall;
   closeTicket: NamespaceCall;
   getTicket: NamespaceCall;
   getTickets: NamespaceCall;
   updateTicket: NamespaceCall;
 }
-
 
 export interface XyteClient {
   organization: OrganizationNamespace;

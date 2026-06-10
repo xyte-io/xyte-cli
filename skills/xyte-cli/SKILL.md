@@ -148,6 +148,7 @@ Rules:
 - `xyte-cli api endpoints list`
 - `xyte-cli api endpoints describe <endpoint-key>`
 - `xyte-cli api call <endpoint-key> --tenant <tenant-id> ...`
+- common raw endpoint examples and query fields: `references/endpoints.md`
 
 4. Insights/reports:
 - `xyte-cli ops inspect fleet --tenant <tenant-id> --provider-scope auto --output json`

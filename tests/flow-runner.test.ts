@@ -1568,11 +1568,11 @@ describe('flow runner', () => {
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-claim-apply`);
     const bodies: Array<Record<string, unknown>> = [];
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
-      if (url.includes('/core/v1/organization/edge/devices/start_claim')) {
+      if (url.includes('/core/v1/organization/edges/devices/start_claim')) {
         bodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
         return new Response(null, { status: 204 });
       }
-      if (url.includes('/core/v1/organization/edge/devices/get_claim_status')) {
+      if (url.includes('/core/v1/organization/edges/devices/get_claim_status')) {
         return new Response(JSON.stringify({ result: 'success' }), {
           status: 200,
           headers: { 'content-type': 'application/json' }
@@ -2742,19 +2742,19 @@ describe('flow runner', () => {
         url,
         body: typeof init?.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : undefined
       });
-      if (url.includes('/core/v1/organization/edge/devices/start_ping')) {
+      if (url.includes('/core/v1/organization/edges/devices/start_ping')) {
         return new Response(null, { status: 204 });
       }
-      if (url.includes('/core/v1/organization/edge/devices/get_ping_status')) {
+      if (url.includes('/core/v1/organization/edges/devices/get_ping_status')) {
         return new Response(JSON.stringify({ status: 'success' }), {
           status: 200,
           headers: { 'content-type': 'application/json' }
         });
       }
-      if (url.includes('/core/v1/organization/edge/devices/start_claim')) {
+      if (url.includes('/core/v1/organization/edges/devices/start_claim')) {
         return new Response(null, { status: 204 });
       }
-      if (url.includes('/core/v1/organization/edge/devices/get_claim_status')) {
+      if (url.includes('/core/v1/organization/edges/devices/get_claim_status')) {
         return new Response(JSON.stringify({ result: 'success' }), {
           status: 200,
           headers: { 'content-type': 'application/json' }
@@ -2850,10 +2850,10 @@ describe('flow runner', () => {
     writeFileSync(sourcePath, 'source\nplaceholder\n');
 
     const fetchMock = vi.fn(async (url: string) => {
-      if (url.includes('/core/v1/organization/edge/devices/start_ping')) {
+      if (url.includes('/core/v1/organization/edges/devices/start_ping')) {
         return new Response(null, { status: 204 });
       }
-      if (url.includes('/core/v1/organization/edge/devices/get_ping_status')) {
+      if (url.includes('/core/v1/organization/edges/devices/get_ping_status')) {
         return new Response(JSON.stringify({ status: 'failed' }), {
           status: 200,
           headers: { 'content-type': 'application/json' }

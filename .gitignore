@@ -3,10 +3,10 @@ video/node_modules/
 dist/
 coverage/
 .venv/
-.env
 *.log
 .DS_Store
 .idea/
+.env
 
 *.tgz
 # Generated artifacts
@@ -26,7 +26,19 @@ marketing/
 
 # Local tooling scratch files
 AGENTS.md
-.agents/skills/
+.agents/skills/*
+!.agents/skills/commit/
+!.agents/skills/commit/**
+!.agents/skills/debug/
+!.agents/skills/debug/**
+!.agents/skills/land/
+!.agents/skills/land/**
+!.agents/skills/linear/
+!.agents/skills/linear/**
+!.agents/skills/pull/
+!.agents/skills/pull/**
+!.agents/skills/push/
+!.agents/skills/push/**
 .claude/skills/
 .github/skills/
 apply

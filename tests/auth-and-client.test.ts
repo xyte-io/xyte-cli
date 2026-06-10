@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createXyteClient } from '../src/client/create-client';
 import { createSecretStore, MemorySecretStore } from '../src/secure/secret-store';
 import { XyteAuthError } from '../src/http/errors';
+import type { HttpTransport } from '../src/http/transport';
 import { MemoryProfileStore } from './support/memory-profile-store';
 
 describe('client auth behavior', () => {
@@ -77,6 +78,47 @@ describe('client auth behavior', () => {
 
     expect(transport.request).toHaveBeenCalledTimes(1);
     expect(transport.request.mock.calls[0][0].headers.Authorization).toBe('partner-key-456');
+  });
+
+  it('does not send a body for organization command reads', async () => {
+    const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { items: [] } });
+    const transport = { request } as unknown as HttpTransport;
+
+    const client = createXyteClient({
+      auth: { organization: 'org-key-123' },
+      hubBaseUrl: 'https://hub.example.test',
+      transport
+    });
+    await client.organization.getCommands({
+      path: { device_id: 'dev-1' },
+      query: { status: 'pending' },
+      body: { device_id: 'dev-1' }
+    });
+
+    expect(request).toHaveBeenCalledTimes(1);
+    const sent = request.mock.calls[0][0];
+    expect(sent.method).toBe('GET');
+    expect(sent.url).toBe('https://hub.example.test/core/v1/organization/devices/dev-1/commands?status=pending');
+    expect(sent.body).toBeUndefined();
+    expect(sent.headers['Content-Type']).toBeUndefined();
+  });
+
+  it('uses the callable partner ticket path without the docs copy suffix', async () => {
+    const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { id: 'ticket-1' } });
+    const transport = { request } as unknown as HttpTransport;
+
+    const client = createXyteClient({
+      auth: { partner: 'partner-key-456' },
+      hubBaseUrl: 'https://hub.example.test',
+      transport
+    });
+    await client.partner.getTicket({ path: { ticket_id: 'ticket-1' } });
+
+    expect(request).toHaveBeenCalledTimes(1);
+    const sent = request.mock.calls[0][0];
+    expect(sent.method).toBe('GET');
+    expect(sent.url).toBe('https://hub.example.test/core/v1/partner/tickets/ticket-1');
+    expect(sent.body).toBeUndefined();
   });
 
   it('uses active slot secret when multiple slots exist', async () => {

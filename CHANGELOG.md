@@ -6,6 +6,50 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.10.7] - 2026-06-01
+
+### Added
+- BE-1529: Documented the new `effective_status` response field on `organization.devices.getDevices`, `organization.devices.getDevice`, and `organization.devices.claimDevice` in the public endpoint catalog. The field is a nullable string with one of `ok`, `warning`, `error`, `offline`, `disconnected`, `never_seen`, computed from incident priority, connectivity, telemetry-seen state, and raw device status. Visible via `xyte-cli api endpoints describe <key>`.
+
+## [0.10.6] - 2026-05-28
+
+### Added
+- Added organization device incident controls:
+  - `organization.devices.suspendIncidents`
+  - `organization.devices.resumeIncidents`
+- Added organization edge discovery:
+  - `organization.edges.getEdges`
+- Added organization group management endpoints:
+  - `organization.groups.createGroup`
+  - `organization.groups.getGroups`
+  - `organization.groups.getGroup`
+  - `organization.groups.updateGroup`
+  - `organization.groups.deleteGroup`
+  - `organization.groups.addUsers`
+  - `organization.groups.removeUsers`
+  - `organization.groups.addExternalUser`
+- Added organization user management endpoints:
+  - `organization.users.createUser`
+  - `organization.users.getUsers`
+  - `organization.users.getUser`
+  - `organization.users.deactivateUser`
+  - `organization.users.resendWelcome`
+- Added partner organization creation:
+  - `partner.organizations.createOrganization`
+- Updated the typed client namespace surface, endpoint catalog, command docs, endpoint reference docs, tests, and shipped `xyte-cli` skill data for the new endpoints.
+
+### Fixed
+- Corrected the Edge claim and ping lifecycle routes to use the deployed `/core/v1/organization/edges/devices/...` paths:
+  - `organization.edge.startClaim`
+  - `organization.edge.getClaimStatus`
+  - `organization.edge.startPing`
+  - `organization.edge.getPingStatus`
+
+## [0.10.5] - 2026-05-12
+
+### Fixed
+- Corrected read endpoint metadata so organization command/ticket reads do not advertise request bodies and partner ticket reads use the callable ticket path without the docs copy suffix.
+
 ## [0.10.4] - 2026-05-11
 
 ### Fixed

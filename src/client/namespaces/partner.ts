@@ -12,6 +12,7 @@ export function createPartnerNamespace(
     getStateHistory: (args) => call('partner.devices.getStateHistory', args),
     getStateHistoryMultiDevices: (args) => call('partner.devices.getStateHistoryMultiDevices', args),
     getTelemetries: (args) => call('partner.devices.getTelemetries', args),
+    createOrganization: (args) => call('partner.organizations.createOrganization', args),
     addComment: (args) => call('partner.tickets.addComment', args),
     closeTicket: (args) => call('partner.tickets.closeTicket', args),
     getTicket: (args) => call('partner.tickets.getTicket', args),
