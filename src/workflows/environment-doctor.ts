@@ -178,7 +178,7 @@ async function defaultNetworkProbe(): Promise<EnvironmentNetworkCheck> {
 }
 
 function buildCommands(prefix: string, platform: NodeJS.Platform): EnvironmentCommands {
-  const stdinSource = platform === 'win32' ? 'Get-Content <key-file>' : '<secret-command>';
+  const stdinSource = platform === 'win32' ? 'Get-Content <path-outside-workspace>' : '<secret-command>';
   return {
     doctor: `${prefix} doctor environment --format json`,
     setupKeyFile: `${prefix} setup run --non-interactive --tenant <tenant-id> --key-file <path-outside-workspace> --output json`,
