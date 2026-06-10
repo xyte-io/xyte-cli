@@ -742,10 +742,10 @@
         gap: 28px;
       }
 
-      .next-grid li,
-      .next-grid li:first-child,
-      .defaults-grid li,
-      .defaults-grid li:first-child {
+      .mini-list.next-grid li,
+      .mini-list.next-grid li:first-child,
+      .mini-list.defaults-grid li,
+      .mini-list.defaults-grid li:first-child {
         padding-top: 16px;
         border-top: 1px solid rgba(255, 255, 255, 0.1);
       }
@@ -855,6 +855,17 @@
 
       .sheet-code,
       .sheet-subrow code,
+      .defaults-grid span code {
+        display: inline;
+        width: auto;
+        padding: 2px 7px;
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
       .mini-list code {
         display: block;
         position: relative;
@@ -1631,7 +1642,7 @@
             </div>
 
             <div class="command-shell shell-lines">
-              <pre id="hero-shell"><code><span class="cmd-line"><span class="prompt">$</span> xyte-cli doctor environment --format json</span><span class="cmd-note"><span class="comment"># or: npx -y @xyteai/cli@latest doctor environment --format json</span></span><span class="cmd-line"><span class="prompt">$</span> xyte-cli setup run</span><span class="cmd-line"><span class="prompt">$</span> xyte-cli setup status --field tenantId</span><span class="cmd-line"><span class="prompt">$</span> xyte-cli init --no-setup</span><span class="cmd-note"><span class="comment"># inspect, watch, console, or generate report artifacts next</span></span></code></pre>
+              <pre id="hero-shell"><code><span class="cmd-line"><span class="prompt">$</span> npx -y @xyteai/cli@latest doctor environment --format json</span><span class="cmd-note"><span class="comment"># follow the report's install recommendation, then:</span></span><span class="cmd-line"><span class="prompt">$</span> xyte-cli setup run</span><span class="cmd-line"><span class="prompt">$</span> xyte-cli setup status --field tenantId</span><span class="cmd-line"><span class="prompt">$</span> xyte-cli init --no-setup</span><span class="cmd-note"><span class="comment"># inspect, watch, console, or generate report artifacts next</span></span></code></pre>
             </div>
           </aside>
         </div>
@@ -1961,6 +1972,9 @@
         function wireCopyIcons() {
           var targets = document.querySelectorAll(".command-shell:not(.shell-lines), .detail-code, .mini-list code");
           targets.forEach(function (el) {
+            if (el.closest(".defaults-grid")) {
+              return;
+            }
             el.classList.add("has-copy");
 
             var btn = document.createElement("button");
