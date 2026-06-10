@@ -40,7 +40,7 @@ PowerShell command path:
 .\.xyte-cli\runtime\node_modules\.bin\xyte-cli.cmd <command>
 ```
 
-Create an API key in your Xyte tenant under **Settings → API Keys** and save it in a file outside your project folder. Agents connect it non-interactively with `--key-file` (or `--key-stdin` / `--key-command` if you use a secret manager). Do not paste API keys into chat. Do not store API keys inside the repo.
+Before you start: in Xyte, open **Settings → API Keys** and create a key. Save it in a plain text file outside your project folder (for example `xyte-api-key.txt` on your Desktop) — any text editor works. Your agent will ask for the file's path. Do not paste API keys into chat. Do not store API keys inside the repo.
 
 Agent prompt (copy/paste):
 
@@ -52,10 +52,10 @@ First run `xyte-cli doctor environment --format json`.
 If `xyte-cli` is missing, run `npx -y @xyteai/cli@latest doctor environment --format json`.
 Follow the report's recommendations.nextCommand and recommendations.commands.
 
-Set up credentials with the report's setupKeyFile, setupStdin, or setupKeyCommand recipe.
+If `xyte-cli setup status` shows no connected tenant, ask me for the path to my API key file (never the key itself) and connect it with the report's setupKeyFile recipe.
 Do not ask me to paste API keys into chat.
 Do not store API keys inside the repo.
-After setup succeeds, run `xyte-cli init --scope project --agents all --force --no-setup`.
+After setup succeeds, offer to delete the key file, then run `xyte-cli init --scope project --agents all --force --no-setup`.
 
 If this surface cannot run shell commands, stop and say I need a shell-capable terminal or agent.
 ```

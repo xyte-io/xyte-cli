@@ -1702,11 +1702,12 @@
 
           <div class="reveal">
             <div class="persona-panel surface" id="panel-agent" role="tabpanel" aria-labelledby="tab-agent">
+              <p class="panel-note">Before you start: in Xyte, open <strong>Settings &rarr; API Keys</strong> and create a key. Save it in a plain text file outside your project folder (for example <code>xyte-api-key.txt</code> on your Desktop) &mdash; any text editor works. Your agent will ask for the file's path.</p>
               <p class="panel-note">Paste this into Claude Code, Codex, or Copilot Agent mode:</p>
               <div class="command-shell">
                 <pre id="agent-prompt"><code><span class="p-line">Use @xyteai/cli in this workspace.</span><span class="p-line p-end">Never print secrets. Do not invent IDs or outputs.
 </span><span class="p-line p-cmd">First run `xyte-cli doctor environment --format json`.</span><span class="p-line p-cmd">If `xyte-cli` is missing, run `npx -y @xyteai/cli@latest doctor environment --format json`.</span><span class="p-line p-end">Follow the report's recommendations.nextCommand and recommendations.commands.
-</span><span class="p-line">Set up credentials with the report's setupKeyFile, setupStdin, or setupKeyCommand recipe.</span><span class="p-line">Do not ask me to paste API keys into chat.</span><span class="p-line">Do not store API keys inside the repo.</span><span class="p-line p-cmd p-end">After setup succeeds, run `xyte-cli init --scope project --agents all --force --no-setup`.
+</span><span class="p-line p-cmd">If `xyte-cli setup status` shows no connected tenant, ask me for the path to my API key file (never the key itself) and connect it with the report's setupKeyFile recipe.</span><span class="p-line">Do not ask me to paste API keys into chat.</span><span class="p-line">Do not store API keys inside the repo.</span><span class="p-line p-cmd p-end">After setup succeeds, offer to delete the key file, then run `xyte-cli init --scope project --agents all --force --no-setup`.
 </span><span class="p-line">If this surface cannot run shell commands, stop and say I need a shell-capable terminal or agent.</span></code></pre>
               </div>
               <div class="action-row">

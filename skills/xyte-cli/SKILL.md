@@ -26,6 +26,7 @@ This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
   - `xyte-cli init --scope project --agents all --force --no-setup`
 - for humans: `xyte-cli setup run --tenant <tenant-id> [--provider <xyte-org|xyte-partner>]`
 - for automation: use `--key-file <path-outside-workspace>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`
+- if no key source is available: ask the user for the path to their API key file (never the key value); keys are created in the Xyte tenant under Settings -> API Keys, and after setup succeeds offer to delete the key file
 - for secret managers: use `--key-command "<cmd>"` to resolve the API key from any CLI that prints it on stdout, e.g. `--key-command "op read op://Employee/Xyte/credential"` (1Password), `--key-command "vault kv get -field=key secret/xyte"` (Vault), `--key-command "aws secretsmanager get-secret-value --secret-id xyte --query SecretString --output text"` (AWS Secrets Manager). xyte-cli trims leading and trailing whitespace; the command must exit 0 and print only the key on stdout.
 - If `--provider` is omitted, setup probes `xyte-org` first and then `xyte-partner`.
 - If `--connectivity never` is used, require `--provider`.
@@ -139,6 +140,7 @@ Rules:
 2. Auth/tenant (if missing or incomplete):
 - human-guided setup: `xyte-cli setup run --tenant <tenant-id> [--provider <xyte-org|xyte-partner>]`
 - automation setup: use `--key-file <path-outside-workspace>` or pipe the key on stdin to `xyte-cli setup run --non-interactive --tenant <tenant-id> [--provider <xyte-org|xyte-partner>] --key-stdin`
+- if no key source is available: ask the user for the path to their API key file (never the key value); keys are created in the Xyte tenant under Settings -> API Keys, and after setup succeeds offer to delete the key file
 - secret-manager setup: use `--key-command "<cmd>"`, e.g. `xyte-cli setup run --non-interactive --tenant <tenant-id> --key-command "op read op://Employee/Xyte/credential"`
 - `xyte-cli setup status --tenant <tenant-id> --field tenantId`
 - `xyte-cli config tenant use <tenant-id>`

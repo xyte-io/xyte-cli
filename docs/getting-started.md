@@ -54,7 +54,7 @@ PowerShell command path:
 
 If the report returns `"mode": "blocked"`, install Node.js 22+, preinstall `@xyteai/cli`, provide `xyte-cli` on `PATH`, or move to an environment with Node/npm and package network access.
 
-Agents must keep setup non-interactive and use `--key-stdin`, `--key-command`, or `--key-file <path-outside-workspace>`. Do not paste API keys into chat. Do not store API keys inside the repo.
+Before you start: in Xyte, open **Settings → API Keys** and create a key. Save it in a plain text file outside your project folder (for example `xyte-api-key.txt` on your Desktop) — any text editor works. Your agent will ask for the file's path. Agents keep setup non-interactive (`--key-file`, `--key-stdin`, or `--key-command`). Do not paste API keys into chat. Do not store API keys inside the repo.
 
 ```sh
 xyte-cli setup run --non-interactive --tenant acme --key-file <path-outside-workspace> --output json
