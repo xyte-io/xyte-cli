@@ -6,6 +6,22 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.10.8] - 2026-06-10
+
+### Added
+- `xyte-cli doctor environment`: environment diagnostics for install and setup. Checks Node version, writability (cwd, HOME, temp, config dir, workspace runtime), secret-store availability, and config-dir placement, then recommends an install mode (`existing` | `npx` | `workspace-local` | `blocked`) with copy-pasteable, platform-appropriate command recipes. Offline by default; `--check-network` probes npm registry reachability. New `xyte.doctor.environment.v1` contract in `docs/schemas/` with a byte-identical skill-bundle mirror.
+- `xyte-cli skills refresh`: force-installs all agent skill bundles (project and user scope) in one command. Run it in each workspace after upgrading; `xyte-cli upgrade` text output now suggests it (upgrade continues to refresh user scope automatically).
+
+### Changed
+- The hidden API key prompt now states that input is hidden and confirms `Received N characters.` after entry, so a failed paste is visible immediately. Secret prompts never render default values.
+- Text-mode errors now include the error detail and `Try:` suggested commands (previously only the summary line was printed; JSON error output is unchanged).
+- Provider auto-detection failures carry actionable, install-mode-agnostic recovery suggestions.
+- Onboarding docs and the GitHub Page are doctor-first with three explicit install paths: AI agent (paste the canonical prompt; the agent installs itself and asks for the path to a key file - never the key), CI/headless (`XYTE_CLI_KEY` secret), and manual terminal. The agent prompt is byte-identical across README, docs/agents.md, and the page.
+- `--key-file` help and docs use the `<path-outside-workspace>` placeholder to reinforce that keys must not live inside the repo.
+
+### Upgrade notes
+- Existing workspaces keep their own skill bundle copies; run `xyte-cli skills refresh` to update them.
+
 ## [0.10.7] - 2026-06-01
 
 ### Added
