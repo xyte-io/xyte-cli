@@ -95,5 +95,9 @@ describe('fetchProviderForKey', () => {
     expect(suggestions.join('\n')).toContain('Settings -> API Keys');
     expect(suggestions.join('\n')).toContain('--key-stdin');
     expect(suggestions.join('\n')).toContain('--key-file <path-outside-workspace>');
+    expect(suggestions.join('\n')).toContain('re-run the same setup command');
+    for (const suggestion of suggestions) {
+      expect(suggestion).not.toMatch(/(^|\| )xyte-cli /);
+    }
   });
 });

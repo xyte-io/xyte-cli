@@ -52,8 +52,7 @@ export async function fetchProviderForKey(args: {
       detail: `Org: ${orgMsg}; Partner: ${partnerMsg}`,
       suggestedCommands: [
         'Verify the API key in the Xyte tenant under Settings -> API Keys',
-        '<secret-command> | xyte-cli setup run --non-interactive --tenant <tenant-id> --key-stdin --output json',
-        'xyte-cli setup run --non-interactive --tenant <tenant-id> --key-file <path-outside-workspace> --output json'
+        'Then re-run the same setup command, passing the key with --key-file <path-outside-workspace> or --key-stdin'
       ]
     });
   }
