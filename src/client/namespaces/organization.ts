@@ -43,6 +43,7 @@ export function createOrganizationNamespace(
     getEdgeClaimStatus: (args) => call('organization.edge.getClaimStatus', args),
     startEdgePing: (args) => call('organization.edge.startPing', args),
     getEdgePingStatus: (args) => call('organization.edge.getPingStatus', args),
+    updateEdgeHostname: (args) => call('organization.edge.updateHostname', args),
     createUser: (args) => call('organization.users.createUser', args),
     deactivateUser: (args) => call('organization.users.deactivateUser', args),
     getUser: (args) => call('organization.users.getUser', args),

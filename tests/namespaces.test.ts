@@ -127,6 +127,21 @@ describe('namespace endpoint mappings', () => {
     });
   });
 
+  it('maps organization.updateEdgeHostname to organization.edge.updateHostname', async () => {
+    const call = vi.fn().mockResolvedValue({ success: true });
+    const organization = createOrganizationNamespace(call);
+
+    await organization.updateEdgeHostname({
+      path: { device_id: 'dev-1' },
+      body: { device_ip: '192.168.1.100', skip_connectivity_check: false }
+    });
+
+    expect(call).toHaveBeenCalledWith('organization.edge.updateHostname', {
+      path: { device_id: 'dev-1' },
+      body: { device_ip: '192.168.1.100', skip_connectivity_check: false }
+    });
+  });
+
   it('maps organization.getEdges to organization.edges.getEdges', async () => {
     const call = vi.fn().mockResolvedValue({ items: [] });
     const organization = createOrganizationNamespace(call);
