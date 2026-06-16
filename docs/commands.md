@@ -131,11 +131,15 @@ Auth note:
 ```bash
 xyte-cli api endpoints list
 xyte-cli api endpoints describe organization.devices.getDevices
+xyte-cli api endpoints describe organization.devices.mergeDevice
+xyte-cli api endpoints describe organization.devices.splitDevice
 xyte-cli api endpoints describe organization.users.getUsers
 xyte-cli api endpoints describe organization.groups.addUsers
 xyte-cli api endpoints describe partner.organizations.createOrganization
 xyte-cli api call organization.devices.getDevices --tenant <tenant-id>
 xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --output-mode envelope --strict-json [--note <text>]
+xyte-cli api call organization.devices.mergeDevice --tenant <tenant-id> --path-json '{"device_id":"<primary-device-id>"}' --body-json '{"with_device_ids":["<shadow-device-id>"]}' --note "approved merge"
+xyte-cli api call organization.devices.splitDevice --tenant <tenant-id> --path-json '{"device_id":"<primary-device-id>"}' --body-json '{"shadow_device_id":"<shadow-device-id>"}' --note "approved split"
 xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once
 xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 10
 ```

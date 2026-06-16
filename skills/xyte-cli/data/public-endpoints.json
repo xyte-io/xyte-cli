@@ -124,6 +124,51 @@
     ]
   },
   {
+    "key": "organization.devices.mergeDevice",
+    "namespace": "organization",
+    "group": "devices",
+    "action": "mergeDevice",
+    "title": "Merge Device",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/:device_id/merge",
+    "pathParams": [
+      "device_id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/merge-device",
+    "bodyExample": "{\n  \"with_device_ids\": [\n    \"shadow-device-id\"\n  ]\n}",
+    "notes": [
+      "Merges one or more shadow devices under this primary device.",
+      "Merge group capped at 4 devices (1 primary + up to 3 shadows)."
+    ]
+  },
+  {
+    "key": "organization.devices.splitDevice",
+    "namespace": "organization",
+    "group": "devices",
+    "action": "splitDevice",
+    "title": "Split Device",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/:device_id/split",
+    "pathParams": [
+      "device_id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/split-device",
+    "bodyExample": "{\n  \"shadow_device_id\": \"shadow-device-id\"\n}",
+    "notes": [
+      "Detaches a shadow device from its primary."
+    ]
+  },
+  {
     "key": "organization.devices.suspendIncidents",
     "namespace": "organization",
     "group": "devices",

@@ -10,6 +10,8 @@ export function createOrganizationNamespace(
     sendCommand: (args) => call('organization.commands.sendCommand', args),
     claimDevice: (args) => call('organization.devices.claimDevice', args),
     moveDevice: (args) => call('organization.devices.moveDevice', args),
+    mergeDevice: (args) => call('organization.devices.mergeDevice', args),
+    splitDevice: (args) => call('organization.devices.splitDevice', args),
     suspendIncidents: (args) => call('organization.devices.suspendIncidents', args),
     resumeIncidents: (args) => call('organization.devices.resumeIncidents', args),
     updateDevice: (args) => call('organization.devices.updateDevice', args),

@@ -108,6 +108,24 @@ xyte-cli api call organization.commands.sendCommand \
   --body-json '{"command":"reboot"}'
 ```
 
+### `organization.devices.mergeDevice` / `organization.devices.splitDevice`
+
+Run only after explicit user approval. Merge attaches shadow devices to a primary device; split detaches one shadow device from its primary.
+
+```bash
+xyte-cli api call organization.devices.mergeDevice \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<primary-device-id>"}' \
+  --body-json '{"with_device_ids":["<shadow-device-id>"]}' \
+  --note "approved merge"
+
+xyte-cli api call organization.devices.splitDevice \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<primary-device-id>"}' \
+  --body-json '{"shadow_device_id":"<shadow-device-id>"}' \
+  --note "approved split"
+```
+
 ### `organization.devices.suspendIncidents` / `organization.devices.resumeIncidents`
 
 ```bash
@@ -143,6 +161,8 @@ Organization:
 - `organization.devices.getDevices`
 - `organization.devices.getDevice`
 - `organization.devices.claimDevice` (native claim)
+- `organization.devices.mergeDevice`
+- `organization.devices.splitDevice`
 - `organization.devices.suspendIncidents`
 - `organization.devices.resumeIncidents`
 - `organization.incidents.closeIncident`
