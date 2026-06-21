@@ -247,6 +247,30 @@ describe('public endpoint catalog', () => {
     expect(endpoint?.queryParams).toEqual(['page', 'per_page']);
   });
 
+  it('includes organization edge models collection endpoint metadata', () => {
+    const endpoint = endpoints.find((item) => item.key === 'organization.edges.getModels');
+    expect(endpoint).toBeDefined();
+    expect(endpoint?.method).toBe('GET');
+    expect(endpoint?.pathTemplate).toBe('/core/v1/organization/edges/models');
+    expect(endpoint?.authScope).toBe('organization');
+    expect(endpoint?.bodyType).toBe('none');
+    expect(endpoint?.hasBody).toBe(false);
+    expect(endpoint?.pathParams).toEqual([]);
+    expect(endpoint?.queryParams).toEqual(['page', 'per_page', 'search', 'q']);
+  });
+
+  it('includes organization edge model show endpoint metadata', () => {
+    const endpoint = endpoints.find((item) => item.key === 'organization.edges.getModel');
+    expect(endpoint).toBeDefined();
+    expect(endpoint?.method).toBe('GET');
+    expect(endpoint?.pathTemplate).toBe('/core/v1/organization/edges/models/:id');
+    expect(endpoint?.authScope).toBe('organization');
+    expect(endpoint?.bodyType).toBe('none');
+    expect(endpoint?.hasBody).toBe(false);
+    expect(endpoint?.pathParams).toEqual(['id']);
+    expect(endpoint?.queryParams).toEqual([]);
+  });
+
   it('includes organization users and groups endpoint metadata', () => {
     const getUsers = endpoints.find((item) => item.key === 'organization.users.getUsers');
     expect(getUsers).toBeDefined();

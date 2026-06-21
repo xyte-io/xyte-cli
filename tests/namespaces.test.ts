@@ -161,6 +161,28 @@ describe('namespace endpoint mappings', () => {
     });
   });
 
+  it('maps organization.getEdgeModels to organization.edges.getModels', async () => {
+    const call = vi.fn().mockResolvedValue({ items: [] });
+    const organization = createOrganizationNamespace(call);
+
+    await organization.getEdgeModels({ query: { page: 1, per_page: 50, search: 'acme' } });
+
+    expect(call).toHaveBeenCalledWith('organization.edges.getModels', {
+      query: { page: 1, per_page: 50, search: 'acme' }
+    });
+  });
+
+  it('maps organization.getEdgeModel to organization.edges.getModel', async () => {
+    const call = vi.fn().mockResolvedValue({ id: 'model-1' });
+    const organization = createOrganizationNamespace(call);
+
+    await organization.getEdgeModel({ path: { id: 'model-1' } });
+
+    expect(call).toHaveBeenCalledWith('organization.edges.getModel', {
+      path: { id: 'model-1' }
+    });
+  });
+
   it('maps organization users and groups to their endpoint keys', async () => {
     const call = vi.fn().mockResolvedValue({ ok: true });
     const organization = createOrganizationNamespace(call);

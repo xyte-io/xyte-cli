@@ -465,6 +465,54 @@
     ]
   },
   {
+    "key": "organization.edges.getModels",
+    "namespace": "organization",
+    "group": "edges",
+    "action": "getModels",
+    "title": "Get Edge Models",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/edges/models",
+    "pathParams": [],
+    "queryParams": [
+      "page",
+      "per_page",
+      "search",
+      "q"
+    ],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/get-edge-models",
+    "notes": [
+      "Server ticket BE-1580 adds this endpoint.",
+      "Search accepts either the `search` or `q` query param (the hub accepts both).",
+      "Returns paginated edge device models with { items, next_page }. Each item: { id, vendor, model, aliases: [string], parameters: [{ name, type, required }] }."
+    ]
+  },
+  {
+    "key": "organization.edges.getModel",
+    "namespace": "organization",
+    "group": "edges",
+    "action": "getModel",
+    "title": "Get Edge Model",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/edges/models/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/get-edge-model",
+    "notes": [
+      "Server ticket BE-1580 adds this endpoint.",
+      "Returns a single edge device model: { id, vendor, model, aliases: [string], parameters: [{ name, type, required }], commands: [{ id, name, friendly_name, custom_fields, with_file }] }."
+    ]
+  },
+  {
     "key": "organization.getOrganizationInfo",
     "namespace": "organization",
     "group": "general",

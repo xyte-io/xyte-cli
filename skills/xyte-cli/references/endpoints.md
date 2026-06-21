@@ -47,6 +47,8 @@ Derived from the bundled public endpoint spec.
 | `organization.commands.getCommands` | `status`, `page`, `per_page` | `page`, `per_page` | Command history pagination and status filter |
 | `organization.incidents.getIncidents` | `from`, `to`, `status`, `priority`, `title`, `description`, `issue`, `device_model`, `partner_name`, `sub_model`, `space_id`, `page`, `per_page` | `page`, `per_page` | Incident filtering matrix. Use integer `from` and `to`; for reliable active-incident fetches use both (`from=0`, `to=<now>`). |
 | `organization.edges.getEdges` | `page`, `per_page` | `page`, `per_page` | Paginated Edge records |
+| `organization.edges.getModels` | `page`, `per_page`, `search`, `q` | `page`, `per_page` | Paginated edge device models; search via `search` or `q` |
+| `organization.edges.getModel` | none (path `id`) | none | One edge device model with `commands` |
 | `organization.groups.getGroups` | `page`, `per_page` | `page`, `per_page` | Paginated team access groups |
 | `organization.users.getUsers` | `page`, `per_page` | `page`, `per_page` | Paginated active users |
 
@@ -168,6 +170,8 @@ Organization:
 - `organization.incidents.closeIncident`
 - `organization.incidents.getIncidents`
 - `organization.edges.getEdges`
+- `organization.edges.getModels`
+- `organization.edges.getModel`
 - `organization.groups.getGroups`
 - `organization.groups.addUsers`
 - `organization.users.getUsers`
