@@ -124,6 +124,51 @@
     ]
   },
   {
+    "key": "organization.devices.mergeDevice",
+    "namespace": "organization",
+    "group": "devices",
+    "action": "mergeDevice",
+    "title": "Merge Device",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/:device_id/merge",
+    "pathParams": [
+      "device_id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/merge-device",
+    "bodyExample": "{\n  \"with_device_ids\": [\n    \"shadow-device-id\"\n  ]\n}",
+    "notes": [
+      "Merges one or more shadow devices under this primary device.",
+      "Merge group capped at 4 devices (1 primary + up to 3 shadows)."
+    ]
+  },
+  {
+    "key": "organization.devices.splitDevice",
+    "namespace": "organization",
+    "group": "devices",
+    "action": "splitDevice",
+    "title": "Split Device",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/:device_id/split",
+    "pathParams": [
+      "device_id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/split-device",
+    "bodyExample": "{\n  \"shadow_device_id\": \"shadow-device-id\"\n}",
+    "notes": [
+      "Detaches a shadow device from its primary."
+    ]
+  },
+  {
     "key": "organization.devices.suspendIncidents",
     "namespace": "organization",
     "group": "devices",
@@ -393,6 +438,33 @@
       "Response: { \"status\": \"pending\" | \"success\" | \"failed\" }.",
       "Legacy route live-verified on 2026-04-19: GET /core/v1/organization/edge/devices/get_ping_status returns 400 \"Proxy not found\" for an unknown proxy_id/device_ip pair.",
       "Server PR xyte-io/server#8732 made /core/v1/organization/edges/devices the canonical route; /core/v1/organization/edge/devices is legacy server compatibility and is not used by the CLI catalog."
+    ]
+  },
+  {
+    "key": "organization.edge.updateHostname",
+    "namespace": "organization",
+    "group": "edge",
+    "action": "updateHostname",
+    "title": "Update Edge Device Hostname",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/edges/devices/:device_id/update_hostname",
+    "pathParams": [
+      "device_id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/edgeupdate-hostname",
+    "bodyExample": "{\n  \"device_ip\": \"192.168.1.100\",\n  \"skip_connectivity_check\": false\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/edgeupdate-hostname",
+      "Docs category: Edge Devices",
+      "Updates the IP/hostname an edge device is reachable on; syncs the address to the Edge monitoring configuration and preserves the device's custom parameter values.",
+      "Unless skip_connectivity_check is true, a successful connectivity check for the new address must be performed first (organization.edge.startPing / organization.edge.getPingStatus).",
+      "Response: { \"success\": true }.",
+      "Customer docs PR xyte-io/customer-docs-portal#20 documents this endpoint; server PR xyte-io/server#8943 adds it."
     ]
   },
   {

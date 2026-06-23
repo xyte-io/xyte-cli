@@ -45,6 +45,8 @@ export interface OrganizationNamespace {
   sendCommand: NamespaceCall;
   claimDevice: NamespaceCall;
   moveDevice: NamespaceCall;
+  mergeDevice: NamespaceCall;
+  splitDevice: NamespaceCall;
   suspendIncidents: NamespaceCall;
   resumeIncidents: NamespaceCall;
   updateDevice: NamespaceCall;
@@ -78,6 +80,7 @@ export interface OrganizationNamespace {
   getEdgeClaimStatus: NamespaceCall;
   startEdgePing: NamespaceCall;
   getEdgePingStatus: NamespaceCall;
+  updateEdgeHostname: NamespaceCall;
   createUser: NamespaceCall;
   deactivateUser: NamespaceCall;
   getUser: NamespaceCall;

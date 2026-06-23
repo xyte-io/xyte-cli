@@ -76,6 +76,32 @@ describe('public endpoint catalog', () => {
     expect(endpoint?.sourceFile).toBe('https://docs.xyte.io/reference/move-device');
   });
 
+  it('includes organization merge and split device endpoint metadata', () => {
+    const merge = endpoints.find((item) => item.key === 'organization.devices.mergeDevice');
+    expect(merge).toBeDefined();
+    expect(merge?.method).toBe('POST');
+    expect(merge?.pathTemplate).toBe('/core/v1/organization/devices/:device_id/merge');
+    expect(merge?.authScope).toBe('organization');
+    expect(merge?.bodyType).toBe('json');
+    expect(merge?.hasBody).toBe(true);
+    expect(merge?.pathParams).toEqual(['device_id']);
+    expect(merge?.queryParams).toEqual([]);
+    expect(merge?.bodyExample).toContain('with_device_ids');
+    expect(merge?.sourceFile).toBe('https://docs.xyte.io/reference/merge-device');
+
+    const split = endpoints.find((item) => item.key === 'organization.devices.splitDevice');
+    expect(split).toBeDefined();
+    expect(split?.method).toBe('POST');
+    expect(split?.pathTemplate).toBe('/core/v1/organization/devices/:device_id/split');
+    expect(split?.authScope).toBe('organization');
+    expect(split?.bodyType).toBe('json');
+    expect(split?.hasBody).toBe(true);
+    expect(split?.pathParams).toEqual(['device_id']);
+    expect(split?.queryParams).toEqual([]);
+    expect(split?.bodyExample).toContain('shadow_device_id');
+    expect(split?.sourceFile).toBe('https://docs.xyte.io/reference/split-device');
+  });
+
   it('includes newly supported organization device incident controls', () => {
     const suspend = endpoints.find((item) => item.key === 'organization.devices.suspendIncidents');
     expect(suspend).toBeDefined();
@@ -207,6 +233,23 @@ describe('public endpoint catalog', () => {
     expect(endpoint?.pathParams).toEqual([]);
     expect(endpoint?.queryParams).toEqual(['proxy_id', 'device_ip']);
     expect(endpoint?.sourceFile).toBe('https://docs.xyte.io/reference/edgeget-ping-status');
+  });
+
+  it('includes organization edge updateHostname endpoint metadata', () => {
+    const endpoint = endpoints.find((item) => item.key === 'organization.edge.updateHostname');
+    expect(endpoint).toBeDefined();
+    expect(endpoint?.method).toBe('POST');
+    expect(endpoint?.pathTemplate).toBe('/core/v1/organization/edges/devices/:device_id/update_hostname');
+    expect((endpoint as { namespace: string }).namespace).toBe('organization');
+    expect((endpoint as { group: string }).group).toBe('edge');
+    expect(endpoint?.authScope).toBe('organization');
+    expect(endpoint?.bodyType).toBe('json');
+    expect(endpoint?.hasBody).toBe(true);
+    expect(endpoint?.pathParams).toEqual(['device_id']);
+    expect(endpoint?.queryParams).toEqual([]);
+    expect(endpoint?.bodyExample).toContain('device_ip');
+    expect(endpoint?.bodyExample).toContain('skip_connectivity_check');
+    expect(endpoint?.sourceFile).toBe('https://docs.xyte.io/reference/edgeupdate-hostname');
   });
 
   it('includes organization edge collection endpoint metadata', () => {
