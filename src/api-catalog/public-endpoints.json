@@ -441,6 +441,33 @@
     ]
   },
   {
+    "key": "organization.edge.updateHostname",
+    "namespace": "organization",
+    "group": "edge",
+    "action": "updateHostname",
+    "title": "Update Edge Device Hostname",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/edges/devices/:device_id/update_hostname",
+    "pathParams": [
+      "device_id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/edgeupdate-hostname",
+    "bodyExample": "{\n  \"device_ip\": \"192.168.1.100\",\n  \"skip_connectivity_check\": false\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/edgeupdate-hostname",
+      "Docs category: Edge Devices",
+      "Updates the IP/hostname an edge device is reachable on; syncs the address to the Edge monitoring configuration and preserves the device's custom parameter values.",
+      "Unless skip_connectivity_check is true, a successful connectivity check for the new address must be performed first (organization.edge.startPing / organization.edge.getPingStatus).",
+      "Response: { \"success\": true }.",
+      "Customer docs PR xyte-io/customer-docs-portal#20 documents this endpoint; server PR xyte-io/server#8943 adds it."
+    ]
+  },
+  {
     "key": "organization.edges.getEdges",
     "namespace": "organization",
     "group": "edges",
