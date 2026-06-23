@@ -289,12 +289,16 @@ xyte-cli edge claim \
 xyte-cli util prepare --action organization.edge.startClaim --input ./edge-devices.xlsx --output-dir ./prepared
 xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --plan
 xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --apply --report ./reports/edge-claim.apply.ndjson --resume-artifact ./reports/edge-claim.resume.ndjson
+
+# Update an already-claimed Edge device IP/hostname, plan first
+xyte-cli edge update-hostname --tenant <tenant-id> --device-id <device-id> --device-ip <new-ip-or-hostname> --plan
 ```
 
 Key params:
 - Use `edge models` / `edge model` before non-heartbeat Edge claim to discover `device_model_id` and required `custom_parameters`
 - `custom_parameters` keys must match model `parameters[].name` values, for example `{"{$DEVICE_ID}":"display-101"}`
 - `edge claim`, `edge claim-batch`, and `edge ping` are mutating; run `--plan` first
+- `edge update-hostname` is mutating; use it instead of generic `updateDevice` when changing an Edge device monitoring address
 - blank or `skip_connectivity_check=false` batch rows run a pre-claim ping before `startClaim`
 - `skip_connectivity_check=true` rows skip that batch-owned ping
 - C2C claiming is not exposed through the public API; use the End Customer Portal

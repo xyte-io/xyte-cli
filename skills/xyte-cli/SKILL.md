@@ -91,6 +91,8 @@ Edge-claim safety:
 - Use model `parameters[].name` values as `custom_parameters` keys. Do not guess model fields or use display labels as keys; reject rows that lack required parameter values such as `{$DEVICE_ID}`.
 - Use `xyte-cli api call organization.edges.getEdges --tenant <tenant-id> --query-json '{"page":1,"per_page":100}'` when `proxy_id` is not known.
 - `edge claim`, `edge claim-batch`, and `edge ping` are mutating. Default to `--plan`; only run `--apply` after explicit user approval.
+- Use `xyte-cli edge update-hostname --tenant <tenant-id> --device-id <device-id> --device-ip <new-ip-or-hostname> --plan` for already-claimed Edge device IP/hostname changes. Do not use generic `organization.devices.updateDevice` to repoint Edge monitoring.
+- `edge update-hostname` preserves existing custom parameters; unless `--skip-connectivity-check` is passed, the backend requires a successful connectivity check for the new address.
 - `edge claim-status` and `edge ping-status` are read-only.
 - After `xyte-cli util prepare --action organization.edge.startClaim`, populate the generated `organization-edge-startclaim.csv` before running `edge claim-batch --plan`.
 - In `edge claim-batch`, blank or `skip_connectivity_check=false` rows run a pre-claim `edge ping` inside the batch before `startClaim`; `skip_connectivity_check=true` skips that ping.

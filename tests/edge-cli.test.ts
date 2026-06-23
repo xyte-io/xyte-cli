@@ -650,6 +650,108 @@ describe('edge command group', () => {
     expect(printed).toContain('\n    "result": "pending"');
   });
 
+  it('edge update-hostname --plan prints request shape without calling the API', async () => {
+    const { profileStore, secretStore } = await bootstrapTenant();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'edge',
+      'update-hostname',
+      '--tenant',
+      'acme',
+      '--device-id',
+      'device-1',
+      '--device-ip',
+      '192.168.1.25',
+      '--skip-connectivity-check',
+      '--plan'
+    ]);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    const printed = stdout.write.mock.calls.map(([chunk]) => chunk).join('');
+    const parsed = JSON.parse(printed) as {
+      schemaVersion: string;
+      planned: { path: { device_id: string }; body: { device_ip: string; skip_connectivity_check?: boolean } };
+    };
+    expect(parsed.schemaVersion).toBe('xyte.edge.update-hostname.plan.v1');
+    expect(parsed.planned.path.device_id).toBe('device-1');
+    expect(parsed.planned.body.device_ip).toBe('192.168.1.25');
+    expect(parsed.planned.body.skip_connectivity_check).toBe(true);
+  });
+
+  it('edge update-hostname --apply calls organization.edge.updateHostname with path and body', async () => {
+    const { profileStore, secretStore } = await bootstrapTenant();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'edge',
+      'update-hostname',
+      '--tenant',
+      'acme',
+      '--device-id',
+      'device-1',
+      '--device-ip',
+      'display-01.local',
+      '--apply'
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/core/v1/organization/edges/devices/device-1/update_hostname');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual({ device_ip: 'display-01.local' });
+    const printed = stdout.write.mock.calls.map(([chunk]) => chunk).join('');
+    expect(printed).toContain('xyte.edge.update-hostname.v1');
+    expect(printed).toContain('"success": true');
+  });
+
+  it('edge update-hostname refuses --plan and --apply at the same time', async () => {
+    const { profileStore, secretStore } = await bootstrapTenant();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await expect(
+      program.parseAsync([
+        'node',
+        'xyte-cli',
+        'edge',
+        'update-hostname',
+        '--tenant',
+        'acme',
+        '--device-id',
+        'device-1',
+        '--device-ip',
+        '192.168.1.25',
+        '--plan',
+        '--apply'
+      ])
+    ).rejects.toThrow(/--plan or --apply/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('edge ping-status calls organization.edge.getPingStatus with query params', async () => {
     const { profileStore, secretStore } = await bootstrapTenant();
     const stdout = { write: vi.fn() };

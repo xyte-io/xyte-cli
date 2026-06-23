@@ -64,6 +64,17 @@ interface EdgeModelOptions {
   strictJson?: boolean;
 }
 
+interface EdgeUpdateHostnameOptions {
+  tenant?: string;
+  output?: string;
+  deviceId: string;
+  deviceIp: string;
+  skipConnectivityCheck?: boolean;
+  plan?: boolean;
+  apply?: boolean;
+  strictJson?: boolean;
+}
+
 interface EdgeStatusOptions {
   tenant?: string;
   output?: string;
@@ -293,6 +304,64 @@ async function handleEdgeClaimStatus(ctx: CliContext, options: EdgeStatusOptions
   }
 }
 
+async function handleEdgeUpdateHostname(ctx: CliContext, options: EdgeUpdateHostnameOptions): Promise<void> {
+  const deviceId = options.deviceId.trim();
+  const deviceIp = options.deviceIp.trim();
+  if (!deviceId) {
+    throw new CliUserError({ summary: 'edge update-hostname requires a non-empty --device-id.' });
+  }
+  if (!deviceIp) {
+    throw new CliUserError({ summary: 'edge update-hostname requires a non-empty --device-ip.' });
+  }
+  const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
+  const tenantId = options.tenant ?? settings.values.defaults.tenant;
+  requireTenantId(tenantId, 'edge update-hostname');
+  const apply = validateMutationMode(options.plan, options.apply, 'edge update-hostname');
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
+  const strictJson = resolveStrictJson({ strictJson: options.strictJson, settings });
+  const body: { device_ip: string; skip_connectivity_check?: boolean } = { device_ip: deviceIp };
+  if (options.skipConnectivityCheck) {
+    body.skip_connectivity_check = true;
+  }
+  const planned = { path: { device_id: deviceId }, body };
+  if (!apply) {
+    const payload = {
+      schemaVersion: 'xyte.edge.update-hostname.plan.v1',
+      tenantId,
+      mode: 'plan',
+      planned
+    };
+    if (output === 'text') {
+      writeEdgeText(ctx, payload);
+      return;
+    }
+    printJson(ctx.stdout, payload, { strictJson });
+    return;
+  }
+  const client = await ctx.withClient({ tenantId });
+  const response = await client.callWithMeta('organization.edge.updateHostname', {
+    tenantId,
+    path: planned.path,
+    body
+  });
+  const payload = {
+    schemaVersion: 'xyte.edge.update-hostname.v1',
+    tenantId,
+    mode: 'apply',
+    request: planned,
+    response: response.data
+  };
+  if (output === 'text') {
+    writeEdgeText(ctx, payload);
+  } else {
+    printJson(ctx.stdout, payload, { strictJson });
+  }
+}
+
 async function handleEdgePing(ctx: CliContext, options: EdgePingOptions): Promise<void> {
   const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
   const tenantId = options.tenant ?? settings.values.defaults.tenant;
@@ -375,6 +444,7 @@ export function registerEdgeCommands(parent: Command, ctx: CliContext): void {
       '  xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --apply --report ./artifacts/edge-claim.report.ndjson --resume-artifact ./artifacts/edge-claim.resume.ndjson',
       '  xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --plan --skip-connectivity-check',
       '  xyte-cli edge claim-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 10.0.0.10',
+      '  xyte-cli edge update-hostname --tenant <tenant-id> --device-id <device-id> --device-ip 10.0.0.11 --plan',
       '  xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 10.0.0.10 --plan',
       '  xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 10.0.0.10 --apply',
       '  xyte-cli edge ping-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 10.0.0.10'
@@ -453,6 +523,20 @@ export function registerEdgeCommands(parent: Command, ctx: CliContext): void {
     .option('--strict-json', 'Fail on non-serializable output')
     .action(async function (options: EdgeStatusOptions) {
       await handleEdgeClaimStatus(ctx, { ...options, output: getExplicitGlobalOutput(this) });
+    });
+
+  edge
+    .command('update-hostname')
+    .description('Update the IP or hostname an already-claimed edge device is monitored at')
+    .requiredOption('--device-id <id>', 'Claimed edge device id')
+    .requiredOption('--device-ip <ip>', 'New device IP or hostname behind the edge')
+    .option('--tenant <tenantId>', 'Tenant id override')
+    .option('--skip-connectivity-check', 'Skip required connectivity check for the new address')
+    .option('--plan', 'Print the planned update without calling the API')
+    .option('--apply', 'Execute the hostname update')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(async function (options: EdgeUpdateHostnameOptions) {
+      await handleEdgeUpdateHostname(ctx, { ...options, output: getExplicitGlobalOutput(this) });
     });
 
   edge

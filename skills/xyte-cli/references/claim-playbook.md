@@ -89,6 +89,17 @@ Peek current state without initiating:
 xyte-cli edge claim-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip>
 ```
 
+### 2a.1. Update an already-claimed Edge device address
+
+Use `xyte-cli edge update-hostname`, not generic `organization.devices.updateDevice`, when changing the IP/hostname monitored by an Edge proxy.
+
+```bash
+xyte-cli edge update-hostname --tenant <tenant-id> --device-id <device-id> --device-ip <new-ip-or-hostname> --plan
+xyte-cli edge update-hostname --tenant <tenant-id> --device-id <device-id> --device-ip <new-ip-or-hostname> --apply
+```
+
+Unless `--skip-connectivity-check` is passed, the backend requires a successful connectivity check for the new address. The endpoint preserves existing custom parameter values.
+
 ### 2b. Bulk edge claim (north star)
 
 ```bash

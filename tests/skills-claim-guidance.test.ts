@@ -52,6 +52,12 @@ describe('claim-guidance surfaces', () => {
         expect(content).toContain('custom_parameters');
       });
 
+      it('documents the edge-specific hostname update path', () => {
+        expect(content).toContain('edge update-hostname');
+        expect(content).toContain('organization.devices.updateDevice');
+        expect(content).toMatch(/preserves existing custom parameter/i);
+      });
+
       it('documents true, false, blank, conflict, and resume retry semantics', () => {
         expect(content).toContain('skip_connectivity_check=true');
         expect(content).toContain('skip_connectivity_check=false');

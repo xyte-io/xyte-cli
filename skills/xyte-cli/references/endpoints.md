@@ -180,6 +180,7 @@ Organization:
 - `organization.commands.sendCommand`
 - `organization.edge.startClaim` (edge claim — async, poll with `getClaimStatus`)
 - `organization.edge.getClaimStatus`
+- `organization.edge.updateHostname` (update an already-claimed Edge device IP/hostname)
 - `organization.edge.startPing` (edge connectivity probe — async, poll with `getPingStatus`)
 - `organization.edge.getPingStatus`
 - `organization.edges.getModels` (edge model discovery)
@@ -200,6 +201,7 @@ Verified raw route mapping:
 - `organization.edges.getModel` -> `GET /core/v1/organization/edges/models/:id`
 - `organization.edge.startClaim` -> `POST /core/v1/organization/edges/devices/start_claim`
 - `organization.edge.getClaimStatus` -> `GET /core/v1/organization/edges/devices/get_claim_status`
+- `organization.edge.updateHostname` -> `POST /core/v1/organization/edges/devices/:device_id/update_hostname`
 - `organization.edge.startPing` -> `POST /core/v1/organization/edges/devices/start_ping`
 - `organization.edge.getPingStatus` -> `GET /core/v1/organization/edges/devices/get_ping_status`
 
@@ -246,6 +248,7 @@ xyte-cli api call organization.edge.getPingStatus \
 Ergonomic wrappers (recommended):
 - Single claim: `xyte-cli edge claim --plan`, then `--apply` after explicit approval.
 - Bulk claim: `xyte-cli edge claim-batch --input <primary-csv> --plan [--skip-connectivity-check]`, then `--apply --resume-artifact <path>` after explicit approval.
+- Update already-claimed Edge address: `xyte-cli edge update-hostname --device-id <device-id> --device-ip <new-ip-or-hostname> --plan`, then `--apply` after explicit approval.
 - In bulk claim, blank or `skip_connectivity_check=false` rows run an internal pre-claim ping; standalone `edge ping` is diagnostic.
 - Batch resume skips completed rows from `--resume-artifact`; it does not store in-flight claim IDs.
 - Status peek: `xyte-cli edge claim-status`, `xyte-cli edge ping-status`

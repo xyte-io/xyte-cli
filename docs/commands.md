@@ -290,6 +290,13 @@ xyte-cli edge claim-batch \
 
 xyte-cli edge claim-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> [--output json|text]
 
+xyte-cli edge update-hostname \
+  --tenant <tenant-id> \
+  --device-id <device-id> \
+  --device-ip <new-device-ip-or-hostname> \
+  [--skip-connectivity-check] \
+  [--plan|--apply] [--output json|text]
+
 xyte-cli edge ping \
   --tenant <tenant-id> \
   --proxy-id <proxy-id> \
@@ -304,6 +311,8 @@ Notes:
 - `edge models` and `edge model` are read-only model discovery commands. Use them before edge claim to choose `device_model_id` and find required model `parameters`.
 - Put edge model `parameters[].name` keys into `custom_parameters`; do not use display labels as keys.
 - `edge claim`, `edge claim-batch`, and `edge ping` are mutating. `--plan` is the safe default; `--apply` only after explicit user approval.
+- `edge update-hostname` is mutating and also defaults to plan mode. It updates the monitored IP/hostname for an already-claimed Edge device and preserves custom parameters.
+- Unless `--skip-connectivity-check` is passed, the backend requires a successful connectivity check for the new address before `edge update-hostname --apply`.
 - `edge claim-status` and `edge ping-status` are read-only.
 - Poll defaults: 5 s interval, 10 min timeout.
 - `edge claim-batch` runs `edge ping` internally before `startClaim` for blank or `skip_connectivity_check=false` rows. Rows with `skip_connectivity_check=true` skip that ping and send `skip_connectivity_check: true`.
@@ -311,8 +320,8 @@ Notes:
 - `edge claim-batch` on a half-finished run requires `--resume-artifact <ndjson-artifact>`; it skips rows previously recorded as `succeeded` or `already-claimed` and re-runs all other rows from the prior artifact. The resume artifact records completed row results, not in-flight claim IDs.
 - `edge claim-batch` exits with code 1 if any row ends in `failed`, `rejected`, `timeout`, `proxy-offline`, `ping-failed`, or `aborted`; per-row dispositions are written to `--report`.
 - `edge ping` remains a standalone diagnostic command; batch does not rely on ping evidence from a separate command.
-- Raw endpoints remain available for advanced cases: `organization.edges.getModels`, `organization.edges.getModel`, `organization.edge.startClaim`, `organization.edge.getClaimStatus`, `organization.edge.startPing`, `organization.edge.getPingStatus`.
-- Raw route mapping: `getModels` -> `GET /core/v1/organization/edges/models`, `getModel` -> `GET /core/v1/organization/edges/models/:id`, `startClaim` -> `POST /core/v1/organization/edges/devices/start_claim`, `getClaimStatus` -> `GET /core/v1/organization/edges/devices/get_claim_status`, `startPing` -> `POST /core/v1/organization/edges/devices/start_ping`, `getPingStatus` -> `GET /core/v1/organization/edges/devices/get_ping_status`.
+- Raw endpoints remain available for advanced cases: `organization.edges.getModels`, `organization.edges.getModel`, `organization.edge.startClaim`, `organization.edge.getClaimStatus`, `organization.edge.updateHostname`, `organization.edge.startPing`, `organization.edge.getPingStatus`.
+- Raw route mapping: `getModels` -> `GET /core/v1/organization/edges/models`, `getModel` -> `GET /core/v1/organization/edges/models/:id`, `startClaim` -> `POST /core/v1/organization/edges/devices/start_claim`, `getClaimStatus` -> `GET /core/v1/organization/edges/devices/get_claim_status`, `updateHostname` -> `POST /core/v1/organization/edges/devices/:device_id/update_hostname`, `startPing` -> `POST /core/v1/organization/edges/devices/start_ping`, `getPingStatus` -> `GET /core/v1/organization/edges/devices/get_ping_status`.
 
 ## Insights And Reports
 
