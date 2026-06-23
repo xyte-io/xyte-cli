@@ -7,6 +7,7 @@ const C2C_UNSUPPORTED_SENTENCE = 'Cloud-to-Cloud (C2C) claiming is not available
 const END_CUSTOMER_PORTAL = 'End Customer Portal';
 const NATIVE_KEY = 'organization.devices.claimDevice';
 const EDGE_KEY = 'organization.edge.startClaim';
+const EDGE_MODELS_KEY = 'organization.edges.getModels';
 const DISAMBIGUATION_MARKER = 'Which claim path applies?';
 
 function read(relPath: string): string {
@@ -42,6 +43,13 @@ describe('claim-guidance surfaces', () => {
       it('documents batch-owned edge connectivity checks', () => {
         expect(content).toContain('pre-claim');
         expect(content).toContain('ping-failed');
+      });
+
+      it('documents edge model discovery before non-heartbeat edge claims', () => {
+        expect(content).toContain('xyte-cli edge models');
+        expect(content).toContain('xyte-cli edge model');
+        expect(content).toContain('parameters[].name');
+        expect(content).toContain('custom_parameters');
       });
 
       it('documents true, false, blank, conflict, and resume retry semantics', () => {
@@ -100,5 +108,12 @@ describe('claim-guidance surfaces', () => {
 
     expect(skill).toContain('edge_claim_input_path');
     expect(skill).not.toContain('edge_claim_prepare_input');
+  });
+
+  it('documents the edge model discovery endpoint key in endpoint references', () => {
+    const endpoints = read('skills/xyte-cli/references/endpoints.md');
+
+    expect(endpoints).toContain(EDGE_MODELS_KEY);
+    expect(endpoints).toContain('organization.edges.getModel');
   });
 });

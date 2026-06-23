@@ -48,6 +48,22 @@ interface EdgeClaimBatchOptions {
   strictJson?: boolean;
 }
 
+interface EdgeModelsOptions {
+  tenant?: string;
+  output?: string;
+  search?: string;
+  q?: string;
+  page?: string;
+  perPage?: string;
+  strictJson?: boolean;
+}
+
+interface EdgeModelOptions {
+  tenant?: string;
+  output?: string;
+  strictJson?: boolean;
+}
+
 interface EdgeStatusOptions {
   tenant?: string;
   output?: string;
@@ -91,6 +107,65 @@ function resolveEdgePollOptions(options: {
 
 function writeEdgeText(ctx: CliContext, value: unknown): void {
   ctx.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
+}
+
+async function handleEdgeModels(ctx: CliContext, options: EdgeModelsOptions): Promise<void> {
+  if (options.search && options.q) {
+    throw new CliUserError({ summary: 'edge models accepts either --search or --q, not both.' });
+  }
+  const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
+  const tenantId = options.tenant ?? settings.values.defaults.tenant;
+  requireTenantId(tenantId, 'edge models');
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
+  const query: Record<string, string | number> = {};
+  const page = parsePositiveInt(options.page, '--page');
+  const perPage = parsePositiveInt(options.perPage, '--per-page');
+  if (page !== undefined) query.page = page;
+  if (perPage !== undefined) query.per_page = perPage;
+  if (options.search) query.search = options.search;
+  if (options.q) query.q = options.q;
+
+  const client = await ctx.withClient({ tenantId });
+  const response = await client.callWithMeta('organization.edges.getModels', {
+    tenantId,
+    query
+  });
+  const payload = { schemaVersion: 'xyte.edge.models.v1', tenantId, query, response: response.data };
+  if (output === 'text') {
+    writeEdgeText(ctx, payload);
+  } else {
+    printJson(ctx.stdout, payload, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+  }
+}
+
+async function handleEdgeModel(ctx: CliContext, id: string, options: EdgeModelOptions): Promise<void> {
+  const modelId = id.trim();
+  if (!modelId) {
+    throw new CliUserError({ summary: 'edge model requires a non-empty model id.' });
+  }
+  const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
+  const tenantId = options.tenant ?? settings.values.defaults.tenant;
+  requireTenantId(tenantId, 'edge model');
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
+  const client = await ctx.withClient({ tenantId });
+  const response = await client.callWithMeta('organization.edges.getModel', {
+    tenantId,
+    path: { id: modelId }
+  });
+  const payload = { schemaVersion: 'xyte.edge.model.v1', tenantId, modelId, response: response.data };
+  if (output === 'text') {
+    writeEdgeText(ctx, payload);
+  } else {
+    printJson(ctx.stdout, payload, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+  }
 }
 
 async function handleEdgeClaim(ctx: CliContext, options: EdgeClaimOptions): Promise<void> {
@@ -293,6 +368,8 @@ export function registerEdgeCommands(parent: Command, ctx: CliContext): void {
     [
       '',
       'Examples:',
+      '  xyte-cli edge models --tenant <tenant-id> --search samsung',
+      '  xyte-cli edge model --tenant <tenant-id> <model-id>',
       '  xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 10.0.0.10 --device-model-id <model-id> --space-id 123 --plan',
       '  xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --plan --report ./artifacts/edge-claim.plan.ndjson',
       '  xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --apply --report ./artifacts/edge-claim.report.ndjson --resume-artifact ./artifacts/edge-claim.resume.ndjson',
@@ -303,6 +380,29 @@ export function registerEdgeCommands(parent: Command, ctx: CliContext): void {
       '  xyte-cli edge ping-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 10.0.0.10'
     ].join('\n')
   );
+
+  edge
+    .command('models')
+    .description('List edge device models and their claim parameter summary')
+    .option('--tenant <tenantId>', 'Tenant id override')
+    .option('--search <text>', 'Search models by vendor, model, or alias')
+    .option('--q <text>', 'Search models by vendor, model, or alias (hub-compatible query name)')
+    .option('--page <number>', 'Page number')
+    .option('--per-page <number>', 'Page size')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(async function (options: EdgeModelsOptions) {
+      await handleEdgeModels(ctx, { ...options, output: getExplicitGlobalOutput(this) });
+    });
+
+  edge
+    .command('model')
+    .description('Inspect one edge device model, including required claim parameters and command metadata')
+    .argument('<id>', 'Edge device model id')
+    .option('--tenant <tenantId>', 'Tenant id override')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(async function (id: string, options: EdgeModelOptions) {
+      await handleEdgeModel(ctx, id, { ...options, output: getExplicitGlobalOutput(this) });
+    });
 
   edge
     .command('claim')

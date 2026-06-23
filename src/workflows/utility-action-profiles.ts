@@ -285,6 +285,8 @@ export function buildFriendlyEdgeClaimProfile(endpoint: PublicEndpointSpec): Uti
       'device_ip must parse as an IPv4/IPv6 address or a resolvable hostname; reject rows that do not.',
       'skip_connectivity_check, when present, must be the literal "true" or "false" (case-insensitive); blank means the batch runner performs a pre-claim ping before startClaim.',
       'custom_parameters, when present, must be a valid JSON object string or empty.',
+      'Before non-heartbeat Edge claims, inspect the model with xyte-cli edge models and xyte-cli edge model; use returned parameters[].name values as custom_parameters keys.',
+      'Reject rows that are missing model-required custom parameter values such as {$DEVICE_ID}.',
       'Do not guess proxy_id or device_model_id from context; reject ambiguous rows.',
       'Write unresolved rows to rejected output with reject_reason.'
     ],

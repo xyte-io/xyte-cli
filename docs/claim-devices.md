@@ -60,7 +60,33 @@ Common failure modes:
 
 ## 2. Edge claim (north star bulk workflow)
 
-Prerequisites: `proxy_id` (from the End Customer Portal), `device_ip`, `device_model_id`, `space_id`. Heartbeat model id: `5dc4ba6c-c323-4118-a4e4-504f074426f2`.
+Prerequisites: `proxy_id`, `device_ip`, `device_model_id`, `space_id`, and any model-required `custom_parameters`. Heartbeat model id: `5dc4ba6c-c323-4118-a4e4-504f074426f2`.
+
+Before claiming non-heartbeat edge devices, discover the same model-specific data the UI uses:
+
+```bash
+# List claimable edge models and pick the intended model id.
+xyte-cli edge models --tenant <tenant-id> --search samsung
+
+# Inspect the selected model before preparing claim rows.
+xyte-cli edge model --tenant <tenant-id> <device-model-id>
+
+# List available Edge proxy records when you need proxy_id.
+xyte-cli api call organization.edges.getEdges --tenant <tenant-id> --query-json '{"page":1,"per_page":100}'
+```
+
+Use the inspected model `parameters` to build `custom_parameters`. The JSON keys must be `parameters[].name` values, not labels. If the model says a parameter such as `{$DEVICE_ID}` is required, every claim row for that model must provide it:
+
+```bash
+xyte-cli edge claim \
+  --tenant <tenant-id> \
+  --proxy-id <proxy-id> \
+  --device-ip 192.168.1.100 \
+  --device-model-id <device-model-id> \
+  --space-id 10000 \
+  --custom-parameters '{"{$DEVICE_ID}":"display-101"}' \
+  --plan
+```
 
 Edge claim is **asynchronous** — `startClaim` returns 204, then the CLI polls `getClaimStatus` until terminal (`success` or `failed`). Default poll: 5 s interval, 10 min timeout.
 

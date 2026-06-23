@@ -274,6 +274,8 @@ describe('public endpoint catalog', () => {
     expect(endpoint?.hasBody).toBe(false);
     expect(endpoint?.pathParams).toEqual([]);
     expect(endpoint?.queryParams).toEqual(['page', 'per_page', 'search', 'q']);
+    expect(endpoint?.notes?.[0]).toContain('Docs page: https://docs.xyte.io/reference/get-edge-models');
+    expect(endpoint?.notes?.[0]).toContain('pending');
   });
 
   it('includes organization edge model show endpoint metadata', () => {
@@ -286,6 +288,8 @@ describe('public endpoint catalog', () => {
     expect(endpoint?.hasBody).toBe(false);
     expect(endpoint?.pathParams).toEqual(['id']);
     expect(endpoint?.queryParams).toEqual([]);
+    expect(endpoint?.notes?.[0]).toContain('Docs page: https://docs.xyte.io/reference/get-edge-model');
+    expect(endpoint?.notes?.[0]).toContain('pending');
   });
 
   it('includes organization users and groups endpoint metadata', () => {

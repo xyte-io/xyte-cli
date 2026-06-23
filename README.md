@@ -275,6 +275,8 @@ xyte-cli api call organization.devices.claimDevice \
   --body-json '{"name":"<name>","space_id":<space-id>,"sn":"<sn>","mac":"<mac>","cloud_id":"<cloud-id>"}'
 
 # Single Edge claim, plan first
+xyte-cli edge models --tenant <tenant-id> --search samsung
+xyte-cli edge model --tenant <tenant-id> <device-model-id>
 xyte-cli edge claim \
   --tenant <tenant-id> \
   --proxy-id <proxy-id> \
@@ -290,6 +292,8 @@ xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-e
 ```
 
 Key params:
+- Use `edge models` / `edge model` before non-heartbeat Edge claim to discover `device_model_id` and required `custom_parameters`
+- `custom_parameters` keys must match model `parameters[].name` values, for example `{"{$DEVICE_ID}":"display-101"}`
 - `edge claim`, `edge claim-batch`, and `edge ping` are mutating; run `--plan` first
 - blank or `skip_connectivity_check=false` batch rows run a pre-claim ping before `startClaim`
 - `skip_connectivity_check=true` rows skip that batch-owned ping

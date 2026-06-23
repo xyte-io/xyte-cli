@@ -263,6 +263,13 @@ Edge devices sit behind an Xyte Edge proxy. Claim and ping are asynchronous: a s
 See [`docs/claim-devices.md`](claim-devices.md) for the full native-vs-edge-vs-C2C decision guide before you pick a command.
 
 ```bash
+xyte-cli edge models \
+  --tenant <tenant-id> \
+  [--search <text>|--q <text>] [--page <n>] [--per-page <n>] \
+  [--output json|text]
+
+xyte-cli edge model --tenant <tenant-id> <device-model-id> [--output json|text]
+
 xyte-cli edge claim \
   --tenant <tenant-id> \
   --proxy-id <proxy-id> \
@@ -294,6 +301,8 @@ xyte-cli edge ping-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip
 ```
 
 Notes:
+- `edge models` and `edge model` are read-only model discovery commands. Use them before edge claim to choose `device_model_id` and find required model `parameters`.
+- Put edge model `parameters[].name` keys into `custom_parameters`; do not use display labels as keys.
 - `edge claim`, `edge claim-batch`, and `edge ping` are mutating. `--plan` is the safe default; `--apply` only after explicit user approval.
 - `edge claim-status` and `edge ping-status` are read-only.
 - Poll defaults: 5 s interval, 10 min timeout.
@@ -302,8 +311,8 @@ Notes:
 - `edge claim-batch` on a half-finished run requires `--resume-artifact <ndjson-artifact>`; it skips rows previously recorded as `succeeded` or `already-claimed` and re-runs all other rows from the prior artifact. The resume artifact records completed row results, not in-flight claim IDs.
 - `edge claim-batch` exits with code 1 if any row ends in `failed`, `rejected`, `timeout`, `proxy-offline`, `ping-failed`, or `aborted`; per-row dispositions are written to `--report`.
 - `edge ping` remains a standalone diagnostic command; batch does not rely on ping evidence from a separate command.
-- Raw endpoints remain available for advanced cases: `organization.edge.startClaim`, `organization.edge.getClaimStatus`, `organization.edge.startPing`, `organization.edge.getPingStatus`.
-- Raw route mapping: `startClaim` -> `POST /core/v1/organization/edges/devices/start_claim`, `getClaimStatus` -> `GET /core/v1/organization/edges/devices/get_claim_status`, `startPing` -> `POST /core/v1/organization/edges/devices/start_ping`, `getPingStatus` -> `GET /core/v1/organization/edges/devices/get_ping_status`.
+- Raw endpoints remain available for advanced cases: `organization.edges.getModels`, `organization.edges.getModel`, `organization.edge.startClaim`, `organization.edge.getClaimStatus`, `organization.edge.startPing`, `organization.edge.getPingStatus`.
+- Raw route mapping: `getModels` -> `GET /core/v1/organization/edges/models`, `getModel` -> `GET /core/v1/organization/edges/models/:id`, `startClaim` -> `POST /core/v1/organization/edges/devices/start_claim`, `getClaimStatus` -> `GET /core/v1/organization/edges/devices/get_claim_status`, `startPing` -> `POST /core/v1/organization/edges/devices/start_ping`, `getPingStatus` -> `GET /core/v1/organization/edges/devices/get_ping_status`.
 
 ## Insights And Reports
 

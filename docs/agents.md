@@ -94,7 +94,8 @@ When a prompt includes "claim device(s)" without specifying the path, the agent 
 
 1. Ask the user whether they mean native / direct (`organization.devices.claimDevice`) or edge (`organization.edge.startClaim`).
 2. Note that Cloud-to-Cloud (C2C) claiming is not available via the public API today — point the user to the End Customer Portal.
-3. Only then run the matching command or flow (`xyte-cli edge claim`, `xyte-cli edge claim-batch`, `xyte-cli flow run flow.edge-claim*`).
+3. For Edge claims, run `xyte-cli edge models` / `xyte-cli edge model <id>` first and use the returned `parameters[].name` keys for `custom_parameters`; never guess required model fields.
+4. Only then run the matching command or flow (`xyte-cli edge claim`, `xyte-cli edge claim-batch`, `xyte-cli flow run flow.edge-claim*`).
 
 Full playbook for the agent: skill reference `references/claim-playbook.md`. User-facing tutorial: [`claim-devices.md`](claim-devices.md).
 

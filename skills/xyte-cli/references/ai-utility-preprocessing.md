@@ -34,6 +34,7 @@ Friendly profiles:
 - `name,space_id,sn,mac,cloud_id`
 3. `organization.edge.startClaim`:
 - `proxy_id,device_ip,device_model_id,space_id,display_name,custom_parameters,custom_partner_name,custom_model_name,skip_connectivity_check`
+- For non-heartbeat Edge models, run `xyte-cli edge models` and `xyte-cli edge model <id>` before preparing rows. Fill `custom_parameters` with model `parameters[].name` keys and reject rows missing required values such as `{$DEVICE_ID}`.
 - downstream execution command: `xyte-cli edge claim-batch`
 4. `device.move`:
 - `device_id,target_space_id,device_name,current_space_id,target_space_name`

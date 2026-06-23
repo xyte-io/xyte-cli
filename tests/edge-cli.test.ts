@@ -27,6 +27,103 @@ describe('edge command group', () => {
     vi.restoreAllMocks();
   });
 
+  it('edge models calls organization.edges.getModels with search and pagination query params', async () => {
+    const { profileStore, secretStore } = await bootstrapTenant();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ items: [{ id: 'model-1', model: 'Samsung QMC Series' }], next_page: null }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'edge',
+      'models',
+      '--tenant',
+      'acme',
+      '--search',
+      'samsung',
+      '--page',
+      '2',
+      '--per-page',
+      '50'
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = fetchMock.mock.calls[0]?.[0] as string;
+    expect(url).toContain('/core/v1/organization/edges/models');
+    expect(url).toContain('search=samsung');
+    expect(url).toContain('page=2');
+    expect(url).toContain('per_page=50');
+    const printed = stdout.write.mock.calls.map(([chunk]) => chunk).join('');
+    expect(printed).toContain('xyte.edge.models.v1');
+    expect(printed).toContain('Samsung QMC Series');
+  });
+
+  it('edge models rejects ambiguous search flags before calling the API', async () => {
+    const { profileStore, secretStore } = await bootstrapTenant();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await expect(
+      program.parseAsync([
+        'node',
+        'xyte-cli',
+        'edge',
+        'models',
+        '--tenant',
+        'acme',
+        '--search',
+        'samsung',
+        '--q',
+        'qmc'
+      ])
+    ).rejects.toThrow(/either --search or --q/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('edge model calls organization.edges.getModel with the path id', async () => {
+    const { profileStore, secretStore } = await bootstrapTenant();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'model-1',
+          model: 'Samsung QMC Series',
+          parameters: [{ name: '{$DEVICE_ID}', type: 'text', required: true }]
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        }
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await program.parseAsync(['node', 'xyte-cli', 'edge', 'model', '--tenant', 'acme', 'model-1']);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = fetchMock.mock.calls[0]?.[0] as string;
+    expect(url).toContain('/core/v1/organization/edges/models/model-1');
+    const printed = stdout.write.mock.calls.map(([chunk]) => chunk).join('');
+    expect(printed).toContain('xyte.edge.model.v1');
+    expect(printed).toContain('{$DEVICE_ID}');
+  });
+
   it('edge claim --plan prints plan payload without calling the API', async () => {
     const { profileStore, secretStore } = await bootstrapTenant();
     const stdout = { write: vi.fn() };

@@ -182,6 +182,8 @@ Organization:
 - `organization.edge.getClaimStatus`
 - `organization.edge.startPing` (edge connectivity probe — async, poll with `getPingStatus`)
 - `organization.edge.getPingStatus`
+- `organization.edges.getModels` (edge model discovery)
+- `organization.edges.getModel` (edge model detail, including claim `parameters`)
 
 Partner:
 - `partner.devices.getDevices`
@@ -194,12 +196,23 @@ Partner:
 Edge devices sit behind an Xyte Edge proxy. Claim/ping are **asynchronous**: the start endpoint returns 204, then you poll the matching status endpoint until terminal (`success` or `failed`). Prefer the `xyte-cli edge` command group or `flow.edge-claim*` flows over raw `api call` — they handle polling, backoff, and resume.
 
 Verified raw route mapping:
+- `organization.edges.getModels` -> `GET /core/v1/organization/edges/models`
+- `organization.edges.getModel` -> `GET /core/v1/organization/edges/models/:id`
 - `organization.edge.startClaim` -> `POST /core/v1/organization/edges/devices/start_claim`
 - `organization.edge.getClaimStatus` -> `GET /core/v1/organization/edges/devices/get_claim_status`
 - `organization.edge.startPing` -> `POST /core/v1/organization/edges/devices/start_ping`
 - `organization.edge.getPingStatus` -> `GET /core/v1/organization/edges/devices/get_ping_status`
 
 ### `organization.edge.startClaim` + `organization.edge.getClaimStatus`
+
+Before non-heartbeat edge claims, inspect the model:
+
+```bash
+xyte-cli edge models --tenant <tenant-id> --search samsung
+xyte-cli edge model --tenant <tenant-id> <device-model-id>
+```
+
+Use returned `parameters[].name` values as `custom_parameters` keys. Required parameters such as `{$DEVICE_ID}` must be filled before calling `startClaim`.
 
 ```bash
 xyte-cli api call organization.edge.startClaim \

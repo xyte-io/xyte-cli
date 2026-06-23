@@ -6,6 +6,10 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+### Added
+- Added edge model discovery endpoints and read-only `xyte-cli edge models` / `xyte-cli edge model` commands so edge claim workflows can inspect required model parameters before claiming.
+- Updated edge claim docs, utility guidance, and shipped skill instructions to require model-parameter discovery before non-heartbeat Edge claims.
+
 ## [0.10.8] - 2026-06-10
 
 ### Added

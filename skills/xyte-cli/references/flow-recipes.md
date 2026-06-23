@@ -106,7 +106,11 @@ When run through `xyte-cli flow run flow.device-migration`, the flow runner also
 
 Claim one edge device end-to-end. `startClaim` is mutating; default to `--plan` and require explicit approval before `--apply`. See `references/claim-playbook.md` for disambiguation vs native/direct claim.
 
+For non-heartbeat models, run `xyte-cli edge models --tenant <tenant-id> --search <model>` and `xyte-cli edge model --tenant <tenant-id> <model-id>` first. Use returned `parameters[].name` values as `custom_parameters` keys.
+
 ```bash
+xyte-cli edge models --tenant <tenant-id> --search <model-or-vendor>
+xyte-cli edge model --tenant <tenant-id> <model-id>
 xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --plan
 xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --apply
 ```

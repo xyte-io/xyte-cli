@@ -87,6 +87,9 @@ Rules:
 | C2C | (none — not public) | Point the user at the End Customer Portal | Same |
 
 Edge-claim safety:
+- Before non-heartbeat Edge claims, run `xyte-cli edge models --tenant <tenant-id> --search <model>` and `xyte-cli edge model --tenant <tenant-id> <model-id>` to discover the correct `device_model_id`, required `parameters`, and command metadata.
+- Use model `parameters[].name` values as `custom_parameters` keys. Do not guess model fields or use display labels as keys; reject rows that lack required parameter values such as `{$DEVICE_ID}`.
+- Use `xyte-cli api call organization.edges.getEdges --tenant <tenant-id> --query-json '{"page":1,"per_page":100}'` when `proxy_id` is not known.
 - `edge claim`, `edge claim-batch`, and `edge ping` are mutating. Default to `--plan`; only run `--apply` after explicit user approval.
 - `edge claim-status` and `edge ping-status` are read-only.
 - After `xyte-cli util prepare --action organization.edge.startClaim`, populate the generated `organization-edge-startclaim.csv` before running `edge claim-batch --plan`.

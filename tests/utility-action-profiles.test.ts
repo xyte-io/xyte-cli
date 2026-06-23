@@ -108,6 +108,9 @@ describe('utility-action-profiles', () => {
       expect(joined).toContain('true');
       expect(joined).toContain('false');
       expect(joined).toContain('blank');
+      expect(joined).toContain('xyte-cli edge models');
+      expect(joined).toContain('parameters[].name');
+      expect(joined).toContain('custom_parameters');
       expect(joined).toMatch(/reject/i);
     });
   });

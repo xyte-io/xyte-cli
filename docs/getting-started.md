@@ -236,6 +236,8 @@ One-liners:
 xyte-cli api call organization.devices.claimDevice --tenant <tenant-id> --body-json '{"name":"<name>","space_id":<space-id>,"sn":"<sn>","mac":"<mac>","cloud_id":"<cloud-id>"}'
 
 # Edge (behind an Xyte Edge proxy):
+xyte-cli edge models --tenant <tenant-id> --search <model-search>
+xyte-cli edge model --tenant <tenant-id> <model-id>
 xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip> --device-model-id <model-id> --space-id <space-id> --plan
 
 # Bulk edge (blank skip_connectivity_check rows ping before claim):

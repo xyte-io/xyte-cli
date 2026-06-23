@@ -50,6 +50,13 @@ Required body fields: `proxy_id`, `device_ip`, `device_model_id`, `space_id` (in
 
 Heartbeat model id: `5dc4ba6c-c323-4118-a4e4-504f074426f2`. `proxy_id` lives in the End Customer Portal.
 
+Preflight for non-heartbeat Edge models:
+1. Run `xyte-cli edge models --tenant <tenant-id> --search <model-or-vendor>` to find candidate model ids.
+2. Run `xyte-cli edge model --tenant <tenant-id> <device-model-id>` to inspect required `parameters` and command metadata.
+3. Put `parameters[].name` values into `custom_parameters`; do not use labels as keys.
+4. If `proxy_id` is unknown, read proxy records with `xyte-cli api call organization.edges.getEdges --tenant <tenant-id> --query-json '{"page":1,"per_page":100}'`.
+5. Reject or ask for missing required parameter values such as `{$DEVICE_ID}` before `edge claim --plan` or `edge claim-batch --plan`.
+
 Lifecycle: `startClaim` returns 204, then poll `getClaimStatus` until `result` is `success` or `failed`.
 
 Connectivity check rule:

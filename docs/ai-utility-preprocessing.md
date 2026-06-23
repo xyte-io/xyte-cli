@@ -37,6 +37,7 @@ Friendly profiles:
 - outputs: `./prepared/organization-edge-startclaim.csv`, `./prepared/organization-edge-startclaim.rejected.csv`, `./prepared/organization-edge-startclaim.notes.md`
 - reject taxonomy: `missing_proxy_id`, `missing_device_ip`, `invalid_device_ip`, `missing_device_model_id`, `missing_space_id`, `invalid_space_id` (non-integer), `invalid_skip_connectivity_check` (non-boolean), `invalid_custom_parameters` (not a JSON object string)
 - `skip_connectivity_check` accepts `true` or `false`; blank means `edge claim-batch` will run a pre-claim ping before `startClaim`
+- For non-heartbeat Edge models, run `xyte-cli edge models` and `xyte-cli edge model <id>` before preparing rows. Fill `custom_parameters` with model `parameters[].name` keys and reject rows missing required values such as `{$DEVICE_ID}`.
 - downstream execution command: [`xyte-cli edge claim-batch`](commands.md#edge-devices)
 4. `device.move`:
 - `device_id,target_space_id,device_name,current_space_id,target_space_name`

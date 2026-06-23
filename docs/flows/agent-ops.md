@@ -262,10 +262,13 @@ xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/
 - Disambiguation: only run this flow after confirming the user means **edge** claim (not native direct claim via `organization.devices.claimDevice`, and not C2C which is unsupported). See [`../claim-devices.md`](../claim-devices.md).
 - Prerequisites:
   - `<tenant-id>` is active and authorized.
-  - `proxy_id`, `device_ip`, `device_model_id`, `space_id` are known.
+  - `proxy_id`, `device_ip`, `device_model_id`, `space_id`, and required model `custom_parameters` are known.
+  - For non-heartbeat models, run `xyte-cli edge models --search <model>` and `xyte-cli edge model <device-model-id>` first; use returned `parameters[].name` keys for `custom_parameters`.
 - Exact commands:
 
 ```bash
+xyte-cli edge models --tenant <tenant-id> --search <model-or-vendor>
+xyte-cli edge model --tenant <tenant-id> <model-id>
 xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --plan
 xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --apply
 ```

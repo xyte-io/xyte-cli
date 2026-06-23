@@ -683,6 +683,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
     intent: 'Claim a single device behind an Edge proxy and poll to terminal state.',
     writeCapable: true,
     recipeCommands: [
+      'xyte-cli edge models --tenant <tenant-id> --search <model-or-vendor>',
+      'xyte-cli edge model --tenant <tenant-id> <model-id>',
       'xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --plan',
       'xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --apply'
     ],

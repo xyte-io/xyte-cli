@@ -39,6 +39,8 @@ Decision gate:
 
 Scope check first: edge claim is for devices **behind an Xyte Edge proxy** identified by IP + device model id. For devices on the same network as the platform with known sn/mac/cloud_id, use SOP A (native claim) instead. If the user mentions Cloud-to-Cloud (C2C), tell them the public API does not expose C2C claiming — point to the End Customer Portal. Full disambiguation guidance: `references/claim-playbook.md`.
 
+Before preparing non-heartbeat Edge claim rows, run `xyte-cli edge models --tenant <tenant-id> --search <model>` and `xyte-cli edge model --tenant <tenant-id> <device-model-id>`. Use the returned model `parameters[].name` values as `custom_parameters` keys, and reject rows missing required values such as `{$DEVICE_ID}`. Use `organization.edges.getEdges` to find `proxy_id` when it is not already known.
+
 Prepare:
 
 ```bash
