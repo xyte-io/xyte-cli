@@ -235,6 +235,23 @@ describe('public endpoint catalog', () => {
     expect(endpoint?.sourceFile).toBe('https://docs.xyte.io/reference/edgeget-ping-status');
   });
 
+  it('includes organization edge updateHostname endpoint metadata', () => {
+    const endpoint = endpoints.find((item) => item.key === 'organization.edge.updateHostname');
+    expect(endpoint).toBeDefined();
+    expect(endpoint?.method).toBe('POST');
+    expect(endpoint?.pathTemplate).toBe('/core/v1/organization/edges/devices/:device_id/update_hostname');
+    expect((endpoint as { namespace: string }).namespace).toBe('organization');
+    expect((endpoint as { group: string }).group).toBe('edge');
+    expect(endpoint?.authScope).toBe('organization');
+    expect(endpoint?.bodyType).toBe('json');
+    expect(endpoint?.hasBody).toBe(true);
+    expect(endpoint?.pathParams).toEqual(['device_id']);
+    expect(endpoint?.queryParams).toEqual([]);
+    expect(endpoint?.bodyExample).toContain('device_ip');
+    expect(endpoint?.bodyExample).toContain('skip_connectivity_check');
+    expect(endpoint?.sourceFile).toBe('https://docs.xyte.io/reference/edgeupdate-hostname');
+  });
+
   it('includes organization edge collection endpoint metadata', () => {
     const endpoint = endpoints.find((item) => item.key === 'organization.edges.getEdges');
     expect(endpoint).toBeDefined();
