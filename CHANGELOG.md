@@ -6,6 +6,19 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-06-24
+
+### Added
+- Added organization note endpoints to the public endpoint catalog, typed client surface, docs, and shipped skill guidance:
+  - `organization.notes.createDeviceNote`
+  - `organization.notes.createSpaceNote`
+  - `organization.notes.deleteDeviceNote`
+  - `organization.notes.deleteSpaceNote`
+  - `organization.notes.getAllDeviceNotes`
+  - `organization.notes.getAllSpaceNotes`
+  - `organization.notes.getDeviceNotes`
+  - `organization.notes.getSpaceNotes`
+
 ## [0.10.8] - 2026-06-10
 
 ### Added

@@ -17,6 +17,8 @@ export interface UtilityActionProfile {
   endpointKey?: string;
   method?: PublicEndpointSpec['method'];
   pathTemplate?: string;
+  queryParams?: string[];
+  hasBody?: boolean;
   primaryFormat: UtilityPreparePrimaryFormat;
   headers: string[];
   jsonShape: Record<string, unknown>;
@@ -339,6 +341,7 @@ function buildGenericJsonShape(pathParams: string[]): Record<string, unknown> {
 
 export function buildGenericEndpointProfile(endpoint: PublicEndpointSpec): UtilityActionProfile {
   const headers = [...endpoint.pathParams, 'query_json', 'body_json'];
+  const queryParamList = endpoint.queryParams.join(', ') || '(none)';
   return {
     actionKey: endpoint.key,
     title: endpoint.title,
@@ -347,13 +350,17 @@ export function buildGenericEndpointProfile(endpoint: PublicEndpointSpec): Utili
     endpointKey: endpoint.key,
     method: endpoint.method,
     pathTemplate: endpoint.pathTemplate,
+    queryParams: endpoint.queryParams,
+    hasBody: endpoint.hasBody,
     primaryFormat: 'csv',
     headers,
     jsonShape: buildGenericJsonShape(endpoint.pathParams),
     decodeRules: [
       `Map path parameter columns exactly: ${endpoint.pathParams.join(', ') || '(none)'}.`,
-      'query_json must be a valid JSON object string or empty.',
-      'body_json must be a valid JSON object string or empty.',
+      `query_json must be a valid JSON object string or empty; only documented query params are allowed: ${queryParamList}.`,
+      endpoint.hasBody
+        ? 'body_json must be a valid JSON object string or empty.'
+        : 'body_json must be empty because this endpoint does not accept a request body.',
       'Do not guess identifiers from context.',
       'Write ambiguous rows to rejected output with reject_reason.'
     ],

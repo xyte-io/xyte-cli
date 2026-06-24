@@ -753,6 +753,214 @@
     ]
   },
   {
+    "key": "organization.notes.createDeviceNote",
+    "namespace": "organization",
+    "group": "notes",
+    "action": "createDeviceNote",
+    "title": "Create Device Note",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/:device_id/notes",
+    "pathParams": [
+      "device_id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/create-device-note",
+    "bodyExample": "{\n  \"content\": \"Replaced PSU on 2026-06-01. Next maintenance due in 12 months.\"\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/create-device-note",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/notes",
+      "Docs raw path params: device_id",
+      "Notes created through the API have null created_by because API calls carry no user context."
+    ]
+  },
+  {
+    "key": "organization.notes.createSpaceNote",
+    "namespace": "organization",
+    "group": "notes",
+    "action": "createSpaceNote",
+    "title": "Create Space Note",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/spaces/:space_id/notes",
+    "pathParams": [
+      "space_id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/create-space-note",
+    "bodyExample": "{\n  \"content\": \"Room rewired 2026-06-01. Patch panel map is on the inside of the rack door.\"\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/create-space-note",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/notes",
+      "Docs raw path params: space_id",
+      "Notes created through the API have null created_by because API calls carry no user context."
+    ]
+  },
+  {
+    "key": "organization.notes.deleteDeviceNote",
+    "namespace": "organization",
+    "group": "notes",
+    "action": "deleteDeviceNote",
+    "title": "Delete Device Note",
+    "method": "DELETE",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/:device_id/notes/:id",
+    "pathParams": [
+      "device_id",
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/delete-device-note",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/delete-device-note",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/notes",
+      "Docs raw path params: device_id, id"
+    ]
+  },
+  {
+    "key": "organization.notes.deleteSpaceNote",
+    "namespace": "organization",
+    "group": "notes",
+    "action": "deleteSpaceNote",
+    "title": "Delete Space Note",
+    "method": "DELETE",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/spaces/:space_id/notes/:id",
+    "pathParams": [
+      "space_id",
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/delete-space-note",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/delete-space-note",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/notes",
+      "Docs raw path params: space_id, id"
+    ]
+  },
+  {
+    "key": "organization.notes.getAllDeviceNotes",
+    "namespace": "organization",
+    "group": "notes",
+    "action": "getAllDeviceNotes",
+    "title": "Get All Device Notes",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/notes",
+    "pathParams": [],
+    "queryParams": [
+      "page",
+      "per_page"
+    ],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/get-all-device-notes",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-all-device-notes",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/notes",
+      "Paginated response uses { items, has_next_page }; query params are page and per_page."
+    ]
+  },
+  {
+    "key": "organization.notes.getAllSpaceNotes",
+    "namespace": "organization",
+    "group": "notes",
+    "action": "getAllSpaceNotes",
+    "title": "Get All Space Notes",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/spaces/notes",
+    "pathParams": [],
+    "queryParams": [
+      "page",
+      "per_page"
+    ],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/get-all-space-notes",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-all-space-notes",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/notes",
+      "Paginated response uses { items, has_next_page }; query params are page and per_page."
+    ]
+  },
+  {
+    "key": "organization.notes.getDeviceNotes",
+    "namespace": "organization",
+    "group": "notes",
+    "action": "getDeviceNotes",
+    "title": "Get Device Notes",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/devices/:device_id/notes",
+    "pathParams": [
+      "device_id"
+    ],
+    "queryParams": [
+      "page",
+      "per_page"
+    ],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/get-device-notes",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-device-notes",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/notes",
+      "Docs raw path params: device_id",
+      "Paginated response uses { items, has_next_page }; query params are page and per_page."
+    ]
+  },
+  {
+    "key": "organization.notes.getSpaceNotes",
+    "namespace": "organization",
+    "group": "notes",
+    "action": "getSpaceNotes",
+    "title": "Get Space Notes",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/spaces/:space_id/notes",
+    "pathParams": [
+      "space_id"
+    ],
+    "queryParams": [
+      "page",
+      "per_page"
+    ],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/get-space-notes",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-space-notes",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/notes",
+      "Docs raw path params: space_id",
+      "Paginated response uses { items, has_next_page }; query params are page and per_page."
+    ]
+  },
+  {
     "key": "organization.spaces.createSpace",
     "namespace": "organization",
     "group": "spaces",

@@ -175,6 +175,70 @@ describe('public endpoint catalog', () => {
     expect(getUsers?.queryParams).toEqual(['page', 'per_page']);
   });
 
+  it('includes organization note endpoint metadata', () => {
+    const createDeviceNote = endpoints.find((item) => item.key === 'organization.notes.createDeviceNote');
+    expect(createDeviceNote).toBeDefined();
+    expect(createDeviceNote?.method).toBe('POST');
+    expect(createDeviceNote?.pathTemplate).toBe('/core/v1/organization/devices/:device_id/notes');
+    expect(createDeviceNote?.pathParams).toEqual(['device_id']);
+    expect(createDeviceNote?.queryParams).toEqual([]);
+    expect(createDeviceNote?.authScope).toBe('organization');
+    expect(createDeviceNote?.bodyType).toBe('json');
+    expect(createDeviceNote?.hasBody).toBe(true);
+    expect(createDeviceNote?.bodyExample).toContain('content');
+    expect(createDeviceNote?.sourceFile).toBe('https://docs.xyte.io/reference/create-device-note');
+
+    const createSpaceNote = endpoints.find((item) => item.key === 'organization.notes.createSpaceNote');
+    expect(createSpaceNote).toBeDefined();
+    expect(createSpaceNote?.method).toBe('POST');
+    expect(createSpaceNote?.pathTemplate).toBe('/core/v1/organization/spaces/:space_id/notes');
+    expect(createSpaceNote?.pathParams).toEqual(['space_id']);
+    expect(createSpaceNote?.bodyType).toBe('json');
+    expect(createSpaceNote?.hasBody).toBe(true);
+    expect(createSpaceNote?.sourceFile).toBe('https://docs.xyte.io/reference/create-space-note');
+
+    const deleteDeviceNote = endpoints.find((item) => item.key === 'organization.notes.deleteDeviceNote');
+    expect(deleteDeviceNote).toBeDefined();
+    expect(deleteDeviceNote?.method).toBe('DELETE');
+    expect(deleteDeviceNote?.pathTemplate).toBe('/core/v1/organization/devices/:device_id/notes/:id');
+    expect(deleteDeviceNote?.pathParams).toEqual(['device_id', 'id']);
+    expect(deleteDeviceNote?.bodyType).toBe('none');
+    expect(deleteDeviceNote?.hasBody).toBe(false);
+
+    const deleteSpaceNote = endpoints.find((item) => item.key === 'organization.notes.deleteSpaceNote');
+    expect(deleteSpaceNote).toBeDefined();
+    expect(deleteSpaceNote?.method).toBe('DELETE');
+    expect(deleteSpaceNote?.pathTemplate).toBe('/core/v1/organization/spaces/:space_id/notes/:id');
+    expect(deleteSpaceNote?.pathParams).toEqual(['space_id', 'id']);
+    expect(deleteSpaceNote?.bodyType).toBe('none');
+    expect(deleteSpaceNote?.hasBody).toBe(false);
+
+    const paginatedReads = [
+      ['organization.notes.getAllDeviceNotes', '/core/v1/organization/devices/notes', []],
+      ['organization.notes.getAllSpaceNotes', '/core/v1/organization/spaces/notes', []],
+      ['organization.notes.getDeviceNotes', '/core/v1/organization/devices/:device_id/notes', ['device_id']],
+      ['organization.notes.getSpaceNotes', '/core/v1/organization/spaces/:space_id/notes', ['space_id']]
+    ] as const;
+
+    for (const [key, pathTemplate, pathParams] of paginatedReads) {
+      const endpoint = endpoints.find((item) => item.key === key);
+      expect(endpoint).toBeDefined();
+      expect(endpoint?.method).toBe('GET');
+      expect(endpoint?.pathTemplate).toBe(pathTemplate);
+      expect(endpoint?.pathParams).toEqual(pathParams);
+      expect(endpoint?.queryParams).toEqual(['page', 'per_page']);
+      expect(endpoint?.authScope).toBe('organization');
+      expect(endpoint?.bodyType).toBe('none');
+      expect(endpoint?.hasBody).toBe(false);
+      expect(endpoint?.sourceFile).toBe(
+        `https://docs.xyte.io/reference/${key
+          .split('.')
+          .pop()
+          ?.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`)}`
+      );
+    }
+  });
+
   it('includes organization edge startClaim endpoint metadata', () => {
     const endpoint = endpoints.find((item) => item.key === 'organization.edge.startClaim');
     expect(endpoint).toBeDefined();

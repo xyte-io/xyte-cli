@@ -18,7 +18,6 @@ describe('client auth behavior', () => {
 
     const secretStore = new MemorySecretStore();
     const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
-      
       name: 'primary',
       fingerprint: 'sha256:org'
     });
@@ -47,7 +46,6 @@ describe('client auth behavior', () => {
     } as any;
 
     await profileStore.addKeySlot('acme', 'xyte-org', {
-      
       name: 'missing-secret',
       fingerprint: 'sha256:none'
     });
@@ -63,7 +61,6 @@ describe('client auth behavior', () => {
 
     const secretStore = new MemorySecretStore();
     const slot = await profileStore.addKeySlot('acme', 'xyte-partner', {
-      
       name: 'partner-primary',
       fingerprint: 'sha256:partner'
     });
@@ -157,6 +154,107 @@ describe('client auth behavior', () => {
     expect(request.mock.calls[1][0].headers['Content-Type']).toBe('application/json');
   });
 
+  it('renders organization note requests with path, pagination, and body semantics', async () => {
+    const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } });
+    const transport = { request } as unknown as HttpTransport;
+
+    const client = createXyteClient({
+      auth: { organization: 'org-key-123' },
+      hubBaseUrl: 'https://hub.example.test',
+      transport
+    });
+
+    await client.organization.createDeviceNote({
+      path: { device_id: 'device/one' },
+      body: { content: 'Mounted behind the left panel.' }
+    });
+    await client.organization.createSpaceNote({
+      path: { space_id: 'space/one' },
+      body: { content: 'Badge escort required.' }
+    });
+    await client.organization.getAllDeviceNotes({
+      query: { page: 2, per_page: 50 }
+    });
+    await client.organization.getAllSpaceNotes({
+      query: { page: 3, per_page: 25 }
+    });
+    await client.organization.getDeviceNotes({
+      path: { device_id: 'device/one' },
+      query: { page: 1, per_page: 100 }
+    });
+    await client.organization.getSpaceNotes({
+      path: { space_id: 'space/one' },
+      query: { page: 4, per_page: 10 }
+    });
+    await client.organization.deleteDeviceNote({
+      path: { device_id: 'device/one', id: 'note/one' },
+      body: { ignored: true }
+    });
+    await client.organization.deleteSpaceNote({
+      path: { space_id: 'space/one', id: 'note/two' },
+      body: { ignored: true }
+    });
+
+    expect(request).toHaveBeenCalledTimes(8);
+    expect(request.mock.calls[0][0]).toMatchObject({
+      method: 'POST',
+      url: 'https://hub.example.test/core/v1/organization/devices/device%2Fone/notes',
+      body: JSON.stringify({ content: 'Mounted behind the left panel.' })
+    });
+    expect(request.mock.calls[0][0].headers.Authorization).toBe('org-key-123');
+    expect(request.mock.calls[0][0].headers['Content-Type']).toBe('application/json');
+
+    expect(request.mock.calls[1][0]).toMatchObject({
+      method: 'POST',
+      url: 'https://hub.example.test/core/v1/organization/spaces/space%2Fone/notes',
+      body: JSON.stringify({ content: 'Badge escort required.' })
+    });
+    expect(request.mock.calls[1][0].headers.Authorization).toBe('org-key-123');
+    expect(request.mock.calls[1][0].headers['Content-Type']).toBe('application/json');
+
+    expect(request.mock.calls[2][0]).toMatchObject({
+      method: 'GET',
+      url: 'https://hub.example.test/core/v1/organization/devices/notes?page=2&per_page=50'
+    });
+    expect(request.mock.calls[2][0].body).toBeUndefined();
+    expect(request.mock.calls[2][0].headers['Content-Type']).toBeUndefined();
+
+    expect(request.mock.calls[3][0]).toMatchObject({
+      method: 'GET',
+      url: 'https://hub.example.test/core/v1/organization/spaces/notes?page=3&per_page=25'
+    });
+    expect(request.mock.calls[3][0].body).toBeUndefined();
+    expect(request.mock.calls[3][0].headers['Content-Type']).toBeUndefined();
+
+    expect(request.mock.calls[4][0]).toMatchObject({
+      method: 'GET',
+      url: 'https://hub.example.test/core/v1/organization/devices/device%2Fone/notes?page=1&per_page=100'
+    });
+    expect(request.mock.calls[4][0].body).toBeUndefined();
+    expect(request.mock.calls[4][0].headers['Content-Type']).toBeUndefined();
+
+    expect(request.mock.calls[5][0]).toMatchObject({
+      method: 'GET',
+      url: 'https://hub.example.test/core/v1/organization/spaces/space%2Fone/notes?page=4&per_page=10'
+    });
+    expect(request.mock.calls[5][0].body).toBeUndefined();
+    expect(request.mock.calls[5][0].headers['Content-Type']).toBeUndefined();
+
+    expect(request.mock.calls[6][0]).toMatchObject({
+      method: 'DELETE',
+      url: 'https://hub.example.test/core/v1/organization/devices/device%2Fone/notes/note%2Fone'
+    });
+    expect(request.mock.calls[6][0].body).toBeUndefined();
+    expect(request.mock.calls[6][0].headers['Content-Type']).toBeUndefined();
+
+    expect(request.mock.calls[7][0]).toMatchObject({
+      method: 'DELETE',
+      url: 'https://hub.example.test/core/v1/organization/spaces/space%2Fone/notes/note%2Ftwo'
+    });
+    expect(request.mock.calls[7][0].body).toBeUndefined();
+    expect(request.mock.calls[7][0].headers['Content-Type']).toBeUndefined();
+  });
+
   it('uses active slot secret when multiple slots exist', async () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });
@@ -164,12 +262,10 @@ describe('client auth behavior', () => {
 
     const secretStore = new MemorySecretStore();
     const slotA = await profileStore.addKeySlot('acme', 'xyte-org', {
-      
       name: 'slot-a',
       fingerprint: 'sha256:a'
     });
     const slotB = await profileStore.addKeySlot('acme', 'xyte-org', {
-      
       name: 'slot-b',
       fingerprint: 'sha256:b'
     });

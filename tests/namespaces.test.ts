@@ -226,6 +226,55 @@ describe('namespace endpoint mappings', () => {
     expect(call).toHaveBeenNthCalledWith(13, 'organization.groups.deleteGroup', { path: { id: 'group-1' } });
   });
 
+  it('maps organization note methods to their endpoint keys', async () => {
+    const call = vi.fn().mockResolvedValue({ ok: true });
+    const organization = createOrganizationNamespace(call);
+
+    await organization.createDeviceNote({
+      path: { device_id: 'dev-1' },
+      body: { content: 'Rack service note' }
+    });
+    await organization.createSpaceNote({
+      path: { space_id: 123 },
+      body: { content: 'Room access note' }
+    });
+    await organization.deleteDeviceNote({ path: { device_id: 'dev-1', id: 'note-1' } });
+    await organization.deleteSpaceNote({ path: { space_id: 123, id: 'note-2' } });
+    await organization.getAllDeviceNotes({ query: { page: 1, per_page: 100 } });
+    await organization.getAllSpaceNotes({ query: { page: 2, per_page: 50 } });
+    await organization.getDeviceNotes({ path: { device_id: 'dev-1' }, query: { page: 1 } });
+    await organization.getSpaceNotes({ path: { space_id: 123 }, query: { page: 1 } });
+
+    expect(call).toHaveBeenNthCalledWith(1, 'organization.notes.createDeviceNote', {
+      path: { device_id: 'dev-1' },
+      body: { content: 'Rack service note' }
+    });
+    expect(call).toHaveBeenNthCalledWith(2, 'organization.notes.createSpaceNote', {
+      path: { space_id: 123 },
+      body: { content: 'Room access note' }
+    });
+    expect(call).toHaveBeenNthCalledWith(3, 'organization.notes.deleteDeviceNote', {
+      path: { device_id: 'dev-1', id: 'note-1' }
+    });
+    expect(call).toHaveBeenNthCalledWith(4, 'organization.notes.deleteSpaceNote', {
+      path: { space_id: 123, id: 'note-2' }
+    });
+    expect(call).toHaveBeenNthCalledWith(5, 'organization.notes.getAllDeviceNotes', {
+      query: { page: 1, per_page: 100 }
+    });
+    expect(call).toHaveBeenNthCalledWith(6, 'organization.notes.getAllSpaceNotes', {
+      query: { page: 2, per_page: 50 }
+    });
+    expect(call).toHaveBeenNthCalledWith(7, 'organization.notes.getDeviceNotes', {
+      path: { device_id: 'dev-1' },
+      query: { page: 1 }
+    });
+    expect(call).toHaveBeenNthCalledWith(8, 'organization.notes.getSpaceNotes', {
+      path: { space_id: 123 },
+      query: { page: 1 }
+    });
+  });
+
   it('maps partner.createOrganization to partner.organizations.createOrganization', async () => {
     const call = vi.fn().mockResolvedValue({ ok: true });
     const partner = createPartnerNamespace(call);

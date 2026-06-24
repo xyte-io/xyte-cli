@@ -115,12 +115,31 @@ Key params:
 
 ```bash
 xyte-cli api call organization.devices.getDevices --tenant <tenant-id>
+xyte-cli api call organization.notes.getDeviceNotes \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}' \
+  --query-json '{"page":1,"per_page":100}'
 ```
 
 Key params:
 - `--tenant <tenant-id>`
 - `--output-mode envelope` for contract output
 - `--strict-json` for machine parsing
+
+### 2b) Device or space notes
+
+Create/delete note calls are writes; get explicit approval before running them.
+
+```bash
+xyte-cli api call organization.notes.createDeviceNote \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}' \
+  --body-json '{"content":"Mounted behind the left panel."}'
+
+xyte-cli api call organization.notes.deleteDeviceNote \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>","id":"<note-id>"}'
+```
 
 ### 3) Incident watch (active incidents)
 
