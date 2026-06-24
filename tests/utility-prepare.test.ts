@@ -116,6 +116,79 @@ describe('utility prepare workflow', () => {
     expect(notes).not.toContain('invalid_target_space_id');
   });
 
+  it('builds generic note-create guidance without fake query params', () => {
+    const root = makeTempRoot('xyte-prepare-note-create-');
+    const inputPath = join(root, 'source.csv');
+    const outDir = join(root, 'out');
+    writeFileSync(inputPath, 'x', 'utf8');
+
+    const result = runUtilityPrepare({
+      inputPath,
+      actionKey: 'organization.notes.createDeviceNote',
+      outputDir: outDir,
+      tenantId: 'acme'
+    });
+
+    expect(result.mode).toBe('generic');
+    expect(result.canonical.headers).toEqual(['device_id', 'query_json', 'body_json']);
+    expect(result.suggestedCommands.apply).toBe(
+      `xyte-cli api call organization.notes.createDeviceNote --tenant acme --path-json '{"device_id":"<device_id>"}' --body-json '{"...":"..."}'`
+    );
+    expect(result.suggestedCommands.apply).not.toContain('--query-json');
+    const notes = readFileSync(result.artifacts.notes, 'utf8');
+    expect(notes).toContain(
+      'query_json must be a valid JSON object string or empty; only documented query params are allowed: (none).'
+    );
+    expect(notes).toContain('body_json must be a valid JSON object string or empty.');
+  });
+
+  it('builds generic note-delete guidance without fake query or body params', () => {
+    const root = makeTempRoot('xyte-prepare-note-delete-');
+    const inputPath = join(root, 'source.csv');
+    const outDir = join(root, 'out');
+    writeFileSync(inputPath, 'x', 'utf8');
+
+    const result = runUtilityPrepare({
+      inputPath,
+      actionKey: 'organization.notes.deleteDeviceNote',
+      outputDir: outDir,
+      tenantId: 'acme'
+    });
+
+    expect(result.mode).toBe('generic');
+    expect(result.canonical.headers).toEqual(['device_id', 'id', 'query_json', 'body_json']);
+    expect(result.suggestedCommands.apply).toBe(
+      `xyte-cli api call organization.notes.deleteDeviceNote --tenant acme --path-json '{"device_id":"<device_id>","id":"<id>"}'`
+    );
+    expect(result.suggestedCommands.apply).not.toContain('--query-json');
+    expect(result.suggestedCommands.apply).not.toContain('--body-json');
+    const notes = readFileSync(result.artifacts.notes, 'utf8');
+    expect(notes).toContain('body_json must be empty because this endpoint does not accept a request body.');
+  });
+
+  it('builds generic query-only write guidance without fake body params', () => {
+    const root = makeTempRoot('xyte-prepare-query-write-');
+    const inputPath = join(root, 'source.csv');
+    const outDir = join(root, 'out');
+    writeFileSync(inputPath, 'x', 'utf8');
+
+    const result = runUtilityPrepare({
+      inputPath,
+      actionKey: 'organization.tickets.sendMessage',
+      outputDir: outDir,
+      tenantId: 'acme'
+    });
+
+    expect(result.mode).toBe('generic');
+    expect(result.suggestedCommands.apply).toBe(
+      `xyte-cli api call organization.tickets.sendMessage --tenant acme --path-json '{"ticket_id":"<ticket_id>"}' --query-json '{"message":"<message>"}'`
+    );
+    expect(result.suggestedCommands.apply).not.toContain('--body-json');
+    const notes = readFileSync(result.artifacts.notes, 'utf8');
+    expect(notes).toContain('only documented query params are allowed: message');
+    expect(notes).toContain('body_json must be empty because this endpoint does not accept a request body.');
+  });
+
   it('builds connector setup prepare-only scaffold', () => {
     const root = makeTempRoot('xyte-prepare-connectors-');
     const inputPath = join(root, 'connectors.csv');
@@ -173,7 +246,9 @@ describe('utility prepare workflow', () => {
     expect(users.executionSupport).toBe('prepare-only');
     expect(memberships.executionSupport).toBe('prepare-only');
     expect(readFileSync(groups.artifacts.primary, 'utf8')).toBe('label,groupName,iconName,sourceRow,notes\n');
-    expect(readFileSync(groups.artifacts.rejected, 'utf8')).toBe('label,groupName,iconName,sourceRow,notes,reject_reason\n');
+    expect(readFileSync(groups.artifacts.rejected, 'utf8')).toBe(
+      'label,groupName,iconName,sourceRow,notes,reject_reason\n'
+    );
     expect(readFileSync(users.artifacts.primary, 'utf8')).toBe(
       'label,email,name,groupName,assignSupportSeat,sourceRow,notes\n'
     );
@@ -312,9 +387,9 @@ describe('utility prepare workflow', () => {
     expect(actions.some((item) => item.actionKey === 'device.move')).toBe(true);
     expect(actions.some((item) => item.actionKey === 'space.import-tree')).toBe(true);
     expect(listUtilityPrepareActions({ mode: 'friendly' }).every((item) => item.mode === 'friendly')).toBe(true);
-    expect(
-      listUtilityPrepareActions({ executionSupport: 'edge.claim-batch' }).map((item) => item.actionKey)
-    ).toEqual(['organization.edge.startClaim']);
+    expect(listUtilityPrepareActions({ executionSupport: 'edge.claim-batch' }).map((item) => item.actionKey)).toEqual([
+      'organization.edge.startClaim'
+    ]);
     expect(listUtilityPrepareActions({ executionSupport: 'prepare-only' }).map((item) => item.actionKey)).toEqual([
       'organization.connectors.prepareSetup',
       'organization.teamAccess.groups',
@@ -329,12 +404,8 @@ describe('utility prepare workflow', () => {
 
     const schemaPath = join(process.cwd(), 'docs/schemas/utility-prepare.v1.schema.json');
     const skillSchemaPath = join(process.cwd(), 'skills/xyte-cli/schemas/utility-prepare.v1.schema.json');
-    const schema = JSON.parse(
-      readFileSync(schemaPath, 'utf8')
-    ) as Record<string, unknown>;
-    const skillSchema = JSON.parse(
-      readFileSync(skillSchemaPath, 'utf8')
-    ) as Record<string, unknown>;
+    const schema = JSON.parse(readFileSync(schemaPath, 'utf8')) as Record<string, unknown>;
+    const skillSchema = JSON.parse(readFileSync(skillSchemaPath, 'utf8')) as Record<string, unknown>;
     expect(skillSchema).toEqual(schema);
 
     const ajv = new Ajv2020({ strict: false });

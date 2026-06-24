@@ -195,5 +195,22 @@ describe('utility-action-profiles', () => {
       const profile = buildGenericEndpointProfile(makeEndpoint({ pathParams: [] }));
       expect(profile.jsonShape.path).toBeUndefined();
     });
+
+    it('carries endpoint query/body facts into generic profile guidance', () => {
+      const profile = buildGenericEndpointProfile(
+        makeEndpoint({
+          key: 'organization.notes.deleteDeviceNote',
+          method: 'DELETE',
+          pathParams: ['device_id', 'id'],
+          queryParams: [],
+          bodyType: 'none',
+          hasBody: false
+        })
+      );
+
+      expect(profile.queryParams).toEqual([]);
+      expect(profile.hasBody).toBe(false);
+      expect(profile.decodeRules.join(' ')).toContain('body_json must be empty');
+    });
   });
 });

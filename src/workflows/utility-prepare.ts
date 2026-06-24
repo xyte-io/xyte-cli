@@ -177,10 +177,24 @@ function buildSuggestedCommands(
       accumulator[header] = `<${header}>`;
       return accumulator;
     }, {});
+  const commandParts = [`xyte-cli api call ${profile.actionKey}`, `--tenant ${tenant}`];
+  if (Object.keys(samplePathObject).length > 0) {
+    commandParts.push(`--path-json '${JSON.stringify(samplePathObject)}'`);
+  }
+  if ((profile.queryParams?.length ?? 0) > 0) {
+    const sampleQueryObject = profile.queryParams!.reduce<Record<string, string>>((accumulator, queryParam) => {
+      accumulator[queryParam] = `<${queryParam}>`;
+      return accumulator;
+    }, {});
+    commandParts.push(`--query-json '${JSON.stringify(sampleQueryObject)}'`);
+  }
+  if (profile.hasBody === true) {
+    commandParts.push(`--body-json '{"...":"..."}'`);
+  }
 
   return {
     next: `Review ${primaryPath}, then decide whether to execute ${profile.actionKey} via xyte-cli api call loop.`,
-    apply: `xyte-cli api call ${profile.actionKey} --tenant ${tenant} --path-json '${JSON.stringify(samplePathObject)}' --query-json '{"...":"..."}' --body-json '{"...":"..."}'`,
+    apply: commandParts.join(' '),
     verify: `xyte-cli api endpoints describe ${profile.actionKey}`
   };
 }
@@ -230,7 +244,9 @@ function exampleForHeader(profile: UtilityActionProfile, header: string): string
 
 function rejectTaxonomy(profile: UtilityActionProfile, requiredHeaders: string[]): string[] {
   const reasons = requiredHeaders.map((header) => `missing_${header}`);
-  const jsonHeaders = profile.headers.filter((header) => header.endsWith('_json') || header === 'config' || header === 'custom_parameters');
+  const jsonHeaders = profile.headers.filter(
+    (header) => header.endsWith('_json') || header === 'config' || header === 'custom_parameters'
+  );
   reasons.push(...jsonHeaders.map((header) => `invalid_${header}`));
   if (profile.actionKey === 'organization.edge.startClaim') {
     reasons.push('invalid_device_ip', 'invalid_space_id', 'invalid_skip_connectivity_check');
@@ -241,7 +257,10 @@ function rejectTaxonomy(profile: UtilityActionProfile, requiredHeaders: string[]
   if (profile.actionKey === 'organization.connectors.prepareSetup') {
     reasons.push('unsupported_connector');
   }
-  if (profile.actionKey === 'organization.teamAccess.users' || profile.actionKey === 'organization.teamAccess.memberships') {
+  if (
+    profile.actionKey === 'organization.teamAccess.users' ||
+    profile.actionKey === 'organization.teamAccess.memberships'
+  ) {
     reasons.push('invalid_email');
   }
   reasons.push('ambiguous_row');
@@ -265,7 +284,10 @@ function buildNotes(
     `Source input: ${inputPath}`,
     '',
     '## Canonical Fields',
-    ...profile.headers.map((header) => `- ${header}: ${requiredSet.has(header) ? 'required' : 'optional'}; example ${exampleForHeader(profile, header)}`),
+    ...profile.headers.map(
+      (header) =>
+        `- ${header}: ${requiredSet.has(header) ? 'required' : 'optional'}; example ${exampleForHeader(profile, header)}`
+    ),
     '',
     '## Canonical JSON Shape',
     '```json',

@@ -302,3 +302,11 @@ xyte-cli util prepare \
 
 Generic canonical headers:
 1. `<path params in order>,query_json,body_json`
+
+Notes endpoints are generic call-loop actions:
+- `organization.notes.createDeviceNote`
+- `organization.notes.createSpaceNote`
+- `organization.notes.deleteDeviceNote`
+- `organization.notes.deleteSpaceNote`
+
+Prepare rows, inspect the generated `.notes.md` and rejected output, then ask the user for explicit approval before running any `xyte-cli api call` loop. There is no dedicated bulk notes executor.

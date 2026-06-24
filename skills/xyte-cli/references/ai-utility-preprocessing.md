@@ -57,6 +57,7 @@ Friendly profiles:
 
 Generic profiles:
 1. `<path params...>,query_json,body_json`
+2. Note write/delete endpoints such as `organization.notes.createDeviceNote`, `organization.notes.createSpaceNote`, `organization.notes.deleteDeviceNote`, and `organization.notes.deleteSpaceNote` are generic `call-loop-only` actions. Prepare rows, review generated notes/rejects, then run controlled `xyte-cli api call` loops only after explicit approval.
 
 ## Required AI rules
 

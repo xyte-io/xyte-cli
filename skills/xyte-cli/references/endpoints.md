@@ -46,6 +46,10 @@ Derived from the bundled public endpoint spec.
 | `organization.devices.getHistories` | `status`, `from`, `to`, `device_id`, `space_id`, `name` | none | Filtered history lookup; can be time-windowed |
 | `organization.commands.getCommands` | `status`, `page`, `per_page` | `page`, `per_page` | Command history pagination and status filter |
 | `organization.incidents.getIncidents` | `from`, `to`, `status`, `priority`, `title`, `description`, `issue`, `device_model`, `partner_name`, `sub_model`, `space_id`, `page`, `per_page` | `page`, `per_page` | Incident filtering matrix. Use integer `from` and `to`; for reliable active-incident fetches use both (`from=0`, `to=<now>`). |
+| `organization.notes.getAllDeviceNotes` | `page`, `per_page` | `page`, `per_page` | Paginated notes across all devices |
+| `organization.notes.getAllSpaceNotes` | `page`, `per_page` | `page`, `per_page` | Paginated notes across all spaces |
+| `organization.notes.getDeviceNotes` | `page`, `per_page` | `page`, `per_page` | Paginated notes for one device; path `device_id` |
+| `organization.notes.getSpaceNotes` | `page`, `per_page` | `page`, `per_page` | Paginated notes for one space; path `space_id` |
 | `organization.edges.getEdges` | `page`, `per_page` | `page`, `per_page` | Paginated Edge records |
 | `organization.groups.getGroups` | `page`, `per_page` | `page`, `per_page` | Paginated team access groups |
 | `organization.users.getUsers` | `page`, `per_page` | `page`, `per_page` | Paginated active users |
@@ -138,6 +142,31 @@ xyte-cli api call organization.devices.resumeIncidents \
   --path-json '{"device_id":"<device-id>"}'
 ```
 
+### `organization.notes.*`
+
+Read notes with pagination. Create and delete notes only after explicit user approval; API-created notes have `created_by: null` because raw API calls carry no user context.
+
+```bash
+xyte-cli api call organization.notes.getDeviceNotes \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}' \
+  --query-json '{"page":1,"per_page":100}'
+
+xyte-cli api call organization.notes.createDeviceNote \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}' \
+  --body-json '{"content":"Mounted behind the left panel."}'
+
+xyte-cli api call organization.notes.deleteDeviceNote \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>","id":"<note-id>"}'
+
+xyte-cli api call organization.notes.getSpaceNotes \
+  --tenant <tenant-id> \
+  --path-json '{"space_id":"<space-id>"}' \
+  --query-json '{"page":1,"per_page":100}'
+```
+
 ### `organization.groups.addUsers`
 
 ```bash
@@ -167,6 +196,14 @@ Organization:
 - `organization.devices.resumeIncidents`
 - `organization.incidents.closeIncident`
 - `organization.incidents.getIncidents`
+- `organization.notes.getAllDeviceNotes`
+- `organization.notes.getAllSpaceNotes`
+- `organization.notes.getDeviceNotes`
+- `organization.notes.getSpaceNotes`
+- `organization.notes.createDeviceNote`
+- `organization.notes.createSpaceNote`
+- `organization.notes.deleteDeviceNote`
+- `organization.notes.deleteSpaceNote`
 - `organization.edges.getEdges`
 - `organization.groups.getGroups`
 - `organization.groups.addUsers`
