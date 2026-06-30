@@ -16,7 +16,7 @@
     <header class="site-nav">
       <div class="wrap nav-row">
         <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Reference</span></a>
-        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../guides/index.html">Guides</a><a href="../index.html#docs">Reference</a></nav>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../guides/index.html">Guides</a><a href="../index.html#docs">Reference</a><a href="../glossary.html">Glossary</a><a href="../troubleshooting.html">Troubleshooting</a></nav>
       </div>
     </header>
     <main class="page" id="main">
@@ -76,7 +76,7 @@ Return the artifact path and the decision you made from it.</code></pre></div>
 
 xyte-cli ops inspect fleet \
   --tenant &lt;tenant-id&gt; \
-  --render json \
+  --output json \
   --strict-json \
   --out ./artifacts/fleet.json
 
@@ -84,34 +84,35 @@ xyte-cli ops watch incidents \
   --tenant &lt;tenant-id&gt; \
   --profile incidents-active \
   --once \
+  --output json \
   --strict-json \
   --out ./artifacts/incidents.ndjson</code></pre></div>
 
           <h2 id="common-outputs">Common outputs</h2>
           <p class="section-copy">Choose the schema by the command that produced the file.</p>
           <ul class="checklist">
-            <li><code>doctor-environment.v1</code>: choose installed, npx, workspace-local, or blocked setup mode.</li>
-            <li><code>status.v1</code>: read fast tenant readiness from jobs and agents.</li>
-            <li><code>watch-frame.v1</code>: react to incident snapshots, deltas, heartbeats, and errors.</li>
-            <li><code>inspect-fleet.v1</code> and <code>inspect-deep-dive.v1</code>: store operational source data for reports.</li>
-            <li><code>report.v1</code>: track generated report paths and report metadata.</li>
-            <li><code>flow-run.v1</code>: read flow outcome, next action, run bundle path, and pause state.</li>
-            <li><code>utility-prepare.v1</code> and <code>utility-batch.v1</code>: process prepared rows, rejected rows, and batch dispositions.</li>
+            <li><code>xyte.doctor.environment.v1</code>: choose installed, npx, workspace-local, or blocked setup mode.</li>
+            <li><code>xyte.status.v1</code>: read fast tenant readiness from jobs and agents.</li>
+            <li><code>xyte.watch.frame.v1</code>: react to incident snapshots, deltas, heartbeats, and errors.</li>
+            <li><code>xyte.inspect.fleet.v1</code> and <code>xyte.inspect.deep-dive.v1</code>: store operational source data for reports.</li>
+            <li><code>xyte.report.v1</code>: track generated report paths and report metadata.</li>
+            <li><code>xyte.flow.run.v1</code>: read flow outcome, next action, run bundle path, and pause state.</li>
+            <li><code>xyte.utility.prepare.v1</code> and <code>xyte.utility.batch.v1</code>: process prepared rows, rejected rows, and batch dispositions.</li>
           </ul>
 
           <h2 id="mapping">Command-to-schema mapping</h2>
           <div class="table-wrap"><table class="matrix">
             <thead><tr><th>Command</th><th>Use this schema</th><th>Automation use</th></tr></thead>
             <tbody>
-              <tr><td><code>xyte-cli doctor environment --format json</code></td><td><code>doctor-environment.v1</code></td><td>Choose installed, npx, workspace-local, or blocked setup path.</td></tr>
-              <tr><td><code>xyte-cli status --mode fast --format json</code></td><td><code>status.v1</code></td><td>Decide whether a job can continue to operational commands.</td></tr>
-              <tr><td><code>xyte-cli ops watch incidents --strict-json</code></td><td><code>watch-frame.v1</code></td><td>Read snapshot, delta, heartbeat, and error frames.</td></tr>
-              <tr><td><code>xyte-cli ops inspect fleet --render json</code></td><td><code>inspect-fleet.v1</code></td><td>Store fleet counts and device context for dashboards or handoffs.</td></tr>
-              <tr><td><code>xyte-cli ops inspect deep-dive --render json</code></td><td><code>inspect-deep-dive.v1</code></td><td>Save report source data before rendering Markdown or PDF.</td></tr>
-              <tr><td><code>xyte-cli ops report generate --input &lt;source.json&gt; --render markdown</code></td><td><code>report.v1</code></td><td>Track report path, input source, and render metadata.</td></tr>
-              <tr><td><code>xyte-cli flow run &lt;flow-id&gt; --plan --strict-json</code></td><td><code>flow-run.v1</code></td><td>Read outcome, pause state, next action, and run bundle path.</td></tr>
-              <tr><td><code>xyte-cli util prepare --action &lt;action-key&gt; --input &lt;file.xlsx&gt;</code></td><td><code>utility-prepare.v1</code></td><td>Count primary rows, rejected rows, generated files, and next command.</td></tr>
-              <tr><td><code>xyte-cli edge claim-batch --input &lt;prepared.csv&gt; --plan</code></td><td><code>utility-batch.v1</code></td><td>Track batch row dispositions, partial runs, and resume behavior.</td></tr>
+              <tr><td><code>xyte-cli doctor environment --format json</code></td><td><code>xyte.doctor.environment.v1</code></td><td>Choose installed, npx, workspace-local, or blocked setup path.</td></tr>
+              <tr><td><code>xyte-cli status --mode fast --format json</code></td><td><code>xyte.status.v1</code></td><td>Decide whether a job can continue to operational commands.</td></tr>
+              <tr><td><code>xyte-cli ops watch incidents --output json --strict-json</code></td><td><code>xyte.watch.frame.v1</code></td><td>Read snapshot, delta, heartbeat, and error frames.</td></tr>
+              <tr><td><code>xyte-cli ops inspect fleet --output json</code></td><td><code>xyte.inspect.fleet.v1</code></td><td>Store fleet counts and device context for dashboards or handoffs.</td></tr>
+              <tr><td><code>xyte-cli ops inspect deep-dive --output json</code></td><td><code>xyte.inspect.deep-dive.v1</code></td><td>Save report source data before rendering Markdown or PDF.</td></tr>
+              <tr><td><code>xyte-cli ops report generate --input &lt;source.json&gt; --out &lt;report.md&gt; --render markdown</code></td><td><code>xyte.report.v1</code></td><td>Track report path, input source, and render metadata.</td></tr>
+              <tr><td><code>xyte-cli flow run &lt;flow-id&gt; --plan --strict-json</code></td><td><code>xyte.flow.run.v1</code></td><td>Read outcome, pause state, next action, and run bundle path.</td></tr>
+              <tr><td><code>xyte-cli util prepare --action &lt;action-key&gt; --input &lt;file.xlsx&gt;</code></td><td><code>xyte.utility.prepare.v1</code></td><td>Count primary rows, rejected rows, generated files, and next command.</td></tr>
+              <tr><td><code>xyte-cli edge claim-batch --input &lt;prepared.csv&gt; --plan</code></td><td><code>xyte.utility.batch.v1</code></td><td>Track batch row dispositions, partial runs, and resume behavior.</td></tr>
             </tbody>
           </table></div>
 
@@ -184,12 +185,12 @@ xyte-cli ops watch incidents \
   "endedAtUtc": "2026-06-30T00:00:02.000Z",
   "durationMs": 2000,
   "outcome": "pending_gate",
-  "nextResumeStepId": "approve-remediation",
+  "nextResumeStepId": "gate_send_command",
   "resumeCommand": "xyte-cli flow run flow.guided-remediation --tenant &lt;tenant-id&gt; --apply --resume ./tmp/flow-runs/flow.guided-remediation/run-001",
   "nextAction": {
     "kind": "approve_gate",
-    "stepId": "approve-remediation",
-    "title": "Approve remediation plan",
+    "stepId": "gate_send_command",
+    "title": "Review command and resume with --apply",
     "requiresWrite": true,
     "artifactPaths": ["./tmp/flow-runs/flow.guided-remediation/run-001/manifest.json"],
     "command": "xyte-cli flow run flow.guided-remediation --tenant &lt;tenant-id&gt; --apply --resume ./tmp/flow-runs/flow.guided-remediation/run-001"
@@ -197,7 +198,7 @@ xyte-cli ops watch incidents \
   "steps": [],
   "decisions": { "pending": 1, "approved": 0, "blocked": 0 },
   "classifications": { "needs_data": 0, "bug": 0 },
-  "cursor": { "nextStepIndex": 0, "nextStepId": "approve-remediation" }
+  "cursor": { "nextStepIndex": 0, "nextStepId": "gate_send_command" }
 }</code></pre></div>
 
           <h2 id="real-examples">Examples</h2>

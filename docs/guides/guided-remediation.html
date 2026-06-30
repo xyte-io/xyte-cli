@@ -14,7 +14,7 @@
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
-    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a></nav></div></header>
+    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a><a href="../glossary.html">Glossary</a><a href="../troubleshooting.html">Troubleshooting</a></nav></div></header>
     <main class="page" id="main"><div class="wrap guide-shell">
       <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">Ask an agent</a><a href="#goal">Goal</a><a href="#commands">Commands</a><a href="#gate">Approval gate</a><a href="#repeat">Make this repeatable</a><a href="#failures">If it fails</a></aside>
       <article class="article">
@@ -29,7 +29,7 @@
           <button class="view-tab" type="button" role="tab" id="tab-ai" aria-controls="ai-agent" aria-selected="true" data-view="ai">AI agent</button>
           <button class="view-tab" type="button" role="tab" id="tab-terminal" aria-controls="terminal" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
         </div>
-        <div class="note prereq-note"><p><strong>Before you start:</strong> You need a connected profile and a target incident and device id, usually from <a href="./incident-triage.html">Incident triage</a>. Run <a href="./setup-readiness.html">Setup readiness</a> if the CLI is not connected yet.</p></div>
+        <div class="note prereq-note"><p><strong>Before you start:</strong> You need a connected profile and a target incident and device id, usually from <a href="./incident-triage.html">Incident triage</a>. Run <a href="./setup-readiness.html">Setup readiness</a> if the CLI is not connected yet. New here? See the <a href="../glossary.html">glossary</a>.</p></div>
 
 
         <section class="guide-view" data-view="ai" id="ai-agent" role="tabpanel" aria-labelledby="tab-ai" tabindex="0">
@@ -66,12 +66,13 @@ How do I resume an approved remediation?</code></pre></div>
   --tenant &lt;tenant-id&gt; \
   --profile incidents-active \
   --once \
+  --output json \
   --strict-json \
   --out ./artifacts/incidents.before.ndjson
 
 xyte-cli ops inspect fleet \
   --tenant &lt;tenant-id&gt; \
-  --render json \
+  --output json \
   --out ./artifacts/fleet.before-remediation.json</code></pre></div></li>
           <li class="step"><h3>Plan against the chosen target</h3><p>After the incident and device are chosen, the plan shows required context and where the workflow will pause before a write. Read <code>device_id</code> and <code>incident_id</code> from the saved frames in step 1 — each incident item carries both.</p><div class="command"><pre><code>xyte-cli flow run flow.guided-remediation \
   --tenant &lt;tenant-id&gt; \
@@ -106,7 +107,7 @@ xyte-cli ops watch incidents \
   "outcome": "pending_gate",
   "nextAction": {
     "kind": "approve_gate",
-    "stepId": "apply-remediation",
+    "stepId": "gate_send_command",
     "title": "Review command and resume with --apply",
     "requiresWrite": true,
     "artifactPaths": [],
@@ -118,11 +119,11 @@ xyte-cli ops watch incidents \
 
         <h2 id="repeat">Make this repeatable</h2>
         <div class="command"><pre><code># Environment
-XYTE_PROFILE=&lt;tenant-id&gt;
+XYTE_TENANT=&lt;tenant-id&gt;
 RUN_PATH=&lt;run-id-or-path&gt;
 
 # Rerun path after approval
-xyte-cli flow run flow.guided-remediation --tenant "$XYTE_PROFILE" --apply --resume "$RUN_PATH" --strict-json</code></pre></div>
+xyte-cli flow run flow.guided-remediation --tenant "$XYTE_TENANT" --apply --resume "$RUN_PATH" --strict-json</code></pre></div>
 
         <h2 id="failures">If it fails</h2>
         <div class="failure-list">
@@ -131,7 +132,7 @@ xyte-cli flow run flow.guided-remediation --tenant "$XYTE_PROFILE" --apply --res
           <div class="failure"><strong>Read-back does not match the expected change</strong><p>Treat the action as incomplete and include the read-back result in the handoff.</p></div>
         </div>
         </section>
-        <aside class="related-next" aria-label="Next steps"><h3>Do this next</h3><p class="section-copy"><a class="next-link" href="./incident-triage.html">Incident triage &rarr;</a> After the fix applies, re-check incidents to confirm the change.</p><p class="section-copy">Reference: <a href="../reference/built-in-flows.html">Built-in flows</a>, <a href="../reference/schema-contracts.html">Schema contracts</a>.</p></aside>
+        <aside class="related-next" aria-label="Next steps"><h3>Do this next</h3><p class="section-copy"><a class="next-link" href="./incident-triage.html">Incident triage &rarr;</a> After the fix applies, re-check incidents to confirm the change.</p><p class="section-copy">Reference: <a href="../reference/built-in-flows.html">Built-in flows</a>, <a href="../reference/schema-contracts.html">Schema contracts</a>, <a href="../troubleshooting.html">Troubleshooting</a>.</p></aside>
 
       </article>
     </div></main>

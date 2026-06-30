@@ -17,7 +17,7 @@
     <header class="site-nav">
       <div class="wrap nav-row">
         <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a>
-        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a></nav>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a><a href="../glossary.html">Glossary</a><a href="../troubleshooting.html">Troubleshooting</a></nav>
       </div>
     </header>
     <main class="page" id="main">
@@ -31,6 +31,7 @@
           <p class="eyebrow">Setup</p>
           <h1>Setup readiness.</h1>
           <p class="lead">Use this before any operational workflow. It confirms that the CLI runs, the API key is connected, and Xyte can answer basic API checks.</p>
+          <div class="note prereq-note"><p><strong>New to Xyte?</strong> Terms like tenant, profile, and provider are explained on the <a href="../glossary.html">glossary</a> page.</p></div>
           <div class="view-switch" role="tablist" aria-label="Guide view">
             <button class="view-tab" type="button" role="tab" id="tab-ai" aria-controls="ai-agent" aria-selected="true" data-view="ai">AI agent</button>
             <button class="view-tab" type="button" role="tab" id="tab-terminal" aria-controls="terminal" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
@@ -122,7 +123,7 @@ xyte-cli config doctor --format json</code></pre></div>
             <div class="failure"><strong>Connectivity fails</strong><p>Check network access, key scope, and provider selection. If you are intentionally offline, run setup with an explicit provider and <code>--connectivity never</code>.</p></div>
           </div>
           </section>
-        <aside class="related-next" aria-label="Next steps"><h3>Do this next</h3><p class="section-copy"><a class="next-link" href="./daily-report.html">Daily fleet report &rarr;</a> Once readiness is green, generate your first fleet report.</p><p class="section-copy">Reference: <a href="../reference/getting-started.html">Getting started</a>, <a href="../reference/commands.html">Commands reference</a>.</p></aside>
+        <aside class="related-next" aria-label="Next steps"><h3>Do this next</h3><p class="section-copy"><a class="next-link" href="./daily-report.html">Daily fleet report &rarr;</a> Once readiness is green, generate your first fleet report.</p><p class="section-copy">Reference: <a href="../reference/getting-started.html">Getting started</a>, <a href="../reference/commands.html">Commands reference</a>, <a href="../troubleshooting.html">Troubleshooting</a>.</p></aside>
 
         </article>
       </div>

@@ -16,7 +16,7 @@
     <header class="site-nav">
       <div class="wrap nav-row">
         <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Reference</span></a>
-        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../guides/index.html">Guides</a><a href="../index.html#docs">Reference</a></nav>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../guides/index.html">Guides</a><a href="../index.html#docs">Reference</a><a href="../glossary.html">Glossary</a><a href="../troubleshooting.html">Troubleshooting</a></nav>
       </div>
     </header>
     <main class="page" id="main">
@@ -77,7 +77,7 @@ xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-acti
 xyte-cli config doctor --tenant &lt;tenant-id&gt; --format json
 xyte-cli ops inspect fleet \
   --tenant &lt;tenant-id&gt; \
-  --render json \
+  --output json \
   --strict-json \
   --out ./artifacts/fleet.json
 
@@ -89,16 +89,16 @@ xyte-cli flow run &lt;flow-id&gt; --tenant &lt;tenant-id&gt; --plan --strict-jso
           <div class="table-wrap"><table class="matrix">
             <thead><tr><th>Command family</th><th>Read/write behavior</th><th>Output format</th><th>File behavior</th><th>Safe for CI</th><th>Relevant schema</th><th>Common failures</th></tr></thead>
             <tbody>
-              <tr><td>doctor environment</td><td>Reads local runtime.</td><td><code>--format json</code> or text.</td><td>No required files.</td><td>Yes.</td><td><code>doctor-environment.v1</code></td><td>Node too old, package unavailable, blocked install path.</td></tr>
-              <tr><td>setup/status</td><td>Setup stores the API key under a local profile; status is read-only.</td><td><code>--format json</code> or text.</td><td>Reads key file or stdin; writes local credential profile.</td><td>Yes, with stdin secret.</td><td><code>status.v1</code></td><td>Empty secret, wrong provider, rejected key.</td></tr>
-              <tr><td>config doctor/status</td><td>Checks API access without changing tenant data.</td><td>JSON or text.</td><td>No required files.</td><td>Yes.</td><td><code>status.v1</code></td><td>Auth failure, network failure, wrong profile.</td></tr>
-              <tr><td>ops watch incidents</td><td>Reads incident state and emits the current frame or changes over time.</td><td>Strict JSON or NDJSON frames.</td><td><code>--out</code> writes watch frames.</td><td>Yes.</td><td><code>watch-frame.v1</code></td><td>Repeated error frame, filter mismatch, long unbounded watch.</td></tr>
-              <tr><td>ops inspect fleet/deep-dive</td><td>Reads fleet state and prepares source data for reports or handoff.</td><td>JSON, Markdown, or report input.</td><td><code>--out</code> writes source artifacts.</td><td>Yes.</td><td><code>inspect-fleet.v1</code>, <code>inspect-deep-dive.v1</code></td><td>Provider scope mismatch, output path missing.</td></tr>
-              <tr><td>flow run --plan</td><td>Shows planned actions and stops before applying changes.</td><td>Strict JSON or text summary.</td><td>Run bundle under <code>--out-dir</code>.</td><td>Yes.</td><td><code>flow-run.v1</code></td><td>Missing input, paused gate, unresolved target.</td></tr>
-              <tr><td>flow run --apply --resume</td><td>Continues an approved flow from its saved run id or bundle path.</td><td>Strict JSON or text summary.</td><td>Reads original run id or bundle path.</td><td>Only in jobs with an approval step.</td><td><code>flow-run.v1</code></td><td>Wrong resume path, rejected write, stale target.</td></tr>
-              <tr><td>util prepare</td><td>Reads source files and writes local prepared files.</td><td>JSON summary plus CSV/notes outputs.</td><td>Writes primary, rejected, and notes files.</td><td>Yes.</td><td><code>utility-prepare.v1</code></td><td>Unsupported action, unreadable input, rejected rows.</td></tr>
-              <tr><td>edge claim-batch</td><td>Plans or runs an Edge claim batch from prepared rows.</td><td>NDJSON report and summary.</td><td>Writes report and resume artifact.</td><td>Use plan in scheduled jobs; run apply only from an approved job.</td><td><code>utility-batch.v1</code></td><td>Offline proxy, timeout, partial batch, rejected row.</td></tr>
-              <tr><td>ops report generate</td><td>Renders a report from saved source data.</td><td>Markdown or PDF.</td><td>Reads saved JSON, writes report file.</td><td>Yes.</td><td><code>report.v1</code></td><td>Wrong input type, output path missing.</td></tr>
+              <tr><td>doctor environment</td><td>Reads local runtime.</td><td><code>--format json</code> or text.</td><td>No required files.</td><td>Yes.</td><td><code>xyte.doctor.environment.v1</code></td><td>Node too old, package unavailable, blocked install path.</td></tr>
+              <tr><td>setup/status</td><td>Setup stores the API key under a local profile; status is read-only.</td><td><code>--format json</code> or text.</td><td>Reads key file or stdin; writes local credential profile.</td><td>Yes, with stdin secret.</td><td><code>xyte.status.v1</code></td><td>Empty secret, wrong provider, rejected key.</td></tr>
+              <tr><td>config doctor/status</td><td>Checks API access without changing tenant data.</td><td>JSON or text.</td><td>No required files.</td><td>Yes.</td><td><code>xyte.status.v1</code></td><td>Auth failure, network failure, wrong profile.</td></tr>
+              <tr><td>ops watch incidents</td><td>Reads incident state and emits the current frame or changes over time.</td><td>Strict JSON or NDJSON frames.</td><td><code>--out</code> writes watch frames.</td><td>Yes.</td><td><code>xyte.watch.frame.v1</code></td><td>Repeated error frame, filter mismatch, long unbounded watch.</td></tr>
+              <tr><td>ops inspect fleet/deep-dive</td><td>Reads fleet state and prepares source data for reports or handoff.</td><td>JSON, Markdown, or report input.</td><td><code>--out</code> writes source artifacts.</td><td>Yes.</td><td><code>xyte.inspect.fleet.v1</code>, <code>xyte.inspect.deep-dive.v1</code></td><td>Provider scope mismatch, output path missing.</td></tr>
+              <tr><td>flow run --plan</td><td>Shows planned actions and stops before applying changes.</td><td>Strict JSON or text summary.</td><td>Run bundle under <code>--out-dir</code>.</td><td>Yes.</td><td><code>xyte.flow.run.v1</code></td><td>Missing input, paused gate, unresolved target.</td></tr>
+              <tr><td>flow run --apply --resume</td><td>Continues an approved flow from its saved run id or bundle path.</td><td>Strict JSON or text summary.</td><td>Reads original run id or bundle path.</td><td>Only in jobs with an approval step.</td><td><code>xyte.flow.run.v1</code></td><td>Wrong resume path, rejected write, stale target.</td></tr>
+              <tr><td>util prepare</td><td>Reads source files and writes local prepared files.</td><td>JSON summary plus CSV/notes outputs.</td><td>Writes primary, rejected, and notes files.</td><td>Yes.</td><td><code>xyte.utility.prepare.v1</code></td><td>Unsupported action, unreadable input, rejected rows.</td></tr>
+              <tr><td>edge claim-batch</td><td>Plans or runs an Edge claim batch from prepared rows.</td><td>NDJSON report and summary.</td><td>Writes report and resume artifact.</td><td>Use plan in scheduled jobs; run apply only from an approved job.</td><td><code>xyte.utility.batch.v1</code></td><td>Offline proxy, timeout, partial batch, rejected row.</td></tr>
+              <tr><td>ops report generate</td><td>Renders a report from saved source data.</td><td>Markdown or PDF.</td><td>Reads saved JSON, writes report file.</td><td>Yes.</td><td><code>xyte.report.v1</code></td><td>Wrong input type, output path missing.</td></tr>
             </tbody>
           </table></div>
 
@@ -121,19 +121,20 @@ xyte-cli init --scope project --agents all --force --no-setup</code></pre></div>
   --tenant &lt;tenant-id&gt; \
   --profile incidents-active \
   --once \
+  --output json \
   --strict-json \
   --out ./artifacts/incidents.ndjson
 
 xyte-cli ops inspect fleet \
   --tenant &lt;tenant-id&gt; \
   --provider-scope auto \
-  --render json \
+  --output json \
   --out ./artifacts/fleet.json
 
 xyte-cli ops inspect deep-dive \
   --tenant &lt;tenant-id&gt; \
   --window 24 \
-  --render json \
+  --output json \
   --out ./artifacts/deep-dive.json</code></pre></div>
 
           <h2 id="endpoint-ops">Endpoint ops</h2>

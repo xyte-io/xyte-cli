@@ -16,7 +16,7 @@
     <header class="site-nav">
       <div class="wrap nav-row">
         <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Reference</span></a>
-        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../guides/index.html">Guides</a><a href="../index.html#docs">Reference</a></nav>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../guides/index.html">Guides</a><a href="../index.html#docs">Reference</a><a href="../glossary.html">Glossary</a><a href="../troubleshooting.html">Troubleshooting</a></nav>
       </div>
     </header>
     <main class="page" id="main">
@@ -120,44 +120,30 @@ Next: run a guide, inspect fleet state, or generate a report.</code></pre></div>
           </div>
 
           <h2 id="scope">Provider scope</h2>
-          <p class="section-copy">Most users can leave provider scope on <code>auto</code>. Set it explicitly when your admin says the key is organization-only, partner-only, or results look incomplete.</p>
+          <p class="section-copy">Two different settings use these words. <strong>Setup</strong> picks the key provider with <code>--provider xyte-org|xyte-partner</code>. <strong>Read commands</strong> pick the data scope with <code>--provider-scope organization|partner|auto</code> (on <code>flow run</code> it is <code>--inspect-provider-scope</code>). Most users leave the read scope on <code>auto</code> and only set a value when a key is organization-only or partner-only, or results look incomplete.</p>
           <div class="table-wrap"><table class="matrix">
-            <thead><tr><th>Value</th><th>Use it when</th></tr></thead>
+            <thead><tr><th>Value</th><th>Used with</th><th>Use it when</th></tr></thead>
             <tbody>
-              <tr><td><code>xyte-org</code></td><td>Setup uses an organization API key.</td></tr>
-              <tr><td><code>xyte-partner</code></td><td>Setup uses a partner API key.</td></tr>
-              <tr><td><code>organization</code></td><td>Read organization devices, spaces, incidents, or reports.</td></tr>
-              <tr><td><code>partner</code></td><td>Read partner-level data when the key allows it.</td></tr>
-              <tr><td><code>auto</code></td><td>Let the CLI choose from the stored profile and command context.</td></tr>
+              <tr><td><code>xyte-org</code></td><td>setup <code>--provider</code></td><td>Setup uses an organization API key.</td></tr>
+              <tr><td><code>xyte-partner</code></td><td>setup <code>--provider</code></td><td>Setup uses a partner API key.</td></tr>
+              <tr><td><code>organization</code></td><td>read <code>--provider-scope</code></td><td>Read organization devices, spaces, incidents, or reports.</td></tr>
+              <tr><td><code>partner</code></td><td>read <code>--provider-scope</code></td><td>Read partner-level data when the key allows it.</td></tr>
+              <tr><td><code>auto</code></td><td>read <code>--provider-scope</code></td><td>Let the CLI choose from the stored profile and command context.</td></tr>
             </tbody>
           </table></div>
 
           <h2 id="glossary">Glossary</h2>
-          <div class="table-wrap"><table class="matrix">
-            <thead><tr><th>Term</th><th>Plain meaning</th></tr></thead>
-            <tbody>
-              <tr><td>Tenant</td><td>Your Xyte organization or partner account — the remote system the CLI reads and writes.</td></tr>
-              <tr><td>Profile</td><td>A local, named connection to one tenant (its stored API key and settings). <code>--tenant &lt;tenant-id&gt;</code> selects a profile by its label; the default label is <code>default</code>.</td></tr>
-              <tr><td>Alias</td><td>A local short name for a tenant profile.</td></tr>
-              <tr><td>Workspace</td><td>The folder where the agent or terminal runs commands.</td></tr>
-              <tr><td>Artifact</td><td>A file produced by a command, usually JSON, NDJSON, Markdown, PDF, or a run bundle.</td></tr>
-              <tr><td>Schema</td><td>A JSON contract that says which fields automation can parse.</td></tr>
-              <tr><td>Strict JSON</td><td>Machine-readable output without extra terminal decoration.</td></tr>
-              <tr><td>NDJSON</td><td>One JSON object per line, useful for watches and batch reports.</td></tr>
-              <tr><td>Flow</td><td>A repeatable multi-step workflow, such as remediation or a report run.</td></tr>
-              <tr><td>Plan/apply</td><td><code>--plan</code> previews a change. <code>--apply</code> runs it after approval.</td></tr>
-              <tr><td>Resume path</td><td>The run id, bundle path, or resume file used to continue an interrupted workflow.</td></tr>
-            </tbody>
-          </table></div>
+          <p class="section-copy">Every Xyte and CLI term used across these docs &mdash; tenant, profile, space, incident, Edge proxy, claim path, provider scope, flow, plan/apply, and more &mdash; is defined in plain language on the <a href="../glossary.html">glossary page</a>.</p>
 
           <h2 id="blockers">Common blockers</h2>
           <div class="failure-grid">
             <div class="failure"><strong>Node.js is missing or too old</strong><p>Install Node.js 22+ or run the command in an environment that already has it.</p></div>
             <div class="failure"><strong>The key file cannot be read</strong><p>Move it outside the repository, check file permissions, and rerun setup.</p></div>
             <div class="failure"><strong>Authentication is rejected</strong><p>Ask for a fresh key with access to the tenant, then rerun setup.</p></div>
-            <div class="failure"><strong>Results look incomplete</strong><p>Rerun with an explicit provider scope: <code>organization</code> or <code>partner</code>.</p></div>
+            <div class="failure"><strong>Results look incomplete</strong><p>Add an explicit scope to the read command: <code>--provider-scope organization</code> or <code>--provider-scope partner</code> (on <code>flow run</code> use <code>--inspect-provider-scope</code>).</p></div>
             <div class="failure"><strong>Network access fails</strong><p>Run <code>xyte-cli config doctor</code> again after fixing VPN, firewall, or proxy access.</p></div>
           </div>
+          <p class="section-copy">More fixes &mdash; including how to remove a stored key, remove a tenant, or uninstall &mdash; are on the <a href="../troubleshooting.html">Troubleshooting</a> page.</p>
         </article>
       </div>
     </main>

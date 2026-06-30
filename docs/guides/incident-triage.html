@@ -14,7 +14,7 @@
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
-    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a></nav></div></header>
+    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a><a href="../glossary.html">Glossary</a><a href="../troubleshooting.html">Troubleshooting</a></nav></div></header>
     <main class="page" id="main"><div class="wrap guide-shell">
       <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">Ask an agent</a><a href="#goal">Goal</a><a href="#commands">Commands</a><a href="#read-output">Read the output</a><a href="#repeat">Make this repeatable</a><a href="#failures">If it fails</a></aside>
       <article class="article">
@@ -29,7 +29,7 @@
           <button class="view-tab" type="button" role="tab" id="tab-ai" aria-controls="ai-agent" aria-selected="true" data-view="ai">AI agent</button>
           <button class="view-tab" type="button" role="tab" id="tab-terminal" aria-controls="terminal" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
         </div>
-        <div class="note prereq-note"><p><strong>Before you start:</strong> You need a connected profile, so <code>xyte-cli ops watch incidents</code> can read tenant state. Run <a href="./setup-readiness.html">Setup readiness</a> first.</p></div>
+        <div class="note prereq-note"><p><strong>Before you start:</strong> You need a connected profile, so <code>xyte-cli ops watch incidents</code> can read tenant state. Run <a href="./setup-readiness.html">Setup readiness</a> first. New here? See the <a href="../glossary.html">glossary</a>.</p></div>
 
 
         <section class="guide-view" data-view="ai" id="ai-agent" role="tabpanel" aria-labelledby="tab-ai" tabindex="0">
@@ -69,6 +69,7 @@ How do I compare incidents since yesterday?</code></pre></div>
   --tenant &lt;tenant-id&gt; \
   --profile incidents-active \
   --once \
+  --output json \
   --strict-json</code></pre></div>
           </li>
           <li class="step">
@@ -79,6 +80,7 @@ How do I compare incidents since yesterday?</code></pre></div>
   --profile incidents-active \
   --interval-ms 2000 \
   --max-polls 30 \
+  --output json \
   --strict-json \
   --out ./artifacts/xyte-watch.incidents.ndjson</code></pre></div>
           </li>
@@ -87,13 +89,13 @@ How do I compare incidents since yesterday?</code></pre></div>
             <p>These files answer whether the incident is isolated or part of a broader tenant problem.</p>
             <div class="command"><pre><code>xyte-cli ops inspect fleet \
   --tenant &lt;tenant-id&gt; \
-  --render json \
+  --output json \
   --out ./artifacts/xyte-fleet.triage.json
 
 xyte-cli ops inspect deep-dive \
   --tenant &lt;tenant-id&gt; \
   --window 24 \
-  --render json \
+  --output json \
   --out ./artifacts/xyte-deep-dive.triage.json</code></pre></div>
           </li>
         </ol>
@@ -122,11 +124,11 @@ xyte-cli ops inspect deep-dive \
 
         <h2 id="repeat">Make this repeatable</h2>
         <div class="command"><pre><code># Environment
-XYTE_PROFILE=&lt;tenant-id&gt;
+XYTE_TENANT=&lt;tenant-id&gt;
 
 # Rerun path
-xyte-cli ops watch incidents --tenant "$XYTE_PROFILE" --profile incidents-active --once --strict-json
-xyte-cli ops inspect fleet --tenant "$XYTE_PROFILE" --render json --out ./artifacts/xyte-fleet.triage.json</code></pre></div>
+xyte-cli ops watch incidents --tenant "$XYTE_TENANT" --profile incidents-active --once --output json --strict-json
+xyte-cli ops inspect fleet --tenant "$XYTE_TENANT" --output json --out ./artifacts/xyte-fleet.triage.json</code></pre></div>
 
         <h2 id="failures">If it fails</h2>
         <div class="failure-list">
@@ -135,7 +137,7 @@ xyte-cli ops inspect fleet --tenant "$XYTE_PROFILE" --render json --out ./artifa
           <div class="failure"><strong>The watch runs too long</strong><p>Use <code>--max-polls</code>. Do not leave an unbounded watch running in a support handoff.</p></div>
         </div>
         </section>
-        <aside class="related-next" aria-label="Next steps"><h3>Do this next</h3><p class="section-copy"><a class="next-link" href="./guided-remediation.html">Guided remediation &rarr;</a> When triage finds a real problem, plan and apply a fix behind an approval gate.</p><p class="section-copy">Reference: <a href="../reference/commands.html">Commands reference</a>, <a href="../reference/schema-contracts.html">Schema contracts</a>.</p></aside>
+        <aside class="related-next" aria-label="Next steps"><h3>Do this next</h3><p class="section-copy"><a class="next-link" href="./guided-remediation.html">Guided remediation &rarr;</a> When triage finds a real problem, plan and apply a fix behind an approval gate.</p><p class="section-copy">Reference: <a href="../reference/commands.html">Commands reference</a>, <a href="../reference/schema-contracts.html">Schema contracts</a>, <a href="../troubleshooting.html">Troubleshooting</a>.</p></aside>
 
       </article>
     </div></main>

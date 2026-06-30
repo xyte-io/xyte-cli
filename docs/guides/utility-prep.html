@@ -14,7 +14,7 @@
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
-    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a></nav></div></header>
+    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a><a href="../glossary.html">Glossary</a><a href="../troubleshooting.html">Troubleshooting</a></nav></div></header>
     <main class="page" id="main"><div class="wrap guide-shell">
       <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">Ask an agent</a><a href="#goal">Goal</a><a href="#commands">Commands</a><a href="#outputs">Review the outputs</a><a href="#repeat">Make this repeatable</a><a href="#failures">If it fails</a></aside>
       <article class="article">
@@ -29,7 +29,7 @@
           <button class="view-tab" type="button" role="tab" id="tab-ai" aria-controls="ai-agent" aria-selected="true" data-view="ai">AI agent</button>
           <button class="view-tab" type="button" role="tab" id="tab-terminal" aria-controls="terminal" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
         </div>
-        <div class="note prereq-note"><p><strong>Before you start:</strong> You need a connected profile and the source spreadsheet you want to clean. Run <a href="./setup-readiness.html">Setup readiness</a> first.</p></div>
+        <div class="note prereq-note"><p><strong>Before you start:</strong> You need a connected profile and the source spreadsheet you want to clean. Run <a href="./setup-readiness.html">Setup readiness</a> first. New here? See the <a href="../glossary.html">glossary</a>.</p></div>
 
 
         <section class="guide-view" data-view="ai" id="ai-agent" role="tabpanel" aria-labelledby="tab-ai" tabindex="0">
@@ -104,11 +104,11 @@ proxy_id,device_ip,device_model_id,space_id,reject_reason
 
         <h2 id="repeat">Make this repeatable</h2>
         <div class="command"><pre><code># Environment
-XYTE_PROFILE=&lt;tenant-id&gt;
+XYTE_TENANT=&lt;tenant-id&gt;
 INPUT_FILE=&lt;input.xlsx&gt;
 
 # Rerun path
-xyte-cli util prepare --action organization.edge.startClaim --tenant "$XYTE_PROFILE" --input "$INPUT_FILE" --output-dir ./prepared</code></pre></div>
+xyte-cli util prepare --action organization.edge.startClaim --tenant "$XYTE_TENANT" --input "$INPUT_FILE" --output-dir ./prepared</code></pre></div>
 
         <h2 id="failures">If it fails</h2>
         <div class="failure-list">
@@ -117,7 +117,7 @@ xyte-cli util prepare --action organization.edge.startClaim --tenant "$XYTE_PROF
           <div class="failure"><strong>You need to execute the prepared rows</strong><p>Use the workflow command that matches the action, such as <code>xyte-cli edge claim-batch</code>, <code>xyte-cli util import-tree</code>, or <code>xyte-cli util move-devices</code>. Run dry mode first.</p></div>
         </div>
         </section>
-        <aside class="related-next" aria-label="Next steps"><h3>Do this next</h3><p class="section-copy"><a class="next-link" href="./edge-claim.html">Device claiming &rarr;</a> With clean rows ready, run the matching claim or move workflow.</p><p class="section-copy">Reference: <a href="../reference/commands.html">Commands reference</a>, <a href="../reference/custom-workflows.html">Custom workflows</a>.</p></aside>
+        <aside class="related-next" aria-label="Next steps"><h3>Do this next</h3><p class="section-copy"><a class="next-link" href="./edge-claim.html">Device claiming &rarr;</a> With clean rows ready, run the matching claim or move workflow.</p><p class="section-copy">Reference: <a href="../reference/commands.html">Commands reference</a>, <a href="../reference/custom-workflows.html">Custom workflows</a>, <a href="../troubleshooting.html">Troubleshooting</a>.</p></aside>
 
       </article>
     </div></main>

@@ -14,7 +14,7 @@
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
-    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a></nav></div></header>
+    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a><a href="../glossary.html">Glossary</a><a href="../troubleshooting.html">Troubleshooting</a></nav></div></header>
     <main class="page" id="main"><div class="wrap guide-shell">
       <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">Ask an agent</a><a href="#goal">Goal</a><a href="#ci">CI recipes</a><a href="#decision-table">CI decision table</a><a href="#agent">Agent prompt</a><a href="#repeat">Make this repeatable</a><a href="#failures">If it fails</a></aside>
       <article class="article">
@@ -56,12 +56,12 @@ How do I make a read-only fleet report job?</code></pre></div>
         <section class="guide-view" data-view="terminal" id="terminal" role="tabpanel" aria-labelledby="tab-terminal" tabindex="0" hidden>
 
         <h2 id="goal">Goal</h2>
-        <p class="section-copy">A good automation job says where the API key comes from, which profile it uses, what files it saves, and whether it can change tenant state. Use JSON for machines and plan mode before writes.</p>
+        <p class="section-copy">A good automation job says where the API key comes from, which tenant it uses, what files it saves, and whether it can change tenant state. Use JSON for machines and plan mode before writes.</p>
 
         <h2 id="ci">CI recipes</h2>
         <p class="section-copy">These jobs are no-write by default. They set up the CLI from <code>XYTE_CLI_KEY</code>, create artifacts, and run read-only or plan-only commands with <code>@xyteai/cli@latest</code>. Pin a known version (<code>@xyteai/cli@&lt;version&gt;</code>) for reproducible CI.</p>
         <ol class="steps">
-          <li class="step"><h3>GitHub Actions</h3><p>Add a repository or environment secret named <code>XYTE_CLI_KEY</code>. Use <code>XYTE_PROFILE</code> only when the runner manages more than one Xyte connection.</p><div class="command"><pre><code>name: xyte-readiness
+          <li class="step"><h3>GitHub Actions</h3><p>Add a repository or environment secret named <code>XYTE_CLI_KEY</code>. Use <code>XYTE_TENANT</code> only when the runner manages more than one Xyte connection.</p><div class="command"><pre><code>name: xyte-readiness
 on:
   workflow_dispatch:
   schedule:
@@ -71,7 +71,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       XYTE_CLI_KEY: ${{ secrets.XYTE_CLI_KEY }}
-      XYTE_PROFILE: default
+      XYTE_TENANT: default
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -81,14 +81,14 @@ jobs:
       - run: |
           printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@latest setup run \
             --non-interactive \
-            --tenant "$XYTE_PROFILE" \
+            --tenant "$XYTE_TENANT" \
             --key-stdin \
             --format json
-          npx -y @xyteai/cli@latest config doctor --tenant "$XYTE_PROFILE" --format json \
+          npx -y @xyteai/cli@latest config doctor --tenant "$XYTE_TENANT" --format json \
             &gt; artifacts/xyte-doctor.json
           npx -y @xyteai/cli@latest ops inspect fleet \
-            --tenant "$XYTE_PROFILE" \
-            --render json \
+            --tenant "$XYTE_TENANT" \
+            --output json \
             --strict-json \
             --out artifacts/xyte-fleet.ci.json
       - uses: actions/upload-artifact@v4
@@ -97,7 +97,7 @@ jobs:
           path: |
             artifacts/
             reports/</code></pre></div></li>
-          <li class="step"><h3>GitLab CI</h3><p>Add a masked CI/CD variable named <code>XYTE_CLI_KEY</code>. Set <code>XYTE_PROFILE</code> to <code>default</code> unless the runner manages multiple connections.</p><div class="command"><pre><code>xyte_readiness:
+          <li class="step"><h3>GitLab CI</h3><p>Add a masked CI/CD variable named <code>XYTE_CLI_KEY</code>. Set <code>XYTE_TENANT</code> to <code>default</code> unless the runner manages multiple connections.</p><div class="command"><pre><code>xyte_readiness:
   image: node:22
   stage: test
   script:
@@ -105,21 +105,21 @@ jobs:
     - |
       printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@latest setup run \
         --non-interactive \
-        --tenant "${XYTE_PROFILE:-default}" \
+        --tenant "${XYTE_TENANT:-default}" \
         --key-stdin \
         --format json
-    - npx -y @xyteai/cli@latest config doctor --tenant "${XYTE_PROFILE:-default}" --format json &gt; artifacts/xyte-doctor.json
-    - npx -y @xyteai/cli@latest ops watch incidents --tenant "${XYTE_PROFILE:-default}" --profile incidents-active --once --strict-json --out artifacts/incidents.ndjson
+    - npx -y @xyteai/cli@latest config doctor --tenant "${XYTE_TENANT:-default}" --format json &gt; artifacts/xyte-doctor.json
+    - npx -y @xyteai/cli@latest ops watch incidents --tenant "${XYTE_TENANT:-default}" --profile incidents-active --once --output json --strict-json --out artifacts/incidents.ndjson
   artifacts:
     when: always
     paths:
       - artifacts/
       - reports/</code></pre></div></li>
-          <li class="step"><h3>Jenkins</h3><p>Store the API key as a secret text credential. Use a plain environment value for the profile label only when this runner manages multiple Xyte connections.</p><div class="command"><pre><code>pipeline {
+          <li class="step"><h3>Jenkins</h3><p>Store the API key as a secret text credential. Use a plain environment value for the tenant id only when this runner manages multiple Xyte connections.</p><div class="command"><pre><code>pipeline {
   agent any
   tools { nodejs "node-22" }
   environment {
-    XYTE_PROFILE = 'default'
+    XYTE_TENANT = 'default'
   }
   stages {
     stage('xyte readiness') {
@@ -129,12 +129,12 @@ jobs:
             mkdir -p artifacts reports
             printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@latest setup run \
               --non-interactive \
-              --tenant "$XYTE_PROFILE" \
+              --tenant "$XYTE_TENANT" \
               --key-stdin \
               --format json
-            npx -y @xyteai/cli@latest config doctor --tenant "$XYTE_PROFILE" --format json &gt; artifacts/xyte-doctor.json
+            npx -y @xyteai/cli@latest config doctor --tenant "$XYTE_TENANT" --format json &gt; artifacts/xyte-doctor.json
             npx -y @xyteai/cli@latest flow run flow.daily-deep-dive-report \
-              --tenant "$XYTE_PROFILE" \
+              --tenant "$XYTE_TENANT" \
               --plan \
               --strict-json \
               --out-dir artifacts/flow-runs
@@ -183,11 +183,11 @@ jobs:
         <h2 id="repeat">Make this repeatable</h2>
         <div class="command"><pre><code># Environment
 XYTE_CLI_KEY=&lt;secret from CI, never from source&gt;
-XYTE_PROFILE=default
+XYTE_TENANT=default
 
 # Rerun path
-printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@latest setup run --non-interactive --tenant "$XYTE_PROFILE" --key-stdin --format json
-npx -y @xyteai/cli@latest ops inspect fleet --tenant "$XYTE_PROFILE" --render json --strict-json --out ./artifacts/xyte-fleet.ci.json</code></pre></div>
+printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@latest setup run --non-interactive --tenant "$XYTE_TENANT" --key-stdin --format json
+npx -y @xyteai/cli@latest ops inspect fleet --tenant "$XYTE_TENANT" --output json --strict-json --out ./artifacts/xyte-fleet.ci.json</code></pre></div>
 
         <h2 id="failures">If it fails</h2>
         <div class="failure-list">
@@ -197,7 +197,7 @@ npx -y @xyteai/cli@latest ops inspect fleet --tenant "$XYTE_PROFILE" --render js
           <div class="failure"><strong>The agent wants to apply a change immediately</strong><p>Stop it and ask for the plan output first. Apply only after the target ids and next action are clear.</p></div>
         </div>
         </section>
-        <aside class="related-next" aria-label="Next steps"><h3>Do this next</h3><p class="section-copy"><a class="next-link" href="./daily-report.html">Daily fleet report &rarr;</a> See the read-only workflow these jobs usually run.</p><p class="section-copy">Reference: <a href="../reference/agents.html">Agent guidance</a>, <a href="../reference/built-in-flows.html">Built-in flows</a>.</p></aside>
+        <aside class="related-next" aria-label="Next steps"><h3>Do this next</h3><p class="section-copy"><a class="next-link" href="./daily-report.html">Daily fleet report &rarr;</a> See the read-only workflow these jobs usually run.</p><p class="section-copy">Reference: <a href="../reference/agents.html">Agent guidance</a>, <a href="../reference/built-in-flows.html">Built-in flows</a>, <a href="../troubleshooting.html">Troubleshooting</a>.</p></aside>
 
       </article>
     </div></main>
