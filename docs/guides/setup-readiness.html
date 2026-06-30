@@ -10,35 +10,33 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./styles.css" />
+    <noscript><style>.guide-view[hidden]{display:block !important}</style></noscript>
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-nav">
       <div class="wrap nav-row">
         <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a>
         <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a></nav>
       </div>
     </header>
-    <main class="page">
+    <main class="page" id="main">
       <div class="wrap guide-shell">
-        <aside class="toc" aria-label="On this page">
-          <strong>On this page</strong>
-          <a href="#ai-agent">AI agent</a>
-          <a href="#terminal">Terminal commands</a>
-        </aside>
+        <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">Ask an agent</a><a href="#goal">Goal</a><a href="#commands">Commands</a><a href="#read-output">Read the output</a><a href="#repeat">Make this repeatable</a><a href="#failures">If it fails</a></aside>
         <article class="article">
-          <p class="breadcrumb"><a href="./index.html">Guides</a> / Setup and readiness</p>
+          <p class="breadcrumb"><a href="../index.html">Overview</a> / <a href="./index.html">Guides</a> / Setup and readiness</p>
           <figure class="guide-visual">
-            <img src="./media/setup-readiness-workflow.png" alt="CLI setup flows through secure key setup, tenant readiness, and connectivity checks." />
+            <img src="./media/setup-readiness-workflow.webp" alt="CLI setup flows through secure key setup, tenant readiness, and connectivity checks." />
           </figure>
           <p class="eyebrow">Setup</p>
           <h1>Setup readiness.</h1>
           <p class="lead">Use this before any operational workflow. It confirms that the CLI runs, the API key is connected, and Xyte can answer basic API checks.</p>
           <div class="view-switch" role="tablist" aria-label="Guide view">
-            <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
-            <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
+            <button class="view-tab" type="button" role="tab" id="tab-ai" aria-controls="ai-agent" aria-selected="true" data-view="ai">AI agent</button>
+            <button class="view-tab" type="button" role="tab" id="tab-terminal" aria-controls="terminal" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
           </div>
 
-          <section class="guide-view" data-view="ai" id="ai-agent">
+          <section class="guide-view" data-view="ai" id="ai-agent" role="tabpanel" aria-labelledby="tab-ai" tabindex="0">
             <h2>Ask an agent</h2>
             <p class="section-copy">Give the agent the outcome you need. It will check the local runtime, connect through the saved API key, and tell you whether this machine is ready for real tenant work.</p>
             <div class="agent-prompt">
@@ -64,7 +62,7 @@ Why is config doctor failing?</code></pre></div>
             <div class="note"><p>If the agent cannot run shell commands, use the Terminal Commands view instead.</p></div>
           </section>
 
-          <section class="guide-view" data-view="terminal" id="terminal" hidden>
+          <section class="guide-view" data-view="terminal" id="terminal" role="tabpanel" aria-labelledby="tab-terminal" tabindex="0" hidden>
 
           <h2 id="goal">Goal</h2>
           <p class="section-copy">A complete setup result means three things: the command resolves on PATH, the key is stored outside the repository, and the tenant responds before you run fleet, incident, Edge, or report commands.</p>
@@ -74,7 +72,9 @@ Why is config doctor failing?</code></pre></div>
             <li class="step">
               <h3>Check the local command environment</h3>
               <p>Start here even if you think the CLI is installed. The doctor tells you whether to use the installed binary, <code>npx</code>, or a workspace-local install.</p>
-              <div class="command"><pre><code>xyte-cli doctor environment --format text
+              <div class="command"><pre><code># not installed yet? run any command through npx:
+# npx -y @xyteai/cli@latest doctor environment --format text
+xyte-cli doctor environment --format text
 xyte-cli doctor install --format text
 xyte-cli --version</code></pre></div>
             </li>
@@ -88,7 +88,7 @@ xyte-cli --version</code></pre></div>
             </li>
             <li class="step">
               <h3>Confirm readiness and connectivity</h3>
-              <p>Run both checks. <code>setup status</code> reads the selected profile; <code>config doctor</code> checks whether the key can actually reach the service.</p>
+              <p>Run both checks. <code>xyte-cli setup status</code> reads the selected profile; <code>xyte-cli config doctor</code> checks whether the key can actually reach the service.</p>
               <div class="command"><pre><code>xyte-cli setup status --format text
 xyte-cli config doctor --format text
 xyte-cli status --mode fast --format json</code></pre></div>
@@ -97,9 +97,9 @@ xyte-cli status --mode fast --format json</code></pre></div>
 
           <h2 id="read-output">Read the output</h2>
           <ul class="checklist">
-            <li><code>setup status</code> shows the active profile and setup readiness.</li>
-            <li><code>config doctor</code> reports connected. If it does not, fix this before using operational commands.</li>
-            <li><code>status --mode fast</code> gives a compact machine-readable readiness result for scripts and agents.</li>
+            <li><code>xyte-cli setup status</code> shows the active profile and setup readiness.</li>
+            <li><code>xyte-cli config doctor</code> reports connected. If it does not, fix this before using operational commands.</li>
+            <li><code>xyte-cli status --mode fast</code> gives a compact machine-readable readiness result for scripts and agents.</li>
           </ul>
           <div class="command"><pre><code>Profile: default
 State: ready
@@ -122,10 +122,12 @@ xyte-cli config doctor --format json</code></pre></div>
             <div class="failure"><strong>Connectivity fails</strong><p>Check network access, key scope, and provider selection. If you are intentionally offline, run setup with an explicit provider and <code>--connectivity never</code>.</p></div>
           </div>
           </section>
+        <aside class="related-next" aria-label="Next steps"><h3>Do this next</h3><p class="section-copy"><a class="next-link" href="./daily-report.html">Daily fleet report &rarr;</a> Once readiness is green, generate your first fleet report.</p><p class="section-copy">Reference: <a href="../reference/getting-started.html">Getting started</a>, <a href="../reference/commands.html">Commands reference</a>.</p></aside>
+
         </article>
       </div>
     </main>
     <footer class="footer"><div class="wrap footer-row"><span>Setup and readiness</span><span><a href="./index.html">Guides</a> · <a href="../index.html">Overview</a></span></div></footer>
-    <script src="./guide.js?v=use-case-guides-2"></script>
+    <script src="./guide.js?v=use-case-guides-3"></script>
   </body>
 </html>

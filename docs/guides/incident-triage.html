@@ -10,25 +10,29 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./styles.css" />
+    <noscript><style>.guide-view[hidden]{display:block !important}</style></noscript>
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a></nav></div></header>
-    <main class="page"><div class="wrap guide-shell">
-      <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">AI agent</a><a href="#terminal">Terminal commands</a></aside>
+    <main class="page" id="main"><div class="wrap guide-shell">
+      <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">Ask an agent</a><a href="#goal">Goal</a><a href="#commands">Commands</a><a href="#read-output">Read the output</a><a href="#repeat">Make this repeatable</a><a href="#failures">If it fails</a></aside>
       <article class="article">
-        <p class="breadcrumb"><a href="./index.html">Guides</a> / Incident triage</p>
+        <p class="breadcrumb"><a href="../index.html">Overview</a> / <a href="./index.html">Guides</a> / Incident triage</p>
         <figure class="guide-visual">
-          <img src="./media/incident-triage-workflow.png" alt="Incident signals grouped into snapshot, change, and context outputs before handoff." />
+          <img src="./media/incident-triage-workflow.webp" alt="Incident signals grouped into snapshot, change, and context outputs before handoff." />
         </figure>
         <p class="eyebrow">Incidents</p>
         <h1>Incident triage.</h1>
         <p class="lead">For active incidents, recent changes, and the fleet context an operator needs before escalation.</p>
         <div class="view-switch" role="tablist" aria-label="Guide view">
-          <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
-          <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
+          <button class="view-tab" type="button" role="tab" id="tab-ai" aria-controls="ai-agent" aria-selected="true" data-view="ai">AI agent</button>
+          <button class="view-tab" type="button" role="tab" id="tab-terminal" aria-controls="terminal" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
         </div>
+        <div class="note prereq-note"><p><strong>Before you start:</strong> You need a connected profile, so <code>xyte-cli ops watch incidents</code> can read tenant state. Run <a href="./setup-readiness.html">Setup readiness</a> first.</p></div>
 
-        <section class="guide-view" data-view="ai" id="ai-agent">
+
+        <section class="guide-view" data-view="ai" id="ai-agent" role="tabpanel" aria-labelledby="tab-ai" tabindex="0">
           <h2>Ask an agent</h2>
           <p class="section-copy">Ask for the incident picture, not a command name. The agent will read active incidents, compare the watch output, and save fleet context for the handoff.</p>
           <div class="agent-prompt"><div class="command"><pre><code>Show me active incidents and what changed since yesterday.</code></pre></div></div>
@@ -51,7 +55,7 @@ How do I compare incidents since yesterday?</code></pre></div>
           </div>
         </section>
 
-        <section class="guide-view" data-view="terminal" id="terminal" hidden>
+        <section class="guide-view" data-view="terminal" id="terminal" role="tabpanel" aria-labelledby="tab-terminal" tabindex="0" hidden>
 
         <h2 id="goal">Goal</h2>
         <p class="section-copy">The incident watch command gives a normalized incident frame. Run it once for a quick count, or poll briefly to detect additions, removals, and updates. Use fleet and deep-dive outputs when the incident needs context.</p>
@@ -62,7 +66,7 @@ How do I compare incidents since yesterday?</code></pre></div>
             <h3>Get the current active incident snapshot</h3>
             <p>This is the fastest way to answer "what is active right now?"</p>
             <div class="command"><pre><code>xyte-cli ops watch incidents \
-  --tenant &lt;profile-label&gt; \
+  --tenant &lt;tenant-id&gt; \
   --profile incidents-active \
   --once \
   --strict-json</code></pre></div>
@@ -71,7 +75,7 @@ How do I compare incidents since yesterday?</code></pre></div>
             <h3>Watch a short change window</h3>
             <p>Use a bounded watch for live triage. The output file is NDJSON so every frame can be read independently.</p>
             <div class="command"><pre><code>xyte-cli ops watch incidents \
-  --tenant &lt;profile-label&gt; \
+  --tenant &lt;tenant-id&gt; \
   --profile incidents-active \
   --interval-ms 2000 \
   --max-polls 30 \
@@ -82,12 +86,12 @@ How do I compare incidents since yesterday?</code></pre></div>
             <h3>Add fleet context before deciding what to do</h3>
             <p>These files answer whether the incident is isolated or part of a broader tenant problem.</p>
             <div class="command"><pre><code>xyte-cli ops inspect fleet \
-  --tenant &lt;profile-label&gt; \
+  --tenant &lt;tenant-id&gt; \
   --render json \
   --out ./artifacts/xyte-fleet.triage.json
 
 xyte-cli ops inspect deep-dive \
-  --tenant &lt;profile-label&gt; \
+  --tenant &lt;tenant-id&gt; \
   --window 24 \
   --render json \
   --out ./artifacts/xyte-deep-dive.triage.json</code></pre></div>
@@ -102,19 +106,23 @@ xyte-cli ops inspect deep-dive \
           <li><code>error</code> means the poll failed; keep the previous good baseline and retry after checking setup.</li>
         </ul>
         <div class="command"><pre><code>{
-  "event": "snapshot",
-  "tenantId": "&lt;profile-label&gt;",
+  "schemaVersion": "xyte.watch.frame.v1",
+  "eventType": "snapshot",
+  "profile": "incidents-active",
+  "tenantId": "&lt;tenant-id&gt;",
   "summary": {
-    "active": 12,
-    "critical": 1,
-    "high": 2
+    "total": 12,
+    "added": 0,
+    "removed": 0,
+    "updated": 0,
+    "changed": 0
   }
 }</code></pre></div>
         <p class="section-copy">A useful handoff names the active count, new or changed incidents, and the fleet context file. If frames repeat errors, the baseline is stale, or counts do not match the intended filters, fix those inputs before escalating.</p>
 
         <h2 id="repeat">Make this repeatable</h2>
         <div class="command"><pre><code># Environment
-XYTE_PROFILE=&lt;profile-label&gt;
+XYTE_PROFILE=&lt;tenant-id&gt;
 
 # Rerun path
 xyte-cli ops watch incidents --tenant "$XYTE_PROFILE" --profile incidents-active --once --strict-json
@@ -123,13 +131,15 @@ xyte-cli ops inspect fleet --tenant "$XYTE_PROFILE" --render json --out ./artifa
         <h2 id="failures">If it fails</h2>
         <div class="failure-list">
           <div class="failure"><strong>Counts differ from the web view</strong><p>Compare filters first: status, date range, page size, and whether the UI hides older active incidents.</p></div>
-          <div class="failure"><strong>Repeated error frames</strong><p>Run <code>xyte-cli config doctor --tenant &lt;profile-label&gt; --format text</code>, then retry with <code>--once</code>.</p></div>
+          <div class="failure"><strong>Repeated error frames</strong><p>Run <code>xyte-cli config doctor --tenant &lt;tenant-id&gt; --format text</code>, then retry with <code>--once</code>.</p></div>
           <div class="failure"><strong>The watch runs too long</strong><p>Use <code>--max-polls</code>. Do not leave an unbounded watch running in a support handoff.</p></div>
         </div>
         </section>
+        <aside class="related-next" aria-label="Next steps"><h3>Do this next</h3><p class="section-copy"><a class="next-link" href="./guided-remediation.html">Guided remediation &rarr;</a> When triage finds a real problem, plan and apply a fix behind an approval gate.</p><p class="section-copy">Reference: <a href="../reference/commands.html">Commands reference</a>, <a href="../reference/schema-contracts.html">Schema contracts</a>.</p></aside>
+
       </article>
     </div></main>
     <footer class="footer"><div class="wrap footer-row"><span>Incident triage</span><span><a href="./index.html">Guides</a> · <a href="../index.html">Overview</a></span></div></footer>
-    <script src="./guide.js?v=use-case-guides-2"></script>
+    <script src="./guide.js?v=use-case-guides-3"></script>
   </body>
 </html>

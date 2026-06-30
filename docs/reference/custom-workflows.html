@@ -12,13 +12,14 @@
     <link rel="stylesheet" href="../guides/styles.css" />
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-nav">
       <div class="wrap nav-row">
         <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Reference</span></a>
-        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../index.html#guides">Guides</a><a href="../index.html#docs">Reference</a></nav>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../guides/index.html">Guides</a><a href="../index.html#docs">Reference</a></nav>
       </div>
     </header>
-    <main class="page">
+    <main class="page" id="main">
       <div class="wrap guide-shell">
         <aside class="toc" aria-label="On this page">
           <strong>On this page</strong>
@@ -30,8 +31,8 @@
           <a href="#rules">Rules</a>
         </aside>
         <article class="article">
-          <p class="breadcrumb"><a href="../index.html">Overview</a> / Custom workflows</p>
-          <figure class="guide-visual"><img src="./media/custom-workflows-reference.png" alt="A built-in flow template becomes a custom alias with defaults, a share file, and a safe plan run." /></figure>
+          <p class="breadcrumb"><a href="../index.html">Overview</a> / <a href="../index.html#docs">Reference</a> / Custom workflows</p>
+          <figure class="guide-visual"><img src="./media/custom-workflows-reference.webp" alt="A built-in flow template becomes a custom alias with defaults, a share file, and a safe plan run." /></figure>
           <p class="eyebrow">Authoring</p>
           <h1>Custom workflows.</h1>
           <p class="lead">Use custom workflows when your team repeats the same built-in flow with the same defaults and wants one stable command.</p>
@@ -72,10 +73,10 @@ Pin the poll interval and timeout, then show the plan command.</code></pre></div
   --var window_hours=12
 
 xyte-cli flow run flow.noc-watch-triage \
-  --tenant &lt;profile-label&gt; \
+  --tenant &lt;tenant-id&gt; \
   --plan</code></pre></div>
 
-          <h2 id="real-examples">Real-life examples</h2>
+          <h2 id="real-examples">Examples</h2>
           <div class="failure-grid">
             <div class="failure"><strong>Daily NOC triage</strong><p>Create <code>flow.noc-watch-triage</code> from <code>flow.watch-to-triage</code> and pin the reporting window used by the shift.</p></div>
             <div class="failure"><strong>Weekly customer report</strong><p>Create <code>flow.customer-weekly-report</code> from <code>flow.daily-deep-dive-report</code> and pin the report window your customer expects.</p></div>
@@ -105,10 +106,11 @@ xyte-cli flow edit flow.noc-watch-triage \
   --replace-defaults \
   --var region=us \
   --var window_hours=6</code></pre></div>
+                <aside class="related-next" aria-label="Related guides"><h3>Related guides</h3><p class="section-copy"><a href="../guides/device-migration.html">Device migration</a>, <a href="../guides/utility-prep.html">Spreadsheet prep</a>, or browse <a href="../guides/index.html">all guides</a>.</p></aside>
         </article>
       </div>
     </main>
     <footer class="footer"><div class="wrap footer-row"><span>Custom workflows</span><span><a href="../index.html#docs">Reference</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
-    <script src="../guides/guide.js?v=use-case-guides-2"></script>
+    <script src="../guides/guide.js?v=use-case-guides-3"></script>
   </body>
 </html>

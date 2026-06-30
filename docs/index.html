@@ -1760,9 +1760,9 @@
                 <li>Add these commands to your pipeline. The setup command stores the key under the default profile.</li>
               </ol>
               <div class="command-shell shell-lines">
-                <pre id="ci-snippet"><code><span class="cmd-line">printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@0.11.0 setup run --non-interactive --key-stdin --format json</span><span class="cmd-line">npx -y @xyteai/cli@0.11.0 setup status --field tenantId</span></code></pre>
+                <pre id="ci-snippet"><code><span class="cmd-line">printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@latest setup run --non-interactive --key-stdin --format json</span><span class="cmd-line">npx -y @xyteai/cli@latest setup status --field tenantId</span></code></pre>
               </div>
-              <p class="panel-note panel-note-after">This CI path is read-oriented by default. Use plan-mode flows for change workflows and reserve apply steps for a separate approved job.</p>
+              <p class="panel-note panel-note-after">This CI path is read-oriented by default. Use plan-mode flows for change workflows and reserve apply steps for a separate approved job. For reproducible builds, pin a known version (<code>@xyteai/cli@&lt;version&gt;</code>) instead of <code>@latest</code>.</p>
               <div class="action-row">
                 <a class="inline-link" href="./reference/getting-started.html">Open setup guidance</a>
                 <span class="toast" id="ci-toast" role="status" aria-live="polite"></span>
@@ -1864,55 +1864,55 @@
 
           <div class="docs-grid reveal">
             <a class="docs-card surface" href="./guides/setup-readiness.html">
-              <div class="docs-card-thumb"><img src="./guides/media/setup-readiness-workflow.png" alt="" loading="lazy" /></div>
+              <div class="docs-card-thumb"><img src="./guides/media/setup-readiness-workflow.webp" alt="" loading="lazy" /></div>
               <strong>Setup and readiness</strong>
               <p>Use when a machine, workspace, or profile is new and later workflows depend on connected credentials.</p>
               <span>Open guide</span>
             </a>
             <a class="docs-card surface" href="./guides/incident-triage.html">
-              <div class="docs-card-thumb"><img src="./guides/media/incident-triage-workflow.png" alt="" loading="lazy" /></div>
+              <div class="docs-card-thumb"><img src="./guides/media/incident-triage-workflow.webp" alt="" loading="lazy" /></div>
               <strong>Incident triage</strong>
               <p>Use when incident state changed and support needs active counts, deltas, and fleet context.</p>
               <span>Open guide</span>
             </a>
             <a class="docs-card surface" href="./guides/daily-report.html">
-              <div class="docs-card-thumb"><img src="./guides/media/daily-report-workflow.png" alt="" loading="lazy" /></div>
+              <div class="docs-card-thumb"><img src="./guides/media/daily-report-workflow.webp" alt="" loading="lazy" /></div>
               <strong>Daily fleet report</strong>
               <p>Use when a scheduled update or customer handoff needs current counts and a reusable source file.</p>
               <span>Open guide</span>
             </a>
             <a class="docs-card surface" href="./guides/guided-remediation.html">
-              <div class="docs-card-thumb"><img src="./guides/media/guided-remediation-workflow.png" alt="" loading="lazy" /></div>
+              <div class="docs-card-thumb"><img src="./guides/media/guided-remediation-workflow.webp" alt="" loading="lazy" /></div>
               <strong>Guided remediation</strong>
               <p>Use when triage found a real issue and the next step might change device, incident, or ticket state.</p>
               <span>Open guide</span>
             </a>
             <a class="docs-card surface" href="./guides/device-migration.html">
-              <div class="docs-card-thumb"><img src="./guides/media/device-migration-workflow.png" alt="" loading="lazy" /></div>
+              <div class="docs-card-thumb"><img src="./guides/media/device-migration-workflow.webp" alt="" loading="lazy" /></div>
               <strong>Device migration</strong>
               <p>Use after a room plan, import, rename, or split makes existing device placement wrong.</p>
               <span>Open guide</span>
             </a>
             <a class="docs-card surface" href="./guides/edge-claim.html">
-              <div class="docs-card-thumb"><img src="./guides/media/edge-claim-workflow.png" alt="" loading="lazy" /></div>
+              <div class="docs-card-thumb"><img src="./guides/media/edge-claim-workflow.webp" alt="" loading="lazy" /></div>
               <strong>Device claiming</strong>
               <p>Use when native/direct devices or Edge devices need a clear claim path, reviewed inputs, and a result to hand off.</p>
               <span>Open guide</span>
             </a>
             <a class="docs-card surface" href="./guides/utility-prep.html">
-              <div class="docs-card-thumb"><img src="./guides/media/utility-prep-workflow.png" alt="" loading="lazy" /></div>
+              <div class="docs-card-thumb"><img src="./guides/media/utility-prep-workflow.webp" alt="" loading="lazy" /></div>
               <strong>Utility preparation</strong>
               <p>Use when a spreadsheet is understandable to people but still not ready for a CLI workflow.</p>
               <span>Open guide</span>
             </a>
             <a class="docs-card surface" href="./guides/ci-agent.html">
-              <div class="docs-card-thumb"><img src="./guides/media/ci-agent-workflow.png" alt="" loading="lazy" /></div>
+              <div class="docs-card-thumb"><img src="./guides/media/ci-agent-workflow.webp" alt="" loading="lazy" /></div>
               <strong>CI and agents</strong>
               <p>Use when a pipeline or shell-capable agent needs repeatable checks, artifacts, and approval gates.</p>
               <span>Open guide</span>
             </a>
             <a class="docs-card surface" href="./guides/index.html">
-              <div class="docs-card-thumb"><img src="./guides/media/setup-readiness-workflow.png" alt="" loading="lazy" /></div>
+              <div class="docs-card-thumb"><img src="./guides/media/setup-readiness-workflow.webp" alt="" loading="lazy" /></div>
               <strong>All guides</strong>
               <p>Browse the full guide library by operator goal.</p>
               <span>Open library</span>
@@ -1925,7 +1925,7 @@
         <div class="wrap">
           <header class="section-head reveal">
             <p class="eyebrow">Reference docs</p>
-            <h2 id="docs-title">Reference docs.</h2>
+            <h2 id="docs-title">Look up exact behavior.</h2>
             <p>
               Guides for first-run onboarding, full command reference, agent integration patterns,
               flow authoring, and schema contracts for machine-readable outputs.
@@ -1934,37 +1934,37 @@
 
           <div class="docs-grid reveal">
             <a class="docs-card surface" href="./reference/getting-started.html">
-              <div class="docs-card-thumb"><img src="./reference/media/getting-started-reference.png" alt="" loading="lazy" /></div>
+              <div class="docs-card-thumb"><img src="./reference/media/getting-started-reference.webp" alt="" loading="lazy" /></div>
               <strong>Getting started</strong>
               <p>First-run prerequisites, onboarding order, and the recommended setup sequence.</p>
               <span>Open guide</span>
             </a>
             <a class="docs-card surface" href="./reference/commands.html">
-              <div class="docs-card-thumb"><img src="./reference/media/commands-reference.png" alt="" loading="lazy" /></div>
+              <div class="docs-card-thumb"><img src="./reference/media/commands-reference.webp" alt="" loading="lazy" /></div>
               <strong>Commands reference</strong>
               <p>Exact command behavior, operator-facing examples, and the practical CLI surface area.</p>
               <span>Open commands</span>
             </a>
             <a class="docs-card surface" href="./reference/agents.html">
-              <div class="docs-card-thumb"><img src="./reference/media/agents-reference.png" alt="" loading="lazy" /></div>
+              <div class="docs-card-thumb"><img src="./reference/media/agents-reference.webp" alt="" loading="lazy" /></div>
               <strong>Agent guidance</strong>
               <p>Patterns for using <code>xyte-cli</code> safely from Codex, Claude, or similar agent workflows.</p>
               <span>Open agents</span>
             </a>
             <a class="docs-card surface" href="./reference/built-in-flows.html">
-              <div class="docs-card-thumb"><img src="./reference/media/built-in-flows-reference.png" alt="" loading="lazy" /></div>
+              <div class="docs-card-thumb"><img src="./reference/media/built-in-flows-reference.webp" alt="" loading="lazy" /></div>
               <strong>Built-in flows</strong>
               <p>Deterministic operational flow packs for incident response and repeated operator scenarios.</p>
               <span>Open flows</span>
             </a>
             <a class="docs-card surface" href="./reference/custom-workflows.html">
-              <div class="docs-card-thumb"><img src="./reference/media/custom-workflows-reference.png" alt="" loading="lazy" /></div>
+              <div class="docs-card-thumb"><img src="./reference/media/custom-workflows-reference.webp" alt="" loading="lazy" /></div>
               <strong>Custom workflows</strong>
               <p>Create, edit, share, and import reusable workflow definitions for your environment.</p>
               <span>Open authoring</span>
             </a>
             <a class="docs-card surface" href="./reference/schema-contracts.html">
-              <div class="docs-card-thumb"><img src="./reference/media/schema-contracts-reference.png" alt="" loading="lazy" /></div>
+              <div class="docs-card-thumb"><img src="./reference/media/schema-contracts-reference.webp" alt="" loading="lazy" /></div>
               <strong>Schema contracts</strong>
               <p>Machine-readable JSON contracts for agents, CI jobs, and integrations.</p>
               <span>Open schemas</span>
@@ -2008,6 +2008,28 @@
         var clipSVG = '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
         var checkSVG = '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
 
+        function copyText(text) {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(text);
+          }
+          return new Promise(function (resolve, reject) {
+            try {
+              var area = document.createElement("textarea");
+              area.value = text;
+              area.setAttribute("readonly", "");
+              area.style.position = "fixed";
+              area.style.left = "-9999px";
+              document.body.appendChild(area);
+              area.select();
+              var ok = document.execCommand("copy");
+              document.body.removeChild(area);
+              ok ? resolve() : reject(new Error("copy failed"));
+            } catch (err) {
+              reject(err);
+            }
+          });
+        }
+
         /* ── Floating copy icons on every code block ── */
         function wireCopyIcons() {
           var targets = document.querySelectorAll(".command-shell:not(.shell-lines), .detail-code, .mini-list code");
@@ -2027,7 +2049,7 @@
             btn.addEventListener("click", function (e) {
               e.stopPropagation();
               var text = (el.querySelector("pre") || el).innerText || "";
-              navigator.clipboard.writeText(text).then(function () {
+              copyText(text).then(function () {
                 btn.innerHTML = checkSVG;
                 btn.classList.add("copied");
                 setTimeout(function () {
@@ -2052,7 +2074,7 @@
             btn.addEventListener("click", function (e) {
               e.stopPropagation();
               var text = (line.innerText || "").replace(/^\$\s+/, "");
-              navigator.clipboard.writeText(text).then(function () {
+              copyText(text).then(function () {
                 btn.innerHTML = checkSVG;
                 btn.classList.add("copied");
                 var panel = line.closest('[role="tabpanel"]');
@@ -2078,7 +2100,7 @@
               var feedback = document.getElementById(button.getAttribute("data-copy-feedback"));
               if (!target || !feedback) return;
 
-              navigator.clipboard.writeText(target.innerText || "").then(
+              copyText(target.innerText || "").then(
                 function () { feedback.textContent = "Copied."; },
                 function () { feedback.textContent = "Copy failed."; }
               );

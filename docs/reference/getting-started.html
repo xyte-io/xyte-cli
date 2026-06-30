@@ -12,13 +12,14 @@
     <link rel="stylesheet" href="../guides/styles.css" />
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-nav">
       <div class="wrap nav-row">
         <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Reference</span></a>
-        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../index.html#guides">Guides</a><a href="../index.html#docs">Reference</a></nav>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../guides/index.html">Guides</a><a href="../index.html#docs">Reference</a></nav>
       </div>
     </header>
-    <main class="page">
+    <main class="page" id="main">
       <div class="wrap guide-shell">
         <aside class="toc" aria-label="On this page">
           <strong>On this page</strong>
@@ -33,8 +34,8 @@
           <a href="#blockers">Common blockers</a>
         </aside>
         <article class="article">
-          <p class="breadcrumb"><a href="../index.html">Overview</a> / Getting started</p>
-          <figure class="guide-visual"><img src="./media/getting-started-reference.png" alt="Setup checks the runtime, reads the key safely, connects the tenant, and runs a first status command." /></figure>
+          <p class="breadcrumb"><a href="../index.html">Overview</a> / <a href="../index.html#docs">Reference</a> / Getting started</p>
+          <figure class="guide-visual"><img src="./media/getting-started-reference.webp" alt="Setup checks the runtime, reads the key safely, connects the tenant, and runs a first status command." /></figure>
           <p class="eyebrow">Start</p>
           <h1>Getting started.</h1>
           <p class="lead">Set up one terminal, CI job, or shell-capable agent so it can run <code>xyte-cli</code> against your Xyte account.</p>
@@ -78,7 +79,7 @@ npx -y @xyteai/cli@latest doctor environment --format json</code></pre></div>
   --key-file &lt;path-outside-workspace&gt; \
   --format json
 
-printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@0.11.0 setup run \
+printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@latest setup run \
   --non-interactive \
   --key-stdin \
   --format json</code></pre></div>
@@ -135,6 +136,8 @@ Next: run a guide, inspect fleet state, or generate a report.</code></pre></div>
           <div class="table-wrap"><table class="matrix">
             <thead><tr><th>Term</th><th>Plain meaning</th></tr></thead>
             <tbody>
+              <tr><td>Tenant</td><td>Your Xyte organization or partner account — the remote system the CLI reads and writes.</td></tr>
+              <tr><td>Profile</td><td>A local, named connection to one tenant (its stored API key and settings). <code>--tenant &lt;tenant-id&gt;</code> selects a profile by its label; the default label is <code>default</code>.</td></tr>
               <tr><td>Alias</td><td>A local short name for a tenant profile.</td></tr>
               <tr><td>Workspace</td><td>The folder where the agent or terminal runs commands.</td></tr>
               <tr><td>Artifact</td><td>A file produced by a command, usually JSON, NDJSON, Markdown, PDF, or a run bundle.</td></tr>
@@ -153,12 +156,12 @@ Next: run a guide, inspect fleet state, or generate a report.</code></pre></div>
             <div class="failure"><strong>The key file cannot be read</strong><p>Move it outside the repository, check file permissions, and rerun setup.</p></div>
             <div class="failure"><strong>Authentication is rejected</strong><p>Ask for a fresh key with access to the tenant, then rerun setup.</p></div>
             <div class="failure"><strong>Results look incomplete</strong><p>Rerun with an explicit provider scope: <code>organization</code> or <code>partner</code>.</p></div>
-            <div class="failure"><strong>Network access fails</strong><p>Run <code>config doctor</code> again after fixing VPN, firewall, or proxy access.</p></div>
+            <div class="failure"><strong>Network access fails</strong><p>Run <code>xyte-cli config doctor</code> again after fixing VPN, firewall, or proxy access.</p></div>
           </div>
         </article>
       </div>
     </main>
     <footer class="footer"><div class="wrap footer-row"><span>Getting started</span><span><a href="../index.html#docs">Reference</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
-    <script src="../guides/guide.js?v=use-case-guides-2"></script>
+    <script src="../guides/guide.js?v=use-case-guides-3"></script>
   </body>
 </html>

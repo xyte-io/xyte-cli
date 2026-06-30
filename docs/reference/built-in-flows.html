@@ -12,13 +12,14 @@
     <link rel="stylesheet" href="../guides/styles.css" />
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-nav">
       <div class="wrap nav-row">
         <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Reference</span></a>
-        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../index.html#guides">Guides</a><a href="../index.html#docs">Reference</a></nav>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../guides/index.html">Guides</a><a href="../index.html#docs">Reference</a></nav>
       </div>
     </header>
-    <main class="page">
+    <main class="page" id="main">
       <div class="wrap guide-shell">
         <aside class="toc" aria-label="On this page">
           <strong>On this page</strong>
@@ -32,8 +33,8 @@
           <a href="#failures">Failures</a>
         </aside>
         <article class="article">
-          <p class="breadcrumb"><a href="../index.html">Overview</a> / Built-in flows</p>
-          <figure class="guide-visual"><img src="./media/built-in-flows-reference.png" alt="Built-in flow cards feed into a flow runner with plan mode, gates, resume state, and artifacts." /></figure>
+          <p class="breadcrumb"><a href="../index.html">Overview</a> / <a href="../index.html#docs">Reference</a> / Built-in flows</p>
+          <figure class="guide-visual"><img src="./media/built-in-flows-reference.webp" alt="Built-in flow cards feed into a flow runner with plan mode, gates, resume state, and artifacts." /></figure>
           <p class="eyebrow">Flows</p>
           <h1>Built-in flows.</h1>
           <p class="lead">Flows package common operator work into repeatable runs: setup checks, incident watch, triage, reporting, remediation, migration, and Edge onboarding.</p>
@@ -70,13 +71,13 @@ I uploaded a spreadsheet of devices to claim. Plan the batch, tell me which rows
           <div class="command"><pre><code>xyte-cli flow list --format text
 
 xyte-cli flow run flow.daily-deep-dive-report \
-  --tenant &lt;profile-label&gt; \
+  --tenant &lt;tenant-id&gt; \
   --plan \
   --out-dir ./tmp/flow-runs \
   --strict-json
 
 xyte-cli flow run flow.guided-remediation \
-  --tenant &lt;profile-label&gt; \
+  --tenant &lt;tenant-id&gt; \
   --apply \
   --resume &lt;run-id-or-path&gt;</code></pre></div>
 
@@ -92,7 +93,7 @@ xyte-cli flow run flow.guided-remediation \
             <li><code>flow.edge-claim</code> and <code>flow.edge-claim-batch</code>: Edge devices need planned claim runs.</li>
           </ul>
 
-          <h2 id="real-examples">Real-life examples</h2>
+          <h2 id="real-examples">Examples</h2>
           <div class="failure-grid">
             <div class="failure"><strong>Shift handoff</strong><p>Run <code>flow.watch-to-triage</code> in plan mode so the next operator gets incident state, fleet context, and report files.</p></div>
             <div class="failure"><strong>Customer report</strong><p>Run <code>flow.daily-deep-dive-report</code> to create the source JSON and readable report from the same tenant snapshot.</p></div>
@@ -126,10 +127,11 @@ xyte-cli flow run flow.guided-remediation \
             <div class="failure"><strong>Resume fails</strong><p>Use the original run id or bundle path. If metadata was edited or moved incorrectly, start a fresh plan.</p></div>
             <div class="failure"><strong>CI write gate</strong><p>Run <code>--plan</code> only and publish the run bundle for human review.</p></div>
           </div>
+                <aside class="related-next" aria-label="Related guides"><h3>Related guides</h3><p class="section-copy"><a href="../guides/guided-remediation.html">Guided remediation</a>, <a href="../guides/daily-report.html">Daily fleet report</a>, or browse <a href="../guides/index.html">all guides</a>.</p></aside>
         </article>
       </div>
     </main>
     <footer class="footer"><div class="wrap footer-row"><span>Built-in flows</span><span><a href="../index.html#docs">Reference</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
-    <script src="../guides/guide.js?v=use-case-guides-2"></script>
+    <script src="../guides/guide.js?v=use-case-guides-3"></script>
   </body>
 </html>

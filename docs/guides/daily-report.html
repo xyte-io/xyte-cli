@@ -10,25 +10,29 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./styles.css" />
+    <noscript><style>.guide-view[hidden]{display:block !important}</style></noscript>
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a></nav></div></header>
-    <main class="page"><div class="wrap guide-shell">
-      <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">AI agent</a><a href="#terminal">Terminal commands</a></aside>
+    <main class="page" id="main"><div class="wrap guide-shell">
+      <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">Ask an agent</a><a href="#goal">Goal</a><a href="#commands">Commands</a><a href="#examples">What to look for</a><a href="#repeat">Make this repeatable</a><a href="#failures">If it fails</a></aside>
       <article class="article">
-        <p class="breadcrumb"><a href="./index.html">Guides</a> / Daily report</p>
+        <p class="breadcrumb"><a href="../index.html">Overview</a> / <a href="./index.html">Guides</a> / Daily report</p>
         <figure class="guide-visual">
-          <img src="./media/daily-report-workflow.png" alt="Fleet signals become a saved source snapshot and a readable report artifact." />
+          <img src="./media/daily-report-workflow.webp" alt="Fleet signals become a saved source snapshot and a readable report artifact." />
         </figure>
         <p class="eyebrow">Reports</p>
         <h1>Daily fleet report.</h1>
         <p class="lead">Use this workflow when a daily review, escalation, or customer update needs current fleet state, clear counts, and a report that can be regenerated from the same source data.</p>
         <div class="view-switch" role="tablist" aria-label="Guide view">
-          <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
-          <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
+          <button class="view-tab" type="button" role="tab" id="tab-ai" aria-controls="ai-agent" aria-selected="true" data-view="ai">AI agent</button>
+          <button class="view-tab" type="button" role="tab" id="tab-terminal" aria-controls="terminal" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
         </div>
+        <div class="note prereq-note"><p><strong>Before you start:</strong> You need a connected profile, so <code>xyte-cli ops inspect deep-dive</code> can read fleet state. Run <a href="./setup-readiness.html">Setup readiness</a> first.</p></div>
 
-        <section class="guide-view" data-view="ai" id="ai-agent">
+
+        <section class="guide-view" data-view="ai" id="ai-agent" role="tabpanel" aria-labelledby="tab-ai" tabindex="0">
           <h2>Ask an agent</h2>
           <p class="section-copy">Ask for the report you need to send. The agent will save the source JSON first, render the report from that file, and return the paths.</p>
           <div class="agent-prompt"><div class="command"><pre><code>Make today's fleet report and show me the saved files.</code></pre></div></div>
@@ -51,7 +55,7 @@ How do I turn fleet JSON into a handoff?</code></pre></div>
           </div>
         </section>
 
-        <section class="guide-view" data-view="terminal" id="terminal" hidden>
+        <section class="guide-view" data-view="terminal" id="terminal" role="tabpanel" aria-labelledby="tab-terminal" tabindex="0" hidden>
 
         <h2 id="goal">Goal</h2>
         <p class="section-copy">Build the report from a saved JSON input, not from a separate manual summary. That keeps the handoff reproducible and gives an agent or script a source file to reuse.</p>
@@ -59,24 +63,24 @@ How do I turn fleet JSON into a handoff?</code></pre></div>
         <h2 id="commands">Commands</h2>
         <ol class="steps">
           <li class="step"><h3>Create the deep-dive source file</h3><p>The <code>--window</code> value is in hours. Use 24 for daily review.</p><div class="command"><pre><code>xyte-cli ops inspect deep-dive \
-  --tenant &lt;profile-label&gt; \
+  --tenant &lt;tenant-id&gt; \
   --provider-scope auto \
   --window 24 \
   --render json \
   --out ./artifacts/xyte-deep-dive.daily.json \
   --strict-json</code></pre></div></li>
           <li class="step"><h3>Render a Markdown report</h3><p>Markdown is easy to review in a terminal, commit comment, or support note.</p><div class="command"><pre><code>xyte-cli ops report generate \
-  --tenant &lt;profile-label&gt; \
+  --tenant &lt;tenant-id&gt; \
   --input ./artifacts/xyte-deep-dive.daily.json \
   --out ./reports/xyte-daily.md \
   --render markdown</code></pre></div></li>
           <li class="step"><h3>Render a PDF when you need an attachment</h3><p>Use the same JSON input so the Markdown and PDF tell the same story.</p><div class="command"><pre><code>xyte-cli ops report generate \
-  --tenant &lt;profile-label&gt; \
+  --tenant &lt;tenant-id&gt; \
   --input ./artifacts/xyte-deep-dive.daily.json \
   --out ./reports/xyte-daily.pdf \
   --render pdf</code></pre></div></li>
           <li class="step"><h3>Keep a compact fleet snapshot</h3><p>This is useful for dashboards and quick trend checks.</p><div class="command"><pre><code>xyte-cli ops inspect fleet \
-  --tenant &lt;profile-label&gt; \
+  --tenant &lt;tenant-id&gt; \
   --provider-scope auto \
   --render json \
   --out ./artifacts/xyte-fleet.daily.json</code></pre></div></li>
@@ -99,7 +103,7 @@ Report: ./reports/xyte-daily.md</code></pre></div>
 
         <h2 id="repeat">Make this repeatable</h2>
         <div class="command"><pre><code># Environment
-XYTE_PROFILE=&lt;profile-label&gt;
+XYTE_PROFILE=&lt;tenant-id&gt;
 REPORT_WINDOW_HOURS=24
 
 # Rerun path
@@ -108,14 +112,16 @@ xyte-cli ops report generate --tenant "$XYTE_PROFILE" --input ./artifacts/xyte-d
 
         <h2 id="failures">If it fails</h2>
         <div class="failure-list">
-          <div class="failure"><strong>The report command rejects the input</strong><p>Confirm the input file came from <code>ops inspect deep-dive</code>, not <code>ops inspect fleet</code>.</p></div>
+          <div class="failure"><strong>The report command rejects the input</strong><p>Confirm the input file came from <code>xyte-cli ops inspect deep-dive</code>, not <code>xyte-cli ops inspect fleet</code>.</p></div>
           <div class="failure"><strong>The output folder does not exist</strong><p>Create <code>./artifacts</code> and <code>./reports</code>, then rerun the command.</p></div>
           <div class="failure"><strong>The report is too broad</strong><p>Use a shorter <code>--window</code> and generate a new source JSON before rendering the report.</p></div>
         </div>
         </section>
+        <aside class="related-next" aria-label="Next steps"><h3>Do this next</h3><p class="section-copy"><a class="next-link" href="./ci-agent.html">CI and agents &rarr;</a> Schedule this report to run unattended from CI or an agent.</p><p class="section-copy">Reference: <a href="../reference/built-in-flows.html">Built-in flows</a>, <a href="../reference/commands.html">Commands reference</a>.</p></aside>
+
       </article>
     </div></main>
     <footer class="footer"><div class="wrap footer-row"><span>Daily report</span><span><a href="./index.html">Guides</a> · <a href="../index.html">Overview</a></span></div></footer>
-    <script src="./guide.js?v=use-case-guides-2"></script>
+    <script src="./guide.js?v=use-case-guides-3"></script>
   </body>
 </html>

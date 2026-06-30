@@ -10,25 +10,29 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./styles.css" />
+    <noscript><style>.guide-view[hidden]{display:block !important}</style></noscript>
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a></nav></div></header>
-    <main class="page"><div class="wrap guide-shell">
-      <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">AI agent</a><a href="#terminal">Terminal commands</a></aside>
+    <main class="page" id="main"><div class="wrap guide-shell">
+      <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">Ask an agent</a><a href="#goal">Goal</a><a href="#commands">Commands</a><a href="#gate">Approval gate</a><a href="#repeat">Make this repeatable</a><a href="#failures">If it fails</a></aside>
       <article class="article">
-        <p class="breadcrumb"><a href="./index.html">Guides</a> / Guided remediation</p>
+        <p class="breadcrumb"><a href="../index.html">Overview</a> / <a href="./index.html">Guides</a> / Guided remediation</p>
         <figure class="guide-visual">
-          <img src="./media/guided-remediation-workflow.png" alt="An issue moves through target discovery, an approval gate, an action, and a read-back check." />
+          <img src="./media/guided-remediation-workflow.webp" alt="An issue moves through target discovery, an approval gate, an action, and a read-back check." />
         </figure>
         <p class="eyebrow">Remediation</p>
         <h1>Guided remediation.</h1>
         <p class="lead">Use this after triage shows a real problem and an operator needs help moving from "what is wrong?" to "what can we safely do next?"</p>
         <div class="view-switch" role="tablist" aria-label="Guide view">
-          <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
-          <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
+          <button class="view-tab" type="button" role="tab" id="tab-ai" aria-controls="ai-agent" aria-selected="true" data-view="ai">AI agent</button>
+          <button class="view-tab" type="button" role="tab" id="tab-terminal" aria-controls="terminal" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
         </div>
+        <div class="note prereq-note"><p><strong>Before you start:</strong> You need a connected profile and a target incident and device id, usually from <a href="./incident-triage.html">Incident triage</a>. Run <a href="./setup-readiness.html">Setup readiness</a> if the CLI is not connected yet.</p></div>
 
-        <section class="guide-view" data-view="ai" id="ai-agent">
+
+        <section class="guide-view" data-view="ai" id="ai-agent" role="tabpanel" aria-labelledby="tab-ai" tabindex="0">
           <h2>Ask an agent</h2>
           <p class="section-copy">Describe the problem the way an operator would. The agent will inspect current state, choose a safe action if one exists, and stop with a plan for approval.</p>
           <div class="agent-prompt"><div class="command"><pre><code>Something is broken in a room. Find the cause and prepare a fix plan. Do not apply changes.</code></pre></div></div>
@@ -51,7 +55,7 @@ How do I resume an approved remediation?</code></pre></div>
           </div>
         </section>
 
-        <section class="guide-view" data-view="terminal" id="terminal" hidden>
+        <section class="guide-view" data-view="terminal" id="terminal" role="tabpanel" aria-labelledby="tab-terminal" tabindex="0" hidden>
 
         <h2 id="goal">Goal</h2>
         <p class="section-copy">Remediation is not just "send a command." The useful sequence is: inspect, confirm the available action, apply only after approval, and read the state back.</p>
@@ -59,38 +63,38 @@ How do I resume an approved remediation?</code></pre></div>
         <h2 id="commands">Commands</h2>
         <ol class="steps">
           <li class="step"><h3>Discover the current problem first</h3><p>Start with active incidents and fleet context. Choose the target from tenant state, not from a stale ticket or guessed id.</p><div class="command"><pre><code>xyte-cli ops watch incidents \
-  --tenant &lt;profile-label&gt; \
+  --tenant &lt;tenant-id&gt; \
   --profile incidents-active \
   --once \
   --strict-json \
   --out ./artifacts/incidents.before.ndjson
 
 xyte-cli ops inspect fleet \
-  --tenant &lt;profile-label&gt; \
+  --tenant &lt;tenant-id&gt; \
   --render json \
   --out ./artifacts/fleet.before-remediation.json</code></pre></div></li>
-          <li class="step"><h3>Plan against the chosen target</h3><p>After the incident and device are chosen, the plan shows required context and where the workflow will pause before a write.</p><div class="command"><pre><code>xyte-cli flow run flow.guided-remediation \
-  --tenant &lt;profile-label&gt; \
+          <li class="step"><h3>Plan against the chosen target</h3><p>After the incident and device are chosen, the plan shows required context and where the workflow will pause before a write. Read <code>device_id</code> and <code>incident_id</code> from the saved frames in step 1 — each incident item carries both.</p><div class="command"><pre><code>xyte-cli flow run flow.guided-remediation \
+  --tenant &lt;tenant-id&gt; \
   --plan \
   --var device_id=&lt;device-id&gt; \
   --var incident_id=&lt;incident-id&gt; \
   --once \
   --strict-json</code></pre></div></li>
           <li class="step"><h3>List commands the device actually supports</h3><p>Choose from returned commands. Do not guess a command name from another device model.</p><div class="command"><pre><code>xyte-cli api call organization.commands.getCommands \
-  --tenant &lt;profile-label&gt; \
+  --tenant &lt;tenant-id&gt; \
   --path-json '{"device_id":"&lt;device-id&gt;"}' \
   --query-json '{"page":1,"per_page":20}'</code></pre></div></li>
           <li class="step"><h3>Apply the approved step</h3><p>Resume the planned run only after the operator approves the write.</p><div class="command"><pre><code>xyte-cli flow run flow.guided-remediation \
-  --tenant &lt;profile-label&gt; \
+  --tenant &lt;tenant-id&gt; \
   --apply \
   --resume &lt;run-id-or-path&gt; \
   --strict-json</code></pre></div></li>
           <li class="step"><h3>Read back the state</h3><p>Use a read command after the write so the final answer is based on tenant state, not just command submission.</p><div class="command"><pre><code>xyte-cli api call organization.devices.getDevice \
-  --tenant &lt;profile-label&gt; \
+  --tenant &lt;tenant-id&gt; \
   --path-json '{"device_id":"&lt;device-id&gt;"}'
 
 xyte-cli ops watch incidents \
-  --tenant &lt;profile-label&gt; \
+  --tenant &lt;tenant-id&gt; \
   --profile incidents-active \
   --once</code></pre></div></li>
         </ol>
@@ -98,16 +102,23 @@ xyte-cli ops watch incidents \
         <h2 id="gate">Approval gate</h2>
         <div class="note"><p>For write-capable workflows, show the plan result first. Apply only when a human explicitly approves the next action and the target ids are known.</p></div>
         <div class="command"><pre><code>{
-  "status": "pending_gate",
-  "nextAction": "Review command and resume with --apply",
-  "requiresWrite": true,
-  "resume": "xyte-cli flow run flow.guided-remediation --tenant &lt;profile-label&gt; --apply --resume &lt;run-id-or-path&gt;"
+  "schemaVersion": "xyte.flow.run.v1",
+  "outcome": "pending_gate",
+  "nextAction": {
+    "kind": "approve_gate",
+    "stepId": "apply-remediation",
+    "title": "Review command and resume with --apply",
+    "requiresWrite": true,
+    "artifactPaths": [],
+    "command": "xyte-cli flow run flow.guided-remediation --tenant &lt;tenant-id&gt; --apply --resume &lt;run-id-or-path&gt;"
+  },
+  "resumeCommand": "xyte-cli flow run flow.guided-remediation --tenant &lt;tenant-id&gt; --apply --resume &lt;run-id-or-path&gt;"
 }</code></pre></div>
         <p class="section-copy">Continue only when the plan stops at a gate, the approved apply succeeds, and a follow-up read confirms the device or incident state. If the target is unclear, no safe command is available, apply fails, or read-back does not match, keep the case open and hand off the exact result.</p>
 
         <h2 id="repeat">Make this repeatable</h2>
         <div class="command"><pre><code># Environment
-XYTE_PROFILE=&lt;profile-label&gt;
+XYTE_PROFILE=&lt;tenant-id&gt;
 RUN_PATH=&lt;run-id-or-path&gt;
 
 # Rerun path after approval
@@ -120,9 +131,11 @@ xyte-cli flow run flow.guided-remediation --tenant "$XYTE_PROFILE" --apply --res
           <div class="failure"><strong>Read-back does not match the expected change</strong><p>Treat the action as incomplete and include the read-back result in the handoff.</p></div>
         </div>
         </section>
+        <aside class="related-next" aria-label="Next steps"><h3>Do this next</h3><p class="section-copy"><a class="next-link" href="./incident-triage.html">Incident triage &rarr;</a> After the fix applies, re-check incidents to confirm the change.</p><p class="section-copy">Reference: <a href="../reference/built-in-flows.html">Built-in flows</a>, <a href="../reference/schema-contracts.html">Schema contracts</a>.</p></aside>
+
       </article>
     </div></main>
     <footer class="footer"><div class="wrap footer-row"><span>Guided remediation</span><span><a href="./index.html">Guides</a> · <a href="../index.html">Overview</a></span></div></footer>
-    <script src="./guide.js?v=use-case-guides-2"></script>
+    <script src="./guide.js?v=use-case-guides-3"></script>
   </body>
 </html>
