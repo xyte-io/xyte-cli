@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Getting started | xyte-cli reference</title>
+    <meta name="description" content="Install xyte-cli, connect tenant access, and reach the first ready operational state." />
+    <link rel="icon" type="image/png" href="../media/xyte-ai-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../guides/styles.css" />
+  </head>
+  <body>
+    <header class="site-nav">
+      <div class="wrap nav-row">
+        <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Reference</span></a>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#guides">Guides</a><a href="../index.html#docs">Docs</a></nav>
+      </div>
+    </header>
+    <main class="page">
+      <div class="wrap guide-shell">
+        <aside class="toc" aria-label="On this page">
+          <strong>On this page</strong>
+          <a href="#first-use">First use</a>
+          <a href="#ask-an-agent">Ask an agent</a>
+          <a href="#start-here">Start here</a>
+          <a href="#connect-the-tenant">Connect tenant</a>
+          <a href="#verify-readiness">Verify readiness</a>
+          <a href="#terminal-ci">Terminal and CI</a>
+          <a href="#agent-skills">Agent skills</a>
+          <a href="#blockers">Blockers</a>
+        </aside>
+        <article class="article">
+          <p class="breadcrumb"><a href="../index.html">Overview</a> / Getting started</p>
+          <figure class="guide-visual"><img src="./media/getting-started-reference.png" alt="First-run setup moves through environment checks, secure key setup, tenant readiness, and a first operation." /></figure>
+          <p class="eyebrow">Start</p>
+          <h1>Getting started.</h1>
+          <p class="lead">Use this path when a new machine, workspace, CI job, or shell-capable agent needs to run real Xyte operations for the first time.</p>
+
+          <div class="summary">
+            <div class="summary-card"><strong>Prerequisites</strong><span>Node.js 22+, a Xyte API key, and a writable config directory.</span></div>
+            <div class="summary-card"><strong>Secret handling</strong><span>Keep the API key outside the repository and pass it by file, stdin, or secret command.</span></div>
+            <div class="summary-card"><strong>Ready state</strong><span>The CLI runs, the tenant is connected, and readiness checks pass.</span></div>
+          </div>
+
+          <h2 id="first-use">First use</h2>
+          <p class="section-copy">The first successful setup answers four questions: can this environment run the CLI, where does the API key come from, which tenant should commands use, and can the tenant answer live checks?</p>
+          <div class="failure-grid">
+            <div class="failure"><strong>New support laptop</strong><p>Install or use <code>npx</code>, connect the tenant once, then run readiness before incident or fleet work.</p></div>
+            <div class="failure"><strong>New CI job</strong><p>Read the API key from a CI secret, run setup non-interactively, then produce JSON artifacts.</p></div>
+            <div class="failure"><strong>New agent workspace</strong><p>Let the agent check the environment, ask for a key-file path if needed, and install workspace skill guidance.</p></div>
+            <div class="failure"><strong>New tenant</strong><p>Use an explicit tenant id and provider when auto-detection cannot choose the right scope.</p></div>
+          </div>
+
+          <h2 id="ask-an-agent">Ask an agent</h2>
+          <p class="section-copy">Give the agent the setup goal, not a pile of command syntax. It should discover the runtime, ask only for missing tenant or key-file information, and stop with readiness status.</p>
+          <div class="command"><pre><code>Set up xyte-cli for this workspace.
+
+Use the configured tenant if one is already ready.
+If setup is missing, ask me for the tenant id and the path to an API key file outside this repo.
+Do not ask me to paste a secret into chat.
+Stop when you can show tenant readiness and connectivity.</code></pre></div>
+
+          <h2 id="start-here">Start here</h2>
+          <p class="section-copy">Run the environment doctor first. It reports whether the current environment should use an installed binary, <code>npx</code>, or a workspace-local install.</p>
+          <div class="command"><pre><code>xyte-cli doctor environment --format json
+npx -y @xyteai/cli@latest doctor environment --format json</code></pre></div>
+          <p class="section-copy">If the report recommends a workspace-local install, keep the runtime under the workspace and call the generated binary path from jobs or agents.</p>
+          <div class="command"><pre><code>npm install --prefix ./.xyte-cli/runtime @xyteai/cli@latest
+./.xyte-cli/runtime/node_modules/.bin/xyte-cli doctor environment --format json</code></pre></div>
+
+          <div class="flow-diagram" aria-label="First-run setup workflow">
+            <h3>Workflow</h3>
+            <ol class="flow-steps">
+              <li><span class="flow-kicker">Runtime</span><strong>Check Node and CLI</strong><span>Pick installed, npx, or workspace-local execution.</span></li>
+              <li><span class="flow-kicker">Secret</span><strong>Read key safely</strong><span>Use a file, stdin, or a secret manager command outside the repo.</span></li>
+              <li><span class="flow-kicker">Tenant</span><strong>Create connection</strong><span>Store tenant profile and credential slot for later commands.</span></li>
+              <li><span class="flow-kicker">Doctor</span><strong>Check connectivity</strong><span>Confirm the tenant can answer before operations begin.</span></li>
+              <li><span class="flow-kicker">Ready</span><strong>Run first command</strong><span>Move into guides, flows, reports, or API calls.</span></li>
+            </ol>
+          </div>
+
+          <h2 id="connect-the-tenant">Connect tenant</h2>
+          <p class="section-copy">Create the API key in Xyte under Settings, save it outside the workspace, then run setup without pasting secrets into chat or command history.</p>
+          <div class="command"><pre><code>xyte-cli setup run \
+  --non-interactive \
+  --tenant &lt;tenant-id&gt; \
+  --key-file &lt;path-outside-workspace&gt; \
+  --format json</code></pre></div>
+          <p class="section-copy">For CI, pass the key through stdin from the job secret. For a secret manager, make the command print only the key and exit 0.</p>
+          <div class="command"><pre><code>printf "%s" "$XYTE_CLI_KEY" | xyte-cli setup run \
+  --non-interactive \
+  --tenant &lt;tenant-id&gt; \
+  --key-stdin \
+  --format json
+
+xyte-cli setup run \
+  --non-interactive \
+  --tenant &lt;tenant-id&gt; \
+  --key-command "&lt;secret-command&gt;" \
+  --format json</code></pre></div>
+
+          <h2 id="verify-readiness">Verify readiness</h2>
+          <p class="section-copy">Readiness is not just a saved key. Check the selected tenant, credential storage, and live connectivity before running fleet, incident, Edge, or write-capable workflows.</p>
+          <div class="command"><pre><code>xyte-cli setup status --tenant &lt;tenant-id&gt; --format text
+xyte-cli config doctor --tenant &lt;tenant-id&gt; --format json
+xyte-cli status --tenant &lt;tenant-id&gt; --mode fast --format json</code></pre></div>
+          <div class="command"><pre><code>Tenant: &lt;tenant-id&gt;
+Readiness: ready
+Connectivity: connected
+Next: run a guide, inspect fleet state, or list flows.</code></pre></div>
+
+          <h2 id="terminal-ci">Terminal and CI</h2>
+          <p class="section-copy">In a local terminal, a person can run setup interactively. In CI, avoid prompts and feed the key from the job secret.</p>
+          <div class="command"><pre><code># Local terminal
+xyte-cli setup run
+xyte-cli config doctor --tenant &lt;tenant-id&gt; --format text
+
+# CI step
+printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@latest setup run \
+  --non-interactive \
+  --tenant &lt;tenant-id&gt; \
+  --key-stdin \
+  --format json
+
+npx -y @xyteai/cli@latest status \
+  --tenant &lt;tenant-id&gt; \
+  --mode fast \
+  --format json</code></pre></div>
+
+          <h2 id="agent-skills">Agent skills</h2>
+          <p class="section-copy">Install the skill bundle when Codex, Claude Code, Copilot Agent mode, or another shell-capable agent will operate the CLI in this workspace.</p>
+          <div class="command"><pre><code>xyte-cli init --scope project --agents all --force --no-setup
+xyte-cli skills refresh</code></pre></div>
+          <ul class="checklist">
+            <li>Project-scope skills stay with the workspace.</li>
+            <li>User-scope skills stay with the developer account on this machine.</li>
+            <li>After upgrading the CLI, refresh workspace skills again.</li>
+          </ul>
+
+          <h2 id="blockers">Common blockers</h2>
+          <div class="failure-grid">
+            <div class="failure"><strong>Node.js is missing or too old</strong><p>Install Node.js 22+ or run in an environment that already has it.</p></div>
+            <div class="failure"><strong>The key file is rejected</strong><p>Move it outside the repository, check file permissions, and rerun setup.</p></div>
+            <div class="failure"><strong>Provider scope is wrong</strong><p>Pass <code>--provider xyte-org</code> or <code>--provider xyte-partner</code> when auto-detection cannot choose correctly.</p></div>
+            <div class="failure"><strong>Connectivity fails</strong><p>Run <code>config doctor</code>, fix tenant access or networking, then verify readiness again.</p></div>
+          </div>
+        </article>
+      </div>
+    </main>
+    <footer class="footer"><div class="wrap footer-row"><span>Getting started</span><span><a href="../index.html#docs">Docs</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
+    <script src="../guides/guide.js?v=use-case-guides-2"></script>
+  </body>
+</html>

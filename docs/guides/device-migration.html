@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Move devices between spaces with xyte-cli</title>
+    <meta name="description" content="Build, review, dry-run, and apply a device move plan with xyte-cli." />
+    <link rel="icon" type="image/png" href="../media/xyte-ai-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="./index.html">Guides</a><a href="../index.html#install">Install</a><a href="../index.html#docs">Docs</a></nav></div></header>
+    <main class="page"><div class="wrap guide-shell">
+      <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">AI agent</a><a href="#terminal">Terminal commands</a></aside>
+      <article class="article">
+        <p class="breadcrumb"><a href="./index.html">Guides</a> / Device migration</p>
+        <figure class="guide-visual">
+          <img src="./media/device-migration-workflow.png" alt="Devices move from source rooms through a reviewed move plan into target spaces." />
+        </figure>
+        <p class="eyebrow">Devices</p>
+        <h1>Device migration.</h1>
+        <p class="lead">Use this when a room plan, space import, naming cleanup, or tenant reorganization means devices must move to different spaces without guessing targets.</p>
+        <div class="summary">
+          <div class="summary-card"><strong>Use when</strong><span>Rooms were reorganized, imported, renamed, or split.</span></div>
+          <div class="summary-card"><strong>Inputs</strong><span>The source group, the intended target structure, and the field that should connect them.</span></div>
+          <div class="summary-card"><strong>Output</strong><span>A move CSV, dry-run report, and apply report.</span></div>
+        </div>
+
+        <div class="view-switch" role="tablist" aria-label="Guide view">
+          <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
+          <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
+        </div>
+
+        <section class="guide-view" data-view="ai" id="ai-agent">
+          <h2>Ask an agent</h2>
+          <p class="section-copy">Ask for the space-change outcome. The workflow turns that into discovered records, a move file, and a dry-run gate.</p>
+          <div class="agent-prompt"><div class="command"><pre><code>Help me move devices after a space change.
+
+Use the ready tenant, or ask which tenant if more than one is ready.
+Ask what changed, then find the source devices and target spaces.
+Show the proposed move CSV and dry-run results.
+Call out ambiguous rows.
+Do not apply moves until I approve the dry run.</code></pre></div></div>
+          <div class="flow-diagram" aria-label="Device migration workflow">
+            <h3>Workflow</h3>
+            <ol class="flow-steps">
+              <li><span class="flow-kicker">Change</span><strong>Space moved</strong><span>Start from the room plan, import, rename, or split.</span></li>
+              <li><span class="flow-kicker">Discover</span><strong>Find records</strong><span>Read source devices and target spaces from tenant state.</span></li>
+              <li><span class="flow-kicker">Map</span><strong>Build CSV</strong><span>Create rows only when device and target ids are known.</span></li>
+              <li><span class="flow-kicker">Dry run</span><strong>Review rows</strong><span>Catch missing, duplicate, or weak matches before changes.</span></li>
+              <li><span class="flow-kicker">Apply</span><strong>Move and verify</strong><span>Apply approved rows and read device spaces back.</span></li>
+            </ol>
+          </div>
+        </section>
+
+        <section class="guide-view" data-view="terminal" id="terminal" hidden>
+
+        <h2 id="goal">Goal</h2>
+        <p class="section-copy">Device migration should be boring: collect source and target data, create a CSV, review the rows, dry-run, then apply. Do not move devices directly from a guessed spreadsheet.</p>
+
+        <h2 id="commands">Commands</h2>
+        <ol class="steps">
+          <li class="step"><h3>Export source devices and target spaces</h3><p>Use explicit filters so the move plan is scoped to the intended part of the tenant.</p><div class="command"><pre><code>xyte-cli api call organization.devices.getDevices \
+  --tenant &lt;tenant-id&gt; \
+  --query-json '{"space_id":"&lt;source-space-id&gt;","page":1,"per_page":100}' \
+  &gt; ./artifacts/source-devices.json
+
+xyte-cli api call organization.spaces.getSpaces \
+  --tenant &lt;tenant-id&gt; \
+  --query-json '{"path_includes":"&lt;target-path&gt;","page":1,"per_page":100}' \
+  &gt; ./artifacts/target-spaces.json</code></pre></div></li>
+          <li class="step"><h3>Create a proposed move CSV</h3><p>Start with name matching when device names and space names are intentionally aligned. If they are not, prepare the CSV manually.</p><div class="command"><pre><code>xyte-cli util match \
+  --tenant &lt;tenant-id&gt; \
+  --source ./artifacts/source-devices.json \
+  --target ./artifacts/target-spaces.json \
+  --source-field name \
+  --target-field name \
+  --out ./artifacts/device-moves.csv \
+  --strict-json</code></pre></div></li>
+          <li class="step"><h3>Dry-run the move plan</h3><p>Dry-run reports planned rows and row-level problems without moving anything.</p><div class="command"><pre><code>xyte-cli util move-devices \
+  --tenant &lt;tenant-id&gt; \
+  --input ./artifacts/device-moves.csv \
+  --report ./artifacts/device-migration.dry-run.ndjson</code></pre></div></li>
+          <li class="step"><h3>Apply reviewed rows</h3><p>Apply only after checking the CSV and dry-run report.</p><div class="command"><pre><code>xyte-cli util move-devices \
+  --tenant &lt;tenant-id&gt; \
+  --input ./artifacts/device-moves.csv \
+  --apply \
+  --report ./artifacts/device-migration.apply.ndjson</code></pre></div></li>
+        </ol>
+
+        <h2 id="review">Review the plan</h2>
+        <ul class="checklist">
+          <li>Every row should have a known <code>device_id</code> and <code>target_space_id</code>.</li>
+          <li>Remove rows where the target was guessed from a weak name match.</li>
+          <li>Keep dry-run and apply reports separate so you can compare planned versus executed rows.</li>
+          <li>After apply, inspect the moved devices rather than assuming the command output is the final tenant state.</li>
+        </ul>
+        <div class="command"><pre><code>device_id,target_space_id,device_name,target_space_name
+&lt;device-id&gt;,&lt;space-id&gt;,"Room 101 Display","HQ / Floor 1 / Room 101"</code></pre></div>
+        <p class="section-copy">You are done when the apply report has no failed rows and the moved devices read back with the expected <code>space_id</code>.</p>
+
+        <h2 id="failures">If it fails</h2>
+        <div class="failure-list">
+          <div class="failure"><strong>Duplicate or weak matches</strong><p>Edit the CSV directly or rerun matching with a better source or target field.</p></div>
+          <div class="failure"><strong>Invalid target space</strong><p>Re-export spaces and replace the target ids before applying.</p></div>
+          <div class="failure"><strong>Some rows fail during apply</strong><p>Fix only the failed rows and rerun. Use <code>--continue-on-error</code> only when partial completion is acceptable.</p></div>
+        </div>
+        </section>
+      </article>
+    </div></main>
+    <footer class="footer"><div class="wrap footer-row"><span>Device migration</span><span><a href="./index.html">Guides</a> · <a href="../index.html">Overview</a></span></div></footer>
+    <script src="./guide.js?v=use-case-guides-2"></script>
+  </body>
+</html>

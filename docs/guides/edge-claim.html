@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Claim Edge devices with xyte-cli</title>
+    <meta name="description" content="Claim one Edge device or process a batch of Edge devices with xyte-cli." />
+    <link rel="icon" type="image/png" href="../media/xyte-ai-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="./index.html">Guides</a><a href="../index.html#install">Install</a><a href="../index.html#docs">Docs</a></nav></div></header>
+    <main class="page"><div class="wrap guide-shell">
+      <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">AI agent</a><a href="#terminal">Terminal commands</a></aside>
+      <article class="article">
+        <p class="breadcrumb"><a href="./index.html">Guides</a> / Edge claim</p>
+        <figure class="guide-visual">
+          <img src="./media/edge-claim-workflow.png" alt="Edge devices move from proxy discovery through claim planning, status polling, and target space confirmation." />
+        </figure>
+        <p class="eyebrow">Edge</p>
+        <h1>Edge device claims.</h1>
+        <p class="lead">Use this when new IP devices need to be onboarded through an Xyte Edge proxy and you want a planned claim, row-level results, and a resume path for batches.</p>
+        <div class="summary">
+          <div class="summary-card"><strong>Use when</strong><span>Claiming IP devices behind an Edge proxy.</span></div>
+          <div class="summary-card"><strong>Inputs</strong><span>A claim path, device source, proxy, model, and target space information.</span></div>
+          <div class="summary-card"><strong>Output</strong><span>Async claim result, report rows, and resume state for batches.</span></div>
+        </div>
+
+        <div class="view-switch" role="tablist" aria-label="Guide view">
+          <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
+          <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
+        </div>
+
+        <section class="guide-view" data-view="ai" id="ai-agent">
+          <h2>Ask an agent</h2>
+          <p class="section-copy">Ask for device onboarding. The workflow first chooses the claim path, then plans the claim before any mutation.</p>
+          <div class="agent-prompt"><div class="command"><pre><code>Help me claim devices.
+
+Use the ready tenant, or ask which tenant if more than one is ready.
+First show which claim path applies: native/direct, Edge, or Cloud-to-Cloud.
+If this is Edge, ask whether it is one device or a spreadsheet batch.
+Show the plan, missing identifiers, report path, and resume path.
+Do not apply the claim until I approve the plan.</code></pre></div></div>
+          <div class="flow-diagram" aria-label="Edge claim workflow">
+            <h3>Workflow</h3>
+            <ol class="flow-steps">
+              <li><span class="flow-kicker">Choose</span><strong>Claim path</strong><span>Separate native, Edge, and Cloud-to-Cloud requests.</span></li>
+              <li><span class="flow-kicker">Inputs</span><strong>Collect data</strong><span>Get proxy, model, IP, and target space details.</span></li>
+              <li><span class="flow-kicker">Prepare</span><strong>Plan claim</strong><span>Use a single plan or prepared batch rows first.</span></li>
+              <li><span class="flow-kicker">Approve</span><strong>Start claim</strong><span>Apply only after the planned target is clear.</span></li>
+              <li><span class="flow-kicker">Track</span><strong>Poll result</strong><span>Use reports and resume files for batch outcomes.</span></li>
+            </ol>
+          </div>
+        </section>
+
+        <section class="guide-view" data-view="terminal" id="terminal" hidden>
+
+        <h2 id="choose">Choose the right claim path</h2>
+        <p class="section-copy">Do not use Edge claim for every device. Native/direct claim uses serial number, MAC, and cloud id. Edge claim uses proxy id, device IP, model id, and space id. Cloud-to-Cloud claiming is not available through the public API.</p>
+
+        <h2 id="single">Single Edge claim</h2>
+        <ol class="steps">
+          <li class="step"><h3>Plan the claim</h3><p>Planning checks the inputs without starting the claim.</p><div class="command"><pre><code>xyte-cli edge claim \
+  --tenant &lt;tenant-id&gt; \
+  --proxy-id &lt;proxy-id&gt; \
+  --device-ip 192.168.1.100 \
+  --device-model-id &lt;device-model-id&gt; \
+  --space-id &lt;space-id&gt; \
+  --display-name "Room 101 Display" \
+  --plan</code></pre></div></li>
+          <li class="step"><h3>Apply after approval</h3><p>Apply starts the async claim and polls until success, failure, or timeout.</p><div class="command"><pre><code>xyte-cli edge claim \
+  --tenant &lt;tenant-id&gt; \
+  --proxy-id &lt;proxy-id&gt; \
+  --device-ip 192.168.1.100 \
+  --device-model-id &lt;device-model-id&gt; \
+  --space-id &lt;space-id&gt; \
+  --display-name "Room 101 Display" \
+  --apply</code></pre></div></li>
+          <li class="step"><h3>Check status without starting a new claim</h3><p>Use this after an interruption or when you need to inspect the current claim state.</p><div class="command"><pre><code>xyte-cli edge claim-status \
+  --tenant &lt;tenant-id&gt; \
+  --proxy-id &lt;proxy-id&gt; \
+  --device-ip 192.168.1.100</code></pre></div></li>
+        </ol>
+
+        <h2 id="batch">Batch Edge claim</h2>
+        <ol class="steps">
+          <li class="step"><h3>Prepare the spreadsheet</h3><p>Review the primary CSV and rejected CSV before running the batch.</p><div class="command"><pre><code>xyte-cli util prepare \
+  --action organization.edge.startClaim \
+  --tenant &lt;tenant-id&gt; \
+  --input &lt;input.xlsx&gt; \
+  --output-dir ./prepared</code></pre></div></li>
+          <li class="step"><h3>Plan and apply the batch</h3><p>Use report and resume files together. If the run is interrupted, rerun the apply command with the same resume file.</p><div class="command"><pre><code>xyte-cli edge claim-batch \
+  --tenant &lt;tenant-id&gt; \
+  --input ./prepared/organization-edge-startclaim.csv \
+  --report ./artifacts/edge-claim.report.ndjson \
+  --plan
+
+xyte-cli edge claim-batch \
+  --tenant &lt;tenant-id&gt; \
+  --input ./prepared/organization-edge-startclaim.csv \
+  --report ./artifacts/edge-claim.report.ndjson \
+  --resume-artifact ./artifacts/edge-claim.resume.ndjson \
+  --apply</code></pre></div></li>
+        </ol>
+
+        <h2 id="failures">If it fails</h2>
+        <div class="command"><pre><code>{
+  "status": "succeeded",
+  "deviceIp": "192.168.1.100",
+  "proxyId": "&lt;proxy-id&gt;",
+  "spaceId": "&lt;space-id&gt;"
+}</code></pre></div>
+        <p class="section-copy">You are done when the claim reaches <code>succeeded</code> or <code>already-claimed</code>. For batches, check the report file for every row disposition before closing the task.</p>
+        <div class="failure-list">
+          <div class="failure"><strong>Proxy offline</strong><p>Bring the proxy online, then resume the same batch with the same resume artifact.</p></div>
+          <div class="failure"><strong>Ping failed</strong><p>Check network and firewall reachability between the Edge proxy and device.</p></div>
+          <div class="failure"><strong>Rows rejected</strong><p>Fix the prepared CSV. Keep successful rows in the resume artifact so they are not repeated.</p></div>
+          <div class="failure"><strong>Claim timed out</strong><p>Check claim status, then rerun with a longer poll timeout if the device is still expected to claim.</p></div>
+        </div>
+        </section>
+      </article>
+    </div></main>
+    <footer class="footer"><div class="wrap footer-row"><span>Edge claim</span><span><a href="./index.html">Guides</a> · <a href="../index.html">Overview</a></span></div></footer>
+    <script src="./guide.js?v=use-case-guides-2"></script>
+  </body>
+</html>

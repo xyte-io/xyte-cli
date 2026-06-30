@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Run guided remediation with xyte-cli approval gates</title>
+    <meta name="description" content="Inspect a device, choose an approved remediation action, and confirm the result with xyte-cli." />
+    <link rel="icon" type="image/png" href="../media/xyte-ai-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="./index.html">Guides</a><a href="../index.html#install">Install</a><a href="../index.html#docs">Docs</a></nav></div></header>
+    <main class="page"><div class="wrap guide-shell">
+      <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">AI agent</a><a href="#terminal">Terminal commands</a></aside>
+      <article class="article">
+        <p class="breadcrumb"><a href="./index.html">Guides</a> / Guided remediation</p>
+        <figure class="guide-visual">
+          <img src="./media/guided-remediation-workflow.png" alt="An issue moves through target discovery, an approval gate, an action, and a read-back check." />
+        </figure>
+        <p class="eyebrow">Remediation</p>
+        <h1>Guided remediation.</h1>
+        <p class="lead">Use this after triage shows a real problem and an operator needs help moving from "what is wrong?" to "what can we safely do next?"</p>
+        <div class="summary">
+          <div class="summary-card"><strong>Use when</strong><span>A real incident needs an approved command, note, ticket update, or close action.</span></div>
+          <div class="summary-card"><strong>Inputs</strong><span>An incident, device, room, ticket, or symptom the operator wants to act on.</span></div>
+          <div class="summary-card"><strong>Output</strong><span>A planned action, an applied response, and a read-back check.</span></div>
+        </div>
+
+        <div class="view-switch" role="tablist" aria-label="Guide view">
+          <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
+          <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
+        </div>
+
+        <section class="guide-view" data-view="ai" id="ai-agent">
+          <h2>Ask an agent</h2>
+          <p class="section-copy">Ask for help with the issue, not for an endpoint call. The workflow keeps the write behind an approval gate.</p>
+          <div class="agent-prompt"><div class="command"><pre><code>Help me remediate the current issue.
+
+Use the ready tenant, or ask which tenant if more than one is ready.
+Show active incidents and likely affected devices first.
+If the target is unclear, show candidates and ask me to pick one.
+Then show the remediation plan, available device commands, and the read-back check.
+Do not apply anything until I approve the plan.</code></pre></div></div>
+          <div class="flow-diagram" aria-label="Guided remediation workflow">
+            <h3>Workflow</h3>
+            <ol class="flow-steps">
+              <li><span class="flow-kicker">Trigger</span><strong>Real issue</strong><span>Start from an incident, room, ticket, device, or symptom.</span></li>
+              <li><span class="flow-kicker">Find</span><strong>Resolve target</strong><span>Search matching records and ask when several targets fit.</span></li>
+              <li><span class="flow-kicker">Plan</span><strong>Gate writes</strong><span>List available actions and stop at the plan.</span></li>
+              <li><span class="flow-kicker">Approve</span><strong>Apply one step</strong><span>Run the write only after explicit approval.</span></li>
+              <li><span class="flow-kicker">Confirm</span><strong>Read back</strong><span>Check tenant state before closing the loop.</span></li>
+            </ol>
+          </div>
+        </section>
+
+        <section class="guide-view" data-view="terminal" id="terminal" hidden>
+
+        <h2 id="goal">Goal</h2>
+        <p class="section-copy">Remediation is not just "send a command." The useful sequence is: inspect, confirm the available action, apply only after approval, and read the state back.</p>
+
+        <h2 id="commands">Commands</h2>
+        <ol class="steps">
+          <li class="step"><h3>Start with the flow plan</h3><p>The plan shows required context and where the workflow will pause before a write.</p><div class="command"><pre><code>xyte-cli flow run flow.guided-remediation \
+  --tenant &lt;tenant-id&gt; \
+  --plan \
+  --var device_id=&lt;device-id&gt; \
+  --var incident_id=&lt;incident-id&gt; \
+  --once \
+  --strict-json</code></pre></div></li>
+          <li class="step"><h3>List commands the device actually supports</h3><p>Choose from returned commands. Do not guess a command name from another device model.</p><div class="command"><pre><code>xyte-cli api call organization.commands.getCommands \
+  --tenant &lt;tenant-id&gt; \
+  --path-json '{"device_id":"&lt;device-id&gt;"}' \
+  --query-json '{"page":1,"per_page":20}'</code></pre></div></li>
+          <li class="step"><h3>Apply the approved step</h3><p>Resume the planned run only after the operator approves the write.</p><div class="command"><pre><code>xyte-cli flow run flow.guided-remediation \
+  --tenant &lt;tenant-id&gt; \
+  --apply \
+  --resume &lt;run-id-or-path&gt; \
+  --strict-json</code></pre></div></li>
+          <li class="step"><h3>Read back the state</h3><p>Use a read command after the write so the final answer is based on tenant state, not just command submission.</p><div class="command"><pre><code>xyte-cli api call organization.devices.getDevice \
+  --tenant &lt;tenant-id&gt; \
+  --path-json '{"device_id":"&lt;device-id&gt;"}'
+
+xyte-cli ops watch incidents \
+  --tenant &lt;tenant-id&gt; \
+  --profile incidents-active \
+  --once</code></pre></div></li>
+        </ol>
+
+        <h2 id="gate">Approval gate</h2>
+        <div class="note"><p>For write-capable workflows, show the plan result first. Apply only when a human explicitly approves the next action and the target ids are known.</p></div>
+        <div class="command"><pre><code>{
+  "status": "pending_gate",
+  "nextAction": "Review command and resume with --apply",
+  "requiresWrite": true,
+  "resume": "xyte-cli flow run flow.guided-remediation --tenant &lt;tenant-id&gt; --apply --resume &lt;run-id-or-path&gt;"
+}</code></pre></div>
+        <p class="section-copy">You are done when the applied step has a successful response and a follow-up read command confirms the device or incident state.</p>
+
+        <h2 id="failures">If it fails</h2>
+        <div class="failure-list">
+          <div class="failure"><strong>No command is available</strong><p>Stop. Choose a different remediation path or escalate to a human operator.</p></div>
+          <div class="failure"><strong>The write response is not successful</strong><p>Do not continue the loop. Inspect the endpoint response and rerun triage.</p></div>
+          <div class="failure"><strong>Read-back does not match the expected change</strong><p>Treat the action as incomplete and include the read-back result in the handoff.</p></div>
+        </div>
+        </section>
+      </article>
+    </div></main>
+    <footer class="footer"><div class="wrap footer-row"><span>Guided remediation</span><span><a href="./index.html">Guides</a> · <a href="../index.html">Overview</a></span></div></footer>
+    <script src="./guide.js?v=use-case-guides-2"></script>
+  </body>
+</html>

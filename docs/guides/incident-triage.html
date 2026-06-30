@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Watch incidents and triage changes with xyte-cli</title>
+    <meta name="description" content="Watch active incidents, capture changes, and collect triage context with xyte-cli." />
+    <link rel="icon" type="image/png" href="../media/xyte-ai-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="./index.html">Guides</a><a href="../index.html#install">Install</a><a href="../index.html#docs">Docs</a></nav></div></header>
+    <main class="page"><div class="wrap guide-shell">
+      <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">AI agent</a><a href="#terminal">Terminal commands</a></aside>
+      <article class="article">
+        <p class="breadcrumb"><a href="./index.html">Guides</a> / Incident triage</p>
+        <figure class="guide-visual">
+          <img src="./media/incident-triage-workflow.png" alt="Incident signals grouped into snapshot, change, and context outputs before handoff." />
+        </figure>
+        <p class="eyebrow">Incidents</p>
+        <h1>Incident triage.</h1>
+        <p class="lead">Use this when you need to know what is active now, whether incidents changed during a short window, and which fleet context should be included before escalation.</p>
+
+        <div class="summary">
+          <div class="summary-card"><strong>Use when</strong><span>Support review, live monitoring, or agent-driven triage.</span></div>
+          <div class="summary-card"><strong>Inputs</strong><span>A ready tenant, or enough context to choose one.</span></div>
+          <div class="summary-card"><strong>Output</strong><span>Snapshot, delta, heartbeat, or error frames.</span></div>
+        </div>
+
+        <div class="view-switch" role="tablist" aria-label="Guide view">
+          <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
+          <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
+        </div>
+
+        <section class="guide-view" data-view="ai" id="ai-agent">
+          <h2>Ask an agent</h2>
+          <p class="section-copy">Ask for the operational view you need. The workflow below shows how the agent turns that into CLI checks and files.</p>
+          <div class="agent-prompt"><div class="command"><pre><code>Show me what changed in active incidents.
+
+Use the ready tenant, or ask which tenant if more than one is ready.
+Start with the current active incident snapshot.
+If incidents are active, add fleet context so I can see whether this is isolated or widespread.
+Show the count, what changed, any files written, and the next useful move.</code></pre></div></div>
+          <div class="flow-diagram" aria-label="Incident triage workflow">
+            <h3>Workflow</h3>
+            <ol class="flow-steps">
+              <li><span class="flow-kicker">Start</span><strong>Select tenant</strong><span>Use the ready tenant that owns the incident queue.</span></li>
+              <li><span class="flow-kicker">Watch</span><strong>Read incidents</strong><span>Capture the active set and any changes in a short window.</span></li>
+              <li><span class="flow-kicker">Branch</span><strong>Check count</strong><span>Stop if nothing is active; collect context if incidents exist.</span></li>
+              <li><span class="flow-kicker">Context</span><strong>Inspect fleet</strong><span>Compare the incident with device and fleet state.</span></li>
+              <li><span class="flow-kicker">Next</span><strong>Choose handoff</strong><span>Continue monitoring, write a report, or plan remediation.</span></li>
+            </ol>
+          </div>
+        </section>
+
+        <section class="guide-view" data-view="terminal" id="terminal" hidden>
+
+        <h2 id="goal">Goal</h2>
+        <p class="section-copy">The incident watch command gives a normalized incident frame. Run it once for a quick count, or poll briefly to detect additions, removals, and updates. Use fleet and deep-dive outputs when the incident needs context.</p>
+
+        <h2 id="commands">Commands</h2>
+        <ol class="steps">
+          <li class="step">
+            <h3>Get the current active incident snapshot</h3>
+            <p>This is the fastest way to answer "what is active right now?"</p>
+            <div class="command"><pre><code>xyte-cli ops watch incidents \
+  --tenant &lt;tenant-id&gt; \
+  --profile incidents-active \
+  --once \
+  --strict-json</code></pre></div>
+          </li>
+          <li class="step">
+            <h3>Watch a short change window</h3>
+            <p>Use a bounded watch for live triage. The output file is NDJSON so every frame can be read independently.</p>
+            <div class="command"><pre><code>xyte-cli ops watch incidents \
+  --tenant &lt;tenant-id&gt; \
+  --profile incidents-active \
+  --interval-ms 2000 \
+  --max-polls 30 \
+  --strict-json \
+  --out ./artifacts/xyte-watch.incidents.ndjson</code></pre></div>
+          </li>
+          <li class="step">
+            <h3>Add fleet context before deciding what to do</h3>
+            <p>These files answer whether the incident is isolated or part of a broader tenant problem.</p>
+            <div class="command"><pre><code>xyte-cli ops inspect fleet \
+  --tenant &lt;tenant-id&gt; \
+  --render json \
+  --out ./artifacts/xyte-fleet.triage.json
+
+xyte-cli ops inspect deep-dive \
+  --tenant &lt;tenant-id&gt; \
+  --window 24 \
+  --render json \
+  --out ./artifacts/xyte-deep-dive.triage.json</code></pre></div>
+          </li>
+        </ol>
+
+        <h2 id="read-output">Read the output</h2>
+        <ul class="checklist">
+          <li><code>snapshot</code> is the baseline incident set.</li>
+          <li><code>delta</code> means an incident was added, removed, or updated since the previous successful frame.</li>
+          <li><code>heartbeat</code> means polling worked and nothing changed.</li>
+          <li><code>error</code> means the poll failed; keep the previous good baseline and retry after checking setup.</li>
+        </ul>
+        <div class="command"><pre><code>{
+  "event": "snapshot",
+  "tenantId": "&lt;tenant-id&gt;",
+  "summary": {
+    "active": 12,
+    "critical": 1,
+    "high": 2
+  }
+}</code></pre></div>
+        <p class="section-copy">You are done when you can name the active count, identify new or changed incidents, and point to the fleet context file that explains whether the issue is isolated.</p>
+
+        <h2 id="failures">If it fails</h2>
+        <div class="failure-list">
+          <div class="failure"><strong>Counts differ from the web view</strong><p>Compare filters first: status, date range, page size, and whether the UI hides older active incidents.</p></div>
+          <div class="failure"><strong>Repeated error frames</strong><p>Run <code>xyte-cli config doctor --tenant &lt;tenant-id&gt; --format text</code>, then retry with <code>--once</code>.</p></div>
+          <div class="failure"><strong>The watch runs too long</strong><p>Use <code>--max-polls</code>. Do not leave an unbounded watch running in a support handoff.</p></div>
+        </div>
+        </section>
+      </article>
+    </div></main>
+    <footer class="footer"><div class="wrap footer-row"><span>Incident triage</span><span><a href="./index.html">Guides</a> · <a href="../index.html">Overview</a></span></div></footer>
+    <script src="./guide.js?v=use-case-guides-2"></script>
+  </body>
+</html>

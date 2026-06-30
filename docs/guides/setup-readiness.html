@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Set up xyte-cli and verify tenant readiness</title>
+    <meta name="description" content="Install xyte-cli, connect a tenant key, and verify that the tenant is ready for operational commands." />
+    <link rel="icon" type="image/png" href="../media/xyte-ai-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-nav">
+      <div class="wrap nav-row">
+        <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a>
+        <nav class="nav-links" aria-label="Primary"><a href="./index.html">Guides</a><a href="../index.html#install">Install</a><a href="../index.html#docs">Docs</a></nav>
+      </div>
+    </header>
+    <main class="page">
+      <div class="wrap guide-shell">
+        <aside class="toc" aria-label="On this page">
+          <strong>On this page</strong>
+          <a href="#ai-agent">AI agent</a>
+          <a href="#terminal">Terminal commands</a>
+        </aside>
+        <article class="article">
+          <p class="breadcrumb"><a href="./index.html">Guides</a> / Setup and readiness</p>
+          <figure class="guide-visual">
+            <img src="./media/setup-readiness-workflow.png" alt="CLI setup flows through secure key setup, tenant readiness, and connectivity checks." />
+          </figure>
+          <p class="eyebrow">Setup</p>
+          <h1>Setup readiness.</h1>
+          <p class="lead">Use this before any operational workflow. It confirms that the CLI runs, the tenant key is connected, and the tenant can answer basic API checks.</p>
+
+          <div class="summary">
+            <div class="summary-card"><strong>Use when</strong><span>New machine, new tenant, or first command in an agent session.</span></div>
+            <div class="summary-card"><strong>Inputs</strong><span>A tenant id or alias, plus an API key file only when setup is missing.</span></div>
+            <div class="summary-card"><strong>Output</strong><span>Ready tenant status and connectivity diagnostics.</span></div>
+          </div>
+
+          <div class="view-switch" role="tablist" aria-label="Guide view">
+            <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
+            <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
+          </div>
+
+          <section class="guide-view" data-view="ai" id="ai-agent">
+            <h2>Ask an agent</h2>
+            <p class="section-copy">Paste a direct request. The workflow below shows what the agent should check behind the scenes.</p>
+            <div class="agent-prompt">
+              <div class="command"><pre><code>Show me whether xyte-cli is ready for operations.
+
+Use the configured tenant if one is ready. If there are several, ask me which one.
+If setup is missing, ask for the tenant id and the path to an API key file outside this workspace.
+Do not ask me to paste a secret into chat.
+Stop once you can show CLI status, tenant readiness, connectivity, and anything blocking operational commands.</code></pre></div>
+            </div>
+            <div class="flow-diagram" aria-label="Setup readiness workflow">
+              <h3>Workflow</h3>
+              <ol class="flow-steps">
+                <li><span class="flow-kicker">Start</span><strong>Check the CLI</strong><span>Confirm the command can run in this environment.</span></li>
+                <li><span class="flow-kicker">Tenant</span><strong>Find readiness</strong><span>Use an existing ready tenant or ask which one to connect.</span></li>
+                <li><span class="flow-kicker">Secret</span><strong>Connect key</strong><span>Read the key from a file only when setup is missing.</span></li>
+                <li><span class="flow-kicker">Doctor</span><strong>Test access</strong><span>Run readiness and connectivity checks for the selected tenant.</span></li>
+                <li><span class="flow-kicker">Ready</span><strong>Stop cleanly</strong><span>Report what is ready and what still blocks operations.</span></li>
+              </ol>
+            </div>
+            <div class="note"><p>If the agent cannot run shell commands, use the Terminal Commands view instead.</p></div>
+          </section>
+
+          <section class="guide-view" data-view="terminal" id="terminal" hidden>
+
+          <h2 id="goal">Goal</h2>
+          <p class="section-copy">A complete setup result means three things: the command resolves on PATH, the key is stored outside the repository, and the tenant reports ready before you run fleet, incident, Edge, or report commands.</p>
+
+          <h2 id="commands">Commands</h2>
+          <ol class="steps">
+            <li class="step">
+              <h3>Check the local command environment</h3>
+              <p>Start here even if you think the CLI is installed. The doctor tells you whether to use the installed binary, <code>npx</code>, or a workspace-local install.</p>
+              <div class="command"><pre><code>xyte-cli doctor environment --format text
+xyte-cli doctor install --format text
+xyte-cli --version</code></pre></div>
+            </li>
+            <li class="step">
+              <h3>Connect a tenant key without exposing the secret</h3>
+              <p>Create the API key in Xyte and save it in a plain text file outside the project folder. Do not paste it into chat or commit it to the repo.</p>
+              <div class="command"><pre><code>xyte-cli setup run \
+  --non-interactive \
+  --tenant &lt;tenant-id&gt; \
+  --key-file &lt;path-outside-workspace&gt; \
+  --format json</code></pre></div>
+            </li>
+            <li class="step">
+              <h3>Confirm readiness and connectivity</h3>
+              <p>Run both checks. <code>setup status</code> reads the configured tenant; <code>config doctor</code> checks whether the key can actually reach the service.</p>
+              <div class="command"><pre><code>xyte-cli setup status --tenant &lt;tenant-id&gt; --format text
+xyte-cli config doctor --tenant &lt;tenant-id&gt; --format text
+xyte-cli status --tenant &lt;tenant-id&gt; --mode fast --format json</code></pre></div>
+            </li>
+          </ol>
+
+          <h2 id="read-output">Read the output</h2>
+          <ul class="checklist">
+            <li><code>setup status</code> should show the tenant profile and that setup is ready.</li>
+            <li><code>config doctor</code> should report connected. If it does not, fix this before using operational commands.</li>
+            <li><code>status --mode fast</code> gives a compact machine-readable readiness result for scripts and agents.</li>
+          </ul>
+          <div class="command"><pre><code>Tenant: &lt;tenant-id&gt;
+State: ready
+Connectivity: connected
+Missing setup: none</code></pre></div>
+          <p class="section-copy">You are done when the tenant is ready and connectivity is connected. If either value is missing or failed, stop here and fix setup before moving to incidents, reports, or Edge workflows.</p>
+
+          <h2 id="failures">If it fails</h2>
+          <div class="failure-list">
+            <div class="failure"><strong><code>xyte-cli</code> is not found</strong><p>Run <code>npx -y @xyteai/cli@latest doctor environment --format json</code> and use the command recommended in the report.</p></div>
+            <div class="failure"><strong>Tenant is not ready</strong><p>Run setup again with the intended tenant id and key file. Confirm you did not use a partner key for an organization tenant or the reverse.</p></div>
+            <div class="failure"><strong>Connectivity fails</strong><p>Check network access, key scope, and provider selection. If you are intentionally offline, run setup with an explicit provider and <code>--connectivity never</code>.</p></div>
+          </div>
+          </section>
+        </article>
+      </div>
+    </main>
+    <footer class="footer"><div class="wrap footer-row"><span>Setup and readiness</span><span><a href="./index.html">Guides</a> · <a href="../index.html">Overview</a></span></div></footer>
+    <script src="./guide.js?v=use-case-guides-2"></script>
+  </body>
+</html>

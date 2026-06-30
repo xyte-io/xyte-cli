@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agent guidance | xyte-cli reference</title>
+    <meta name="description" content="How to ask a shell-capable AI agent to operate xyte-cli without hiding commands or exposing secrets." />
+    <link rel="icon" type="image/png" href="../media/xyte-ai-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../guides/styles.css" />
+  </head>
+  <body>
+    <header class="site-nav">
+      <div class="wrap nav-row">
+        <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Reference</span></a>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#guides">Guides</a><a href="../index.html#docs">Docs</a></nav>
+      </div>
+    </header>
+    <main class="page">
+      <div class="wrap guide-shell">
+        <aside class="toc" aria-label="On this page">
+          <strong>On this page</strong>
+          <a href="#what-agents-do">What agents do</a>
+          <a href="#ask-an-agent">Ask an agent</a>
+          <a href="#terminal-ci">Terminal and CI</a>
+          <a href="#setup-path">Setup path</a>
+          <a href="#write-boundary">Write boundary</a>
+          <a href="#real-examples">Examples</a>
+          <a href="#handoff">Handoff</a>
+        </aside>
+        <article class="article">
+          <p class="breadcrumb"><a href="../index.html">Overview</a> / Agent guidance</p>
+          <figure class="guide-visual"><img src="./media/agents-reference.png" alt="An AI agent uses a terminal, secure key source, CLI guidance, and an approval gate before operations." /></figure>
+          <p class="eyebrow">Agents</p>
+          <h1>Agent guidance.</h1>
+          <p class="lead">Use this when Codex, Claude Code, Copilot Agent mode, or another shell-capable agent is running <code>xyte-cli</code> for you.</p>
+
+          <div class="summary">
+            <div class="summary-card"><strong>Agent role</strong><span>Run commands, inspect output, create files, and explain the next safe action.</span></div>
+            <div class="summary-card"><strong>Your role</strong><span>Provide goals, tenant choice, key-file path, and approval before writes.</span></div>
+            <div class="summary-card"><strong>Boundary</strong><span>Never paste secrets into chat. Never let an agent apply a write from a vague prompt.</span></div>
+          </div>
+
+          <h2 id="what-agents-do">What agents do</h2>
+          <p class="section-copy">An agent should operate the same CLI a person would use. It should show the command it ran, use structured output when it needs to reason over results, and stop when the next step needs a human decision.</p>
+          <div class="flow-diagram" aria-label="Agent operation workflow">
+            <h3>Workflow</h3>
+            <ol class="flow-steps">
+              <li><span class="flow-kicker">Goal</span><strong>Understand the task</strong><span>Start from the operator outcome, not from a guessed endpoint.</span></li>
+              <li><span class="flow-kicker">Ready</span><strong>Check setup</strong><span>Confirm CLI, tenant, and connectivity before interpreting data.</span></li>
+              <li><span class="flow-kicker">Read</span><strong>Inspect current state</strong><span>Watch incidents, inspect fleet, or describe endpoint contracts.</span></li>
+              <li><span class="flow-kicker">Gate</span><strong>Plan writes</strong><span>Show the proposed change and wait for explicit approval.</span></li>
+              <li><span class="flow-kicker">Handoff</span><strong>Report paths</strong><span>List commands run, files written, and the next safe action.</span></li>
+            </ol>
+          </div>
+
+          <h2 id="ask-an-agent">Ask an agent</h2>
+          <p class="section-copy">Use short, plain requests. Do not preload the prompt with IDs unless you already have them. Let the agent discover context and ask only for missing inputs.</p>
+          <div class="command"><pre><code>Show me whether xyte-cli is ready for this workspace.
+
+Show me active incidents and the fleet context for the ready tenant.
+
+Create today's fleet report. Save the source JSON and tell me the report path.
+
+Help me plan remediation for the current issue, but stop before apply.</code></pre></div>
+
+          <h2 id="terminal-ci">Terminal and CI</h2>
+          <p class="section-copy">The same work should be reproducible without an agent. In a terminal, run the command directly. In CI, use non-interactive setup, JSON output, saved artifacts, and plan-only flows unless the job has a separate approval step.</p>
+          <div class="command"><pre><code># Terminal
+xyte-cli ops inspect fleet \
+  --tenant &lt;tenant-id&gt; \
+  --render json \
+  --out ./artifacts/fleet.json
+
+# CI
+printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@latest setup run \
+  --non-interactive \
+  --tenant &lt;tenant-id&gt; \
+  --key-stdin \
+  --format json
+
+npx -y @xyteai/cli@latest flow run flow.daily-deep-dive-report \
+  --tenant &lt;tenant-id&gt; \
+  --plan \
+  --strict-json</code></pre></div>
+
+          <h2 id="setup-path">Setup path</h2>
+          <p class="section-copy">When setup is missing, the agent should ask for a tenant id and a path to an API key file outside the workspace. It should not ask for the key text.</p>
+          <div class="command"><pre><code>xyte-cli doctor environment --format json
+xyte-cli setup run \
+  --non-interactive \
+  --tenant &lt;tenant-id&gt; \
+  --key-file &lt;path-outside-workspace&gt; \
+  --format json
+xyte-cli setup status --tenant &lt;tenant-id&gt; --format text
+xyte-cli init --scope project --agents all --force --no-setup</code></pre></div>
+
+          <h2 id="write-boundary">Write boundary</h2>
+          <p class="section-copy">For commands that can change tenant state, the agent should plan first. Apply is a separate step after the operator reviews the target, effect, and resume path.</p>
+          <div class="command"><pre><code>xyte-cli flow run &lt;flow-id&gt; --tenant &lt;tenant-id&gt; --plan
+xyte-cli flow run &lt;flow-id&gt; --tenant &lt;tenant-id&gt; --apply --resume &lt;run-id-or-path&gt;</code></pre></div>
+          <ul class="checklist">
+            <li>Read-only requests can run immediately after readiness checks.</li>
+            <li>Move, claim, close, update, send-command, and import actions need approval.</li>
+            <li>After a write, the agent should read back the changed state.</li>
+          </ul>
+
+          <h2 id="real-examples">Real-life examples</h2>
+          <div class="failure-grid">
+            <div class="failure"><strong>Morning support handoff</strong><p>Ask: "Show me what changed in active incidents since yesterday and save fleet context." The agent runs watch once, saves fleet JSON, and summarizes changes.</p></div>
+            <div class="failure"><strong>Weekly operations report</strong><p>Ask: "Create this week's deep-dive report for the ready tenant." The agent saves source JSON and a Markdown or PDF report.</p></div>
+            <div class="failure"><strong>Room reorganization</strong><p>Ask: "Help me move devices after the room import." The agent exports current devices and spaces, builds a move CSV, and stops at dry run.</p></div>
+            <div class="failure"><strong>Edge onboarding</strong><p>Ask: "Help me claim these Edge devices from the spreadsheet." The agent prepares rows, explains rejects, runs plan, and waits before apply.</p></div>
+          </div>
+
+          <h2 id="handoff">Handoff</h2>
+          <p class="section-copy">A useful agent answer should end with what changed, what did not change, where the files are, and what the next decision is.</p>
+          <div class="command"><pre><code>Ready tenant: &lt;tenant-id&gt;
+Commands run: setup status, config doctor, ops inspect fleet
+Files written:
+  ./artifacts/fleet.json
+  ./reports/xyte-daily.md
+Next action: review the report or ask for remediation planning.</code></pre></div>
+        </article>
+      </div>
+    </main>
+    <footer class="footer"><div class="wrap footer-row"><span>Agent guidance</span><span><a href="../index.html#docs">Docs</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
+    <script src="../guides/guide.js?v=use-case-guides-2"></script>
+  </body>
+</html>

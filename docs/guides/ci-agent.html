@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Use xyte-cli from CI or an AI agent</title>
+    <meta name="description" content="Run xyte-cli from CI jobs and shell-capable AI agents without exposing API keys." />
+    <link rel="icon" type="image/png" href="../media/xyte-ai-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="./index.html">Guides</a><a href="../index.html#install">Install</a><a href="../index.html#docs">Docs</a></nav></div></header>
+    <main class="page"><div class="wrap guide-shell">
+      <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">AI agent</a><a href="#terminal">Terminal commands</a></aside>
+      <article class="article">
+        <p class="breadcrumb"><a href="./index.html">Guides</a> / CI and agents</p>
+        <figure class="guide-visual">
+          <img src="./media/ci-agent-workflow.png" alt="CI and AI agent lanes use tenant access to produce artifacts and stop at an approval gate." />
+        </figure>
+        <p class="eyebrow">Automation</p>
+        <h1>CI and agents.</h1>
+        <p class="lead">Use this when Xyte checks or reports need to run without a person typing every command: scheduled jobs, pipeline checks, or shell-capable agents such as Codex, Claude Code, and Copilot Agent mode.</p>
+        <div class="summary">
+          <div class="summary-card"><strong>Use when</strong><span>You need repeatable setup, inspection, or reports.</span></div>
+          <div class="summary-card"><strong>Inputs</strong><span>The job goal, tenant context, and a secret source outside the repository.</span></div>
+          <div class="summary-card"><strong>Output</strong><span>JSON files, report artifacts, and approval-gated flow summaries.</span></div>
+        </div>
+
+        <div class="view-switch" role="tablist" aria-label="Guide view">
+          <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
+          <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
+        </div>
+
+        <section class="guide-view" data-view="ai" id="ai-agent">
+          <h2>Ask an agent</h2>
+          <p class="section-copy">Ask for the automation outcome. The workflow keeps environment setup, tenant access, and write gates explicit.</p>
+          <div class="agent-prompt"><div class="command"><pre><code>Set up a repeatable xyte-cli job for this workspace.
+
+Ask what the job should produce: readiness, fleet JSON, incident snapshot, daily report, or a plan-only change workflow.
+Check the CLI and tenant access.
+If setup is missing, ask for the tenant id and a secret source outside the repo.
+Write machine-readable artifacts.
+For changes, stop at --plan until I approve --apply.</code></pre></div></div>
+          <div class="flow-diagram" aria-label="CI and agent workflow">
+            <h3>Workflow</h3>
+            <ol class="flow-steps">
+              <li><span class="flow-kicker">Goal</span><strong>Choose job</strong><span>Decide whether the run checks, reports, or plans a change.</span></li>
+              <li><span class="flow-kicker">Runtime</span><strong>Check CLI</strong><span>Use the installed command or the recommended package path.</span></li>
+              <li><span class="flow-kicker">Tenant</span><strong>Resolve access</strong><span>Select a ready tenant or connect one from a secret source.</span></li>
+              <li><span class="flow-kicker">Run</span><strong>Write artifacts</strong><span>Produce JSON, reports, or a plan-only flow summary.</span></li>
+              <li><span class="flow-kicker">Gate</span><strong>Stop safely</strong><span>Wait for approval before any apply step.</span></li>
+            </ol>
+          </div>
+        </section>
+
+        <section class="guide-view" data-view="terminal" id="terminal" hidden>
+
+        <h2 id="goal">Goal</h2>
+        <p class="section-copy">Automation should be explicit about where the API key comes from, which tenant is used, and whether the command is read-only or write-capable. Use JSON output for machines and plan mode before writes.</p>
+
+        <h2 id="ci">CI commands</h2>
+        <ol class="steps">
+          <li class="step"><h3>Check the environment</h3><p>Use <code>npx</code> when you do not want to depend on a preinstalled global binary.</p><div class="command"><pre><code>npx -y @xyteai/cli@latest doctor environment --format json</code></pre></div></li>
+          <li class="step"><h3>Set up from a CI secret</h3><p>Map your CI secret to <code>XYTE_CLI_KEY</code>, then pass it through stdin. This keeps the key out of command history and source files.</p><div class="command"><pre><code>printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@latest setup run \
+  --non-interactive \
+  --tenant &lt;tenant-id&gt; \
+  --key-stdin \
+  --format json</code></pre></div></li>
+          <li class="step"><h3>Run a read-only job</h3><p>Strict JSON is the safest output when another tool needs to parse the result.</p><div class="command"><pre><code>npx -y @xyteai/cli@latest ops inspect fleet \
+  --tenant &lt;tenant-id&gt; \
+  --render json \
+  --strict-json \
+  --out ./artifacts/xyte-fleet.ci.json</code></pre></div></li>
+        </ol>
+
+        <h2 id="agent">Agent prompt</h2>
+        <p class="section-copy">Use a shell-capable agent. Chat-only assistants can explain commands, but they cannot install or run the CLI.</p>
+        <div class="command"><pre><code>Set up a repeatable xyte-cli job for this workspace.
+
+Ask what the job should produce.
+Check the CLI and tenant access.
+If setup is missing, ask for the tenant id and a secret source outside the repo.
+Write machine-readable artifacts.
+For changes, stop at --plan until I approve --apply.</code></pre></div>
+        <p class="section-copy">You are done when the job produces a JSON artifact or the agent can point to the command it ran, the tenant it used, and the next safe action.</p>
+
+        <h2 id="failures">If it fails</h2>
+        <div class="failure-list">
+          <div class="failure"><strong>The command is missing</strong><p>Use the <code>npx</code> command or the workspace-local command recommended by <code>doctor environment</code>.</p></div>
+          <div class="failure"><strong>The secret is empty</strong><p>Check the CI variable name and whether the job is allowed to read it for this branch or environment.</p></div>
+          <div class="failure"><strong>A parser fails on output</strong><p>Use the command's JSON output option with <code>--strict-json</code>. Do not parse human-readable terminal text.</p></div>
+          <div class="failure"><strong>The agent wants to apply a change immediately</strong><p>Stop it and ask for the plan output first. Apply only after the target ids and next action are clear.</p></div>
+        </div>
+        </section>
+      </article>
+    </div></main>
+    <footer class="footer"><div class="wrap footer-row"><span>CI and agents</span><span><a href="./index.html">Guides</a> · <a href="../index.html">Overview</a></span></div></footer>
+    <script src="./guide.js?v=use-case-guides-2"></script>
+  </body>
+</html>

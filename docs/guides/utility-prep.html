@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Prepare spreadsheets for xyte-cli workflows</title>
+    <meta name="description" content="Prepare rough spreadsheets and source files for safe xyte-cli workflows." />
+    <link rel="icon" type="image/png" href="../media/xyte-ai-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="./index.html">Guides</a><a href="../index.html#install">Install</a><a href="../index.html#docs">Docs</a></nav></div></header>
+    <main class="page"><div class="wrap guide-shell">
+      <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">AI agent</a><a href="#terminal">Terminal commands</a></aside>
+      <article class="article">
+        <p class="breadcrumb"><a href="./index.html">Guides</a> / Utility preparation</p>
+        <figure class="guide-visual">
+          <img src="./media/utility-prep-workflow.png" alt="Rough spreadsheets become primary rows, rejected rows, and notes before execution." />
+        </figure>
+        <p class="eyebrow">Utilities</p>
+        <h1>Spreadsheet prep.</h1>
+        <p class="lead">Use utility preparation when a spreadsheet, CSV, or document describes work a human understands, but the CLI needs clean rows with real identifiers before anything can run.</p>
+        <div class="summary">
+          <div class="summary-card"><strong>Use when</strong><span>Spreadsheets, CSVs, or documents need to become workflow inputs.</span></div>
+          <div class="summary-card"><strong>Inputs</strong><span>A source file, the workflow goal, and tenant context when lookups are needed.</span></div>
+          <div class="summary-card"><strong>Output</strong><span>Primary rows, rejected rows, and notes for review.</span></div>
+        </div>
+
+        <div class="view-switch" role="tablist" aria-label="Guide view">
+          <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
+          <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
+        </div>
+
+        <section class="guide-view" data-view="ai" id="ai-agent">
+          <h2>Ask an agent</h2>
+          <p class="section-copy">Ask for a prepared workflow input. The workflow separates understanding the file from executing tenant changes.</p>
+          <div class="agent-prompt"><div class="command"><pre><code>Prepare this spreadsheet for a CLI workflow.
+
+If I did not give a file path, ask for it.
+Ask what the file should become: Edge claim rows, a space tree, device moves, access rows, connector setup, or another supported action.
+Show the selected action, primary file, rejected file, notes file, and rows that still need user input.
+Stop before executing the prepared rows.</code></pre></div></div>
+          <div class="flow-diagram" aria-label="Utility preparation workflow">
+            <h3>Workflow</h3>
+            <ol class="flow-steps">
+              <li><span class="flow-kicker">Source</span><strong>Read file</strong><span>Start from the spreadsheet and the user’s goal.</span></li>
+              <li><span class="flow-kicker">Action</span><strong>Pick profile</strong><span>Match the goal to a supported utility action.</span></li>
+              <li><span class="flow-kicker">Prepare</span><strong>Create files</strong><span>Write primary rows, rejected rows, and notes.</span></li>
+              <li><span class="flow-kicker">Review</span><strong>Fix gaps</strong><span>Surface missing ids or rows that need a human decision.</span></li>
+              <li><span class="flow-kicker">Pause</span><strong>Do not execute</strong><span>Stop before any workflow consumes the prepared rows.</span></li>
+            </ol>
+          </div>
+        </section>
+
+        <section class="guide-view" data-view="terminal" id="terminal" hidden>
+
+        <h2 id="goal">Goal</h2>
+        <p class="section-copy">Preparation separates understanding from execution. The CLI creates structured files. A human or agent reviews missing identifiers and rejected rows. Only then should a workflow run.</p>
+
+        <h2 id="commands">Commands</h2>
+        <ol class="steps">
+          <li class="step"><h3>Find the supported action</h3><p>Do this first so you do not force the wrong spreadsheet shape into the wrong workflow.</p><div class="command"><pre><code>xyte-cli util list-actions \
+  --format text \
+  --mode friendly</code></pre></div></li>
+          <li class="step"><h3>Prepare Edge claim rows</h3><p>Use this for devices behind an Edge proxy. Required columns include proxy id, device IP, model id, and space id.</p><div class="command"><pre><code>xyte-cli util prepare \
+  --action organization.edge.startClaim \
+  --input &lt;input.xlsx&gt; \
+  --tenant &lt;tenant-id&gt; \
+  --output-dir ./prepared</code></pre></div></li>
+          <li class="step"><h3>Prepare a space tree import</h3><p>Use this when a hierarchy source needs to become rows with <code>path</code>, <code>space_type</code>, and <code>config</code>.</p><div class="command"><pre><code>xyte-cli util prepare \
+  --action space.import-tree \
+  --input &lt;input.xlsx&gt; \
+  --tenant &lt;tenant-id&gt; \
+  --output-dir ./prepared</code></pre></div></li>
+          <li class="step"><h3>Prepare device moves</h3><p>Use this when the source file already identifies devices and intended target spaces.</p><div class="command"><pre><code>xyte-cli util prepare \
+  --action device.move \
+  --input &lt;input.xlsx&gt; \
+  --tenant &lt;tenant-id&gt; \
+  --output-dir ./prepared</code></pre></div></li>
+        </ol>
+
+        <h2 id="outputs">Review the outputs</h2>
+        <ul class="checklist">
+          <li>The primary file contains rows that match the selected action profile.</li>
+          <li>The rejected file contains rows that need missing ids, corrected formats, or a different workflow.</li>
+          <li>The notes file explains columns, reject reasons, and safe next commands.</li>
+          <li>Unknown identifiers should stay rejected until a user provides real values.</li>
+        </ul>
+        <div class="command"><pre><code>./prepared/organization-edge-startclaim.csv
+./prepared/organization-edge-startclaim.rejected.csv
+./prepared/organization-edge-startclaim.notes.md</code></pre></div>
+        <p class="section-copy">You are done when the primary file has only rows you are willing to execute and the rejected file has been reviewed instead of ignored.</p>
+
+        <h2 id="failures">If it fails</h2>
+        <div class="failure-list">
+          <div class="failure"><strong>Too many rows are rejected</strong><p>Check whether the selected action matches the source. If not, choose a different action and prepare again.</p></div>
+          <div class="failure"><strong>Identifiers are missing</strong><p>Look them up in Xyte or ask the user. Do not invent ids to make the CSV look complete.</p></div>
+          <div class="failure"><strong>You need to execute the prepared rows</strong><p>Use the workflow command that matches the action, such as <code>edge claim-batch</code>, <code>util import-tree</code>, or <code>util move-devices</code>. Run dry mode first.</p></div>
+        </div>
+        </section>
+      </article>
+    </div></main>
+    <footer class="footer"><div class="wrap footer-row"><span>Utility preparation</span><span><a href="./index.html">Guides</a> · <a href="../index.html">Overview</a></span></div></footer>
+    <script src="./guide.js?v=use-case-guides-2"></script>
+  </body>
+</html>

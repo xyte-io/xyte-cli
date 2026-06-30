@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Schema contracts | xyte-cli reference</title>
+    <meta name="description" content="Machine-readable JSON contracts for CLI outputs used by agents, CI jobs, and integrations." />
+    <link rel="icon" type="image/png" href="../media/xyte-ai-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../guides/styles.css" />
+  </head>
+  <body>
+    <header class="site-nav">
+      <div class="wrap nav-row">
+        <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Reference</span></a>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#guides">Guides</a><a href="../index.html#docs">Docs</a></nav>
+      </div>
+    </header>
+    <main class="page">
+      <div class="wrap guide-shell">
+        <aside class="toc" aria-label="On this page">
+          <strong>On this page</strong>
+          <a href="#what-schemas-do">What schemas do</a>
+          <a href="#agent-ci">Agent and CI</a>
+          <a href="#common-outputs">Common outputs</a>
+          <a href="#real-examples">Examples</a>
+          <a href="#schema-links">Schema links</a>
+        </aside>
+        <article class="article">
+          <p class="breadcrumb"><a href="../index.html">Overview</a> / Schema contracts</p>
+          <figure class="guide-visual"><img src="./media/schema-contracts-reference.png" alt="JSON contract documents flow through validation into automation and reporting consumers." /></figure>
+          <p class="eyebrow">Contracts</p>
+          <h1>Schema contracts.</h1>
+          <p class="lead">Schemas describe the JSON shape produced by CLI commands so agents, CI jobs, and integrations can depend on fields instead of scraping terminal text.</p>
+
+          <div class="summary">
+            <div class="summary-card"><strong>Use when</strong><span>A job parses CLI output, stores artifacts, or passes data to another tool.</span></div>
+            <div class="summary-card"><strong>Best input</strong><span>Use command JSON, strict JSON, or saved output files.</span></div>
+            <div class="summary-card"><strong>Avoid</strong><span>Do not parse colorful terminal summaries or human report text.</span></div>
+          </div>
+
+          <h2 id="what-schemas-do">What schemas do</h2>
+          <p class="section-copy">A schema gives a stable contract for automation. For example, an incident watch job can read frame events, a report job can store a known report payload, and an agent can decide what to do next from a flow summary.</p>
+          <div class="flow-diagram" aria-label="Schema usage workflow">
+            <h3>Workflow</h3>
+            <ol class="flow-steps">
+              <li><span class="flow-kicker">Command</span><strong>Run JSON mode</strong><span>Use structured CLI output or save a JSON file.</span></li>
+              <li><span class="flow-kicker">Schema</span><strong>Pick contract</strong><span>Match the command output to the schema family.</span></li>
+              <li><span class="flow-kicker">Parse</span><strong>Read fields</strong><span>Use fields like event, outcome, nextAction, totals, and paths.</span></li>
+              <li><span class="flow-kicker">Branch</span><strong>Decide action</strong><span>Notify, fail CI, create a report, or wait for approval.</span></li>
+              <li><span class="flow-kicker">Store</span><strong>Keep artifacts</strong><span>Attach JSON alongside human-readable output.</span></li>
+            </ol>
+          </div>
+
+          <h2 id="agent-ci">Agent and CI</h2>
+          <p class="section-copy">Agents should ask for JSON when they need to reason over output. CI jobs should save the JSON as an artifact and fail on clear machine-readable conditions.</p>
+          <div class="command"><pre><code>xyte-cli flow run flow.daily-deep-dive-report \
+  --tenant &lt;tenant-id&gt; \
+  --plan \
+  --strict-json \
+  --out-dir ./tmp/flow-runs
+
+xyte-cli ops inspect fleet \
+  --tenant &lt;tenant-id&gt; \
+  --render json \
+  --strict-json \
+  --out ./artifacts/fleet.json
+
+xyte-cli ops watch incidents \
+  --tenant &lt;tenant-id&gt; \
+  --profile incidents-active \
+  --once \
+  --strict-json \
+  --out ./artifacts/incidents.ndjson</code></pre></div>
+
+          <h2 id="common-outputs">Common outputs</h2>
+          <p class="section-copy">Start with the schema that matches the workflow you are automating.</p>
+          <ul class="checklist">
+            <li><code>doctor-environment.v1</code>: choose installed, npx, workspace-local, or blocked setup mode.</li>
+            <li><code>status.v1</code>: read fast tenant readiness from jobs and agents.</li>
+            <li><code>watch-frame.v1</code>: react to incident snapshots, deltas, heartbeats, and errors.</li>
+            <li><code>inspect-fleet.v1</code> and <code>inspect-deep-dive.v1</code>: store operational source data for reports.</li>
+            <li><code>report.v1</code>: track generated report paths and report metadata.</li>
+            <li><code>flow-run.v1</code>: read flow outcome, next action, run bundle path, and pause state.</li>
+            <li><code>utility-prepare.v1</code> and <code>utility-batch.v1</code>: process prepared rows, rejected rows, and batch dispositions.</li>
+          </ul>
+
+          <h2 id="real-examples">Real-life examples</h2>
+          <div class="failure-grid">
+            <div class="failure"><strong>Fail CI when setup is blocked</strong><p>Run <code>doctor environment --format json</code>, read the recommended mode, and fail when the mode is blocked.</p></div>
+            <div class="failure"><strong>Notify on incident delta</strong><p>Run incident watch with <code>--strict-json</code>, read <code>snapshot</code> or <code>delta</code> frames, and notify only when active incidents changed.</p></div>
+            <div class="failure"><strong>Attach report sources</strong><p>Generate a Markdown or PDF report from saved deep-dive JSON, then attach both files so readers can trace the numbers.</p></div>
+            <div class="failure"><strong>Resume paused flow</strong><p>Read <code>nextAction</code> from a flow summary and use the bundle path in the approved resume command.</p></div>
+          </div>
+
+          <h2 id="schema-links">Schema links</h2>
+          <p class="section-copy">These files are the public machine-readable contracts shipped with the docs.</p>
+          <ul class="checklist">
+            <li><a href="../schemas/call-envelope.v1.schema.json">call-envelope.v1.schema.json</a></li>
+            <li><a href="../schemas/doctor-environment.v1.schema.json">doctor-environment.v1.schema.json</a></li>
+            <li><a href="../schemas/flow-run.v1.schema.json">flow-run.v1.schema.json</a></li>
+            <li><a href="../schemas/headless-frame.v1.schema.json">headless-frame.v1.schema.json</a></li>
+            <li><a href="../schemas/inspect-deep-dive.v1.schema.json">inspect-deep-dive.v1.schema.json</a></li>
+            <li><a href="../schemas/inspect-fleet.v1.schema.json">inspect-fleet.v1.schema.json</a></li>
+            <li><a href="../schemas/report.v1.schema.json">report.v1.schema.json</a></li>
+            <li><a href="../schemas/status.v1.schema.json">status.v1.schema.json</a></li>
+            <li><a href="../schemas/upgrade-check.v1.schema.json">upgrade-check.v1.schema.json</a></li>
+            <li><a href="../schemas/upgrade-result.v1.schema.json">upgrade-result.v1.schema.json</a></li>
+            <li><a href="../schemas/utility-batch.v1.schema.json">utility-batch.v1.schema.json</a></li>
+            <li><a href="../schemas/utility-prepare.v1.schema.json">utility-prepare.v1.schema.json</a></li>
+            <li><a href="../schemas/watch-frame.v1.schema.json">watch-frame.v1.schema.json</a></li>
+          </ul>
+        </article>
+      </div>
+    </main>
+    <footer class="footer"><div class="wrap footer-row"><span>Schema contracts</span><span><a href="../index.html#docs">Docs</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
+    <script src="../guides/guide.js?v=use-case-guides-2"></script>
+  </body>
+</html>
