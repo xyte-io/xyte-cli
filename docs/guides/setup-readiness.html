@@ -15,7 +15,7 @@
     <header class="site-nav">
       <div class="wrap nav-row">
         <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a>
-        <nav class="nav-links" aria-label="Primary"><a href="./index.html">Guides</a><a href="../index.html#install">Install</a><a href="../index.html#docs">Docs</a></nav>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a></nav>
       </div>
     </header>
     <main class="page">
@@ -40,9 +40,9 @@
 
           <section class="guide-view" data-view="ai" id="ai-agent">
             <h2>Ask an agent</h2>
-            <p class="section-copy">Ask like this. The workflow below shows what the agent should check behind the scenes.</p>
+            <p class="section-copy">Give the agent the outcome you need. It will check the local runtime, connect through the saved API key, and tell you whether this machine is ready for real tenant work.</p>
             <div class="agent-prompt">
-              <div class="command"><pre><code>Use xyte-cli to check whether this machine can run tenant operations.</code></pre></div>
+              <div class="command"><pre><code>Can you check whether this machine is ready to use xyte-cli?</code></pre></div>
             </div>
             <div class="flow-diagram" aria-label="Setup readiness workflow">
               <h3>What the agent will do</h3>
@@ -56,7 +56,7 @@
             </div>
             <div class="ask-help">
               <h3>Ask how it works first</h3>
-              <p class="section-copy">A shell-capable agent with xyte-cli guidance can explain the setup path before it runs commands.</p>
+              <p class="section-copy">If setup terms are unfamiliar, ask first. The agent can explain what the status checks mean before it touches local configuration.</p>
               <div class="command"><pre><code>What does xyte-cli setup status check?
 How do I connect xyte-cli to a tenant?
 Why is config doctor failing?</code></pre></div>
@@ -97,8 +97,8 @@ xyte-cli status --mode fast --format json</code></pre></div>
 
           <h2 id="read-output">Read the output</h2>
           <ul class="checklist">
-            <li><code>setup status</code> should show the active profile and that setup is ready.</li>
-            <li><code>config doctor</code> should report connected. If it does not, fix this before using operational commands.</li>
+            <li><code>setup status</code> shows the active profile and setup readiness.</li>
+            <li><code>config doctor</code> reports connected. If it does not, fix this before using operational commands.</li>
             <li><code>status --mode fast</code> gives a compact machine-readable readiness result for scripts and agents.</li>
           </ul>
           <div class="command"><pre><code>Profile: default

@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="./index.html">Guides</a><a href="../index.html#install">Install</a><a href="../index.html#docs">Docs</a></nav></div></header>
+    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a></nav></div></header>
     <main class="page"><div class="wrap guide-shell">
       <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">AI agent</a><a href="#terminal">Terminal commands</a></aside>
       <article class="article">
@@ -30,8 +30,8 @@
 
         <section class="guide-view" data-view="ai" id="ai-agent">
           <h2>Ask an agent</h2>
-          <p class="section-copy">Ask like this. The workflow cleans the file into CLI-ready rows and does not execute the workflow.</p>
-          <div class="agent-prompt"><div class="command"><pre><code>Use xyte-cli to clean this spreadsheet for a CLI workflow.</code></pre></div></div>
+          <p class="section-copy">Give the agent the messy file and the job it is meant to support. It will create clean rows, rejected rows, and notes without running the final workflow.</p>
+          <div class="agent-prompt"><div class="command"><pre><code>Clean this spreadsheet so it can be used by a xyte-cli workflow.</code></pre></div></div>
           <div class="flow-diagram" aria-label="Utility preparation workflow">
             <h3>What the agent will do</h3>
             <ol class="flow-steps">
@@ -44,9 +44,9 @@
           </div>
           <div class="ask-help">
             <h3>Ask how it works first</h3>
-            <p class="section-copy">The agent can explain preparation profiles and rejected rows before it writes cleaned files.</p>
+            <p class="section-copy">Ask this when you need to know which preparation action fits the file before generating outputs.</p>
             <div class="command"><pre><code>How do I prepare a spreadsheet for xyte-cli?
-Which util prepare action should I use?
+Which util prepare action fits my file?
 Why did rows get rejected?</code></pre></div>
           </div>
         </section>
@@ -54,7 +54,7 @@ Why did rows get rejected?</code></pre></div>
         <section class="guide-view" data-view="terminal" id="terminal" hidden>
 
         <h2 id="goal">Goal</h2>
-        <p class="section-copy">Preparation separates understanding from execution. The CLI creates structured files. A human or agent reviews missing identifiers and rejected rows. Only then should a workflow run.</p>
+        <p class="section-copy">Preparation turns a human-readable file into files the CLI can trust. Review rejected rows and missing identifiers first; run the final workflow only after the prepared data matches the tenant.</p>
 
         <h2 id="commands">Commands</h2>
         <ol class="steps">
@@ -66,12 +66,12 @@ Why did rows get rejected?</code></pre></div>
   --input &lt;input.xlsx&gt; \
   --tenant &lt;profile-label&gt; \
   --output-dir ./prepared</code></pre></div></li>
-          <li class="step"><h3>Prepare a space tree import</h3><p>Use this when a hierarchy source needs to become rows with <code>path</code>, <code>space_type</code>, and <code>config</code>.</p><div class="command"><pre><code>xyte-cli util prepare \
+          <li class="step"><h3>Prepare a space tree import</h3><p>For hierarchy sources that need rows with <code>path</code>, <code>space_type</code>, and <code>config</code>.</p><div class="command"><pre><code>xyte-cli util prepare \
   --action space.import-tree \
   --input &lt;input.xlsx&gt; \
   --tenant &lt;profile-label&gt; \
   --output-dir ./prepared</code></pre></div></li>
-          <li class="step"><h3>Prepare device moves</h3><p>Use this when the source file already identifies devices and intended target spaces.</p><div class="command"><pre><code>xyte-cli util prepare \
+          <li class="step"><h3>Prepare device moves</h3><p>For source files that already identify devices and intended target spaces.</p><div class="command"><pre><code>xyte-cli util prepare \
   --action device.move \
   --input &lt;input.xlsx&gt; \
   --tenant &lt;profile-label&gt; \
@@ -83,7 +83,7 @@ Why did rows get rejected?</code></pre></div>
           <li>The primary file contains rows that match the selected action profile.</li>
           <li>The rejected file contains rows that need missing ids, corrected formats, or a different workflow.</li>
           <li>The notes file explains columns, reject reasons, and safe next commands.</li>
-          <li>Unknown identifiers should stay rejected until a user provides real values.</li>
+          <li>Keep unknown identifiers rejected until someone provides real values.</li>
         </ul>
         <div class="command"><pre><code>./prepared/organization-edge-startclaim.csv
 ./prepared/organization-edge-startclaim.rejected.csv

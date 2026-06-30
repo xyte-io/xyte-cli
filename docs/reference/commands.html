@@ -15,7 +15,7 @@
     <header class="site-nav">
       <div class="wrap nav-row">
         <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Reference</span></a>
-        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#guides">Guides</a><a href="../index.html#docs">Docs</a></nav>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../index.html#guides">Guides</a><a href="../index.html#docs">Reference</a></nav>
       </div>
     </header>
     <main class="page">
@@ -39,7 +39,7 @@
           <figure class="guide-visual"><img src="./media/commands-reference.png" alt="Command groups for setup, inspect, watch, utility, flow, and logs are connected as a CLI reference map." /></figure>
           <p class="eyebrow">Commands</p>
           <h1>Commands reference.</h1>
-          <p class="lead">Use this page as the command-family map. Start with the job you need, then run the exact command help for flags on your installed version.</p>
+          <p class="lead">Choose commands by the work in front of you: setup, incident checks, fleet reports, endpoint calls, prepared files, flows, Edge operations, or logs.</p>
 
           <div class="summary">
             <div class="summary-card"><strong>Read first</strong><span><code>--format</code> controls setup/status JSON or text. <code>--render</code> controls inspect/report output files.</span></div>
@@ -47,27 +47,27 @@
             <div class="summary-card"><strong>Writes</strong><span>Use flow or utility plan modes before commands that can change tenant state.</span></div>
           </div>
 
-          <h2 id="how-to-use">How to use this page</h2>
-          <p class="section-copy">Start from the work you need to finish. Setup commands connect an API key. Watch and inspect commands read current state. Flows coordinate multi-step work. Utilities turn messy files into clean inputs. API calls are for endpoint-level control.</p>
+          <h2 id="how-to-use">Find the command you need</h2>
+          <p class="section-copy">Start with the question closest to your situation. Run the example, then add <code>--help</code> to that command when you need the full flag list for your installed version.</p>
           <div class="failure-grid">
-            <div class="failure"><strong>"Is setup working?"</strong><p>Use setup status, config doctor, and fast status.</p></div>
-            <div class="failure"><strong>"What changed?"</strong><p>Use incident watch, then inspect fleet or deep-dive for context.</p></div>
-            <div class="failure"><strong>"I have a spreadsheet."</strong><p>Use util prepare, review generated rows and rejects, then run the matching workflow.</p></div>
-            <div class="failure"><strong>"I need one endpoint."</strong><p>Describe the endpoint first, then call it with explicit path, query, or body JSON.</p></div>
+            <div class="failure"><strong>"Can this machine use xyte-cli?"</strong><p>Run <code>doctor environment</code> first. Then add an API key and run <code>config doctor</code> to confirm the CLI can reach your Xyte account.</p></div>
+            <div class="failure"><strong>"What is happening in my fleet right now?"</strong><p>Use <code>ops watch incidents</code> for active incident changes. Use <code>ops inspect fleet</code> or <code>ops inspect deep-dive</code> when you need the wider device context.</p></div>
+            <div class="failure"><strong>"I have a spreadsheet to clean up."</strong><p>Use <code>util prepare</code> to turn the file into reviewed rows, rejected rows, and notes. Do not run a claim or move flow until the rejected rows make sense.</p></div>
+            <div class="failure"><strong>"I need to change devices, spaces, or claims."</strong><p>Use a flow in <code>--plan</code> mode first. Review the saved plan, then resume with <code>--apply</code> only after you approve the exact changes.</p></div>
           </div>
 
           <h2 id="ask-an-agent">Ask an agent</h2>
-          <p class="section-copy">Ask for an operator result. The agent can choose the command family and should show the commands it ran.</p>
+          <p class="section-copy">Ask for the result you need. A shell-capable agent can choose the command, run it, and return the command plus any files it wrote.</p>
           <div class="command"><pre><code>Show me whether this tenant is ready for operations.
 
 Show me active incidents and save the fleet context JSON.
 
-Prepare this spreadsheet for device claiming. Tell me whether the rows are native/direct or Edge, explain rows that need more data, and stop before apply.
+I uploaded a spreadsheet of devices to claim. Read it, tell me which rows are native/direct or Edge, explain rows that need more data, and stop before apply.
 
 Find the endpoint for device notes and show a read-only example first.</code></pre></div>
 
           <h2 id="terminal-ci">Terminal and CI</h2>
-          <p class="section-copy">In a terminal, run the command family that matches the task and read the help for exact flags. In CI, prefer JSON, saved files, and plan-only flows unless the job has an explicit approval path.</p>
+          <p class="section-copy">In a terminal, start with the task command and add flags as needed. In CI, use JSON, saved files, and plan-only flows unless the job has a separate approval step.</p>
           <div class="command"><pre><code># Human terminal
 xyte-cli config doctor --tenant &lt;profile-label&gt; --format text
 xyte-cli ops watch incidents --tenant &lt;profile-label&gt; --profile incidents-active --once
@@ -84,7 +84,7 @@ xyte-cli ops inspect fleet \
 xyte-cli flow run &lt;flow-id&gt; --tenant &lt;profile-label&gt; --plan --strict-json</code></pre></div>
 
           <h2 id="output-matrix">Command output matrix</h2>
-          <p class="section-copy">Use this to choose the right command family for a terminal, CI job, or agent. Automation should start with commands that inspect state or produce a plan before any tenant change runs.</p>
+          <p class="section-copy">This matrix shows what each command group reads, writes, saves, and returns. Automation starts by inspecting state or creating a plan before any tenant change runs.</p>
           <div class="table-wrap"><table class="matrix">
             <thead><tr><th>Command family</th><th>Read/write behavior</th><th>Output format</th><th>File behavior</th><th>Safe for CI</th><th>Relevant schema</th><th>Common failures</th></tr></thead>
             <tbody>
@@ -102,7 +102,7 @@ xyte-cli flow run &lt;flow-id&gt; --tenant &lt;profile-label&gt; --plan --strict
           </table></div>
 
           <h2 id="core-setup">Core setup</h2>
-          <p class="section-copy">Use these when a machine, workspace, or job needs to become ready before any operational command runs.</p>
+          <p class="section-copy">Run these before reports, incident checks, device claiming, or automation on a new machine, workspace, or job.</p>
           <div class="command"><pre><code>xyte-cli doctor environment --format json
 xyte-cli setup run --non-interactive --key-file &lt;path-outside-workspace&gt; --format json
 xyte-cli setup status --field tenantId
@@ -115,7 +115,7 @@ xyte-cli init --scope project --agents all --force --no-setup</code></pre></div>
           </ul>
 
           <h2 id="operations">Operations</h2>
-          <p class="section-copy">Use watch for incident changes and inspect for current tenant state. Save source JSON when the result will feed a report, dashboard, or agent answer.</p>
+          <p class="section-copy">Watch incident changes and inspect current tenant state. Save source JSON when the result feeds a report, dashboard, or agent answer.</p>
           <div class="command"><pre><code>xyte-cli ops watch incidents \
   --tenant &lt;profile-label&gt; \
   --profile incidents-active \
@@ -136,7 +136,7 @@ xyte-cli ops inspect deep-dive \
   --out ./artifacts/deep-dive.json</code></pre></div>
 
           <h2 id="endpoint-ops">Endpoint ops</h2>
-          <p class="section-copy">Use endpoint discovery before raw API calls. Describe the endpoint, check path and body shape, then call it with explicit JSON.</p>
+          <p class="section-copy">Discover endpoints before raw API calls. Describe the endpoint, check path and body shape, then call it with explicit JSON.</p>
           <div class="command"><pre><code>xyte-cli api endpoints list
 xyte-cli api endpoints describe organization.devices.getDevices
 xyte-cli api call organization.devices.getDevices \
@@ -150,7 +150,7 @@ xyte-cli api call organization.commands.getCommands \
   --query-json '{"page":1,"per_page":20}'</code></pre></div>
 
           <h2 id="flows-utilities">Flows and utilities</h2>
-          <p class="section-copy">Use flows for repeatable operator workflows and utilities for messy input files that need to become structured rows.</p>
+          <p class="section-copy">Flows run repeatable operator work. Utilities prepare messy input files as structured rows for later commands.</p>
           <div class="command"><pre><code>xyte-cli flow list --format text
 xyte-cli flow run &lt;flow-id&gt; --tenant &lt;profile-label&gt; --plan
 xyte-cli flow run &lt;flow-id&gt; --tenant &lt;profile-label&gt; --apply --resume &lt;run-id-or-path&gt;
@@ -173,7 +173,7 @@ xyte-cli util prepare \
           </div>
 
           <h2 id="edge-reports">Edge and reports</h2>
-          <p class="section-copy">Edge claim and ping are async operations. Start in plan mode, then apply after approval. Reports should be generated from saved source files.</p>
+          <p class="section-copy">Edge claim and ping are async operations. Start in plan mode, then apply after approval. Generate reports from saved source files.</p>
           <div class="command"><pre><code>xyte-cli api endpoints describe organization.edge.startClaim
 xyte-cli api call organization.edges.getEdges --tenant &lt;profile-label&gt; --query-json '{"page":1,"per_page":100}' &gt; ./artifacts/edge-proxies.json
 xyte-cli api call organization.spaces.getSpaces --tenant &lt;profile-label&gt; --query-json '{"path_includes":"&lt;target-path&gt;","page":1,"per_page":100}' &gt; ./artifacts/edge-target-spaces.json
@@ -198,7 +198,7 @@ xyte-cli ops report generate \
   --render markdown</code></pre></div>
 
           <h2 id="logs-console">Logs and console</h2>
-          <p class="section-copy">Use action logs when a run needs traceable command history. Use headless console when a job needs a machine-readable console frame.</p>
+          <p class="section-copy">Action logs give a traceable command history. Headless console gives a machine-readable console frame for jobs.</p>
           <div class="command"><pre><code>xyte-cli --log-actions --log-actions-path ./logs/xyte-cli.actions.ndjson status --tenant &lt;profile-label&gt;
 xyte-cli logs list --path ./logs/xyte-cli.actions.ndjson --limit 200
 xyte-cli logs show --path ./logs/xyte-cli.actions.ndjson --entry &lt;session-id&gt;:&lt;seq&gt;
@@ -208,13 +208,13 @@ xyte-cli ops console --headless --screen dashboard --once --tenant &lt;profile-l
           <h2 id="retry">Idempotency and retry guidance</h2>
           <div class="failure-grid">
             <div class="failure"><strong>Flows</strong><p>Retry <code>--plan</code> freely. For writes, resume the original run with <code>--apply --resume &lt;run-id-or-path&gt;</code> so the next approved gate stays tied to the reviewed plan.</p></div>
-            <div class="failure"><strong>Edge claim batch</strong><p>Keep the same report and resume artifact. Completed rows should not be started again; fix failed rows, then rerun with the same resume file.</p></div>
+            <div class="failure"><strong>Edge claim batch</strong><p>Keep the same report and resume artifact. Do not start completed rows again; fix failed rows, then rerun with the same resume file.</p></div>
             <div class="failure"><strong>Device moves</strong><p>Dry-run until rows are clean. After partial apply, rerun only the failed rows or use the apply report to remove completed rows.</p></div>
-            <div class="failure"><strong>Report generation</strong><p>Regenerate reports from the same saved JSON when you need identical numbers. Create a new source JSON only when the reporting window or tenant state should change.</p></div>
+            <div class="failure"><strong>Report generation</strong><p>Regenerate reports from the same saved JSON when you need identical numbers. Create a new source JSON only when the reporting window or tenant state changes.</p></div>
           </div>
 
           <div class="failure-grid">
-            <div class="failure"><strong>A flag is rejected</strong><p>Run <code>xyte-cli &lt;command&gt; --help</code> against the installed version and adjust the command family, not the workflow goal.</p></div>
+            <div class="failure"><strong>A flag is rejected</strong><p>Run <code>xyte-cli &lt;command&gt; --help</code> against the installed version and adjust the command, not the workflow goal.</p></div>
             <div class="failure"><strong>JSON parsing fails</strong><p>Use command-native JSON output or <code>--strict-json</code>. Do not parse human-readable terminal text.</p></div>
             <div class="failure"><strong>Provider scope is ambiguous</strong><p>Set <code>--provider-scope organization</code> or <code>--provider-scope partner</code> instead of <code>auto</code>.</p></div>
             <div class="failure"><strong>A write needs approval</strong><p>Stop at <code>--plan</code>, review the target state, then resume with apply only after approval.</p></div>
@@ -222,7 +222,7 @@ xyte-cli ops console --headless --screen dashboard --once --tenant &lt;profile-l
         </article>
       </div>
     </main>
-    <footer class="footer"><div class="wrap footer-row"><span>Commands reference</span><span><a href="../index.html#docs">Docs</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
+    <footer class="footer"><div class="wrap footer-row"><span>Commands reference</span><span><a href="../index.html#docs">Reference</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
     <script src="../guides/guide.js?v=use-case-guides-2"></script>
   </body>
 </html>

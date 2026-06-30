@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="./index.html">Guides</a><a href="../index.html#install">Install</a><a href="../index.html#docs">Docs</a></nav></div></header>
+    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a></nav></div></header>
     <main class="page"><div class="wrap guide-shell">
       <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">AI agent</a><a href="#terminal">Terminal commands</a></aside>
       <article class="article">
@@ -22,7 +22,7 @@
         </figure>
         <p class="eyebrow">Devices</p>
         <h1>Device claiming.</h1>
-        <p class="lead">Use this when new devices need to be added to a tenant. Start by choosing the claim path: native/direct devices use serial, MAC, cloud id, and target space; Edge devices use proxy, IP, model, and target space.</p>
+        <p class="lead">For adding new devices to a tenant. Native/direct devices use serial, MAC, cloud id, and target space; Edge devices use proxy, IP, model, and target space.</p>
         <div class="view-switch" role="tablist" aria-label="Guide view">
           <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
           <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
@@ -30,8 +30,8 @@
 
         <section class="guide-view" data-view="ai" id="ai-agent">
           <h2>Ask an agent</h2>
-          <p class="section-copy">Ask like this. The workflow chooses the claim path, finds the required identifiers, and stops before running the claim.</p>
-          <div class="agent-prompt"><div class="command"><pre><code>Use xyte-cli to plan device claiming. First determine whether the devices are native/direct, Edge, or Cloud-to-Cloud. Do not run the claim yet.</code></pre></div></div>
+          <p class="section-copy">Upload or point the agent to a spreadsheet, CSV, or exported device list. It will read the file, separate native/direct devices from Edge devices, find missing fields, and stop before claiming.</p>
+          <div class="agent-prompt"><div class="command"><pre><code>I uploaded a spreadsheet of devices to claim. Read the file, tell me which rows are native/direct or Edge, list anything missing, and prepare a claim plan. Do not claim anything yet.</code></pre></div></div>
           <div class="flow-diagram" aria-label="Device claiming workflow">
             <h3>What the agent will do</h3>
             <ol class="flow-steps">
@@ -44,7 +44,7 @@
           </div>
           <div class="ask-help">
             <h3>Ask how it works first</h3>
-            <p class="section-copy">The agent can explain claim paths and required identifiers before it prepares a claim.</p>
+            <p class="section-copy">Ask this when you are not sure which claim path fits the devices you received.</p>
             <div class="command"><pre><code>How do I claim devices with xyte-cli?
 How do I choose native/direct vs Edge claiming?
 What identifiers do I need before claiming devices?</code></pre></div>
@@ -126,7 +126,7 @@ xyte-cli api call organization.spaces.getSpaces \
 
         <h2 id="batch">Batch Edge claim</h2>
         <ol class="steps">
-          <li class="step"><h3>Prepare the spreadsheet</h3><p>Review the primary CSV and rejected CSV before running the batch. Missing proxy, model, or space values should stay rejected until a user provides real tenant values.</p><div class="command"><pre><code>xyte-cli util prepare \
+          <li class="step"><h3>Prepare the spreadsheet</h3><p>Review the primary CSV and rejected CSV before running the batch. Keep rows with missing proxy, model, or space values rejected until someone provides real tenant values.</p><div class="command"><pre><code>xyte-cli util prepare \
   --action organization.edge.startClaim \
   --tenant &lt;profile-label&gt; \
   --input &lt;input.xlsx&gt; \

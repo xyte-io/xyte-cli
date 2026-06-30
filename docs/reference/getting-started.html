@@ -15,7 +15,7 @@
     <header class="site-nav">
       <div class="wrap nav-row">
         <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Reference</span></a>
-        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#guides">Guides</a><a href="../index.html#docs">Docs</a></nav>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../index.html#guides">Guides</a><a href="../index.html#docs">Reference</a></nav>
       </div>
     </header>
     <main class="page">
@@ -37,7 +37,7 @@
           <figure class="guide-visual"><img src="./media/getting-started-reference.png" alt="Setup checks the runtime, reads the key safely, connects the tenant, and runs a first status command." /></figure>
           <p class="eyebrow">Start</p>
           <h1>Getting started.</h1>
-          <p class="lead">Use this page to get one machine, CI job, or shell-capable agent ready to run <code>xyte-cli</code> against a real Xyte tenant.</p>
+          <p class="lead">Set up one terminal, CI job, or shell-capable agent so it can run <code>xyte-cli</code> against your Xyte account.</p>
 
           <h2 id="what-you-need">What you need</h2>
           <p class="section-copy">First setup needs an API key. The CLI stores it under a local profile label, uses <code>default</code> when you do not choose one, and auto-detects whether the key can use organization or partner APIs.</p>
@@ -49,18 +49,18 @@
           </div>
 
           <h2 id="ask-admin">Ask your Xyte admin for</h2>
-          <p class="section-copy">Use this short request when you are missing setup details.</p>
+          <p class="section-copy">Send this when you have the CLI installed but do not yet have the key and policy details.</p>
           <div class="command"><pre><code>Please send the values I need to set up xyte-cli:
 
 API key delivery: key file or secret manager
-Provider, only if auto-detect should not be used: organization or partner
+Provider, only if auto-detect is disabled: organization or partner
 Profile label, only if we use more than one Xyte connection:
 Default artifact folder:
 Allowed workflows: read-only reports, incident triage, device claiming, or approved writes</code></pre></div>
 
           <h2 id="agent-path">AI agent path</h2>
-          <p class="section-copy">Use this when Codex, Claude Code, Copilot Agent mode, or another shell-capable agent is setting up the workspace for you.</p>
-          <div class="command"><pre><code>Use xyte-cli to check whether this machine can run tenant operations.</code></pre></div>
+          <p class="section-copy">Give the agent the setup goal and a safe key source. It can run the checks, store the profile locally, and report whether the workspace is ready.</p>
+          <div class="command"><pre><code>Can you check whether this machine is ready to use xyte-cli?</code></pre></div>
 
           <h2 id="terminal-path">Terminal and CI path</h2>
           <ol class="steps">
@@ -125,9 +125,9 @@ Next: run a guide, inspect fleet state, or generate a report.</code></pre></div>
             <tbody>
               <tr><td><code>xyte-org</code></td><td>Setup uses an organization API key.</td></tr>
               <tr><td><code>xyte-partner</code></td><td>Setup uses a partner API key.</td></tr>
-              <tr><td><code>organization</code></td><td>A command should read organization devices, spaces, incidents, or reports.</td></tr>
-              <tr><td><code>partner</code></td><td>A command should read partner-level data and the key allows it.</td></tr>
-              <tr><td><code>auto</code></td><td>The CLI should choose from the stored profile and command context.</td></tr>
+              <tr><td><code>organization</code></td><td>Read organization devices, spaces, incidents, or reports.</td></tr>
+              <tr><td><code>partner</code></td><td>Read partner-level data when the key allows it.</td></tr>
+              <tr><td><code>auto</code></td><td>Let the CLI choose from the stored profile and command context.</td></tr>
             </tbody>
           </table></div>
 
@@ -158,7 +158,7 @@ Next: run a guide, inspect fleet state, or generate a report.</code></pre></div>
         </article>
       </div>
     </main>
-    <footer class="footer"><div class="wrap footer-row"><span>Getting started</span><span><a href="../index.html#docs">Docs</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
+    <footer class="footer"><div class="wrap footer-row"><span>Getting started</span><span><a href="../index.html#docs">Reference</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
     <script src="../guides/guide.js?v=use-case-guides-2"></script>
   </body>
 </html>

@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="./index.html">Guides</a><a href="../index.html#install">Install</a><a href="../index.html#docs">Docs</a></nav></div></header>
+    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a></nav></div></header>
     <main class="page"><div class="wrap guide-shell">
       <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">AI agent</a><a href="#terminal">Terminal commands</a></aside>
       <article class="article">
@@ -30,8 +30,8 @@
 
         <section class="guide-view" data-view="ai" id="ai-agent">
           <h2>Ask an agent</h2>
-          <p class="section-copy">Ask like this. The workflow keeps the readable report tied to the saved source data.</p>
-          <div class="agent-prompt"><div class="command"><pre><code>Use xyte-cli to make today's fleet report and tell me where it saved the files.</code></pre></div></div>
+          <p class="section-copy">Ask for the report you need to send. The agent will save the source JSON first, render the report from that file, and return the paths.</p>
+          <div class="agent-prompt"><div class="command"><pre><code>Make today's fleet report and show me the saved files.</code></pre></div></div>
           <div class="flow-diagram" aria-label="Daily report workflow">
             <h3>What the agent will do</h3>
             <ol class="flow-steps">
@@ -44,9 +44,9 @@
           </div>
           <div class="ask-help">
             <h3>Ask how it works first</h3>
-            <p class="section-copy">The agent can explain reports, source files, and handoffs before it generates anything.</p>
+            <p class="section-copy">Ask this when you want to understand which files matter before you schedule or share the report.</p>
             <div class="command"><pre><code>How do I create a daily fleet report with xyte-cli?
-What files should I save from a fleet report?
+What files do I save from a fleet report?
 How do I turn fleet JSON into a handoff?</code></pre></div>
           </div>
         </section>
@@ -54,7 +54,7 @@ How do I turn fleet JSON into a handoff?</code></pre></div>
         <section class="guide-view" data-view="terminal" id="terminal" hidden>
 
         <h2 id="goal">Goal</h2>
-        <p class="section-copy">The report should come from a saved JSON input, not from a separate manual summary. That keeps the handoff reproducible and gives an agent or script a source file to reuse.</p>
+        <p class="section-copy">Build the report from a saved JSON input, not from a separate manual summary. That keeps the handoff reproducible and gives an agent or script a source file to reuse.</p>
 
         <h2 id="commands">Commands</h2>
         <ol class="steps">

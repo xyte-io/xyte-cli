@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="./index.html">Guides</a><a href="../index.html#install">Install</a><a href="../index.html#docs">Docs</a></nav></div></header>
+    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a></nav></div></header>
     <main class="page"><div class="wrap guide-shell">
       <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">AI agent</a><a href="#terminal">Terminal commands</a></aside>
       <article class="article">
@@ -22,7 +22,7 @@
         </figure>
         <p class="eyebrow">Incidents</p>
         <h1>Incident triage.</h1>
-        <p class="lead">Use this when you need to know what is active now, whether incidents changed during a short window, and which fleet context should be included before escalation.</p>
+        <p class="lead">For active incidents, recent changes, and the fleet context an operator needs before escalation.</p>
         <div class="view-switch" role="tablist" aria-label="Guide view">
           <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
           <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
@@ -30,8 +30,8 @@
 
         <section class="guide-view" data-view="ai" id="ai-agent">
           <h2>Ask an agent</h2>
-          <p class="section-copy">Ask like this. The workflow below shows how the agent turns that into CLI checks and files.</p>
-          <div class="agent-prompt"><div class="command"><pre><code>Use xyte-cli to show active incidents and what changed since yesterday.</code></pre></div></div>
+          <p class="section-copy">Ask for the incident picture, not a command name. The agent will read active incidents, compare the watch output, and save fleet context for the handoff.</p>
+          <div class="agent-prompt"><div class="command"><pre><code>Show me active incidents and what changed since yesterday.</code></pre></div></div>
           <div class="flow-diagram" aria-label="Incident triage workflow">
             <h3>What the agent will do</h3>
             <ol class="flow-steps">
@@ -44,7 +44,7 @@
           </div>
           <div class="ask-help">
             <h3>Ask how it works first</h3>
-            <p class="section-copy">The agent can explain incident watching and then run the watch command when you ask.</p>
+            <p class="section-copy">Ask this when you want to understand the watch command before using it in a handoff or recurring job.</p>
             <div class="command"><pre><code>How do I set a watch on my incidents using xyte-cli?
 What does ops watch incidents return?
 How do I compare incidents since yesterday?</code></pre></div>

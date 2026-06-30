@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="./index.html">Guides</a><a href="../index.html#install">Install</a><a href="../index.html#docs">Docs</a></nav></div></header>
+    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a></nav></div></header>
     <main class="page"><div class="wrap guide-shell">
       <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">AI agent</a><a href="#terminal">Terminal commands</a></aside>
       <article class="article">
@@ -30,8 +30,8 @@
 
         <section class="guide-view" data-view="ai" id="ai-agent">
           <h2>Ask an agent</h2>
-          <p class="section-copy">Ask like this. The workflow investigates the problem and keeps every change behind approval.</p>
-          <div class="agent-prompt"><div class="command"><pre><code>Use xyte-cli to investigate a broken room or device and prepare a remediation plan. Do not apply changes.</code></pre></div></div>
+          <p class="section-copy">Describe the problem the way an operator would. The agent will inspect current state, choose a safe action if one exists, and stop with a plan for approval.</p>
+          <div class="agent-prompt"><div class="command"><pre><code>Something is broken in a room. Find the cause and prepare a fix plan. Do not apply changes.</code></pre></div></div>
           <div class="flow-diagram" aria-label="Guided remediation workflow">
             <h3>What the agent will do</h3>
             <ol class="flow-steps">
@@ -44,7 +44,7 @@
           </div>
           <div class="ask-help">
             <h3>Ask how it works first</h3>
-            <p class="section-copy">The agent can explain safe remediation planning before it prepares a write-capable command.</p>
+            <p class="section-copy">Ask this before a real incident if you want to understand where planning ends and approval begins.</p>
             <div class="command"><pre><code>What remediation workflows does xyte-cli support?
 How do I plan a fix without applying it?
 How do I resume an approved remediation?</code></pre></div>

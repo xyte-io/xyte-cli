@@ -15,7 +15,7 @@
     <header class="site-nav">
       <div class="wrap nav-row">
         <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Reference</span></a>
-        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#guides">Guides</a><a href="../index.html#docs">Docs</a></nav>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../index.html#guides">Guides</a><a href="../index.html#docs">Reference</a></nav>
       </div>
     </header>
     <main class="page">
@@ -45,11 +45,11 @@
           </div>
 
           <h2 id="what-flows-are">What flows are</h2>
-          <p class="section-copy">A flow is not magic. It runs normal CLI steps in a known order, records the run, and pauses before sensitive changes. Use flows when an agent or CI job should follow the same operating path every time.</p>
+          <p class="section-copy">A flow is a recorded sequence of normal CLI steps. It collects inputs, writes a run bundle, and pauses before sensitive changes so operators, agents, and CI jobs follow the same path each time.</p>
           <div class="flow-diagram" aria-label="Flow execution workflow">
             <h3>Workflow</h3>
             <ol class="flow-steps">
-              <li><span class="flow-kicker">Select</span><strong>Choose flow</strong><span>Pick the flow that matches the operator state.</span></li>
+              <li><span class="flow-kicker">Select</span><strong>Choose flow</strong><span>Match the flow to the work that triggered it.</span></li>
               <li><span class="flow-kicker">Plan</span><strong>Run dry path</strong><span>Collect inputs, check readiness, and stop at gates.</span></li>
               <li><span class="flow-kicker">Review</span><strong>Read nextAction</strong><span>Use the summary to decide what to approve or fix.</span></li>
               <li><span class="flow-kicker">Resume</span><strong>Apply one gate</strong><span>Advance one approved write with <code>--apply --resume</code>.</span></li>
@@ -58,12 +58,12 @@
           </div>
 
           <h2 id="ask-an-agent">Ask an agent</h2>
-          <p class="section-copy">Ask for the workflow outcome. The agent should list available flows, choose the safest match, run plan, and explain what would happen next.</p>
+          <p class="section-copy">Ask for the outcome. The agent can list available flows, choose the safest match, run a plan, and explain the next step.</p>
           <div class="command"><pre><code>Show me the built-in xyte-cli flow that fits incident triage, then run it in plan mode.
 
-Use xyte-cli to plan a daily deep-dive report and show me the output files.
+Plan a daily deep-dive report and show me the output files.
 
-Plan a device claiming batch from this spreadsheet. Tell me whether the rows are native/direct or Edge, explain rows that need more data, and stop before apply.</code></pre></div>
+I uploaded a spreadsheet of devices to claim. Plan the batch, tell me which rows are native/direct or Edge, explain rows that need more data, and stop before apply.</code></pre></div>
 
           <h2 id="terminal-ci">Terminal and CI</h2>
           <p class="section-copy">In a terminal, start with the catalog. In CI, run read-only or plan-mode flows by default and publish the run bundle as an artifact.</p>
@@ -81,7 +81,7 @@ xyte-cli flow run flow.guided-remediation \
   --resume &lt;run-id-or-path&gt;</code></pre></div>
 
           <h2 id="flow-catalog">Flow catalog</h2>
-          <p class="section-copy">Pick the flow by the state that made the task relevant.</p>
+          <p class="section-copy">Choose the flow by the event that created the work: setup, incident change, report handoff, remediation, migration, or onboarding.</p>
           <ul class="checklist">
             <li><code>flow.setup-readiness-10m</code>: a machine, tenant, or agent session needs a readiness baseline.</li>
             <li><code>flow.incidents-delta-watch</code>: incident state may have changed and you need a watch frame.</li>
@@ -113,7 +113,7 @@ xyte-cli flow run flow.guided-remediation \
 
           <h2 id="retry">Retry and resume</h2>
           <div class="failure-grid">
-            <div class="failure"><strong>Plan runs</strong><p>Rerun <code>--plan</code> whenever tenant state, input files, or operator intent changed. It should not change tenant state.</p></div>
+            <div class="failure"><strong>Plan runs</strong><p>Rerun <code>--plan</code> whenever tenant state, input files, or operator intent changed. Plan mode does not change tenant state.</p></div>
             <div class="failure"><strong>Paused gates</strong><p>Use the run bundle path or run id from the plan output. Do not create a new apply command from memory.</p></div>
             <div class="failure"><strong><code>--apply --resume</code></strong><p>Resume the approved bundle only after the target and effect are still correct. If tenant state changed, run plan again first.</p></div>
             <div class="failure"><strong>Interrupted runs</strong><p>Keep the bundle and error output. For batch work, use the matching resume artifact instead of starting over.</p></div>
@@ -124,12 +124,12 @@ xyte-cli flow run flow.guided-remediation \
             <div class="failure"><strong>Needs input</strong><p>The flow is missing a profile label, a file path, or a specific value. Add <code>--var key=value</code> or <code>--context-json</code>.</p></div>
             <div class="failure"><strong>Paused at a gate</strong><p>Read <code>nextAction</code>. Resume only after the operator approves the specific change.</p></div>
             <div class="failure"><strong>Resume fails</strong><p>Use the original run id or bundle path. If metadata was edited or moved incorrectly, start a fresh plan.</p></div>
-            <div class="failure"><strong>CI should not write</strong><p>Run <code>--plan</code> only and publish the run bundle for human review.</p></div>
+            <div class="failure"><strong>CI write gate</strong><p>Run <code>--plan</code> only and publish the run bundle for human review.</p></div>
           </div>
         </article>
       </div>
     </main>
-    <footer class="footer"><div class="wrap footer-row"><span>Built-in flows</span><span><a href="../index.html#docs">Docs</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
+    <footer class="footer"><div class="wrap footer-row"><span>Built-in flows</span><span><a href="../index.html#docs">Reference</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
     <script src="../guides/guide.js?v=use-case-guides-2"></script>
   </body>
 </html>

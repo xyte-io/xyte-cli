@@ -15,7 +15,7 @@
     <header class="site-nav">
       <div class="wrap nav-row">
         <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Reference</span></a>
-        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#guides">Guides</a><a href="../index.html#docs">Docs</a></nav>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../index.html#guides">Guides</a><a href="../index.html#docs">Reference</a></nav>
       </div>
     </header>
     <main class="page">
@@ -46,7 +46,7 @@
           </div>
 
           <h2 id="what-schemas-do">What schemas do</h2>
-          <p class="section-copy">A schema gives a stable contract for automation. For example, an incident watch job can read frame events, a report job can store a known report payload, and an agent can decide what to do next from a flow summary.</p>
+          <p class="section-copy">A schema tells another program which fields it can trust. Use schemas when a watch job reads incident frames, a report job stores source data, or an agent decides the next step from a flow summary.</p>
           <div class="flow-diagram" aria-label="Schema usage workflow">
             <h3>Workflow</h3>
             <ol class="flow-steps">
@@ -59,14 +59,14 @@
           </div>
 
           <h2 id="ask-an-agent">Ask an agent</h2>
-          <p class="section-copy">Ask the agent to use schema-backed output whenever it needs to make a decision from CLI data.</p>
+          <p class="section-copy">Ask for JSON whenever the result will drive a decision, a CI status, or another tool.</p>
           <div class="command"><pre><code>Run the xyte-cli command with strict JSON or a saved output file.
 Tell me which schema applies.
 Read fields from the JSON, not from terminal text.
 Return the artifact path and the decision you made from it.</code></pre></div>
 
           <h2 id="agent-ci">Agent and CI</h2>
-          <p class="section-copy">Agents should ask for JSON when they need to reason over output. CI jobs should save the JSON as an artifact and fail on clear machine-readable conditions.</p>
+          <p class="section-copy">Agents use JSON when they need to reason over output. CI jobs save JSON as an artifact and fail only on clear machine-readable conditions.</p>
           <div class="command"><pre><code>xyte-cli flow run flow.daily-deep-dive-report \
   --tenant &lt;profile-label&gt; \
   --plan \
@@ -87,7 +87,7 @@ xyte-cli ops watch incidents \
   --out ./artifacts/incidents.ndjson</code></pre></div>
 
           <h2 id="common-outputs">Common outputs</h2>
-          <p class="section-copy">Start with the schema that matches the workflow you are automating.</p>
+          <p class="section-copy">Choose the schema by the command that produced the file.</p>
           <ul class="checklist">
             <li><code>doctor-environment.v1</code>: choose installed, npx, workspace-local, or blocked setup mode.</li>
             <li><code>status.v1</code>: read fast tenant readiness from jobs and agents.</li>
@@ -116,9 +116,9 @@ xyte-cli ops watch incidents \
 
           <h2 id="compatibility">Compatibility notes</h2>
           <ul class="checklist">
-            <li>The <code>.v1</code> suffix means consumers should expect additive changes, not arbitrary field renames, inside that version.</li>
-            <li>Automation should ignore unknown fields and require only the fields it needs for the decision.</li>
-            <li>Use <code>--strict-json</code> when a process reads stdout. Use <code>--out</code> when a process should parse a saved artifact.</li>
+            <li>The <code>.v1</code> suffix means consumers can expect additive changes, not arbitrary field renames, inside that version.</li>
+            <li>Automation can ignore unknown fields and require only the fields it needs for the decision.</li>
+            <li>Use <code>--strict-json</code> when a process reads stdout. Use <code>--out</code> when a process parses a saved artifact.</li>
             <li>Watch and batch reports can be NDJSON. Validate one line at a time instead of treating the whole file as a JSON array.</li>
           </ul>
 
@@ -239,7 +239,7 @@ done &lt; ./artifacts/incidents.ndjson</code></pre></div>
         </article>
       </div>
     </main>
-    <footer class="footer"><div class="wrap footer-row"><span>Schema contracts</span><span><a href="../index.html#docs">Docs</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
+    <footer class="footer"><div class="wrap footer-row"><span>Schema contracts</span><span><a href="../index.html#docs">Reference</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
     <script src="../guides/guide.js?v=use-case-guides-2"></script>
   </body>
 </html>

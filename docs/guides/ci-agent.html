@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Use xyte-cli from CI or an AI agent</title>
+    <title>CI and AI agent setup | xyte-cli guides</title>
     <meta name="description" content="Run xyte-cli from CI jobs and shell-capable AI agents without exposing API keys." />
     <link rel="icon" type="image/png" href="../media/xyte-ai-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="./index.html">Guides</a><a href="../index.html#install">Install</a><a href="../index.html#docs">Docs</a></nav></div></header>
+    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a></nav></div></header>
     <main class="page"><div class="wrap guide-shell">
       <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">AI agent</a><a href="#terminal">Terminal commands</a></aside>
       <article class="article">
@@ -22,7 +22,7 @@
         </figure>
         <p class="eyebrow">Automation</p>
         <h1>CI and agents.</h1>
-        <p class="lead">Use this when Xyte checks or reports need to run without a person typing every command: scheduled jobs, pipeline checks, or shell-capable agents such as Codex, Claude Code, and Copilot Agent mode.</p>
+        <p class="lead">For scheduled jobs, pipeline checks, and shell-capable agents such as Codex, Claude Code, and Copilot Agent mode.</p>
         <div class="view-switch" role="tablist" aria-label="Guide view">
           <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
           <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
@@ -30,8 +30,8 @@
 
         <section class="guide-view" data-view="ai" id="ai-agent">
           <h2>Ask an agent</h2>
-          <p class="section-copy">Ask like this when the job does not exist yet. The agent should learn the job purpose before it writes configuration.</p>
-          <div class="agent-prompt"><div class="command"><pre><code>Use xyte-cli to set up a repeatable CI or agent job for fleet reporting.</code></pre></div></div>
+          <p class="section-copy">Ask for the automation outcome. The agent will map the secret, pin the CLI version, create artifacts, and keep the first job read-only.</p>
+          <div class="agent-prompt"><div class="command"><pre><code>Set up a repeatable fleet report job that runs without printing secrets.</code></pre></div></div>
           <div class="flow-diagram" aria-label="CI and agent workflow">
             <h3>What the agent will do</h3>
             <ol class="flow-steps">
@@ -44,9 +44,9 @@
           </div>
           <div class="ask-help">
             <h3>Ask how it works first</h3>
-            <p class="section-copy">The agent can explain CI setup, secret handling, and artifacts before it writes workflow configuration.</p>
+            <p class="section-copy">Ask this before adding a workflow file when you need to understand secret handling and saved outputs.</p>
             <div class="command"><pre><code>How do I run xyte-cli from GitHub Actions?
-How should an AI agent handle XYTE_CLI_KEY?
+How do AI agents handle XYTE_CLI_KEY safely?
 How do I make a read-only fleet report job?</code></pre></div>
           </div>
         </section>
@@ -54,7 +54,7 @@ How do I make a read-only fleet report job?</code></pre></div>
         <section class="guide-view" data-view="terminal" id="terminal" hidden>
 
         <h2 id="goal">Goal</h2>
-        <p class="section-copy">Automation should be explicit about where the API key comes from, which local profile is used, and whether the command is read-only or write-capable. Use JSON output for machines and plan mode before writes.</p>
+        <p class="section-copy">A good automation job says where the API key comes from, which profile it uses, what files it saves, and whether it can change tenant state. Use JSON for machines and plan mode before writes.</p>
 
         <h2 id="ci">CI recipes</h2>
         <p class="section-copy">These jobs are no-write by default. They set up the CLI from <code>XYTE_CLI_KEY</code>, create artifacts, and run read-only or plan-only commands with pinned <code>@xyteai/cli@0.11.0</code>.</p>
@@ -167,8 +167,8 @@ jobs:
 
         <h2 id="agent">Agent prompt</h2>
         <p class="section-copy">Use a shell-capable agent. Chat-only assistants can explain commands, but they cannot install or run the CLI.</p>
-        <div class="command"><pre><code>Use xyte-cli to set up a repeatable CI or agent job for fleet reporting.</code></pre></div>
-        <p class="section-copy">Use the job result when it creates JSON artifacts, uses the intended profile, and ends read-only or at a plan gate. If the secret is missing, readiness is blocked, JSON artifacts are missing, incidents need handoff, or a write plan waits for approval, keep the job output attached and route the next step to a person.</p>
+        <div class="command"><pre><code>Set up a repeatable fleet report job that runs without printing secrets.</code></pre></div>
+        <p class="section-copy">A useful result includes the workflow file, the secret name to configure, the artifact paths, and the command the job will run. If the job cannot authenticate, cannot write artifacts, or reaches a write plan, keep the logs and route the next step to a person.</p>
 
         <h2 id="repeat">Make this repeatable</h2>
         <div class="command"><pre><code># Environment

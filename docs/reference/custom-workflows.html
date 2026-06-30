@@ -15,7 +15,7 @@
     <header class="site-nav">
       <div class="wrap nav-row">
         <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Reference</span></a>
-        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#guides">Guides</a><a href="../index.html#docs">Docs</a></nav>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../index.html#guides">Guides</a><a href="../index.html#docs">Reference</a></nav>
       </div>
     </header>
     <main class="page">
@@ -47,7 +47,7 @@
           <div class="flow-diagram" aria-label="Custom workflow lifecycle">
             <h3>Workflow</h3>
             <ol class="flow-steps">
-              <li><span class="flow-kicker">Base</span><strong>Choose built-in flow</strong><span>Start from the workflow that already matches the task.</span></li>
+              <li><span class="flow-kicker">Base</span><strong>Choose built-in flow</strong><span>Use the flow that already matches the task.</span></li>
               <li><span class="flow-kicker">Alias</span><strong>Name it for the team</strong><span>Use a stable id such as <code>flow.noc-watch-triage</code>.</span></li>
               <li><span class="flow-kicker">Defaults</span><strong>Pin context</strong><span>Store values like report window, region, or poll timeout.</span></li>
               <li><span class="flow-kicker">Plan</span><strong>Run safely</strong><span>Check the alias in <code>--plan</code> before anyone relies on it.</span></li>
@@ -56,7 +56,7 @@
           </div>
 
           <h2 id="ask-an-agent">Ask an agent</h2>
-          <p class="section-copy">Ask the agent to create a team shortcut only after it can name the repeated use case and the built-in flow it should wrap.</p>
+          <p class="section-copy">Create a custom workflow when the repeated job is clear and the base flow is known.</p>
           <div class="command"><pre><code>Create a custom xyte-cli workflow for our daily NOC triage.
 Use the built-in watch-to-triage flow, set the window to 12 hours, and run it in plan mode.
 
@@ -84,7 +84,7 @@ xyte-cli flow run flow.noc-watch-triage \
           </div>
 
           <h2 id="share-import">Share and import</h2>
-          <p class="section-copy">Shared workflow files contain the alias, base flow, title, description, and defaults. They should not contain API keys or secrets.</p>
+          <p class="section-copy">Shared workflow files contain the alias, base flow, title, description, and defaults. Keep API keys and secrets out of them.</p>
           <div class="command"><pre><code>xyte-cli flow share flow.noc-watch-triage --out ./artifacts/flow.noc-watch-triage.json
 xyte-cli flow import --file ./artifacts/flow.noc-watch-triage.json
 xyte-cli flow import --file ./artifacts/flow.noc-watch-triage.json --force</code></pre></div>
@@ -108,7 +108,7 @@ xyte-cli flow edit flow.noc-watch-triage \
         </article>
       </div>
     </main>
-    <footer class="footer"><div class="wrap footer-row"><span>Custom workflows</span><span><a href="../index.html#docs">Docs</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
+    <footer class="footer"><div class="wrap footer-row"><span>Custom workflows</span><span><a href="../index.html#docs">Reference</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
     <script src="../guides/guide.js?v=use-case-guides-2"></script>
   </body>
 </html>

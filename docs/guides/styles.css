@@ -230,9 +230,8 @@ h3 {
   display: block;
   width: 100%;
   height: auto;
-  max-height: 320px;
-  aspect-ratio: 16 / 7.5;
-  object-fit: cover;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
   border: 1px solid var(--line-soft);
   border-radius: 12px;
   background: var(--panel);
