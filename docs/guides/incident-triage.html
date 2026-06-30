@@ -23,13 +23,6 @@
         <p class="eyebrow">Incidents</p>
         <h1>Incident triage.</h1>
         <p class="lead">Use this when you need to know what is active now, whether incidents changed during a short window, and which fleet context should be included before escalation.</p>
-
-        <div class="summary">
-          <div class="summary-card"><strong>Use when</strong><span>Support review, live monitoring, or agent-driven triage.</span></div>
-          <div class="summary-card"><strong>Inputs</strong><span>A ready tenant, or enough context to choose one.</span></div>
-          <div class="summary-card"><strong>Output</strong><span>Snapshot, delta, heartbeat, or error frames.</span></div>
-        </div>
-
         <div class="view-switch" role="tablist" aria-label="Guide view">
           <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
           <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
@@ -37,22 +30,24 @@
 
         <section class="guide-view" data-view="ai" id="ai-agent">
           <h2>Ask an agent</h2>
-          <p class="section-copy">Ask for the operational view you need. The workflow below shows how the agent turns that into CLI checks and files.</p>
-          <div class="agent-prompt"><div class="command"><pre><code>Show me what changed in active incidents.
-
-Use the ready tenant, or ask which tenant if more than one is ready.
-Start with the current active incident snapshot.
-If incidents are active, add fleet context so I can see whether this is isolated or widespread.
-Show the count, what changed, any files written, and the next useful move.</code></pre></div></div>
+          <p class="section-copy">Ask like this. The workflow below shows how the agent turns that into CLI checks and files.</p>
+          <div class="agent-prompt"><div class="command"><pre><code>Use xyte-cli to show active incidents and what changed since yesterday.</code></pre></div></div>
           <div class="flow-diagram" aria-label="Incident triage workflow">
-            <h3>Workflow</h3>
+            <h3>What the agent will do</h3>
             <ol class="flow-steps">
-              <li><span class="flow-kicker">Start</span><strong>Select tenant</strong><span>Use the ready tenant that owns the incident queue.</span></li>
-              <li><span class="flow-kicker">Watch</span><strong>Read incidents</strong><span>Capture the active set and any changes in a short window.</span></li>
-              <li><span class="flow-kicker">Branch</span><strong>Check count</strong><span>Stop if nothing is active; collect context if incidents exist.</span></li>
-              <li><span class="flow-kicker">Context</span><strong>Inspect fleet</strong><span>Compare the incident with device and fleet state.</span></li>
-              <li><span class="flow-kicker">Next</span><strong>Choose handoff</strong><span>Continue monitoring, write a report, or plan remediation.</span></li>
+              <li><span class="flow-kicker">Discover</span><strong>Check access</strong><span>Confirm xyte-cli can read incident state.</span></li>
+              <li><span class="flow-kicker">Inspect</span><strong>Read incidents</strong><span>Capture active incidents and recent frames.</span></li>
+              <li><span class="flow-kicker">Choose</span><strong>Set time window</strong><span>Use the requested time window, or ask before choosing a different one.</span></li>
+              <li><span class="flow-kicker">Write</span><strong>Save handoff files</strong><span>Write incident frames and source JSON when useful.</span></li>
+              <li><span class="flow-kicker">Return</span><strong>Explain change</strong><span>Summarize active count, changes, files, and next move.</span></li>
             </ol>
+          </div>
+          <div class="ask-help">
+            <h3>Ask how it works first</h3>
+            <p class="section-copy">The agent can explain incident watching and then run the watch command when you ask.</p>
+            <div class="command"><pre><code>How do I set a watch on my incidents using xyte-cli?
+What does ops watch incidents return?
+How do I compare incidents since yesterday?</code></pre></div>
           </div>
         </section>
 
@@ -67,7 +62,7 @@ Show the count, what changed, any files written, and the next useful move.</code
             <h3>Get the current active incident snapshot</h3>
             <p>This is the fastest way to answer "what is active right now?"</p>
             <div class="command"><pre><code>xyte-cli ops watch incidents \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --profile incidents-active \
   --once \
   --strict-json</code></pre></div>
@@ -76,7 +71,7 @@ Show the count, what changed, any files written, and the next useful move.</code
             <h3>Watch a short change window</h3>
             <p>Use a bounded watch for live triage. The output file is NDJSON so every frame can be read independently.</p>
             <div class="command"><pre><code>xyte-cli ops watch incidents \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --profile incidents-active \
   --interval-ms 2000 \
   --max-polls 30 \
@@ -87,12 +82,12 @@ Show the count, what changed, any files written, and the next useful move.</code
             <h3>Add fleet context before deciding what to do</h3>
             <p>These files answer whether the incident is isolated or part of a broader tenant problem.</p>
             <div class="command"><pre><code>xyte-cli ops inspect fleet \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --render json \
   --out ./artifacts/xyte-fleet.triage.json
 
 xyte-cli ops inspect deep-dive \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --window 24 \
   --render json \
   --out ./artifacts/xyte-deep-dive.triage.json</code></pre></div>
@@ -108,19 +103,27 @@ xyte-cli ops inspect deep-dive \
         </ul>
         <div class="command"><pre><code>{
   "event": "snapshot",
-  "tenantId": "&lt;tenant-id&gt;",
+  "tenantId": "&lt;profile-label&gt;",
   "summary": {
     "active": 12,
     "critical": 1,
     "high": 2
   }
 }</code></pre></div>
-        <p class="section-copy">You are done when you can name the active count, identify new or changed incidents, and point to the fleet context file that explains whether the issue is isolated.</p>
+        <p class="section-copy">A useful handoff names the active count, new or changed incidents, and the fleet context file. If frames repeat errors, the baseline is stale, or counts do not match the intended filters, fix those inputs before escalating.</p>
+
+        <h2 id="repeat">Make this repeatable</h2>
+        <div class="command"><pre><code># Environment
+XYTE_PROFILE=&lt;profile-label&gt;
+
+# Rerun path
+xyte-cli ops watch incidents --tenant "$XYTE_PROFILE" --profile incidents-active --once --strict-json
+xyte-cli ops inspect fleet --tenant "$XYTE_PROFILE" --render json --out ./artifacts/xyte-fleet.triage.json</code></pre></div>
 
         <h2 id="failures">If it fails</h2>
         <div class="failure-list">
           <div class="failure"><strong>Counts differ from the web view</strong><p>Compare filters first: status, date range, page size, and whether the UI hides older active incidents.</p></div>
-          <div class="failure"><strong>Repeated error frames</strong><p>Run <code>xyte-cli config doctor --tenant &lt;tenant-id&gt; --format text</code>, then retry with <code>--once</code>.</p></div>
+          <div class="failure"><strong>Repeated error frames</strong><p>Run <code>xyte-cli config doctor --tenant &lt;profile-label&gt; --format text</code>, then retry with <code>--once</code>.</p></div>
           <div class="failure"><strong>The watch runs too long</strong><p>Use <code>--max-polls</code>. Do not leave an unbounded watch running in a support handoff.</p></div>
         </div>
         </section>

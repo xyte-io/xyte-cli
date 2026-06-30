@@ -22,6 +22,7 @@
       <div class="wrap guide-shell">
         <aside class="toc" aria-label="On this page">
           <strong>On this page</strong>
+          <a href="#agent-setup">Agent setup</a>
           <a href="#what-agents-do">What agents do</a>
           <a href="#ask-an-agent">Ask an agent</a>
           <a href="#terminal-ci">Terminal and CI</a>
@@ -43,6 +44,31 @@
             <div class="summary-card"><strong>Boundary</strong><span>Never paste secrets into chat. Never let an agent apply a write from a vague prompt.</span></div>
           </div>
 
+          <h2 id="agent-setup">Agent setup</h2>
+          <p class="section-copy">Use a shell-capable agent. It needs terminal access in the workspace, permission to run <code>xyte-cli</code>, and a safe way to read the API key without seeing the key text in chat.</p>
+          <div class="table-wrap"><table class="matrix">
+            <thead><tr><th>Agent type</th><th>What it needs</th><th>How it should run xyte-cli</th></tr></thead>
+            <tbody>
+              <tr><td>Codex or Claude Code</td><td>Workspace terminal access and permission to run commands.</td><td>Inspect setup, run commands, create files, and ask before write-capable apply steps.</td></tr>
+              <tr><td>Copilot Agent mode</td><td>A repository workspace with terminal or CI job access.</td><td>Prepare commands, config, and job snippets; use CI secrets for API keys.</td></tr>
+              <tr><td>Chat-only assistant</td><td>No shell access.</td><td>Explain commands only. A person still runs them in a terminal.</td></tr>
+              <tr><td>CI agent</td><td>Node.js, pinned CLI package, and <code>XYTE_CLI_KEY</code> as a secret.</td><td>Run non-interactive setup, write artifacts, and stop at plan for changes.</td></tr>
+            </tbody>
+          </table></div>
+          <div class="failure-grid">
+            <div class="failure"><strong>Terminal access</strong><p>The agent must be able to run <code>xyte-cli</code>, read command output, and write artifacts such as JSON, NDJSON, CSV, Markdown, or run bundles.</p></div>
+            <div class="failure"><strong>Key handling</strong><p>Give the agent a key-file path, stdin secret, or secret manager command. Do not paste the API key into chat.</p></div>
+            <div class="failure"><strong>Approval boundary</strong><p>For moves, claims, remediation, imports, or other tenant changes, the agent should stop after the plan and wait for approval.</p></div>
+            <div class="failure"><strong>Handoff</strong><p>The agent should end with commands run, files written, what changed, what did not change, and the next decision.</p></div>
+          </div>
+          <h3>Do not paste</h3>
+          <ul class="checklist">
+            <li>API keys, bearer tokens, cookies, or browser session data.</li>
+            <li>Customer exports or tenant-sensitive data unless the task requires that data in the workspace.</li>
+            <li>Guessed device ids, incident ids, proxy ids, or space ids.</li>
+            <li>Approval to apply a tenant change before the target and effect are clear.</li>
+          </ul>
+
           <h2 id="what-agents-do">What agents do</h2>
           <p class="section-copy">An agent should operate the same CLI a person would use. It should show the command it ran, use structured output when it needs to reason over results, and stop when the next step needs a human decision.</p>
           <div class="flow-diagram" aria-label="Agent operation workflow">
@@ -58,51 +84,52 @@
 
           <h2 id="ask-an-agent">Ask an agent</h2>
           <p class="section-copy">Use short, plain requests. Do not preload the prompt with IDs unless you already have them. Let the agent discover context and ask only for missing inputs.</p>
-          <div class="command"><pre><code>Show me whether xyte-cli is ready for this workspace.
-
-Show me active incidents and the fleet context for the ready tenant.
-
-Create today's fleet report. Save the source JSON and tell me the report path.
-
-Help me plan remediation for the current issue, but stop before apply.</code></pre></div>
+          <h3>Readiness prompt</h3>
+          <div class="command"><pre><code>Use xyte-cli to check whether this machine can run tenant operations.</code></pre></div>
+          <h3>Incident triage prompt</h3>
+          <div class="command"><pre><code>Use xyte-cli to show active incidents and what changed since yesterday.</code></pre></div>
+          <h3>Report prompt</h3>
+          <div class="command"><pre><code>Use xyte-cli to make today's fleet report and tell me where it saved the files.</code></pre></div>
+          <h3>Write plan prompt</h3>
+          <div class="command"><pre><code>Use xyte-cli to investigate a broken room or device and prepare a remediation plan. Do not apply changes.</code></pre></div>
+          <h3>CI job prompt</h3>
+          <div class="command"><pre><code>Use xyte-cli to set up a repeatable CI or agent job for fleet reporting.</code></pre></div>
 
           <h2 id="terminal-ci">Terminal and CI</h2>
           <p class="section-copy">The same work should be reproducible without an agent. In a terminal, run the command directly. In CI, use non-interactive setup, JSON output, saved artifacts, and plan-only flows unless the job has a separate approval step.</p>
           <div class="command"><pre><code># Terminal
 xyte-cli ops inspect fleet \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --render json \
   --out ./artifacts/fleet.json
 
 # CI
-printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@latest setup run \
+printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@0.11.0 setup run \
   --non-interactive \
-  --tenant &lt;tenant-id&gt; \
   --key-stdin \
   --format json
 
-npx -y @xyteai/cli@latest flow run flow.daily-deep-dive-report \
-  --tenant &lt;tenant-id&gt; \
+npx -y @xyteai/cli@0.11.0 flow run flow.daily-deep-dive-report \
+  --tenant default \
   --plan \
   --strict-json</code></pre></div>
 
           <h2 id="setup-path">Setup path</h2>
-          <p class="section-copy">When setup is missing, the agent should ask for a tenant id and a path to an API key file outside the workspace. It should not ask for the key text.</p>
+          <p class="section-copy">When setup is missing, the agent should ask for a path to an API key file outside the workspace. It should not ask for the key text. If the user manages more than one Xyte connection, ask which local profile label to use.</p>
           <div class="command"><pre><code>xyte-cli doctor environment --format json
 xyte-cli setup run \
   --non-interactive \
-  --tenant &lt;tenant-id&gt; \
   --key-file &lt;path-outside-workspace&gt; \
   --format json
-xyte-cli setup status --tenant &lt;tenant-id&gt; --format text
+xyte-cli setup status --format text
 xyte-cli init --scope project --agents all --force --no-setup</code></pre></div>
 
           <h2 id="write-boundary">Write boundary</h2>
           <p class="section-copy">For commands that can change tenant state, the agent should plan first. Apply is a separate step after the operator reviews the target, effect, and resume path.</p>
-          <div class="command"><pre><code>xyte-cli flow run &lt;flow-id&gt; --tenant &lt;tenant-id&gt; --plan
-xyte-cli flow run &lt;flow-id&gt; --tenant &lt;tenant-id&gt; --apply --resume &lt;run-id-or-path&gt;</code></pre></div>
+          <div class="command"><pre><code>xyte-cli flow run &lt;flow-id&gt; --tenant &lt;profile-label&gt; --plan
+xyte-cli flow run &lt;flow-id&gt; --tenant &lt;profile-label&gt; --apply --resume &lt;run-id-or-path&gt;</code></pre></div>
           <ul class="checklist">
-            <li>Read-only requests can run immediately after readiness checks.</li>
+            <li>Requests that only inspect tenant state can run immediately after readiness checks.</li>
             <li>Move, claim, close, update, send-command, and import actions need approval.</li>
             <li>After a write, the agent should read back the changed state.</li>
           </ul>
@@ -110,14 +137,14 @@ xyte-cli flow run &lt;flow-id&gt; --tenant &lt;tenant-id&gt; --apply --resume &l
           <h2 id="real-examples">Real-life examples</h2>
           <div class="failure-grid">
             <div class="failure"><strong>Morning support handoff</strong><p>Ask: "Show me what changed in active incidents since yesterday and save fleet context." The agent runs watch once, saves fleet JSON, and summarizes changes.</p></div>
-            <div class="failure"><strong>Weekly operations report</strong><p>Ask: "Create this week's deep-dive report for the ready tenant." The agent saves source JSON and a Markdown or PDF report.</p></div>
+            <div class="failure"><strong>Weekly operations report</strong><p>Ask: "Use xyte-cli to create this week's deep-dive report." The agent saves source JSON and a Markdown or PDF report.</p></div>
             <div class="failure"><strong>Room reorganization</strong><p>Ask: "Help me move devices after the room import." The agent exports current devices and spaces, builds a move CSV, and stops at dry run.</p></div>
-            <div class="failure"><strong>Edge onboarding</strong><p>Ask: "Help me claim these Edge devices from the spreadsheet." The agent prepares rows, explains rejects, runs plan, and waits before apply.</p></div>
+            <div class="failure"><strong>Device onboarding</strong><p>Ask: "Use xyte-cli to plan device claiming from this spreadsheet." The agent chooses native/direct or Edge, prepares rows, explains missing fields, and stops before the claim runs.</p></div>
           </div>
 
           <h2 id="handoff">Handoff</h2>
           <p class="section-copy">A useful agent answer should end with what changed, what did not change, where the files are, and what the next decision is.</p>
-          <div class="command"><pre><code>Ready tenant: &lt;tenant-id&gt;
+          <div class="command"><pre><code>Profile checked: default
 Commands run: setup status, config doctor, ops inspect fleet
 Files written:
   ./artifacts/fleet.json

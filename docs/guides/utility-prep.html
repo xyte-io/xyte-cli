@@ -23,12 +23,6 @@
         <p class="eyebrow">Utilities</p>
         <h1>Spreadsheet prep.</h1>
         <p class="lead">Use utility preparation when a spreadsheet, CSV, or document describes work a human understands, but the CLI needs clean rows with real identifiers before anything can run.</p>
-        <div class="summary">
-          <div class="summary-card"><strong>Use when</strong><span>Spreadsheets, CSVs, or documents need to become workflow inputs.</span></div>
-          <div class="summary-card"><strong>Inputs</strong><span>A source file, the workflow goal, and tenant context when lookups are needed.</span></div>
-          <div class="summary-card"><strong>Output</strong><span>Primary rows, rejected rows, and notes for review.</span></div>
-        </div>
-
         <div class="view-switch" role="tablist" aria-label="Guide view">
           <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
           <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
@@ -36,22 +30,24 @@
 
         <section class="guide-view" data-view="ai" id="ai-agent">
           <h2>Ask an agent</h2>
-          <p class="section-copy">Ask for a prepared workflow input. The workflow separates understanding the file from executing tenant changes.</p>
-          <div class="agent-prompt"><div class="command"><pre><code>Prepare this spreadsheet for a CLI workflow.
-
-If I did not give a file path, ask for it.
-Ask what the file should become: Edge claim rows, a space tree, device moves, access rows, connector setup, or another supported action.
-Show the selected action, primary file, rejected file, notes file, and rows that still need user input.
-Stop before executing the prepared rows.</code></pre></div></div>
+          <p class="section-copy">Ask like this. The workflow cleans the file into CLI-ready rows and does not execute the workflow.</p>
+          <div class="agent-prompt"><div class="command"><pre><code>Use xyte-cli to clean this spreadsheet for a CLI workflow.</code></pre></div></div>
           <div class="flow-diagram" aria-label="Utility preparation workflow">
-            <h3>Workflow</h3>
+            <h3>What the agent will do</h3>
             <ol class="flow-steps">
-              <li><span class="flow-kicker">Source</span><strong>Read file</strong><span>Start from the spreadsheet and the user’s goal.</span></li>
-              <li><span class="flow-kicker">Action</span><strong>Pick profile</strong><span>Match the goal to a supported utility action.</span></li>
-              <li><span class="flow-kicker">Prepare</span><strong>Create files</strong><span>Write primary rows, rejected rows, and notes.</span></li>
-              <li><span class="flow-kicker">Review</span><strong>Fix gaps</strong><span>Surface missing ids or rows that need a human decision.</span></li>
-              <li><span class="flow-kicker">Pause</span><strong>Do not execute</strong><span>Stop before any workflow consumes the prepared rows.</span></li>
+              <li><span class="flow-kicker">Discover</span><strong>Get file and goal</strong><span>Confirm the spreadsheet path and target workflow when they are not already provided.</span></li>
+              <li><span class="flow-kicker">Inspect</span><strong>Read file</strong><span>Match the spreadsheet to a supported action.</span></li>
+              <li><span class="flow-kicker">Choose</span><strong>Pick profile</strong><span>Select the utility action and required columns.</span></li>
+              <li><span class="flow-kicker">Write</span><strong>Create files</strong><span>Write primary, rejected, and notes files.</span></li>
+              <li><span class="flow-kicker">Return</span><strong>Handoff</strong><span>Explain rejected rows and the next command without executing it.</span></li>
             </ol>
+          </div>
+          <div class="ask-help">
+            <h3>Ask how it works first</h3>
+            <p class="section-copy">The agent can explain preparation profiles and rejected rows before it writes cleaned files.</p>
+            <div class="command"><pre><code>How do I prepare a spreadsheet for xyte-cli?
+Which util prepare action should I use?
+Why did rows get rejected?</code></pre></div>
           </div>
         </section>
 
@@ -68,17 +64,17 @@ Stop before executing the prepared rows.</code></pre></div></div>
           <li class="step"><h3>Prepare Edge claim rows</h3><p>Use this for devices behind an Edge proxy. Required columns include proxy id, device IP, model id, and space id.</p><div class="command"><pre><code>xyte-cli util prepare \
   --action organization.edge.startClaim \
   --input &lt;input.xlsx&gt; \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --output-dir ./prepared</code></pre></div></li>
           <li class="step"><h3>Prepare a space tree import</h3><p>Use this when a hierarchy source needs to become rows with <code>path</code>, <code>space_type</code>, and <code>config</code>.</p><div class="command"><pre><code>xyte-cli util prepare \
   --action space.import-tree \
   --input &lt;input.xlsx&gt; \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --output-dir ./prepared</code></pre></div></li>
           <li class="step"><h3>Prepare device moves</h3><p>Use this when the source file already identifies devices and intended target spaces.</p><div class="command"><pre><code>xyte-cli util prepare \
   --action device.move \
   --input &lt;input.xlsx&gt; \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --output-dir ./prepared</code></pre></div></li>
         </ol>
 
@@ -92,7 +88,15 @@ Stop before executing the prepared rows.</code></pre></div></div>
         <div class="command"><pre><code>./prepared/organization-edge-startclaim.csv
 ./prepared/organization-edge-startclaim.rejected.csv
 ./prepared/organization-edge-startclaim.notes.md</code></pre></div>
-        <p class="section-copy">You are done when the primary file has only rows you are willing to execute and the rejected file has been reviewed instead of ignored.</p>
+        <p class="section-copy">Use the prepared file only when the primary file contains rows you are willing to execute and rejected rows have clear next steps. If too many rows are rejected, required Xyte identifiers are missing, or the selected action does not match the source file, fix the source and prepare it again.</p>
+
+        <h2 id="repeat">Make this repeatable</h2>
+        <div class="command"><pre><code># Environment
+XYTE_PROFILE=&lt;profile-label&gt;
+INPUT_FILE=&lt;input.xlsx&gt;
+
+# Rerun path
+xyte-cli util prepare --action organization.edge.startClaim --tenant "$XYTE_PROFILE" --input "$INPUT_FILE" --output-dir ./prepared</code></pre></div>
 
         <h2 id="failures">If it fails</h2>
         <div class="failure-list">

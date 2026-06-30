@@ -23,9 +23,13 @@
         <aside class="toc" aria-label="On this page">
           <strong>On this page</strong>
           <a href="#what-schemas-do">What schemas do</a>
+          <a href="#ask-an-agent">Ask an agent</a>
           <a href="#agent-ci">Agent and CI</a>
           <a href="#common-outputs">Common outputs</a>
+          <a href="#mapping">Command mapping</a>
+          <a href="#compatibility">Compatibility</a>
           <a href="#real-examples">Examples</a>
+          <a href="#validate">Validate JSON</a>
           <a href="#schema-links">Schema links</a>
         </aside>
         <article class="article">
@@ -54,22 +58,29 @@
             </ol>
           </div>
 
+          <h2 id="ask-an-agent">Ask an agent</h2>
+          <p class="section-copy">Ask the agent to use schema-backed output whenever it needs to make a decision from CLI data.</p>
+          <div class="command"><pre><code>Run the xyte-cli command with strict JSON or a saved output file.
+Tell me which schema applies.
+Read fields from the JSON, not from terminal text.
+Return the artifact path and the decision you made from it.</code></pre></div>
+
           <h2 id="agent-ci">Agent and CI</h2>
           <p class="section-copy">Agents should ask for JSON when they need to reason over output. CI jobs should save the JSON as an artifact and fail on clear machine-readable conditions.</p>
           <div class="command"><pre><code>xyte-cli flow run flow.daily-deep-dive-report \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --plan \
   --strict-json \
   --out-dir ./tmp/flow-runs
 
 xyte-cli ops inspect fleet \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --render json \
   --strict-json \
   --out ./artifacts/fleet.json
 
 xyte-cli ops watch incidents \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --profile incidents-active \
   --once \
   --strict-json \
@@ -87,6 +98,107 @@ xyte-cli ops watch incidents \
             <li><code>utility-prepare.v1</code> and <code>utility-batch.v1</code>: process prepared rows, rejected rows, and batch dispositions.</li>
           </ul>
 
+          <h2 id="mapping">Command-to-schema mapping</h2>
+          <div class="table-wrap"><table class="matrix">
+            <thead><tr><th>Command</th><th>Use this schema</th><th>Automation use</th></tr></thead>
+            <tbody>
+              <tr><td><code>doctor environment --format json</code></td><td><code>doctor-environment.v1</code></td><td>Choose installed, npx, workspace-local, or blocked setup path.</td></tr>
+              <tr><td><code>status --mode fast --format json</code></td><td><code>status.v1</code></td><td>Decide whether a job can continue to operational commands.</td></tr>
+              <tr><td><code>ops watch incidents --strict-json</code></td><td><code>watch-frame.v1</code></td><td>Read snapshot, delta, heartbeat, and error frames.</td></tr>
+              <tr><td><code>ops inspect fleet --render json</code></td><td><code>inspect-fleet.v1</code></td><td>Store fleet counts and device context for dashboards or handoffs.</td></tr>
+              <tr><td><code>ops inspect deep-dive --render json</code></td><td><code>inspect-deep-dive.v1</code></td><td>Save report source data before rendering Markdown or PDF.</td></tr>
+              <tr><td><code>ops report generate</code></td><td><code>report.v1</code></td><td>Track report path, input source, and render metadata.</td></tr>
+              <tr><td><code>flow run --plan --strict-json</code></td><td><code>flow-run.v1</code></td><td>Read outcome, pause state, next action, and run bundle path.</td></tr>
+              <tr><td><code>util prepare</code></td><td><code>utility-prepare.v1</code></td><td>Count primary rows, rejected rows, generated files, and next command.</td></tr>
+              <tr><td><code>edge claim-batch</code></td><td><code>utility-batch.v1</code></td><td>Track batch row dispositions, partial runs, and resume behavior.</td></tr>
+            </tbody>
+          </table></div>
+
+          <h2 id="compatibility">Compatibility notes</h2>
+          <ul class="checklist">
+            <li>The <code>.v1</code> suffix means consumers should expect additive changes, not arbitrary field renames, inside that version.</li>
+            <li>Automation should ignore unknown fields and require only the fields it needs for the decision.</li>
+            <li>Use <code>--strict-json</code> when a process reads stdout. Use <code>--out</code> when a process should parse a saved artifact.</li>
+            <li>Watch and batch reports can be NDJSON. Validate one line at a time instead of treating the whole file as a JSON array.</li>
+          </ul>
+
+          <h2 id="payloads">Small payload examples</h2>
+          <div class="command"><pre><code>{
+  "schemaVersion": "xyte.status.v1",
+  "generatedAtUtc": "2026-06-30T00:00:00.000Z",
+  "mode": "fast",
+  "checkConnectivity": true,
+  "readiness": {
+    "state": "ready",
+    "tenantId": "&lt;profile-label&gt;",
+    "missingItems": [],
+    "recommendedActions": [],
+    "providers": [
+      { "provider": "xyte-org", "slotCount": 1, "hasActiveSecret": true }
+    ],
+    "connectionState": "connected",
+    "connectivity": {
+      "state": "connected",
+      "message": "Connected",
+      "retriable": false
+    }
+  }
+}</code></pre></div>
+          <div class="command"><pre><code>{
+  "schemaVersion": "xyte.watch.frame.v1",
+  "timestamp": "2026-06-30T00:00:00.000Z",
+  "runId": "run-001",
+  "sequence": 0,
+  "pollIndex": 1,
+  "intervalMs": 2000,
+  "profile": "incidents-active",
+  "endpointKey": "organization.incidents.getIncidents",
+  "tenantId": "&lt;profile-label&gt;",
+  "eventType": "snapshot",
+  "query": { "status": "active" },
+  "summary": {
+    "total": 12,
+    "added": 0,
+    "removed": 0,
+    "updated": 0,
+    "changed": false
+  },
+  "items": []
+}</code></pre></div>
+          <div class="command"><pre><code>{
+  "schemaVersion": "xyte.flow.run.v1",
+  "generatedAtUtc": "2026-06-30T00:00:00.000Z",
+  "runId": "run-001",
+  "flowId": "flow.guided-remediation",
+  "resolvedFlowId": "flow.guided-remediation",
+  "mode": "plan",
+  "tenantId": "&lt;profile-label&gt;",
+  "bundleDir": "./tmp/flow-runs/flow.guided-remediation/run-001",
+  "manifestPath": "./tmp/flow-runs/flow.guided-remediation/run-001/manifest.json",
+  "inputsPath": "./tmp/flow-runs/flow.guided-remediation/run-001/inputs.json",
+  "decisionsPath": "./tmp/flow-runs/flow.guided-remediation/run-001/decisions.ndjson",
+  "errorsPath": "./tmp/flow-runs/flow.guided-remediation/run-001/errors.ndjson",
+  "watchFramesPath": "./tmp/flow-runs/flow.guided-remediation/run-001/watch-frames.ndjson",
+  "startedAtUtc": "2026-06-30T00:00:00.000Z",
+  "endedAtUtc": "2026-06-30T00:00:02.000Z",
+  "durationMs": 2000,
+  "outcome": "pending_gate",
+  "nextResumeStepId": "approve-remediation",
+  "resumeCommand": "xyte-cli flow run flow.guided-remediation --tenant &lt;profile-label&gt; --apply --resume ./tmp/flow-runs/flow.guided-remediation/run-001",
+  "nextAction": {
+    "kind": "approve_gate",
+    "stepId": "approve-remediation",
+    "title": "Approve remediation plan",
+    "requiresWrite": true,
+    "artifactPaths": ["./tmp/flow-runs/flow.guided-remediation/run-001/manifest.json"],
+    "command": "xyte-cli flow run flow.guided-remediation --tenant &lt;profile-label&gt; --apply --resume ./tmp/flow-runs/flow.guided-remediation/run-001"
+  },
+  "steps": [],
+  "decisions": { "pending": 1, "approved": 0, "blocked": 0 },
+  "classifications": { "needs_data": 0, "bug": 0 },
+  "cursor": { "nextStepIndex": 0, "nextStepId": "approve-remediation" }
+}</code></pre></div>
+
           <h2 id="real-examples">Real-life examples</h2>
           <div class="failure-grid">
             <div class="failure"><strong>Fail CI when setup is blocked</strong><p>Run <code>doctor environment --format json</code>, read the recommended mode, and fail when the mode is blocked.</p></div>
@@ -94,6 +206,18 @@ xyte-cli ops watch incidents \
             <div class="failure"><strong>Attach report sources</strong><p>Generate a Markdown or PDF report from saved deep-dive JSON, then attach both files so readers can trace the numbers.</p></div>
             <div class="failure"><strong>Resume paused flow</strong><p>Read <code>nextAction</code> from a flow summary and use the bundle path in the approved resume command.</p></div>
           </div>
+
+          <h2 id="validate">Validate JSON with ajv</h2>
+          <p class="section-copy">Use schema validation when another system will depend on a CLI artifact. For NDJSON, validate each line separately.</p>
+          <div class="command"><pre><code>npm exec --yes ajv-cli validate \
+  -s ./docs/schemas/status.v1.schema.json \
+  -d ./artifacts/status.json
+
+while IFS= read -r line; do
+  printf "%s\n" "$line" | npm exec --yes ajv-cli validate \
+    -s ./docs/schemas/watch-frame.v1.schema.json \
+    -d /dev/stdin
+done &lt; ./artifacts/incidents.ndjson</code></pre></div>
 
           <h2 id="schema-links">Schema links</h2>
           <p class="section-copy">These files are the public machine-readable contracts shipped with the docs.</p>

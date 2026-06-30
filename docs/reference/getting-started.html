@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Getting started | xyte-cli reference</title>
-    <meta name="description" content="Install xyte-cli, connect tenant access, and reach the first ready operational state." />
+    <meta name="description" content="Set up xyte-cli for a tenant, check readiness, and choose the first workflow to run." />
     <link rel="icon" type="image/png" href="../media/xyte-ai-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -22,129 +22,138 @@
       <div class="wrap guide-shell">
         <aside class="toc" aria-label="On this page">
           <strong>On this page</strong>
-          <a href="#first-use">First use</a>
-          <a href="#ask-an-agent">Ask an agent</a>
-          <a href="#start-here">Start here</a>
-          <a href="#connect-the-tenant">Connect tenant</a>
-          <a href="#verify-readiness">Verify readiness</a>
-          <a href="#terminal-ci">Terminal and CI</a>
-          <a href="#agent-skills">Agent skills</a>
-          <a href="#blockers">Blockers</a>
+          <a href="#what-you-need">What you need</a>
+          <a href="#ask-admin">Ask your admin</a>
+          <a href="#agent-path">AI agent path</a>
+          <a href="#terminal-path">Terminal and CI</a>
+          <a href="#ready">Ready state</a>
+          <a href="#next">What to run next</a>
+          <a href="#scope">Provider scope</a>
+          <a href="#glossary">Glossary</a>
+          <a href="#blockers">Common blockers</a>
         </aside>
         <article class="article">
           <p class="breadcrumb"><a href="../index.html">Overview</a> / Getting started</p>
-          <figure class="guide-visual"><img src="./media/getting-started-reference.png" alt="First-run setup moves through environment checks, secure key setup, tenant readiness, and a first operation." /></figure>
+          <figure class="guide-visual"><img src="./media/getting-started-reference.png" alt="Setup checks the runtime, reads the key safely, connects the tenant, and runs a first status command." /></figure>
           <p class="eyebrow">Start</p>
           <h1>Getting started.</h1>
-          <p class="lead">Use this path when a new machine, workspace, CI job, or shell-capable agent needs to run real Xyte operations for the first time.</p>
+          <p class="lead">Use this page to get one machine, CI job, or shell-capable agent ready to run <code>xyte-cli</code> against a real Xyte tenant.</p>
 
-          <div class="summary">
-            <div class="summary-card"><strong>Prerequisites</strong><span>Node.js 22+, a Xyte API key, and a writable config directory.</span></div>
-            <div class="summary-card"><strong>Secret handling</strong><span>Keep the API key outside the repository and pass it by file, stdin, or secret command.</span></div>
-            <div class="summary-card"><strong>Ready state</strong><span>The CLI runs, the tenant is connected, and readiness checks pass.</span></div>
-          </div>
-
-          <h2 id="first-use">First use</h2>
-          <p class="section-copy">The first successful setup answers four questions: can this environment run the CLI, where does the API key come from, which tenant should commands use, and can the tenant answer live checks?</p>
+          <h2 id="what-you-need">What you need</h2>
+          <p class="section-copy">First setup needs an API key. The CLI stores it under a local profile label, uses <code>default</code> when you do not choose one, and auto-detects whether the key can use organization or partner APIs.</p>
           <div class="failure-grid">
-            <div class="failure"><strong>New support laptop</strong><p>Install or use <code>npx</code>, connect the tenant once, then run readiness before incident or fleet work.</p></div>
-            <div class="failure"><strong>New CI job</strong><p>Read the API key from a CI secret, run setup non-interactively, then produce JSON artifacts.</p></div>
-            <div class="failure"><strong>New agent workspace</strong><p>Let the agent check the environment, ask for a key-file path if needed, and install workspace skill guidance.</p></div>
-            <div class="failure"><strong>New tenant</strong><p>Use an explicit tenant id and provider when auto-detection cannot choose the right scope.</p></div>
+            <div class="failure"><strong>API key</strong><p>A Xyte API key. Save it outside this repository, for example <code>~/Desktop/xyte-api-key.txt</code>.</p></div>
+            <div class="failure"><strong>Profile label</strong><p>Optional. Use one only when the same machine or CI runner manages more than one Xyte connection.</p></div>
+            <div class="failure"><strong>Provider</strong><p>Usually auto-detected. Set <code>xyte-org</code> or <code>xyte-partner</code> only when your admin tells you to force one.</p></div>
+            <div class="failure"><strong>Artifact folder</strong><p>A place for command output, such as <code>./artifacts</code> or <code>./reports</code>.</p></div>
           </div>
 
-          <h2 id="ask-an-agent">Ask an agent</h2>
-          <p class="section-copy">Give the agent the setup goal, not a pile of command syntax. It should discover the runtime, ask only for missing tenant or key-file information, and stop with readiness status.</p>
-          <div class="command"><pre><code>Set up xyte-cli for this workspace.
+          <h2 id="ask-admin">Ask your Xyte admin for</h2>
+          <p class="section-copy">Use this short request when you are missing setup details.</p>
+          <div class="command"><pre><code>Please send the values I need to set up xyte-cli:
 
-Use the configured tenant if one is already ready.
-If setup is missing, ask me for the tenant id and the path to an API key file outside this repo.
-Do not ask me to paste a secret into chat.
-Stop when you can show tenant readiness and connectivity.</code></pre></div>
+API key delivery: key file or secret manager
+Provider, only if auto-detect should not be used: organization or partner
+Profile label, only if we use more than one Xyte connection:
+Default artifact folder:
+Allowed workflows: read-only reports, incident triage, device claiming, or approved writes</code></pre></div>
 
-          <h2 id="start-here">Start here</h2>
-          <p class="section-copy">Run the environment doctor first. It reports whether the current environment should use an installed binary, <code>npx</code>, or a workspace-local install.</p>
-          <div class="command"><pre><code>xyte-cli doctor environment --format json
+          <h2 id="agent-path">AI agent path</h2>
+          <p class="section-copy">Use this when Codex, Claude Code, Copilot Agent mode, or another shell-capable agent is setting up the workspace for you.</p>
+          <div class="command"><pre><code>Use xyte-cli to check whether this machine can run tenant operations.</code></pre></div>
+
+          <h2 id="terminal-path">Terminal and CI path</h2>
+          <ol class="steps">
+            <li class="step">
+              <h3>Check the runtime</h3>
+              <p>Start with the environment doctor. If a global install is not available, <code>npx</code> can run the CLI without changing the repository.</p>
+              <div class="command"><pre><code>xyte-cli doctor environment --format json
 npx -y @xyteai/cli@latest doctor environment --format json</code></pre></div>
-          <p class="section-copy">If the report recommends a workspace-local install, keep the runtime under the workspace and call the generated binary path from jobs or agents.</p>
-          <div class="command"><pre><code>npm install --prefix ./.xyte-cli/runtime @xyteai/cli@latest
-./.xyte-cli/runtime/node_modules/.bin/xyte-cli doctor environment --format json</code></pre></div>
+            </li>
+            <li class="step">
+              <h3>Connect the API key</h3>
+              <p>Use a key file outside the workspace for local setup. In CI, feed the key from the job secret through stdin. The CLI stores the key under the active profile, usually <code>default</code>.</p>
+              <div class="command"><pre><code>xyte-cli setup run \
+  --non-interactive \
+  --key-file &lt;path-outside-workspace&gt; \
+  --format json
+
+printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@0.11.0 setup run \
+  --non-interactive \
+  --key-stdin \
+  --format json</code></pre></div>
+            </li>
+            <li class="step">
+              <h3>Check readiness</h3>
+              <p>Run these before reports, incidents, device claiming, or approved writes.</p>
+              <div class="command"><pre><code>xyte-cli config doctor --format text
+xyte-cli status --mode fast --format json</code></pre></div>
+            </li>
+          </ol>
 
           <div class="flow-diagram" aria-label="First-run setup workflow">
             <h3>Workflow</h3>
             <ol class="flow-steps">
-              <li><span class="flow-kicker">Runtime</span><strong>Check Node and CLI</strong><span>Pick installed, npx, or workspace-local execution.</span></li>
-              <li><span class="flow-kicker">Secret</span><strong>Read key safely</strong><span>Use a file, stdin, or a secret manager command outside the repo.</span></li>
-              <li><span class="flow-kicker">Tenant</span><strong>Create connection</strong><span>Store tenant profile and credential slot for later commands.</span></li>
-              <li><span class="flow-kicker">Doctor</span><strong>Check connectivity</strong><span>Confirm the tenant can answer before operations begin.</span></li>
-              <li><span class="flow-kicker">Ready</span><strong>Run first command</strong><span>Move into guides, flows, reports, or API calls.</span></li>
+              <li><span class="flow-kicker">Runtime</span><strong>Can this shell run the CLI?</strong><span>Check Node.js and choose installed CLI, <code>npx</code>, or workspace-local execution.</span></li>
+              <li><span class="flow-kicker">Secret</span><strong>Where does the API key come from?</strong><span>Read it from a file, stdin, CI secret, or secret manager command.</span></li>
+              <li><span class="flow-kicker">Profile</span><strong>Where is the key stored?</strong><span>Save the key under the active profile, usually <code>default</code>.</span></li>
+              <li><span class="flow-kicker">Doctor</span><strong>Can Xyte answer?</strong><span>Confirm authentication, provider scope, and network access.</span></li>
+              <li><span class="flow-kicker">Operate</span><strong>Run the first useful command.</strong><span>Move to status, incidents, reports, device claiming, or automation.</span></li>
             </ol>
           </div>
 
-          <h2 id="connect-the-tenant">Connect tenant</h2>
-          <p class="section-copy">Create the API key in Xyte under Settings, save it outside the workspace, then run setup without pasting secrets into chat or command history.</p>
-          <div class="command"><pre><code>xyte-cli setup run \
-  --non-interactive \
-  --tenant &lt;tenant-id&gt; \
-  --key-file &lt;path-outside-workspace&gt; \
-  --format json</code></pre></div>
-          <p class="section-copy">For CI, pass the key through stdin from the job secret. For a secret manager, make the command print only the key and exit 0.</p>
-          <div class="command"><pre><code>printf "%s" "$XYTE_CLI_KEY" | xyte-cli setup run \
-  --non-interactive \
-  --tenant &lt;tenant-id&gt; \
-  --key-stdin \
-  --format json
-
-xyte-cli setup run \
-  --non-interactive \
-  --tenant &lt;tenant-id&gt; \
-  --key-command "&lt;secret-command&gt;" \
-  --format json</code></pre></div>
-
-          <h2 id="verify-readiness">Verify readiness</h2>
-          <p class="section-copy">Readiness is not just a saved key. Check the selected tenant, credential storage, and live connectivity before running fleet, incident, Edge, or write-capable workflows.</p>
-          <div class="command"><pre><code>xyte-cli setup status --tenant &lt;tenant-id&gt; --format text
-xyte-cli config doctor --tenant &lt;tenant-id&gt; --format json
-xyte-cli status --tenant &lt;tenant-id&gt; --mode fast --format json</code></pre></div>
-          <div class="command"><pre><code>Tenant: &lt;tenant-id&gt;
-Readiness: ready
+          <h2 id="ready">Ready state</h2>
+          <p class="section-copy">A ready setup has an active profile, a usable credential, and a live status response.</p>
+          <div class="command"><pre><code>Profile: default
+Provider: organization
+Credential: available
 Connectivity: connected
-Next: run a guide, inspect fleet state, or list flows.</code></pre></div>
+Next: run a guide, inspect fleet state, or generate a report.</code></pre></div>
 
-          <h2 id="terminal-ci">Terminal and CI</h2>
-          <p class="section-copy">In a local terminal, a person can run setup interactively. In CI, avoid prompts and feed the key from the job secret.</p>
-          <div class="command"><pre><code># Local terminal
-xyte-cli setup run
-xyte-cli config doctor --tenant &lt;tenant-id&gt; --format text
+          <h2 id="next">What to run next</h2>
+          <div class="failure-grid">
+            <div class="failure"><strong>I need today's status</strong><p>Run the <a href="../guides/daily-report.html">daily fleet report guide</a>.</p></div>
+            <div class="failure"><strong>Something is broken</strong><p>Run the <a href="../guides/incident-triage.html">incident triage guide</a>.</p></div>
+            <div class="failure"><strong>I am onboarding devices</strong><p>Run the <a href="../guides/edge-claim.html">device claiming guide</a>.</p></div>
+            <div class="failure"><strong>I want automation</strong><p>Use the <a href="../guides/ci-agent.html">CI and agent guide</a>.</p></div>
+          </div>
 
-# CI step
-printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@latest setup run \
-  --non-interactive \
-  --tenant &lt;tenant-id&gt; \
-  --key-stdin \
-  --format json
+          <h2 id="scope">Provider scope</h2>
+          <p class="section-copy">Most users can leave provider scope on <code>auto</code>. Set it explicitly when your admin says the key is organization-only, partner-only, or results look incomplete.</p>
+          <div class="table-wrap"><table class="matrix">
+            <thead><tr><th>Value</th><th>Use it when</th></tr></thead>
+            <tbody>
+              <tr><td><code>xyte-org</code></td><td>Setup uses an organization API key.</td></tr>
+              <tr><td><code>xyte-partner</code></td><td>Setup uses a partner API key.</td></tr>
+              <tr><td><code>organization</code></td><td>A command should read organization devices, spaces, incidents, or reports.</td></tr>
+              <tr><td><code>partner</code></td><td>A command should read partner-level data and the key allows it.</td></tr>
+              <tr><td><code>auto</code></td><td>The CLI should choose from the stored profile and command context.</td></tr>
+            </tbody>
+          </table></div>
 
-npx -y @xyteai/cli@latest status \
-  --tenant &lt;tenant-id&gt; \
-  --mode fast \
-  --format json</code></pre></div>
-
-          <h2 id="agent-skills">Agent skills</h2>
-          <p class="section-copy">Install the skill bundle when Codex, Claude Code, Copilot Agent mode, or another shell-capable agent will operate the CLI in this workspace.</p>
-          <div class="command"><pre><code>xyte-cli init --scope project --agents all --force --no-setup
-xyte-cli skills refresh</code></pre></div>
-          <ul class="checklist">
-            <li>Project-scope skills stay with the workspace.</li>
-            <li>User-scope skills stay with the developer account on this machine.</li>
-            <li>After upgrading the CLI, refresh workspace skills again.</li>
-          </ul>
+          <h2 id="glossary">Glossary</h2>
+          <div class="table-wrap"><table class="matrix">
+            <thead><tr><th>Term</th><th>Plain meaning</th></tr></thead>
+            <tbody>
+              <tr><td>Alias</td><td>A local short name for a tenant profile.</td></tr>
+              <tr><td>Workspace</td><td>The folder where the agent or terminal runs commands.</td></tr>
+              <tr><td>Artifact</td><td>A file produced by a command, usually JSON, NDJSON, Markdown, PDF, or a run bundle.</td></tr>
+              <tr><td>Schema</td><td>A JSON contract that says which fields automation can parse.</td></tr>
+              <tr><td>Strict JSON</td><td>Machine-readable output without extra terminal decoration.</td></tr>
+              <tr><td>NDJSON</td><td>One JSON object per line, useful for watches and batch reports.</td></tr>
+              <tr><td>Flow</td><td>A repeatable multi-step workflow, such as remediation or a report run.</td></tr>
+              <tr><td>Plan/apply</td><td><code>--plan</code> previews a change. <code>--apply</code> runs it after approval.</td></tr>
+              <tr><td>Resume path</td><td>The run id, bundle path, or resume file used to continue an interrupted workflow.</td></tr>
+            </tbody>
+          </table></div>
 
           <h2 id="blockers">Common blockers</h2>
           <div class="failure-grid">
-            <div class="failure"><strong>Node.js is missing or too old</strong><p>Install Node.js 22+ or run in an environment that already has it.</p></div>
-            <div class="failure"><strong>The key file is rejected</strong><p>Move it outside the repository, check file permissions, and rerun setup.</p></div>
-            <div class="failure"><strong>Provider scope is wrong</strong><p>Pass <code>--provider xyte-org</code> or <code>--provider xyte-partner</code> when auto-detection cannot choose correctly.</p></div>
-            <div class="failure"><strong>Connectivity fails</strong><p>Run <code>config doctor</code>, fix tenant access or networking, then verify readiness again.</p></div>
+            <div class="failure"><strong>Node.js is missing or too old</strong><p>Install Node.js 22+ or run the command in an environment that already has it.</p></div>
+            <div class="failure"><strong>The key file cannot be read</strong><p>Move it outside the repository, check file permissions, and rerun setup.</p></div>
+            <div class="failure"><strong>Authentication is rejected</strong><p>Ask for a fresh key with access to the tenant, then rerun setup.</p></div>
+            <div class="failure"><strong>Results look incomplete</strong><p>Rerun with an explicit provider scope: <code>organization</code> or <code>partner</code>.</p></div>
+            <div class="failure"><strong>Network access fails</strong><p>Run <code>config doctor</code> again after fixing VPN, firewall, or proxy access.</p></div>
           </div>
         </article>
       </div>

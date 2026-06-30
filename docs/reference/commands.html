@@ -25,12 +25,14 @@
           <a href="#how-to-use">How to use</a>
           <a href="#ask-an-agent">Ask an agent</a>
           <a href="#terminal-ci">Terminal and CI</a>
+          <a href="#output-matrix">Output matrix</a>
           <a href="#core-setup">Core setup</a>
           <a href="#operations">Operations</a>
           <a href="#endpoint-ops">Endpoint ops</a>
           <a href="#flows-utilities">Flows and utilities</a>
           <a href="#edge-reports">Edge and reports</a>
           <a href="#logs-console">Logs and console</a>
+          <a href="#retry">Retry guidance</a>
         </aside>
         <article class="article">
           <p class="breadcrumb"><a href="../index.html">Overview</a> / Commands reference</p>
@@ -41,14 +43,14 @@
 
           <div class="summary">
             <div class="summary-card"><strong>Read first</strong><span><code>--format</code> controls setup/status JSON or text. <code>--render</code> controls inspect/report output files.</span></div>
-            <div class="summary-card"><strong>Tenant scope</strong><span>Pass <code>--tenant &lt;tenant-id&gt;</code> for tenant-scoped operations and automation.</span></div>
+            <div class="summary-card"><strong>Profile scope</strong><span>Pass <code>--tenant &lt;profile-label&gt;</code> when a machine has more than one Xyte connection.</span></div>
             <div class="summary-card"><strong>Writes</strong><span>Use flow or utility plan modes before commands that can change tenant state.</span></div>
           </div>
 
           <h2 id="how-to-use">How to use this page</h2>
-          <p class="section-copy">Start from the work you need to finish. Setup commands make a tenant usable. Watch and inspect commands read current state. Flows coordinate multi-step work. Utilities turn messy files into clean inputs. API calls are for endpoint-level control.</p>
+          <p class="section-copy">Start from the work you need to finish. Setup commands connect an API key. Watch and inspect commands read current state. Flows coordinate multi-step work. Utilities turn messy files into clean inputs. API calls are for endpoint-level control.</p>
           <div class="failure-grid">
-            <div class="failure"><strong>"Is the tenant ready?"</strong><p>Use setup status, config doctor, and fast status.</p></div>
+            <div class="failure"><strong>"Is setup working?"</strong><p>Use setup status, config doctor, and fast status.</p></div>
             <div class="failure"><strong>"What changed?"</strong><p>Use incident watch, then inspect fleet or deep-dive for context.</p></div>
             <div class="failure"><strong>"I have a spreadsheet."</strong><p>Use util prepare, review generated rows and rejects, then run the matching workflow.</p></div>
             <div class="failure"><strong>"I need one endpoint."</strong><p>Describe the endpoint first, then call it with explicit path, query, or body JSON.</p></div>
@@ -60,57 +62,75 @@
 
 Show me active incidents and save the fleet context JSON.
 
-Prepare this spreadsheet for Edge claim. Explain rejected rows and stop before apply.
+Prepare this spreadsheet for device claiming. Tell me whether the rows are native/direct or Edge, explain rows that need more data, and stop before apply.
 
 Find the endpoint for device notes and show a read-only example first.</code></pre></div>
 
           <h2 id="terminal-ci">Terminal and CI</h2>
           <p class="section-copy">In a terminal, run the command family that matches the task and read the help for exact flags. In CI, prefer JSON, saved files, and plan-only flows unless the job has an explicit approval path.</p>
           <div class="command"><pre><code># Human terminal
-xyte-cli config doctor --tenant &lt;tenant-id&gt; --format text
-xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-active --once
+xyte-cli config doctor --tenant &lt;profile-label&gt; --format text
+xyte-cli ops watch incidents --tenant &lt;profile-label&gt; --profile incidents-active --once
 
 # CI-friendly read path
-xyte-cli config doctor --tenant &lt;tenant-id&gt; --format json
+xyte-cli config doctor --tenant &lt;profile-label&gt; --format json
 xyte-cli ops inspect fleet \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --render json \
   --strict-json \
   --out ./artifacts/fleet.json
 
 # CI-friendly change path
-xyte-cli flow run &lt;flow-id&gt; --tenant &lt;tenant-id&gt; --plan --strict-json</code></pre></div>
+xyte-cli flow run &lt;flow-id&gt; --tenant &lt;profile-label&gt; --plan --strict-json</code></pre></div>
+
+          <h2 id="output-matrix">Command output matrix</h2>
+          <p class="section-copy">Use this to choose the right command family for a terminal, CI job, or agent. Automation should start with commands that inspect state or produce a plan before any tenant change runs.</p>
+          <div class="table-wrap"><table class="matrix">
+            <thead><tr><th>Command family</th><th>Read/write behavior</th><th>Output format</th><th>File behavior</th><th>Safe for CI</th><th>Relevant schema</th><th>Common failures</th></tr></thead>
+            <tbody>
+              <tr><td>doctor environment</td><td>Reads local runtime.</td><td><code>--format json</code> or text.</td><td>No required files.</td><td>Yes.</td><td><code>doctor-environment.v1</code></td><td>Node too old, package unavailable, blocked install path.</td></tr>
+              <tr><td>setup/status</td><td>Setup stores the API key under a local profile; status is read-only.</td><td><code>--format json</code> or text.</td><td>Reads key file or stdin; writes local credential profile.</td><td>Yes, with stdin secret.</td><td><code>status.v1</code></td><td>Empty secret, wrong provider, rejected key.</td></tr>
+              <tr><td>config doctor/status</td><td>Checks API access without changing tenant data.</td><td>JSON or text.</td><td>No required files.</td><td>Yes.</td><td><code>status.v1</code></td><td>Auth failure, network failure, wrong profile.</td></tr>
+              <tr><td>ops watch incidents</td><td>Reads incident state and emits the current frame or changes over time.</td><td>Strict JSON or NDJSON frames.</td><td><code>--out</code> writes watch frames.</td><td>Yes.</td><td><code>watch-frame.v1</code></td><td>Repeated error frame, filter mismatch, long unbounded watch.</td></tr>
+              <tr><td>ops inspect fleet/deep-dive</td><td>Reads fleet state and prepares source data for reports or handoff.</td><td>JSON, Markdown, or report input.</td><td><code>--out</code> writes source artifacts.</td><td>Yes.</td><td><code>inspect-fleet.v1</code>, <code>inspect-deep-dive.v1</code></td><td>Provider scope mismatch, output path missing.</td></tr>
+              <tr><td>flow run --plan</td><td>Shows planned actions and stops before applying changes.</td><td>Strict JSON or text summary.</td><td>Run bundle under <code>--out-dir</code>.</td><td>Yes.</td><td><code>flow-run.v1</code></td><td>Missing input, paused gate, unresolved target.</td></tr>
+              <tr><td>flow run --apply --resume</td><td>Continues an approved flow from its saved run id or bundle path.</td><td>Strict JSON or text summary.</td><td>Reads original run id or bundle path.</td><td>Only in jobs with an approval step.</td><td><code>flow-run.v1</code></td><td>Wrong resume path, rejected write, stale target.</td></tr>
+              <tr><td>util prepare</td><td>Reads source files and writes local prepared files.</td><td>JSON summary plus CSV/notes outputs.</td><td>Writes primary, rejected, and notes files.</td><td>Yes.</td><td><code>utility-prepare.v1</code></td><td>Unsupported action, unreadable input, rejected rows.</td></tr>
+              <tr><td>edge claim-batch</td><td>Plans or runs an Edge claim batch from prepared rows.</td><td>NDJSON report and summary.</td><td>Writes report and resume artifact.</td><td>Use plan in scheduled jobs; run apply only from an approved job.</td><td><code>utility-batch.v1</code></td><td>Offline proxy, timeout, partial batch, rejected row.</td></tr>
+              <tr><td>ops report generate</td><td>Renders a report from saved source data.</td><td>Markdown or PDF.</td><td>Reads saved JSON, writes report file.</td><td>Yes.</td><td><code>report.v1</code></td><td>Wrong input type, output path missing.</td></tr>
+            </tbody>
+          </table></div>
 
           <h2 id="core-setup">Core setup</h2>
           <p class="section-copy">Use these when a machine, workspace, or job needs to become ready before any operational command runs.</p>
           <div class="command"><pre><code>xyte-cli doctor environment --format json
-xyte-cli setup run --non-interactive --tenant &lt;tenant-id&gt; --key-file &lt;path-outside-workspace&gt; --format json
-xyte-cli setup status --tenant &lt;tenant-id&gt; --field tenantId
-xyte-cli config doctor --tenant &lt;tenant-id&gt; --format json
+xyte-cli setup run --non-interactive --key-file &lt;path-outside-workspace&gt; --format json
+xyte-cli setup status --field tenantId
+xyte-cli config doctor --format json
 xyte-cli init --scope project --agents all --force --no-setup</code></pre></div>
           <ul class="checklist">
             <li>Use <code>doctor environment</code> when the command is missing or the environment is unknown.</li>
-            <li>Use <code>setup status</code> for the stored tenant state.</li>
+            <li>Use <code>setup status</code> for the stored profile state.</li>
             <li>Use <code>config doctor</code> for live connectivity and credential diagnostics.</li>
           </ul>
 
           <h2 id="operations">Operations</h2>
           <p class="section-copy">Use watch for incident changes and inspect for current tenant state. Save source JSON when the result will feed a report, dashboard, or agent answer.</p>
           <div class="command"><pre><code>xyte-cli ops watch incidents \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --profile incidents-active \
   --once \
   --strict-json \
   --out ./artifacts/incidents.ndjson
 
 xyte-cli ops inspect fleet \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --provider-scope auto \
   --render json \
   --out ./artifacts/fleet.json
 
 xyte-cli ops inspect deep-dive \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --window 24 \
   --render json \
   --out ./artifacts/deep-dive.json</code></pre></div>
@@ -120,20 +140,20 @@ xyte-cli ops inspect deep-dive \
           <div class="command"><pre><code>xyte-cli api endpoints list
 xyte-cli api endpoints describe organization.devices.getDevices
 xyte-cli api call organization.devices.getDevices \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --query-json '{"page":1,"per_page":100}'</code></pre></div>
           <p class="section-copy">For write-capable endpoints, prefer a guide or flow first. If you use <code>api call</code> directly, choose the target from endpoint output and read the state back afterward.</p>
           <div class="command"><pre><code>xyte-cli api endpoints describe organization.commands.sendCommand
 xyte-cli api call organization.commands.getCommands \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --path-json '{"device_id":"&lt;device-id&gt;"}' \
   --query-json '{"page":1,"per_page":20}'</code></pre></div>
 
           <h2 id="flows-utilities">Flows and utilities</h2>
           <p class="section-copy">Use flows for repeatable operator workflows and utilities for messy input files that need to become structured rows.</p>
           <div class="command"><pre><code>xyte-cli flow list --format text
-xyte-cli flow run &lt;flow-id&gt; --tenant &lt;tenant-id&gt; --plan
-xyte-cli flow run &lt;flow-id&gt; --tenant &lt;tenant-id&gt; --apply --resume &lt;run-id-or-path&gt;
+xyte-cli flow run &lt;flow-id&gt; --tenant &lt;profile-label&gt; --plan
+xyte-cli flow run &lt;flow-id&gt; --tenant &lt;profile-label&gt; --apply --resume &lt;run-id-or-path&gt;
 
 xyte-cli util list-actions --format text
 xyte-cli util prepare \
@@ -154,8 +174,12 @@ xyte-cli util prepare \
 
           <h2 id="edge-reports">Edge and reports</h2>
           <p class="section-copy">Edge claim and ping are async operations. Start in plan mode, then apply after approval. Reports should be generated from saved source files.</p>
-          <div class="command"><pre><code>xyte-cli edge claim \
-  --tenant &lt;tenant-id&gt; \
+          <div class="command"><pre><code>xyte-cli api endpoints describe organization.edge.startClaim
+xyte-cli api call organization.edges.getEdges --tenant &lt;profile-label&gt; --query-json '{"page":1,"per_page":100}' &gt; ./artifacts/edge-proxies.json
+xyte-cli api call organization.spaces.getSpaces --tenant &lt;profile-label&gt; --query-json '{"path_includes":"&lt;target-path&gt;","page":1,"per_page":100}' &gt; ./artifacts/edge-target-spaces.json
+
+xyte-cli edge claim \
+  --tenant &lt;profile-label&gt; \
   --proxy-id &lt;proxy-id&gt; \
   --device-ip &lt;device-ip&gt; \
   --device-model-id &lt;device-model-id&gt; \
@@ -163,23 +187,31 @@ xyte-cli util prepare \
   --plan
 
 xyte-cli edge claim-status \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --proxy-id &lt;proxy-id&gt; \
   --device-ip &lt;device-ip&gt;
 
 xyte-cli ops report generate \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --input ./artifacts/deep-dive.json \
   --out ./reports/xyte-report.md \
   --render markdown</code></pre></div>
 
           <h2 id="logs-console">Logs and console</h2>
           <p class="section-copy">Use action logs when a run needs traceable command history. Use headless console when a job needs a machine-readable console frame.</p>
-          <div class="command"><pre><code>xyte-cli --log-actions --log-actions-path ./logs/xyte-cli.actions.ndjson status --tenant &lt;tenant-id&gt;
+          <div class="command"><pre><code>xyte-cli --log-actions --log-actions-path ./logs/xyte-cli.actions.ndjson status --tenant &lt;profile-label&gt;
 xyte-cli logs list --path ./logs/xyte-cli.actions.ndjson --limit 200
 xyte-cli logs show --path ./logs/xyte-cli.actions.ndjson --entry &lt;session-id&gt;:&lt;seq&gt;
 
-xyte-cli ops console --headless --screen dashboard --once --tenant &lt;tenant-id&gt;</code></pre></div>
+xyte-cli ops console --headless --screen dashboard --once --tenant &lt;profile-label&gt;</code></pre></div>
+
+          <h2 id="retry">Idempotency and retry guidance</h2>
+          <div class="failure-grid">
+            <div class="failure"><strong>Flows</strong><p>Retry <code>--plan</code> freely. For writes, resume the original run with <code>--apply --resume &lt;run-id-or-path&gt;</code> so the next approved gate stays tied to the reviewed plan.</p></div>
+            <div class="failure"><strong>Edge claim batch</strong><p>Keep the same report and resume artifact. Completed rows should not be started again; fix failed rows, then rerun with the same resume file.</p></div>
+            <div class="failure"><strong>Device moves</strong><p>Dry-run until rows are clean. After partial apply, rerun only the failed rows or use the apply report to remove completed rows.</p></div>
+            <div class="failure"><strong>Report generation</strong><p>Regenerate reports from the same saved JSON when you need identical numbers. Create a new source JSON only when the reporting window or tenant state should change.</p></div>
+          </div>
 
           <div class="failure-grid">
             <div class="failure"><strong>A flag is rejected</strong><p>Run <code>xyte-cli &lt;command&gt; --help</code> against the installed version and adjust the command family, not the workflow goal.</p></div>

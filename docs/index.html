@@ -6,7 +6,7 @@
     <title>Xyte AI CLI | Operate Xyte with command-line clarity</title>
     <meta
       name="description"
-      content="Install xyte-cli, connect a tenant key, inspect fleet state, open console workflows, and export shareable artifacts inside Xyte's design language."
+      content="Install xyte-cli, connect an API key, inspect fleet state, open console workflows, and export shareable artifacts inside Xyte's design language."
     />
     <link rel="icon" type="image/png" href="./media/xyte-ai-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -1617,7 +1617,8 @@
 
         <nav class="nav-links" aria-label="Primary">
           <a href="#install">Install</a>
-          <a href="#docs">Docs</a>
+          <a href="#start">Start</a>
+          <a href="#docs">Reference</a>
           <a href="#guides">Guides</a>
         </nav>
 
@@ -1709,8 +1710,8 @@
             <h2 id="install-title">Three ways to get running.</h2>
             <p>
               Using an AI agent? Hand it the prompt &mdash; it runs <code>xyte-cli doctor environment --format json</code>
-              and follows the recommended install mode from the report. Manual terminals install the package globally, connect a
-              tenant key, and verify readiness. Then move into fleet inspection, incident watch, or report generation.
+              and follows the recommended install mode from the report. Manual terminals install the package globally, connect an
+              API key, and verify readiness. Then move into fleet inspection, incident watch, or report generation.
             </p>
           </header>
 
@@ -1734,7 +1735,7 @@
               <div class="command-shell">
                 <pre id="agent-prompt"><code><span class="p-line">Use @xyteai/cli in this workspace.</span><span class="p-line p-end">Never print secrets. Do not invent IDs or outputs.
 </span><span class="p-line p-cmd">First run `xyte-cli doctor environment --format json`.</span><span class="p-line p-cmd">If `xyte-cli` is missing, run `npx -y @xyteai/cli@latest doctor environment --format json`.</span><span class="p-line p-end">Follow the report's recommendations.nextCommand and recommendations.commands.
-</span><span class="p-line p-cmd">If `xyte-cli setup status` shows no connected tenant, ask me for the path to my API key file (never the key itself) and connect it with the report's setupKeyFile recipe.</span><span class="p-line">Do not ask me to paste API keys into chat.</span><span class="p-line">Do not store API keys inside the repo.</span><span class="p-line p-cmd p-end">After setup succeeds, offer to delete the key file, then run `xyte-cli init --scope project --agents all --force --no-setup`.
+</span><span class="p-line p-cmd">If `xyte-cli setup status` shows no connected profile, ask me for the path to my API key file (never the key itself) and connect it with the report's setupKeyFile recipe.</span><span class="p-line">Do not ask me to paste API keys into chat.</span><span class="p-line">Do not store API keys inside the repo.</span><span class="p-line p-cmd p-end">After setup succeeds, offer to delete the key file, then run `xyte-cli init --scope project --agents all --force --no-setup`.
 </span><span class="p-line">If this surface cannot run shell commands, stop and say I need a shell-capable terminal or agent.</span></code></pre>
               </div>
               <div class="action-row">
@@ -1756,12 +1757,12 @@
                 <li>In Xyte, open <strong>Settings &rarr; API Keys</strong> and create a key.</li>
                 <li>In your CI tool (GitHub Actions, GitLab CI, Jenkins), add a secret named <code>XYTE_CLI_KEY</code> and paste the key as its value.</li>
                 <li>Make sure the job receives the secret as an environment variable &mdash; in GitHub Actions add <code>env: XYTE_CLI_KEY: ${{ secrets.XYTE_CLI_KEY }}</code> to the step; GitLab CI passes variables automatically.</li>
-                <li>Add these commands to your pipeline (<code>acme</code> is just a name for this connection &mdash; use your company name):</li>
+                <li>Add these commands to your pipeline. The setup command stores the key under the default profile.</li>
               </ol>
               <div class="command-shell shell-lines">
-                <pre id="ci-snippet"><code><span class="cmd-line">npx -y @xyteai/cli@latest setup run --non-interactive --tenant acme --format json</span><span class="cmd-line">npx -y @xyteai/cli@latest setup status --tenant acme --field tenantId</span></code></pre>
+                <pre id="ci-snippet"><code><span class="cmd-line">printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@0.11.0 setup run --non-interactive --key-stdin --format json</span><span class="cmd-line">npx -y @xyteai/cli@0.11.0 setup status --field tenantId</span></code></pre>
               </div>
-              <p class="panel-note panel-note-after">For reproducible pipelines, replace <code>@latest</code> with a pinned version (e.g. <code>@0.10.7</code>).</p>
+              <p class="panel-note panel-note-after">This CI path is read-oriented by default. Use plan-mode flows for change workflows and reserve apply steps for a separate approved job.</p>
               <div class="action-row">
                 <a class="inline-link" href="./reference/getting-started.html">Open setup guidance</a>
                 <span class="toast" id="ci-toast" role="status" aria-live="polite"></span>
@@ -1781,7 +1782,7 @@
                 <li>
                   <span class="step-index">01</span>
                   <span class="step-copy">
-                    <strong>Connect the tenant key once</strong>
+                    <strong>Connect the API key once</strong>
                     <span>Create an API key in your Xyte tenant under <strong>Settings &rarr; API Keys</strong> and save it in a file outside your project folder. Run interactive setup once, or use the documented stdin flow for automation. The key prompt hides input and confirms with a <code>Received N characters.</code> line. Persisted credentials default to macOS Keychain, Windows DPAPI, or Linux Secret Service.</span>
                     <span class="detail-code">xyte-cli setup run</span>
                   </span>
@@ -1790,7 +1791,7 @@
                   <span class="step-index">02</span>
                   <span class="step-copy">
                     <strong>Read readiness back out</strong>
-                    <span>Confirm the tenant is connected and capture the tenant ID for subsequent commands.</span>
+                    <span>Confirm the profile is connected and use that profile label for subsequent commands.</span>
                     <span class="detail-code">xyte-cli setup status --field tenantId</span>
                   </span>
                 </li>
@@ -1809,14 +1810,125 @@
         </div>
       </section>
 
+      <section class="section" id="start" aria-labelledby="start-title">
+        <div class="wrap">
+          <header class="section-head reveal">
+            <p class="eyebrow">Start by situation</p>
+            <h2 id="start-title">Choose the state you are in.</h2>
+            <p>
+              Pick the path that matches why you opened the CLI. Each path starts with discovery,
+              uses rendered docs, and keeps write-capable actions behind a plan or approval gate.
+            </p>
+          </header>
+
+          <div class="docs-grid reveal">
+            <a class="docs-card surface" href="./guides/setup-readiness.html">
+              <strong>I’m setting up</strong>
+              <p>Connect the API key, verify readiness, and prepare the workspace for an agent, terminal, or CI job.</p>
+              <span>Start setup</span>
+            </a>
+            <a class="docs-card surface" href="./guides/daily-report.html">
+              <strong>I need today’s status</strong>
+              <p>Create current fleet source data and a readable report for a handoff or customer update.</p>
+              <span>Create report</span>
+            </a>
+            <a class="docs-card surface" href="./guides/incident-triage.html">
+              <strong>Something is broken</strong>
+              <p>Read active incidents, compare what changed, and collect fleet context before remediation.</p>
+              <span>Triage incidents</span>
+            </a>
+            <a class="docs-card surface" href="./guides/edge-claim.html">
+              <strong>I’m onboarding devices</strong>
+              <p>Choose native/direct or Edge claiming, collect the right identifiers, and run only after the target is clear.</p>
+              <span>Plan onboarding</span>
+            </a>
+            <a class="docs-card surface" href="./guides/ci-agent.html">
+              <strong>I want automation</strong>
+              <p>Run setup, reports, incident checks, and plan-only workflows from CI or a shell-capable agent.</p>
+              <span>Build automation</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="guides" aria-labelledby="guides-title">
+        <div class="wrap">
+          <header class="section-head reveal">
+            <p class="eyebrow">Guides</p>
+            <h2 id="guides-title">Start with what you need to do.</h2>
+            <p>
+              Start with what changed: setup is missing, incidents changed, a report is due,
+              spaces were reorganized, devices need onboarding, or a job needs automation.
+            </p>
+          </header>
+
+          <div class="docs-grid reveal">
+            <a class="docs-card surface" href="./guides/setup-readiness.html">
+              <div class="docs-card-thumb"><img src="./guides/media/setup-readiness-workflow.png" alt="" loading="lazy" /></div>
+              <strong>Setup and readiness</strong>
+              <p>Use when a machine, workspace, or profile is new and later workflows depend on connected credentials.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="docs-card surface" href="./guides/incident-triage.html">
+              <div class="docs-card-thumb"><img src="./guides/media/incident-triage-workflow.png" alt="" loading="lazy" /></div>
+              <strong>Incident triage</strong>
+              <p>Use when incident state changed and support needs active counts, deltas, and fleet context.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="docs-card surface" href="./guides/daily-report.html">
+              <div class="docs-card-thumb"><img src="./guides/media/daily-report-workflow.png" alt="" loading="lazy" /></div>
+              <strong>Daily fleet report</strong>
+              <p>Use when a scheduled update or customer handoff needs current counts and a reusable source file.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="docs-card surface" href="./guides/guided-remediation.html">
+              <div class="docs-card-thumb"><img src="./guides/media/guided-remediation-workflow.png" alt="" loading="lazy" /></div>
+              <strong>Guided remediation</strong>
+              <p>Use when triage found a real issue and the next step might change device, incident, or ticket state.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="docs-card surface" href="./guides/device-migration.html">
+              <div class="docs-card-thumb"><img src="./guides/media/device-migration-workflow.png" alt="" loading="lazy" /></div>
+              <strong>Device migration</strong>
+              <p>Use after a room plan, import, rename, or split makes existing device placement wrong.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="docs-card surface" href="./guides/edge-claim.html">
+              <div class="docs-card-thumb"><img src="./guides/media/edge-claim-workflow.png" alt="" loading="lazy" /></div>
+              <strong>Device claiming</strong>
+              <p>Use when native/direct devices or Edge devices need a clear claim path, reviewed inputs, and a result to hand off.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="docs-card surface" href="./guides/utility-prep.html">
+              <div class="docs-card-thumb"><img src="./guides/media/utility-prep-workflow.png" alt="" loading="lazy" /></div>
+              <strong>Utility preparation</strong>
+              <p>Use when a spreadsheet is understandable to people but still not ready for a CLI workflow.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="docs-card surface" href="./guides/ci-agent.html">
+              <div class="docs-card-thumb"><img src="./guides/media/ci-agent-workflow.png" alt="" loading="lazy" /></div>
+              <strong>CI and agents</strong>
+              <p>Use when a pipeline or shell-capable agent needs repeatable checks, artifacts, and approval gates.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="docs-card surface" href="./guides/index.html">
+              <div class="docs-card-thumb"><img src="./guides/media/setup-readiness-workflow.png" alt="" loading="lazy" /></div>
+              <strong>All guides</strong>
+              <p>Browse the full guide library by operator goal.</p>
+              <span>Open library</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
       <section class="section" id="docs" aria-labelledby="docs-title">
         <div class="wrap">
           <header class="section-head reveal">
-            <p class="eyebrow">Docs and contracts</p>
-            <h2 id="docs-title">Reference and contracts.</h2>
+            <p class="eyebrow">Reference docs</p>
+            <h2 id="docs-title">Reference docs.</h2>
             <p>
               Guides for first-run onboarding, full command reference, agent integration patterns,
-              flow authoring, and machine-readable JSON schemas.
+              flow authoring, and schema contracts for machine-readable outputs.
             </p>
           </header>
 
@@ -1861,76 +1973,6 @@
         </div>
       </section>
 
-      <section class="section" id="guides" aria-labelledby="guides-title">
-        <div class="wrap">
-          <header class="section-head reveal">
-            <p class="eyebrow">Guides</p>
-            <h2 id="guides-title">Pick the workflow that matches your state.</h2>
-            <p>
-              Start with what changed: setup is missing, incidents changed, a report is due,
-              spaces were reorganized, devices need onboarding, or a job needs automation.
-            </p>
-          </header>
-
-          <div class="docs-grid reveal">
-            <a class="docs-card surface" href="./guides/setup-readiness.html">
-              <div class="docs-card-thumb"><img src="./guides/media/setup-readiness-workflow.png" alt="" loading="lazy" /></div>
-              <strong>Setup and readiness</strong>
-              <p>Use when a machine, workspace, or tenant is new and later workflows depend on connected credentials.</p>
-              <span>Open guide</span>
-            </a>
-            <a class="docs-card surface" href="./guides/incident-triage.html">
-              <div class="docs-card-thumb"><img src="./guides/media/incident-triage-workflow.png" alt="" loading="lazy" /></div>
-              <strong>Incident triage</strong>
-              <p>Use when incident state changed and support needs active counts, deltas, and fleet context.</p>
-              <span>Open guide</span>
-            </a>
-            <a class="docs-card surface" href="./guides/daily-report.html">
-              <div class="docs-card-thumb"><img src="./guides/media/daily-report-workflow.png" alt="" loading="lazy" /></div>
-              <strong>Daily fleet report</strong>
-              <p>Use when a scheduled update or customer handoff needs current counts and a reusable source file.</p>
-              <span>Open guide</span>
-            </a>
-            <a class="docs-card surface" href="./guides/guided-remediation.html">
-              <div class="docs-card-thumb"><img src="./guides/media/guided-remediation-workflow.png" alt="" loading="lazy" /></div>
-              <strong>Guided remediation</strong>
-              <p>Use when triage found a real issue and the next step might change device, incident, or ticket state.</p>
-              <span>Open guide</span>
-            </a>
-            <a class="docs-card surface" href="./guides/device-migration.html">
-              <div class="docs-card-thumb"><img src="./guides/media/device-migration-workflow.png" alt="" loading="lazy" /></div>
-              <strong>Device migration</strong>
-              <p>Use after a room plan, import, rename, or split makes existing device placement wrong.</p>
-              <span>Open guide</span>
-            </a>
-            <a class="docs-card surface" href="./guides/edge-claim.html">
-              <div class="docs-card-thumb"><img src="./guides/media/edge-claim-workflow.png" alt="" loading="lazy" /></div>
-              <strong>Edge claim</strong>
-              <p>Use when IP devices behind an Edge proxy need a planned single claim or a resumable batch.</p>
-              <span>Open guide</span>
-            </a>
-            <a class="docs-card surface" href="./guides/utility-prep.html">
-              <div class="docs-card-thumb"><img src="./guides/media/utility-prep-workflow.png" alt="" loading="lazy" /></div>
-              <strong>Utility preparation</strong>
-              <p>Use when a spreadsheet is understandable to people but still not ready for a CLI workflow.</p>
-              <span>Open guide</span>
-            </a>
-            <a class="docs-card surface" href="./guides/ci-agent.html">
-              <div class="docs-card-thumb"><img src="./guides/media/ci-agent-workflow.png" alt="" loading="lazy" /></div>
-              <strong>CI and agents</strong>
-              <p>Use when a pipeline or shell-capable agent needs repeatable checks, artifacts, and approval gates.</p>
-              <span>Open guide</span>
-            </a>
-            <a class="docs-card surface" href="./guides/index.html">
-              <div class="docs-card-thumb"><img src="./guides/media/setup-readiness-workflow.png" alt="" loading="lazy" /></div>
-              <strong>All guides</strong>
-              <p>Browse the full guide library by operator goal.</p>
-              <span>Open library</span>
-            </a>
-          </div>
-        </div>
-      </section>
-
       <section class="section">
         <div class="wrap">
           <div class="final-card surface reveal">
@@ -1938,7 +1980,7 @@
               <p class="eyebrow">Ready to run</p>
               <h2>Start operating.</h2>
               <p>
-                Install the CLI, connect your tenant, and run your first fleet inspection in under five minutes.
+                Install the CLI, connect the API key, and run your first fleet inspection in under five minutes.
               </p>
             </div>
             <div class="final-actions">

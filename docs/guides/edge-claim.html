@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Claim Edge devices with xyte-cli</title>
-    <meta name="description" content="Claim one Edge device or process a batch of Edge devices with xyte-cli." />
+    <title>Claim devices with xyte-cli</title>
+    <meta name="description" content="Choose native/direct or Edge device claiming and run the right xyte-cli workflow." />
     <link rel="icon" type="image/png" href="../media/xyte-ai-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -16,19 +16,13 @@
     <main class="page"><div class="wrap guide-shell">
       <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">AI agent</a><a href="#terminal">Terminal commands</a></aside>
       <article class="article">
-        <p class="breadcrumb"><a href="./index.html">Guides</a> / Edge claim</p>
+        <p class="breadcrumb"><a href="./index.html">Guides</a> / Device claiming</p>
         <figure class="guide-visual">
-          <img src="./media/edge-claim-workflow.png" alt="Edge devices move from proxy discovery through claim planning, status polling, and target space confirmation." />
+          <img src="./media/edge-claim-workflow.png" alt="Device claiming starts by choosing native or Edge, then discovers identifiers before approval and apply." />
         </figure>
-        <p class="eyebrow">Edge</p>
-        <h1>Edge device claims.</h1>
-        <p class="lead">Use this when new IP devices need to be onboarded through an Xyte Edge proxy and you want a planned claim, row-level results, and a resume path for batches.</p>
-        <div class="summary">
-          <div class="summary-card"><strong>Use when</strong><span>Claiming IP devices behind an Edge proxy.</span></div>
-          <div class="summary-card"><strong>Inputs</strong><span>A claim path, device source, proxy, model, and target space information.</span></div>
-          <div class="summary-card"><strong>Output</strong><span>Async claim result, report rows, and resume state for batches.</span></div>
-        </div>
-
+        <p class="eyebrow">Devices</p>
+        <h1>Device claiming.</h1>
+        <p class="lead">Use this when new devices need to be added to a tenant. Start by choosing the claim path: native/direct devices use serial, MAC, cloud id, and target space; Edge devices use proxy, IP, model, and target space.</p>
         <div class="view-switch" role="tablist" aria-label="Guide view">
           <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
           <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
@@ -36,35 +30,80 @@
 
         <section class="guide-view" data-view="ai" id="ai-agent">
           <h2>Ask an agent</h2>
-          <p class="section-copy">Ask for device onboarding. The workflow first chooses the claim path, then plans the claim before any mutation.</p>
-          <div class="agent-prompt"><div class="command"><pre><code>Help me claim devices.
-
-Use the ready tenant, or ask which tenant if more than one is ready.
-First show which claim path applies: native/direct, Edge, or Cloud-to-Cloud.
-If this is Edge, ask whether it is one device or a spreadsheet batch.
-Show the plan, missing identifiers, report path, and resume path.
-Do not apply the claim until I approve the plan.</code></pre></div></div>
-          <div class="flow-diagram" aria-label="Edge claim workflow">
-            <h3>Workflow</h3>
+          <p class="section-copy">Ask like this. The workflow chooses the claim path, finds the required identifiers, and stops before running the claim.</p>
+          <div class="agent-prompt"><div class="command"><pre><code>Use xyte-cli to plan device claiming. First determine whether the devices are native/direct, Edge, or Cloud-to-Cloud. Do not run the claim yet.</code></pre></div></div>
+          <div class="flow-diagram" aria-label="Device claiming workflow">
+            <h3>What the agent will do</h3>
             <ol class="flow-steps">
-              <li><span class="flow-kicker">Choose</span><strong>Claim path</strong><span>Separate native, Edge, and Cloud-to-Cloud requests.</span></li>
-              <li><span class="flow-kicker">Inputs</span><strong>Collect data</strong><span>Get proxy, model, IP, and target space details.</span></li>
-              <li><span class="flow-kicker">Prepare</span><strong>Plan claim</strong><span>Use a single plan or prepared batch rows first.</span></li>
-              <li><span class="flow-kicker">Approve</span><strong>Start claim</strong><span>Apply only after the planned target is clear.</span></li>
-              <li><span class="flow-kicker">Track</span><strong>Poll result</strong><span>Use reports and resume files for batch outcomes.</span></li>
+              <li><span class="flow-kicker">Discover</span><strong>Choose claim path</strong><span>Use the device source to choose native/direct, Edge, or Cloud-to-Cloud.</span></li>
+              <li><span class="flow-kicker">Inspect</span><strong>Read setup</strong><span>Find spaces, endpoints, and required identifiers.</span></li>
+              <li><span class="flow-kicker">Choose</span><strong>Build payload</strong><span>Use real identifiers and target space before any write.</span></li>
+              <li><span class="flow-kicker">Stop</span><strong>Show claim</strong><span>Show payload or prepared files before running claim.</span></li>
+              <li><span class="flow-kicker">Return</span><strong>Handoff</strong><span>Provide command, report path, and read-back or resume path.</span></li>
             </ol>
+          </div>
+          <div class="ask-help">
+            <h3>Ask how it works first</h3>
+            <p class="section-copy">The agent can explain claim paths and required identifiers before it prepares a claim.</p>
+            <div class="command"><pre><code>How do I claim devices with xyte-cli?
+How do I choose native/direct vs Edge claiming?
+What identifiers do I need before claiming devices?</code></pre></div>
           </div>
         </section>
 
         <section class="guide-view" data-view="terminal" id="terminal" hidden>
 
         <h2 id="choose">Choose the right claim path</h2>
-        <p class="section-copy">Do not use Edge claim for every device. Native/direct claim uses serial number, MAC, and cloud id. Edge claim uses proxy id, device IP, model id, and space id. Cloud-to-Cloud claiming is not available through the public API.</p>
+        <p class="section-copy">Start by matching the request to the device type. Native/direct claim is for devices identified by serial number, MAC, cloud id, and target space. Edge claim is for devices behind an Xyte Edge proxy. Cloud-to-Cloud devices are claimed in the End Customer Portal, not through this CLI path.</p>
+        <div class="table-wrap"><table class="matrix">
+          <thead><tr><th>Path</th><th>Use when</th><th>CLI surface</th></tr></thead>
+          <tbody>
+            <tr><td>Native/direct</td><td>You have serial number, MAC, cloud id, display name, and target space.</td><td><code>organization.devices.claimDevice</code></td></tr>
+            <tr><td>Edge</td><td>The device is reachable through an Xyte Edge proxy and you have proxy id, device IP, model id, and target space.</td><td><code>edge claim</code> or <code>edge claim-batch</code></td></tr>
+            <tr><td>Cloud-to-Cloud</td><td>The device is claimed through a vendor cloud account.</td><td>Use the End Customer Portal.</td></tr>
+          </tbody>
+        </table></div>
+
+        <h2 id="native">Native/direct claim</h2>
+        <ol class="steps">
+          <li class="step"><h3>Confirm the endpoint and target space</h3><p>Describe the claim endpoint, then search spaces before placing a device into one.</p><div class="command"><pre><code>xyte-cli api endpoints describe organization.devices.claimDevice
+
+xyte-cli api call organization.spaces.getSpaces \
+  --tenant &lt;profile-label&gt; \
+  --query-json '{"path_includes":"&lt;target-path&gt;","page":1,"per_page":100}' \
+  &gt; ./artifacts/native-target-spaces.json</code></pre></div></li>
+          <li class="step"><h3>Build the claim payload</h3><p>Use real identifiers from the device label, inventory export, vendor record, or installer handoff. Do not guess missing identifiers.</p><div class="command"><pre><code>{
+  "name": "Room 101 Display",
+  "space_id": &lt;space-id&gt;,
+  "sn": "&lt;serial-number&gt;",
+  "mac": "&lt;mac&gt;",
+  "cloud_id": "&lt;cloud-id&gt;"
+}</code></pre></div></li>
+          <li class="step"><h3>Claim one native/direct device</h3><p>Run the write only after the target space and identifiers are confirmed.</p><div class="command"><pre><code>xyte-cli api call organization.devices.claimDevice \
+  --tenant &lt;profile-label&gt; \
+  --body-json '{"name":"Room 101 Display","space_id":&lt;space-id&gt;,"sn":"&lt;serial-number&gt;","mac":"&lt;mac&gt;","cloud_id":"&lt;cloud-id&gt;"}'</code></pre></div></li>
+          <li class="step"><h3>Prepare a native/direct spreadsheet</h3><p>For a list of devices, prepare the spreadsheet first and review the accepted and rejected rows before running endpoint calls per accepted row.</p><div class="command"><pre><code>xyte-cli util prepare \
+  --action organization.devices.claimDevice \
+  --tenant &lt;profile-label&gt; \
+  --input &lt;input.xlsx&gt; \
+  --output-dir ./prepared</code></pre></div></li>
+        </ol>
 
         <h2 id="single">Single Edge claim</h2>
         <ol class="steps">
+          <li class="step"><h3>Discover the Edge claim fields</h3><p>Describe the claim endpoint, list Edge proxies, and search target spaces before choosing ids for the claim.</p><div class="command"><pre><code>xyte-cli api endpoints describe organization.edge.startClaim
+
+xyte-cli api call organization.edges.getEdges \
+  --tenant &lt;profile-label&gt; \
+  --query-json '{"page":1,"per_page":100}' \
+  &gt; ./artifacts/edge-proxies.json
+
+xyte-cli api call organization.spaces.getSpaces \
+  --tenant &lt;profile-label&gt; \
+  --query-json '{"path_includes":"&lt;target-path&gt;","page":1,"per_page":100}' \
+  &gt; ./artifacts/edge-target-spaces.json</code></pre></div></li>
           <li class="step"><h3>Plan the claim</h3><p>Planning checks the inputs without starting the claim.</p><div class="command"><pre><code>xyte-cli edge claim \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --proxy-id &lt;proxy-id&gt; \
   --device-ip 192.168.1.100 \
   --device-model-id &lt;device-model-id&gt; \
@@ -72,7 +111,7 @@ Do not apply the claim until I approve the plan.</code></pre></div></div>
   --display-name "Room 101 Display" \
   --plan</code></pre></div></li>
           <li class="step"><h3>Apply after approval</h3><p>Apply starts the async claim and polls until success, failure, or timeout.</p><div class="command"><pre><code>xyte-cli edge claim \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --proxy-id &lt;proxy-id&gt; \
   --device-ip 192.168.1.100 \
   --device-model-id &lt;device-model-id&gt; \
@@ -80,26 +119,26 @@ Do not apply the claim until I approve the plan.</code></pre></div></div>
   --display-name "Room 101 Display" \
   --apply</code></pre></div></li>
           <li class="step"><h3>Check status without starting a new claim</h3><p>Use this after an interruption or when you need to inspect the current claim state.</p><div class="command"><pre><code>xyte-cli edge claim-status \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --proxy-id &lt;proxy-id&gt; \
   --device-ip 192.168.1.100</code></pre></div></li>
         </ol>
 
         <h2 id="batch">Batch Edge claim</h2>
         <ol class="steps">
-          <li class="step"><h3>Prepare the spreadsheet</h3><p>Review the primary CSV and rejected CSV before running the batch.</p><div class="command"><pre><code>xyte-cli util prepare \
+          <li class="step"><h3>Prepare the spreadsheet</h3><p>Review the primary CSV and rejected CSV before running the batch. Missing proxy, model, or space values should stay rejected until a user provides real tenant values.</p><div class="command"><pre><code>xyte-cli util prepare \
   --action organization.edge.startClaim \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --input &lt;input.xlsx&gt; \
   --output-dir ./prepared</code></pre></div></li>
           <li class="step"><h3>Plan and apply the batch</h3><p>Use report and resume files together. If the run is interrupted, rerun the apply command with the same resume file.</p><div class="command"><pre><code>xyte-cli edge claim-batch \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --input ./prepared/organization-edge-startclaim.csv \
   --report ./artifacts/edge-claim.report.ndjson \
   --plan
 
 xyte-cli edge claim-batch \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --input ./prepared/organization-edge-startclaim.csv \
   --report ./artifacts/edge-claim.report.ndjson \
   --resume-artifact ./artifacts/edge-claim.resume.ndjson \
@@ -109,21 +148,36 @@ xyte-cli edge claim-batch \
         <h2 id="failures">If it fails</h2>
         <div class="command"><pre><code>{
   "status": "succeeded",
-  "deviceIp": "192.168.1.100",
-  "proxyId": "&lt;proxy-id&gt;",
+  "path": "native/direct or edge",
+  "device": "Room 101 Display",
   "spaceId": "&lt;space-id&gt;"
 }</code></pre></div>
-        <p class="section-copy">You are done when the claim reaches <code>succeeded</code> or <code>already-claimed</code>. For batches, check the report file for every row disposition before closing the task.</p>
+        <p class="section-copy">For native/direct devices, finish when the claim call succeeds and a read-back shows the device in the target space. For Edge devices, finish when the claim reaches <code>succeeded</code> or <code>already-claimed</code>, and every batch row has a result in the report.</p>
+        <h2 id="repeat">Make this repeatable</h2>
+        <div class="command"><pre><code># Environment
+XYTE_PROFILE=&lt;profile-label&gt;
+NATIVE_INPUT=./prepared/organization-devices-claimdevice.csv
+EDGE_INPUT=./prepared/organization-edge-startclaim.csv
+EDGE_REPORT=./artifacts/edge-claim.report.ndjson
+EDGE_RESUME=./artifacts/edge-claim.resume.ndjson
+
+# Native/direct spreadsheet path
+xyte-cli util prepare --action organization.devices.claimDevice --tenant "$XYTE_PROFILE" --input &lt;input.xlsx&gt; --output-dir ./prepared
+
+# Edge rerun path
+xyte-cli edge claim-batch --tenant "$XYTE_PROFILE" --input "$EDGE_INPUT" --report "$EDGE_REPORT" --resume-artifact "$EDGE_RESUME" --apply</code></pre></div>
         <div class="failure-list">
+          <div class="failure"><strong>Native identifier is missing</strong><p>Stop and get the serial number, MAC, or cloud id from the installer, inventory export, or device record.</p></div>
+          <div class="failure"><strong>Native device is already claimed</strong><p>Read the existing device record before trying another claim path.</p></div>
           <div class="failure"><strong>Proxy offline</strong><p>Bring the proxy online, then resume the same batch with the same resume artifact.</p></div>
           <div class="failure"><strong>Ping failed</strong><p>Check network and firewall reachability between the Edge proxy and device.</p></div>
-          <div class="failure"><strong>Rows rejected</strong><p>Fix the prepared CSV. Keep successful rows in the resume artifact so they are not repeated.</p></div>
+          <div class="failure"><strong>Rows need more data</strong><p>Fix the prepared CSV with real tenant values, then rerun from the same input and resume files.</p></div>
           <div class="failure"><strong>Claim timed out</strong><p>Check claim status, then rerun with a longer poll timeout if the device is still expected to claim.</p></div>
         </div>
         </section>
       </article>
     </div></main>
-    <footer class="footer"><div class="wrap footer-row"><span>Edge claim</span><span><a href="./index.html">Guides</a> · <a href="../index.html">Overview</a></span></div></footer>
+    <footer class="footer"><div class="wrap footer-row"><span>Device claiming</span><span><a href="./index.html">Guides</a> · <a href="../index.html">Overview</a></span></div></footer>
     <script src="./guide.js?v=use-case-guides-2"></script>
   </body>
 </html>

@@ -23,12 +23,6 @@
         <p class="eyebrow">Remediation</p>
         <h1>Guided remediation.</h1>
         <p class="lead">Use this after triage shows a real problem and an operator needs help moving from "what is wrong?" to "what can we safely do next?"</p>
-        <div class="summary">
-          <div class="summary-card"><strong>Use when</strong><span>A real incident needs an approved command, note, ticket update, or close action.</span></div>
-          <div class="summary-card"><strong>Inputs</strong><span>An incident, device, room, ticket, or symptom the operator wants to act on.</span></div>
-          <div class="summary-card"><strong>Output</strong><span>A planned action, an applied response, and a read-back check.</span></div>
-        </div>
-
         <div class="view-switch" role="tablist" aria-label="Guide view">
           <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
           <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
@@ -36,23 +30,24 @@
 
         <section class="guide-view" data-view="ai" id="ai-agent">
           <h2>Ask an agent</h2>
-          <p class="section-copy">Ask for help with the issue, not for an endpoint call. The workflow keeps the write behind an approval gate.</p>
-          <div class="agent-prompt"><div class="command"><pre><code>Help me remediate the current issue.
-
-Use the ready tenant, or ask which tenant if more than one is ready.
-Show active incidents and likely affected devices first.
-If the target is unclear, show candidates and ask me to pick one.
-Then show the remediation plan, available device commands, and the read-back check.
-Do not apply anything until I approve the plan.</code></pre></div></div>
+          <p class="section-copy">Ask like this. The workflow investigates the problem and keeps every change behind approval.</p>
+          <div class="agent-prompt"><div class="command"><pre><code>Use xyte-cli to investigate a broken room or device and prepare a remediation plan. Do not apply changes.</code></pre></div></div>
           <div class="flow-diagram" aria-label="Guided remediation workflow">
-            <h3>Workflow</h3>
+            <h3>What the agent will do</h3>
             <ol class="flow-steps">
-              <li><span class="flow-kicker">Trigger</span><strong>Real issue</strong><span>Start from an incident, room, ticket, device, or symptom.</span></li>
-              <li><span class="flow-kicker">Find</span><strong>Resolve target</strong><span>Search matching records and ask when several targets fit.</span></li>
-              <li><span class="flow-kicker">Plan</span><strong>Gate writes</strong><span>List available actions and stop at the plan.</span></li>
-              <li><span class="flow-kicker">Approve</span><strong>Apply one step</strong><span>Run the write only after explicit approval.</span></li>
-              <li><span class="flow-kicker">Confirm</span><strong>Read back</strong><span>Check tenant state before closing the loop.</span></li>
+              <li><span class="flow-kicker">Discover</span><strong>Understand problem</strong><span>Clarify the symptom, room, ticket, device, or incident when it is not already provided.</span></li>
+              <li><span class="flow-kicker">Inspect</span><strong>Find target</strong><span>Use tenant state to find affected records.</span></li>
+              <li><span class="flow-kicker">Choose</span><strong>Plan command</strong><span>Select the safest workflow or endpoint.</span></li>
+              <li><span class="flow-kicker">Stop</span><strong>Show plan</strong><span>Show target, effect, and resume path before any write.</span></li>
+              <li><span class="flow-kicker">Return</span><strong>Handoff</strong><span>Provide the plan, files, and read-back command.</span></li>
             </ol>
+          </div>
+          <div class="ask-help">
+            <h3>Ask how it works first</h3>
+            <p class="section-copy">The agent can explain safe remediation planning before it prepares a write-capable command.</p>
+            <div class="command"><pre><code>What remediation workflows does xyte-cli support?
+How do I plan a fix without applying it?
+How do I resume an approved remediation?</code></pre></div>
           </div>
         </section>
 
@@ -63,28 +58,39 @@ Do not apply anything until I approve the plan.</code></pre></div></div>
 
         <h2 id="commands">Commands</h2>
         <ol class="steps">
-          <li class="step"><h3>Start with the flow plan</h3><p>The plan shows required context and where the workflow will pause before a write.</p><div class="command"><pre><code>xyte-cli flow run flow.guided-remediation \
-  --tenant &lt;tenant-id&gt; \
+          <li class="step"><h3>Discover the current problem first</h3><p>Start with active incidents and fleet context. Choose the target from tenant state, not from a stale ticket or guessed id.</p><div class="command"><pre><code>xyte-cli ops watch incidents \
+  --tenant &lt;profile-label&gt; \
+  --profile incidents-active \
+  --once \
+  --strict-json \
+  --out ./artifacts/incidents.before.ndjson
+
+xyte-cli ops inspect fleet \
+  --tenant &lt;profile-label&gt; \
+  --render json \
+  --out ./artifacts/fleet.before-remediation.json</code></pre></div></li>
+          <li class="step"><h3>Plan against the chosen target</h3><p>After the incident and device are chosen, the plan shows required context and where the workflow will pause before a write.</p><div class="command"><pre><code>xyte-cli flow run flow.guided-remediation \
+  --tenant &lt;profile-label&gt; \
   --plan \
   --var device_id=&lt;device-id&gt; \
   --var incident_id=&lt;incident-id&gt; \
   --once \
   --strict-json</code></pre></div></li>
           <li class="step"><h3>List commands the device actually supports</h3><p>Choose from returned commands. Do not guess a command name from another device model.</p><div class="command"><pre><code>xyte-cli api call organization.commands.getCommands \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --path-json '{"device_id":"&lt;device-id&gt;"}' \
   --query-json '{"page":1,"per_page":20}'</code></pre></div></li>
           <li class="step"><h3>Apply the approved step</h3><p>Resume the planned run only after the operator approves the write.</p><div class="command"><pre><code>xyte-cli flow run flow.guided-remediation \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --apply \
   --resume &lt;run-id-or-path&gt; \
   --strict-json</code></pre></div></li>
           <li class="step"><h3>Read back the state</h3><p>Use a read command after the write so the final answer is based on tenant state, not just command submission.</p><div class="command"><pre><code>xyte-cli api call organization.devices.getDevice \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --path-json '{"device_id":"&lt;device-id&gt;"}'
 
 xyte-cli ops watch incidents \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --profile incidents-active \
   --once</code></pre></div></li>
         </ol>
@@ -95,9 +101,17 @@ xyte-cli ops watch incidents \
   "status": "pending_gate",
   "nextAction": "Review command and resume with --apply",
   "requiresWrite": true,
-  "resume": "xyte-cli flow run flow.guided-remediation --tenant &lt;tenant-id&gt; --apply --resume &lt;run-id-or-path&gt;"
+  "resume": "xyte-cli flow run flow.guided-remediation --tenant &lt;profile-label&gt; --apply --resume &lt;run-id-or-path&gt;"
 }</code></pre></div>
-        <p class="section-copy">You are done when the applied step has a successful response and a follow-up read command confirms the device or incident state.</p>
+        <p class="section-copy">Continue only when the plan stops at a gate, the approved apply succeeds, and a follow-up read confirms the device or incident state. If the target is unclear, no safe command is available, apply fails, or read-back does not match, keep the case open and hand off the exact result.</p>
+
+        <h2 id="repeat">Make this repeatable</h2>
+        <div class="command"><pre><code># Environment
+XYTE_PROFILE=&lt;profile-label&gt;
+RUN_PATH=&lt;run-id-or-path&gt;
+
+# Rerun path after approval
+xyte-cli flow run flow.guided-remediation --tenant "$XYTE_PROFILE" --apply --resume "$RUN_PATH" --strict-json</code></pre></div>
 
         <h2 id="failures">If it fails</h2>
         <div class="failure-list">

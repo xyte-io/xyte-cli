@@ -23,12 +23,6 @@
         <p class="eyebrow">Devices</p>
         <h1>Device migration.</h1>
         <p class="lead">Use this when a room plan, space import, naming cleanup, or tenant reorganization means devices must move to different spaces without guessing targets.</p>
-        <div class="summary">
-          <div class="summary-card"><strong>Use when</strong><span>Rooms were reorganized, imported, renamed, or split.</span></div>
-          <div class="summary-card"><strong>Inputs</strong><span>The source group, the intended target structure, and the field that should connect them.</span></div>
-          <div class="summary-card"><strong>Output</strong><span>A move CSV, dry-run report, and apply report.</span></div>
-        </div>
-
         <div class="view-switch" role="tablist" aria-label="Guide view">
           <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
           <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
@@ -36,23 +30,24 @@
 
         <section class="guide-view" data-view="ai" id="ai-agent">
           <h2>Ask an agent</h2>
-          <p class="section-copy">Ask for the space-change outcome. The workflow turns that into discovered records, a move file, and a dry-run gate.</p>
-          <div class="agent-prompt"><div class="command"><pre><code>Help me move devices after a space change.
-
-Use the ready tenant, or ask which tenant if more than one is ready.
-Ask what changed, then find the source devices and target spaces.
-Show the proposed move CSV and dry-run results.
-Call out ambiguous rows.
-Do not apply moves until I approve the dry run.</code></pre></div></div>
+          <p class="section-copy">Ask like this. The workflow discovers the devices and destination, builds a move plan, and stops at dry-run.</p>
+          <div class="agent-prompt"><div class="command"><pre><code>Use xyte-cli to plan moving devices to a new space. Do not apply changes.</code></pre></div></div>
           <div class="flow-diagram" aria-label="Device migration workflow">
-            <h3>Workflow</h3>
+            <h3>What the agent will do</h3>
             <ol class="flow-steps">
-              <li><span class="flow-kicker">Change</span><strong>Space moved</strong><span>Start from the room plan, import, rename, or split.</span></li>
-              <li><span class="flow-kicker">Discover</span><strong>Find records</strong><span>Read source devices and target spaces from tenant state.</span></li>
-              <li><span class="flow-kicker">Map</span><strong>Build CSV</strong><span>Create rows only when device and target ids are known.</span></li>
-              <li><span class="flow-kicker">Dry run</span><strong>Review rows</strong><span>Catch missing, duplicate, or weak matches before changes.</span></li>
-              <li><span class="flow-kicker">Apply</span><strong>Move and verify</strong><span>Apply approved rows and read device spaces back.</span></li>
+              <li><span class="flow-kicker">Discover</span><strong>Get move request</strong><span>Clarify the device list and destination space when they are not already provided.</span></li>
+              <li><span class="flow-kicker">Inspect</span><strong>Find records</strong><span>Read source devices and target spaces from tenant state.</span></li>
+              <li><span class="flow-kicker">Choose</span><strong>Build move file</strong><span>Create rows only when device and target ids are known.</span></li>
+              <li><span class="flow-kicker">Stop</span><strong>Dry run</strong><span>Show ambiguous rows before applying moves.</span></li>
+              <li><span class="flow-kicker">Return</span><strong>Handoff</strong><span>Provide the CSV, dry-run report, and rerun path.</span></li>
             </ol>
+          </div>
+          <div class="ask-help">
+            <h3>Ask how it works first</h3>
+            <p class="section-copy">The agent can explain move files, dry-runs, and approval before any device is moved.</p>
+            <div class="command"><pre><code>How do I move devices between spaces with xyte-cli?
+How do I build a move CSV?
+How do I dry-run device moves before applying them?</code></pre></div>
           </div>
         </section>
 
@@ -63,17 +58,23 @@ Do not apply moves until I approve the dry run.</code></pre></div></div>
 
         <h2 id="commands">Commands</h2>
         <ol class="steps">
+          <li class="step"><h3>Discover spaces before using ids</h3><p>Search the space tree by path or name first. Pick the source and target ids from these files before building a move plan.</p><div class="command"><pre><code>xyte-cli api call organization.spaces.getSpaces \
+  --tenant &lt;profile-label&gt; \
+  --query-json '{"path_includes":"&lt;source-path&gt;","page":1,"per_page":100}' \
+  &gt; ./artifacts/source-spaces.json
+
+xyte-cli api call organization.spaces.getSpaces \
+  --tenant &lt;profile-label&gt; \
+  --query-json '{"path_includes":"&lt;target-path&gt;","page":1,"per_page":100}' \
+  &gt; ./artifacts/target-spaces.json</code></pre></div></li>
           <li class="step"><h3>Export source devices and target spaces</h3><p>Use explicit filters so the move plan is scoped to the intended part of the tenant.</p><div class="command"><pre><code>xyte-cli api call organization.devices.getDevices \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --query-json '{"space_id":"&lt;source-space-id&gt;","page":1,"per_page":100}' \
   &gt; ./artifacts/source-devices.json
 
-xyte-cli api call organization.spaces.getSpaces \
-  --tenant &lt;tenant-id&gt; \
-  --query-json '{"path_includes":"&lt;target-path&gt;","page":1,"per_page":100}' \
-  &gt; ./artifacts/target-spaces.json</code></pre></div></li>
+cat ./artifacts/target-spaces.json</code></pre></div></li>
           <li class="step"><h3>Create a proposed move CSV</h3><p>Start with name matching when device names and space names are intentionally aligned. If they are not, prepare the CSV manually.</p><div class="command"><pre><code>xyte-cli util match \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --source ./artifacts/source-devices.json \
   --target ./artifacts/target-spaces.json \
   --source-field name \
@@ -81,11 +82,11 @@ xyte-cli api call organization.spaces.getSpaces \
   --out ./artifacts/device-moves.csv \
   --strict-json</code></pre></div></li>
           <li class="step"><h3>Dry-run the move plan</h3><p>Dry-run reports planned rows and row-level problems without moving anything.</p><div class="command"><pre><code>xyte-cli util move-devices \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --input ./artifacts/device-moves.csv \
   --report ./artifacts/device-migration.dry-run.ndjson</code></pre></div></li>
           <li class="step"><h3>Apply reviewed rows</h3><p>Apply only after checking the CSV and dry-run report.</p><div class="command"><pre><code>xyte-cli util move-devices \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --input ./artifacts/device-moves.csv \
   --apply \
   --report ./artifacts/device-migration.apply.ndjson</code></pre></div></li>
@@ -100,7 +101,16 @@ xyte-cli api call organization.spaces.getSpaces \
         </ul>
         <div class="command"><pre><code>device_id,target_space_id,device_name,target_space_name
 &lt;device-id&gt;,&lt;space-id&gt;,"Room 101 Display","HQ / Floor 1 / Room 101"</code></pre></div>
-        <p class="section-copy">You are done when the apply report has no failed rows and the moved devices read back with the expected <code>space_id</code>.</p>
+        <p class="section-copy">Close the move only after the apply report has no failed rows and the moved devices read back with the expected <code>space_id</code>. If matches are weak, target spaces are invalid, only part of the file applied, or rows still point to old spaces, fix the rows before continuing.</p>
+
+        <h2 id="repeat">Make this repeatable</h2>
+        <div class="command"><pre><code># Environment
+XYTE_PROFILE=&lt;profile-label&gt;
+MOVE_FILE=./artifacts/device-moves.csv
+
+# Rerun path
+xyte-cli util move-devices --tenant "$XYTE_PROFILE" --input "$MOVE_FILE" --report ./artifacts/device-migration.dry-run.ndjson
+xyte-cli util move-devices --tenant "$XYTE_PROFILE" --input "$MOVE_FILE" --apply --report ./artifacts/device-migration.apply.ndjson</code></pre></div>
 
         <h2 id="failures">If it fails</h2>
         <div class="failure-list">

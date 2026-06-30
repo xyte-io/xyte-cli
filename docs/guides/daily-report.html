@@ -23,12 +23,6 @@
         <p class="eyebrow">Reports</p>
         <h1>Daily fleet report.</h1>
         <p class="lead">Use this workflow when a daily review, escalation, or customer update needs current fleet state, clear counts, and a report that can be regenerated from the same source data.</p>
-        <div class="summary">
-          <div class="summary-card"><strong>Use when</strong><span>Daily review, support handoff, or customer status update.</span></div>
-          <div class="summary-card"><strong>Inputs</strong><span>A ready tenant and the time window the update should cover.</span></div>
-          <div class="summary-card"><strong>Output</strong><span>Deep-dive JSON plus Markdown or PDF report.</span></div>
-        </div>
-
         <div class="view-switch" role="tablist" aria-label="Guide view">
           <button class="view-tab" type="button" role="tab" aria-selected="true" data-view="ai">AI agent</button>
           <button class="view-tab" type="button" role="tab" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
@@ -36,22 +30,24 @@
 
         <section class="guide-view" data-view="ai" id="ai-agent">
           <h2>Ask an agent</h2>
-          <p class="section-copy">Ask for the report outcome. The workflow keeps the readable report tied to the saved source data.</p>
-          <div class="agent-prompt"><div class="command"><pre><code>Create today's fleet report.
-
-Use the ready tenant, or ask which tenant if more than one is ready.
-Use a 24-hour window unless I give a different one.
-Save the deep-dive JSON first, then render a Markdown report from it.
-Show the report path, source path, headline counts, and anything that needs follow-up.</code></pre></div></div>
+          <p class="section-copy">Ask like this. The workflow keeps the readable report tied to the saved source data.</p>
+          <div class="agent-prompt"><div class="command"><pre><code>Use xyte-cli to make today's fleet report and tell me where it saved the files.</code></pre></div></div>
           <div class="flow-diagram" aria-label="Daily report workflow">
-            <h3>Workflow</h3>
+            <h3>What the agent will do</h3>
             <ol class="flow-steps">
-              <li><span class="flow-kicker">Start</span><strong>Pick scope</strong><span>Choose the tenant and reporting window.</span></li>
-              <li><span class="flow-kicker">Source</span><strong>Deep-dive JSON</strong><span>Save the structured snapshot first.</span></li>
-              <li><span class="flow-kicker">Render</span><strong>Create report</strong><span>Generate Markdown or PDF from the same source file.</span></li>
-              <li><span class="flow-kicker">Compare</span><strong>Fleet snapshot</strong><span>Keep compact counts for quick trend checks.</span></li>
-              <li><span class="flow-kicker">Handoff</span><strong>Summarize</strong><span>Return paths, counts, and follow-up items.</span></li>
+              <li><span class="flow-kicker">Discover</span><strong>Check access</strong><span>Confirm xyte-cli can read fleet state.</span></li>
+              <li><span class="flow-kicker">Inspect</span><strong>Create source</strong><span>Save the deep-dive JSON before writing prose.</span></li>
+              <li><span class="flow-kicker">Choose</span><strong>Pick format</strong><span>Use Markdown unless PDF or another format is requested.</span></li>
+              <li><span class="flow-kicker">Write</span><strong>Save report</strong><span>Write the source JSON and readable report.</span></li>
+              <li><span class="flow-kicker">Return</span><strong>Show paths</strong><span>Summarize counts, report path, source path, and follow-up items.</span></li>
             </ol>
+          </div>
+          <div class="ask-help">
+            <h3>Ask how it works first</h3>
+            <p class="section-copy">The agent can explain reports, source files, and handoffs before it generates anything.</p>
+            <div class="command"><pre><code>How do I create a daily fleet report with xyte-cli?
+What files should I save from a fleet report?
+How do I turn fleet JSON into a handoff?</code></pre></div>
           </div>
         </section>
 
@@ -63,24 +59,24 @@ Show the report path, source path, headline counts, and anything that needs foll
         <h2 id="commands">Commands</h2>
         <ol class="steps">
           <li class="step"><h3>Create the deep-dive source file</h3><p>The <code>--window</code> value is in hours. Use 24 for daily review.</p><div class="command"><pre><code>xyte-cli ops inspect deep-dive \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --provider-scope auto \
   --window 24 \
   --render json \
   --out ./artifacts/xyte-deep-dive.daily.json \
   --strict-json</code></pre></div></li>
           <li class="step"><h3>Render a Markdown report</h3><p>Markdown is easy to review in a terminal, commit comment, or support note.</p><div class="command"><pre><code>xyte-cli ops report generate \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --input ./artifacts/xyte-deep-dive.daily.json \
   --out ./reports/xyte-daily.md \
   --render markdown</code></pre></div></li>
           <li class="step"><h3>Render a PDF when you need an attachment</h3><p>Use the same JSON input so the Markdown and PDF tell the same story.</p><div class="command"><pre><code>xyte-cli ops report generate \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --input ./artifacts/xyte-deep-dive.daily.json \
   --out ./reports/xyte-daily.pdf \
   --render pdf</code></pre></div></li>
           <li class="step"><h3>Keep a compact fleet snapshot</h3><p>This is useful for dashboards and quick trend checks.</p><div class="command"><pre><code>xyte-cli ops inspect fleet \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --provider-scope auto \
   --render json \
   --out ./artifacts/xyte-fleet.daily.json</code></pre></div></li>
@@ -99,7 +95,16 @@ Offline devices: 7
 Active incidents: 18
 Open tickets: 3
 Report: ./reports/xyte-daily.md</code></pre></div>
-        <p class="section-copy">You are done when the report exists, the source JSON exists, and the headline numbers are clear enough to paste into a status update.</p>
+        <p class="section-copy">Use the report when the source JSON exists, the rendered report exists, and the headline numbers are clear enough for a status update. If the report came from the wrong source, the output folder is missing, or the window is too broad, fix that and rerun from the source step.</p>
+
+        <h2 id="repeat">Make this repeatable</h2>
+        <div class="command"><pre><code># Environment
+XYTE_PROFILE=&lt;profile-label&gt;
+REPORT_WINDOW_HOURS=24
+
+# Rerun path
+xyte-cli ops inspect deep-dive --tenant "$XYTE_PROFILE" --window "$REPORT_WINDOW_HOURS" --render json --out ./artifacts/xyte-deep-dive.daily.json --strict-json
+xyte-cli ops report generate --tenant "$XYTE_PROFILE" --input ./artifacts/xyte-deep-dive.daily.json --out ./reports/xyte-daily.md --render markdown</code></pre></div>
 
         <h2 id="failures">If it fails</h2>
         <div class="failure-list">

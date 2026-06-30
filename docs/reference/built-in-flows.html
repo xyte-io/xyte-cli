@@ -28,6 +28,7 @@
           <a href="#flow-catalog">Flow catalog</a>
           <a href="#real-examples">Examples</a>
           <a href="#artifacts">Artifacts</a>
+          <a href="#retry">Retry</a>
           <a href="#failures">Failures</a>
         </aside>
         <article class="article">
@@ -60,22 +61,22 @@
           <p class="section-copy">Ask for the workflow outcome. The agent should list available flows, choose the safest match, run plan, and explain what would happen next.</p>
           <div class="command"><pre><code>Show me the built-in xyte-cli flow that fits incident triage, then run it in plan mode.
 
-Plan a daily deep-dive report for the ready tenant and show me the expected files.
+Use xyte-cli to plan a daily deep-dive report and show me the output files.
 
-Plan an Edge claim batch from this spreadsheet. Explain rejected rows before any apply.</code></pre></div>
+Plan a device claiming batch from this spreadsheet. Tell me whether the rows are native/direct or Edge, explain rows that need more data, and stop before apply.</code></pre></div>
 
           <h2 id="terminal-ci">Terminal and CI</h2>
           <p class="section-copy">In a terminal, start with the catalog. In CI, run read-only or plan-mode flows by default and publish the run bundle as an artifact.</p>
           <div class="command"><pre><code>xyte-cli flow list --format text
 
 xyte-cli flow run flow.daily-deep-dive-report \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --plan \
   --out-dir ./tmp/flow-runs \
   --strict-json
 
 xyte-cli flow run flow.guided-remediation \
-  --tenant &lt;tenant-id&gt; \
+  --tenant &lt;profile-label&gt; \
   --apply \
   --resume &lt;run-id-or-path&gt;</code></pre></div>
 
@@ -110,9 +111,17 @@ xyte-cli flow run flow.guided-remediation \
   steps/
   outputs/</code></pre></div>
 
+          <h2 id="retry">Retry and resume</h2>
+          <div class="failure-grid">
+            <div class="failure"><strong>Plan runs</strong><p>Rerun <code>--plan</code> whenever tenant state, input files, or operator intent changed. It should not change tenant state.</p></div>
+            <div class="failure"><strong>Paused gates</strong><p>Use the run bundle path or run id from the plan output. Do not create a new apply command from memory.</p></div>
+            <div class="failure"><strong><code>--apply --resume</code></strong><p>Resume the approved bundle only after the target and effect are still correct. If tenant state changed, run plan again first.</p></div>
+            <div class="failure"><strong>Interrupted runs</strong><p>Keep the bundle and error output. For batch work, use the matching resume artifact instead of starting over.</p></div>
+          </div>
+
           <h2 id="failures">Common failures</h2>
           <div class="failure-grid">
-            <div class="failure"><strong>Needs input</strong><p>The flow is missing tenant context, a file path, or a specific value. Add <code>--var key=value</code> or <code>--context-json</code>.</p></div>
+            <div class="failure"><strong>Needs input</strong><p>The flow is missing a profile label, a file path, or a specific value. Add <code>--var key=value</code> or <code>--context-json</code>.</p></div>
             <div class="failure"><strong>Paused at a gate</strong><p>Read <code>nextAction</code>. Resume only after the operator approves the specific change.</p></div>
             <div class="failure"><strong>Resume fails</strong><p>Use the original run id or bundle path. If metadata was edited or moved incorrectly, start a fresh plan.</p></div>
             <div class="failure"><strong>CI should not write</strong><p>Run <code>--plan</code> only and publish the run bundle for human review.</p></div>
