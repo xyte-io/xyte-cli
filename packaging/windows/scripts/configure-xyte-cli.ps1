@@ -55,12 +55,12 @@ Invoke-XyteCli @("doctor", "environment", "--format", "text")
 
 Write-Step "Check command precedence"
 $commands = @(Get-Command "xyte-cli" -All -ErrorAction SilentlyContinue) + @(Get-Command "xyte-cli.cmd" -All -ErrorAction SilentlyContinue)
-$uniqueCommands = $commands | Sort-Object -Property Source -Unique
+$uniqueCommands = $commands | Sort-Object -Property Definition -Unique
 if ($uniqueCommands.Count -eq 0) {
   Write-Host "No xyte-cli command is visible on PATH yet. Open a new PowerShell window after install."
 } else {
   foreach ($command in $uniqueCommands) {
-    Write-Host "PATH candidate: $($command.Source)"
+    Write-Host "PATH candidate: $($command.Definition)"
   }
 }
 
