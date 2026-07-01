@@ -26,6 +26,7 @@ function Invoke-XyteCli {
     throw "xyte-cli $($Arguments -join ' ') failed with exit code $exitCode."
   }
   if ($AllowFailure) {
+    $global:LASTEXITCODE = 0
     return $exitCode
   }
 }
@@ -112,7 +113,7 @@ if (!$SkipApiKeySetup) {
 }
 
 Write-Step "Readiness"
-$readinessExitCode = Invoke-XyteCli -Arguments @("setup", "status", "--field", "tenantId") -AllowFailure
+$readinessExitCode = Invoke-XyteCli -Arguments @("setup", "status", "--format", "text") -AllowFailure
 if ($readinessExitCode -ne 0) {
   Write-Host "No connected tenant was confirmed. Run this assistant again or run: xyte-cli setup run"
 }
