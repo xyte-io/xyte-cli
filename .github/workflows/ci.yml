@@ -131,10 +131,13 @@ jobs:
           }
 
           $installLog = Join-Path $env:RUNNER_TEMP "xyte-cli-msi-install.log"
-          & msiexec.exe /i $msi.FullName /qn /norestart /l*v $installLog
-          if ($LASTEXITCODE -ne 0) {
-            Get-Content -LiteralPath $installLog -Tail 200
-            throw "MSI install failed with exit code $LASTEXITCODE."
+          $installArgs = @("/i", "`"$($msi.FullName)`"", "/qn", "/norestart", "/L*V", "`"$installLog`"")
+          $install = Start-Process -FilePath "msiexec.exe" -ArgumentList $installArgs -Wait -PassThru
+          if ($install.ExitCode -ne 0) {
+            if (Test-Path -LiteralPath $installLog) {
+              Get-Content -LiteralPath $installLog -Tail 200
+            }
+            throw "MSI install failed with exit code $($install.ExitCode)."
           }
 
           $installDir = Join-Path $env:ProgramFiles "Xyte CLI"
