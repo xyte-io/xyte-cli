@@ -81,10 +81,7 @@ xyte-cli ops inspect fleet \
   --var incident_id=&lt;incident-id&gt; \
   --once \
   --strict-json</code></pre></div></li>
-          <li class="step"><h3>List commands the device actually supports</h3><p>Choose from returned commands. Do not guess a command name from another device model.</p><div class="command"><pre><code>xyte-cli api call organization.commands.getCommands \
-  --tenant &lt;tenant-id&gt; \
-  --path-json '{"device_id":"&lt;device-id&gt;"}' \
-  --query-json '{"page":1,"per_page":20}'</code></pre></div></li>
+          <li class="step"><h3>Confirm the approved action</h3><p>Use only a documented or operator-approved remediation command for this device. Do not infer supported commands from command history or copy a command from another device model.</p></li>
           <li class="step"><h3>Apply the approved step</h3><p>Resume the planned run only after the operator approves the write.</p><div class="command"><pre><code>xyte-cli flow run flow.guided-remediation \
   --tenant &lt;tenant-id&gt; \
   --apply \
@@ -127,7 +124,7 @@ xyte-cli flow run flow.guided-remediation --tenant "$XYTE_TENANT" --apply --resu
 
         <h2 id="failures">If it fails</h2>
         <div class="failure-list">
-          <div class="failure"><strong>No command is available</strong><p>Stop. Choose a different remediation path or escalate to a human operator.</p></div>
+          <div class="failure"><strong>No approved command is available</strong><p>Stop. Choose a different remediation path or escalate to a human operator.</p></div>
           <div class="failure"><strong>The write response is not successful</strong><p>Do not continue the loop. Inspect the endpoint response and rerun triage.</p></div>
           <div class="failure"><strong>Read-back does not match the expected change</strong><p>Treat the action as incomplete and include the read-back result in the handoff.</p></div>
         </div>

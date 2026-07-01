@@ -35,7 +35,7 @@ xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/xyte-deep-
 
 3. Optional write handoff:
 - run writes only after explicit human approval
-- run `organization.commands.getCommands` preflight before `organization.commands.sendCommand`
+- run `organization.commands.sendCommand` only with an operator-approved command/friendly_name for the target device
 - after `organization.devices.updateDevice`, read back with `organization.devices.getDevice` and verify target fields changed
 - `xyte-cli util import-tree` remains dry-run unless `--apply` is provided
 

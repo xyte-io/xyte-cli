@@ -278,15 +278,10 @@ xyte-cli api call organization.incidents.getIncidents \
 Write call:
 
 ```bash
-xyte-cli api call organization.commands.getCommands \
-  --tenant <tenant-id> \
-  --path-json '{"device_id":"<device-id>"}' \
-  --query-json '{"page":1,"per_page":20}'
-
 xyte-cli api call organization.commands.sendCommand \
   --tenant <tenant-id> \
   --path-json '{"device_id":"<device-id>"}' \
-  --body-json '{"command":"<valid-command-from-history>"}'
+  --body-json '{"command":"<operator-approved-command>"}'
 ```
 
 Delete call:

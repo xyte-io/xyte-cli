@@ -54,15 +54,10 @@ Write safety requirements:
 ```bash
 xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json --out ./artifacts/xyte-watch.before.ndjson
 
-xyte-cli api call organization.commands.getCommands \
-  --tenant <tenant-id> \
-  --path-json '{"device_id":"<device-id>"}' \
-  --query-json '{"page":1,"per_page":20}'
-
 xyte-cli api call organization.commands.sendCommand \
   --tenant <tenant-id> \
   --path-json '{"device_id":"<device-id>"}' \
-  --body-json '{"command":"<valid-command-from-history>"}'
+  --body-json '{"command":"<operator-approved-command>"}'
 
 xyte-cli api call organization.devices.updateDevice \
   --tenant <tenant-id> \

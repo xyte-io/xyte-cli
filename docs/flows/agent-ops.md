@@ -131,15 +131,10 @@ xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/xyte-deep-
 ```bash
 xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json --out ./artifacts/xyte-watch.before.ndjson
 
-xyte-cli api call organization.commands.getCommands \
-  --tenant <tenant-id> \
-  --path-json '{"device_id":"<device-id>"}' \
-  --query-json '{"page":1,"per_page":20}'
-
 xyte-cli api call organization.commands.sendCommand \
   --tenant <tenant-id> \
   --path-json '{"device_id":"<device-id>"}' \
-  --body-json '{"command":"<valid-command-from-history>"}'
+  --body-json '{"command":"<operator-approved-command>"}'
 
 xyte-cli api call organization.devices.updateDevice \
   --tenant <tenant-id> \
@@ -164,12 +159,12 @@ xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --o
 
 - Expected artifacts:
   - pre/post watch snapshots for remediation verification.
-  - command preflight history and command dispatch response.
+  - command dispatch response.
   - update-device response plus read-back verification from `organization.devices.getDevice`.
   - ticket message response, incident close response.
 - Stop/decision gates:
   - Mandatory human decision gate before each write command or write loop.
-  - Stop if command preflight has no valid command/friendly_name for the target device.
+  - Stop if no operator-approved command/friendly_name is known for the target device.
   - Stop if update-device read-back does not reflect the expected field changes.
   - Stop immediately on any non-2xx write response.
   - Stop if post-remediation watch still shows unchanged high-priority incidents.
