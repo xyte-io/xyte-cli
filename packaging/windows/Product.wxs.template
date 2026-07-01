@@ -1,0 +1,74 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="Xyte CLI"
+    Manufacturer="Xyte"
+    Version="{{VERSION}}"
+    UpgradeCode="{{UPGRADE_CODE}}"
+    Scope="perMachine"
+    Language="1033">
+    <SummaryInformation Description="Xyte CLI Windows installer" Manufacturer="Xyte" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Xyte CLI is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Xyte CLI">
+{{DIRECTORIES}}
+{{FILE_COMPONENTS}}
+        <Component Id="PathEnvironment" Guid="*">
+          <Environment
+            Id="AddInstallFolderToPath"
+            Name="PATH"
+            Value="[INSTALLFOLDER]"
+            Permanent="no"
+            Part="last"
+            Action="set"
+            System="yes" />
+          <RegistryValue Root="HKLM" Key="Software\Xyte\Xyte CLI" Name="InstallDir" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="Xyte CLI" />
+    </StandardDirectory>
+
+    <Component Id="StartMenuShortcuts" Directory="ApplicationProgramsFolder" Guid="*">
+      <Shortcut
+        Id="ConfigureShortcut"
+        Name="Configure Xyte CLI"
+        Description="Configure Xyte CLI, migrate npm installs, and connect an API key"
+        Target="[SystemFolder]WindowsPowerShell\v1.0\powershell.exe"
+        Arguments="-NoProfile -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]scripts\configure-xyte-cli.ps1&quot;"
+        WorkingDirectory="INSTALLFOLDER" />
+      <Shortcut
+        Id="PowerShellShortcut"
+        Name="Xyte CLI PowerShell"
+        Description="Open PowerShell with Xyte CLI available"
+        Target="[SystemFolder]WindowsPowerShell\v1.0\powershell.exe"
+        Arguments="-NoExit -Command &quot;xyte-cli --version; xyte-cli doctor environment --format text&quot;"
+        WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKLM" Key="Software\Xyte\Xyte CLI" Name="Shortcuts" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <CustomAction
+      Id="LaunchConfigureXyteCli"
+      Directory="INSTALLFOLDER"
+      ExeCommand="[SystemFolder]WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]scripts\configure-xyte-cli.ps1&quot;"
+      Execute="immediate"
+      Return="asyncNoWait"
+      Impersonate="yes" />
+
+    <InstallExecuteSequence>
+      <Custom
+        Action="LaunchConfigureXyteCli"
+        After="InstallFinalize"
+        Condition="NOT Installed AND NOT WIX_UPGRADE_DETECTED AND UILevel &gt;= 5" />
+    </InstallExecuteSequence>
+
+    <Feature Id="ProductFeature" Title="Xyte CLI" Level="1">
+{{FEATURE_COMPONENTS}}
+      <ComponentRef Id="PathEnvironment" />
+      <ComponentRef Id="StartMenuShortcuts" />
+    </Feature>
+  </Package>
+</Wix>

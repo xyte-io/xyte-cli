@@ -8,6 +8,7 @@
     "schemaVersion",
     "generatedAtUtc",
     "packageName",
+    "installChannel",
     "currentVersion",
     "latestVersion",
     "upToDate",
@@ -22,6 +23,12 @@
     },
     "packageName": {
       "type": "string"
+    },
+    "installChannel": {
+      "enum": [
+        "npm",
+        "windows-msi"
+      ]
     },
     "currentVersion": {
       "type": "string"

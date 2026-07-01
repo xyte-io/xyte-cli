@@ -76,7 +76,7 @@ jobs:
         run: npm run smoke:pack-install
 
   release:
-    needs: [meta, packaged-install-smoke]
+    needs: [meta, packaged-install-smoke, windows-msi]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout tag
@@ -112,6 +112,12 @@ jobs:
           npm run build
           npm pack
 
+      - name: Download Windows MSI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-msi
+          path: windows-installer
+
       - name: Generate SBOM
         run: npx --yes @cyclonedx/cyclonedx-npm --output-file sbom.cdx.json --omit dev
 
@@ -119,7 +125,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sha256sum *.tgz sbom.cdx.json > checksums.txt
+          sha256sum *.tgz sbom.cdx.json windows-installer/*.msi windows-installer/winget/*.yaml > checksums.txt
 
       - name: Publish GitHub release assets
         uses: softprops/action-gh-release@v2
@@ -128,5 +134,67 @@ jobs:
           generate_release_notes: true
           files: |
             *.tgz
+            windows-installer/*.msi
+            windows-installer/windows-installer-manifest.json
+            windows-installer/winget/*.yaml
             sbom.cdx.json
             checksums.txt
+
+  windows-msi:
+    needs: meta
+    runs-on: windows-latest
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: refs/tags/${{ needs.meta.outputs.tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.x"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate package version matches tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          TAG_VERSION="${{ needs.meta.outputs.version }}"
+          if [[ "${PACKAGE_VERSION}" != "${TAG_VERSION}" ]]; then
+            echo "::error::package.json version (${PACKAGE_VERSION}) does not match tag (${TAG_VERSION})."
+            exit 1
+          fi
+
+      - name: Install WiX Toolset
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 7.0.0
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Validate Windows packaging metadata
+        run: npm run validate:windows-packaging
+
+      - name: Build Windows MSI
+        env:
+          WINDOWS_CODESIGN_PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX_BASE64 }}
+          WINDOWS_CODESIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PFX_PASSWORD }}
+        run: npm run package:windows-msi -- --out-dir artifacts/windows-installer
+
+      - name: Upload Windows MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-msi
+          path: |
+            artifacts/windows-installer/*.msi
+            artifacts/windows-installer/windows-installer-manifest.json
+            artifacts/windows-installer/winget/*.yaml

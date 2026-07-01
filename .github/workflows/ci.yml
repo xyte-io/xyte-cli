@@ -89,6 +89,47 @@ jobs:
       - name: Certify Windows native secret-store path
         run: npm run smoke:windows:native-secret-store
 
+  windows-installer-package:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.x"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install WiX Toolset
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 7.0.0
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Validate Windows packaging metadata
+        run: npm run validate:windows-packaging
+
+      - name: Build Windows MSI
+        run: npm run package:windows-msi -- --out-dir artifacts/windows-installer
+
+      - name: Upload Windows MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-msi
+          path: |
+            artifacts/windows-installer/*.msi
+            artifacts/windows-installer/windows-installer-manifest.json
+            artifacts/windows-installer/winget/*.yaml
+
   linux-native-secret-store-cert:
     runs-on: ubuntu-latest
     steps:

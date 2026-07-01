@@ -5,6 +5,7 @@ import { runProcess } from '../utils/run-command';
 import { getCliVersion } from '../utils/version';
 import { buildUpgradeCheck, type UpgradeCheckV1, type UpgradeResultV1 } from '../contracts/upgrade';
 import { UPGRADE_RESULT_SCHEMA_VERSION } from '../contracts/versions';
+import { detectInstallChannel, type InstallChannel } from '../utils/install-channel';
 
 const DEFAULT_CLI_PACKAGE = '@xyteai/cli';
 const DEFAULT_SKILL_AGENTS: SkillAgent[] = ['claude', 'copilot', 'codex'];
@@ -22,6 +23,7 @@ export interface UpgradeDependencies {
   commandRunner?: CommandRunner;
   installSkillsImpl?: typeof installSkills;
   getCurrentVersion?: () => string;
+  getInstallChannel?: () => InstallChannel;
   npmCommand?: string;
 }
 
@@ -70,12 +72,15 @@ export async function checkForUpgrade(
   const packageName = settings.packageName ?? DEFAULT_CLI_PACKAGE;
   const fetchImpl = deps.fetchImpl ?? fetch;
   const currentVersion = (deps.getCurrentVersion ?? getCliVersion)();
+  const installChannel = (deps.getInstallChannel ?? detectInstallChannel)();
   const latestVersion =
     typeof settings.latestVersionOverride === 'string' && settings.latestVersionOverride.trim()
       ? settings.latestVersionOverride.trim()
       : await fetchLatestVersion(packageName, fetchImpl);
   return buildUpgradeCheck({
     packageName,
+    installChannel: installChannel.kind,
+    recommendedCommand: installChannel.updateCommand,
     currentVersion,
     latestVersion
   });
@@ -88,6 +93,7 @@ export async function applyUpgrade(
   const packageName = settings.packageName ?? DEFAULT_CLI_PACKAGE;
   const runner = deps.commandRunner ?? defaultRunner;
   const installSkillsImpl = deps.installSkillsImpl ?? installSkills;
+  const installChannel = (deps.getInstallChannel ?? detectInstallChannel)();
   const npmCommand = deps.npmCommand ?? (process.platform === 'win32' ? 'npm.cmd' : 'npm');
   const check = await checkForUpgrade(
     {
@@ -103,18 +109,22 @@ export async function applyUpgrade(
     : typeof settings.latestVersionOverride === 'string' && settings.latestVersionOverride.trim()
       ? `${packageName}@${settings.latestVersionOverride.trim()}`
       : `${packageName}@latest`;
-  const updateArgs = ['install', '--global', installSpec];
+  const updateArgs =
+    installChannel.kind === 'windows-msi'
+      ? ['upgrade', '--id', installChannel.packageId ?? 'Xyte.XyteCLI', '--exact']
+      : ['install', '--global', installSpec];
   let updateCommand: { command: string; args: string[] } | undefined;
 
   if (compareSemver(check.currentVersion, check.latestVersion) < 0) {
+    const command = installChannel.kind === 'windows-msi' ? 'winget' : npmCommand;
     updateCommand = {
-      command: npmCommand,
+      command,
       args: updateArgs
     };
-    const installResult = await runner(npmCommand, updateArgs);
+    const installResult = await runner(command, updateArgs);
     if (installResult.code !== 0) {
       throw new CliUserError({
-        summary: `Upgrade failed while running "${npmCommand} ${updateArgs.join(' ')}": ${installResult.stderr.trim() || installResult.stdout.trim() || 'unknown error'}`
+        summary: `Upgrade failed while running "${command} ${updateArgs.join(' ')}": ${installResult.stderr.trim() || installResult.stdout.trim() || 'unknown error'}`
       });
     }
   }
@@ -153,6 +163,7 @@ export async function applyUpgrade(
     schemaVersion: UPGRADE_RESULT_SCHEMA_VERSION,
     generatedAtUtc: new Date().toISOString(),
     packageName,
+    installChannel: installChannel.kind,
     currentVersion: check.currentVersion,
     latestVersion: check.latestVersion,
     upToDateBefore: check.upToDate,

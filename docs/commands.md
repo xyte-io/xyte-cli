@@ -95,6 +95,9 @@ Environment doctor notes:
 - If global install or persistent `PATH` changes are blocked, use `npm install --prefix ./.xyte-cli/runtime @xyteai/cli@latest`, then `./.xyte-cli/runtime/node_modules/.bin/xyte-cli <command>` or PowerShell `.\.xyte-cli\runtime\node_modules\.bin\xyte-cli.cmd <command>`.
 - Chat-only assistants cannot install the CLI; use a shell-capable terminal or agent (Terminal, PowerShell, Codex, Claude Code/Desktop, GitHub Copilot CLI, VS Code Copilot Agent).
 
+Upgrade notes:
+- `xyte-cli upgrade --check --format json` reports `installChannel`. Npm installs use `npm install --global @xyteai/cli@latest`; Windows MSI installs use `winget upgrade --id Xyte.XyteCLI --exact` or a newer MSI.
+
 Skill bundle notes:
 - `xyte-cli skills refresh` force-installs all agent skill bundles (project and user scope).
 - `xyte-cli upgrade` refreshes user-scope skills automatically; workspace copies are not auto-updated — run `xyte-cli skills refresh` in each workspace after upgrading.

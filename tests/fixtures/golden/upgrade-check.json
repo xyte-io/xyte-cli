@@ -2,6 +2,7 @@
   "schemaVersion": "xyte.upgrade.check.v1",
   "generatedAtUtc": "<ISO_TIMESTAMP>",
   "packageName": "@xyteai/cli",
+  "installChannel": "npm",
   "currentVersion": "0.4.0",
   "latestVersion": "0.4.1",
   "upToDate": false,

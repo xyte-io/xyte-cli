@@ -884,6 +884,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
       if (options.check) {
         if (output === 'text') {
           stdout.write(`Package: ${check.packageName}\n`);
+          stdout.write(`Install channel: ${check.installChannel}\n`);
           stdout.write(`Current: ${check.currentVersion}\n`);
           stdout.write(`Latest: ${check.latestVersion}\n`);
           stdout.write(`Up to date: ${check.upToDate}\n`);
@@ -931,6 +932,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
       if (output === 'text') {
         stdout.write(`Package: ${result.packageName}\n`);
+        stdout.write(`Install channel: ${result.installChannel}\n`);
         stdout.write(`Current: ${result.currentVersion}\n`);
         stdout.write(`Latest: ${result.latestVersion}\n`);
         stdout.write(`Updated: ${result.updated}\n`);

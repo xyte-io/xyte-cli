@@ -314,6 +314,7 @@ describe('schema contracts', () => {
       schemaVersion: 'xyte.upgrade.result.v1',
       generatedAtUtc: new Date().toISOString(),
       packageName: '@xyteai/cli',
+      installChannel: 'npm',
       currentVersion: '0.4.0',
       latestVersion: '0.4.1',
       upToDateBefore: false,

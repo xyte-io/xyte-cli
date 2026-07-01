@@ -16,7 +16,7 @@ If `node --version` is missing or below 22:
 brew install node@22
 
 # Windows
-winget install OpenJS.NodeJS.LTS
+winget install -e --id OpenJS.NodeJS.LTS
 ```
 
 Other platforms: download from [nodejs.org](https://nodejs.org/en/download).
@@ -78,6 +78,8 @@ npx -y @xyteai/cli@latest setup status --tenant acme --field tenantId
 For reproducible pipelines, replace `@latest` with a pinned version (e.g. `@0.10.7`).
 
 ### Manual terminal
+
+On Windows, use the native MSI when you want a bundled runtime and normal Windows install/update behavior. The Node/npm path below remains supported for developers, agents, and environments that already standardize on Node.js. See [Windows Installer](./windows-installer.md).
 
 ```sh
 npm install -g @xyteai/cli@latest

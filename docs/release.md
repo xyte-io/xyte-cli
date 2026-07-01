@@ -9,6 +9,7 @@ This project targets **Node.js 22** as its primary runtime environment.
 - Earlier Node.js releases, including **Node 18**, are no longer supported.
 
 This repository ships one npm package: `@xyteai/cli`.
+Release assets also include a Windows x64 MSI for users who should not install Node.js/npm manually. The npm package remains a first-class install path.
 
 ## Governance
 
@@ -26,6 +27,7 @@ This repository ships one npm package: `@xyteai/cli`.
 - `npm test`
 - `npm run build`
 - packaged-install smoke from the built tarball (`npm run smoke:pack-install`)
+- Windows MSI package build (`npm run package:windows-msi`)
 - Windows native secret-store certification (`windows-native-secret-store-cert`)
 - Linux native secret-store certification (`linux-native-secret-store-cert`)
 - separate security job: `npm audit --audit-level=high`
@@ -65,6 +67,9 @@ Prerequisites:
 
 - npm package publish rights for `@xyteai/cli`.
 - `NPM_TOKEN` configured in repository/environment secrets.
+- Optional Windows code-signing secrets for MSI release assets:
+  - `WINDOWS_CODESIGN_PFX_BASE64`
+  - `WINDOWS_CODESIGN_PFX_PASSWORD`
 
 ## Release Assets Workflow
 
@@ -72,8 +77,16 @@ Prerequisites:
 
 - the same packaged-install smoke validates the tarball before attach/upload steps
 - built npm tarball (`*.tgz`)
+- Windows installer (`XyteCLI-<version>-win-x64.msi`)
+- generated WinGet manifests for `Xyte.XyteCLI`
 - CycloneDX SBOM (`sbom.cdx.json`)
 - SHA-256 checksums (`checksums.txt`)
+
+The MSI embeds a bundled Windows Node.js runtime, adds `C:\Program Files\Xyte CLI` to machine `PATH`, ships the post-install setup assistant, and marks the install channel as `windows-msi`. Users update MSI installs with `winget upgrade --id Xyte.XyteCLI --exact` or a newer MSI, not `npm install -g`.
+
+If Windows code-signing secrets are configured, the Windows packaging script signs the MSI before generating WinGet manifests, checksums, and upload. If they are not configured, the workflow still builds and uploads the MSI, but the asset is unsigned and should not be submitted to WinGet.
+
+CI currently pins the WiX .NET tool to `7.0.0` and the MSI build command passes WiX's `-acceptEula wix7` flag.
 
 ## Manual Emergency Publish
 

@@ -6,6 +6,7 @@ Manual terminal use is supported for setup, debugging, and local testing.
 - npm: [@xyteai/cli](https://www.npmjs.com/package/@xyteai/cli)
 - GitHub Page: [docs/index.html](./docs/index.html)
 - Command reference: [docs/commands.md](./docs/commands.md)
+- Windows installer: [docs/windows-installer.md](./docs/windows-installer.md)
 - Flows: [docs/flows/agent-ops.md](./docs/flows/agent-ops.md)
 - Schemas: [docs/schemas](./docs/schemas)
 
@@ -78,7 +79,9 @@ For reproducible pipelines, replace `@latest` with a pinned version (e.g. `@0.10
 
 ### Manual terminal
 
-Install [Node.js 22+](https://nodejs.org/en/download) first if `node --version` is missing or below 22 (macOS: `brew install node@22`, Windows: `winget install OpenJS.NodeJS.LTS`).
+Install [Node.js 22+](https://nodejs.org/en/download) first if `node --version` is missing or below 22 (macOS: `brew install node@22`, Windows: `winget install -e --id OpenJS.NodeJS.LTS`).
+
+On Windows, use the native MSI when you want a bundled runtime and normal Windows install/update behavior. The Node/npm path remains supported for developers, agents, and environments that already standardize on Node.js. See [docs/windows-installer.md](./docs/windows-installer.md).
 
 ```sh
 npm install -g @xyteai/cli@latest
