@@ -121,6 +121,36 @@ jobs:
       - name: Build Windows MSI
         run: npm run package:windows-msi -- --out-dir artifacts/windows-installer
 
+      - name: Smoke installed MSI from PATH
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $msi = Get-ChildItem -Path "artifacts/windows-installer" -Filter "*.msi" | Select-Object -First 1
+          if (!$msi) {
+            throw "MSI artifact was not produced."
+          }
+
+          $installLog = Join-Path $env:RUNNER_TEMP "xyte-cli-msi-install.log"
+          & msiexec.exe /i $msi.FullName /qn /norestart /l*v $installLog
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content -LiteralPath $installLog -Tail 200
+            throw "MSI install failed with exit code $LASTEXITCODE."
+          }
+
+          $installDir = Join-Path $env:ProgramFiles "Xyte CLI"
+          $xyteCliCmd = Join-Path $installDir "xyte-cli.cmd"
+          if (!(Test-Path -LiteralPath $xyteCliCmd)) {
+            throw "Installed xyte-cli.cmd not found at $xyteCliCmd."
+          }
+
+          $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+          $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+          $env:Path = @($machinePath, $userPath) -join ";"
+
+          where.exe xyte-cli
+          xyte-cli --version
+          xyte-cli doctor environment --format text
+
       - name: Upload Windows MSI artifact
         uses: actions/upload-artifact@v4
         with:
