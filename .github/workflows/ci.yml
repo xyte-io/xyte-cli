@@ -169,6 +169,52 @@ jobs:
 
           & $assistant -NonInteractive
 
+      - name: Record pristine Windows terminal transcript
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $transcript = Join-Path (Resolve-Path "artifacts/windows-installer") "xyte-cli-windows-pristine-terminal.log"
+          $demoScript = Join-Path $env:RUNNER_TEMP "xyte-cli-windows-pristine-terminal.ps1"
+          @'
+          $ErrorActionPreference = "Stop"
+          $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+          $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+          $env:Path = @($machinePath, $userPath) -join ";"
+
+          Write-Host "Windows: $([Environment]::OSVersion.VersionString)"
+          Write-Host "PowerShell: $($PSVersionTable.PSVersion)"
+          Write-Host ""
+
+          Write-Host "PS> where.exe xyte-cli"
+          where.exe xyte-cli
+          Write-Host ""
+
+          Write-Host "PS> xyte-cli --version"
+          xyte-cli --version
+          Write-Host ""
+
+          Write-Host "PS> xyte-cli doctor environment --format text"
+          xyte-cli doctor environment --format text
+          Write-Host ""
+
+          $assistant = Join-Path $env:ProgramFiles "Xyte CLI\scripts\configure-xyte-cli.ps1"
+          Write-Host "PS> & `"$assistant`" -NonInteractive"
+          & $assistant -NonInteractive
+          '@ | Set-Content -LiteralPath $demoScript -Encoding utf8
+
+          & pwsh -NoProfile -ExecutionPolicy Bypass -File $demoScript *>&1 | Tee-Object -FilePath $transcript
+          if ($LASTEXITCODE -ne 0) {
+            throw "Pristine Windows terminal transcript failed with exit code $LASTEXITCODE."
+          }
+
+      - name: Upload Windows terminal transcript
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-terminal-transcript
+          path: artifacts/windows-installer/xyte-cli-windows-pristine-terminal.log
+          if-no-files-found: ignore
+
       - name: Upload Windows MSI artifact
         uses: actions/upload-artifact@v4
         with:
