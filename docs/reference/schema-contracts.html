@@ -76,6 +76,7 @@ Return the artifact path and the decision you made from it.</code></pre></div>
 
 xyte-cli ops inspect fleet \
   --tenant &lt;tenant-id&gt; \
+  --render json \
   --output json \
   --strict-json \
   --out ./artifacts/fleet.json
@@ -107,8 +108,8 @@ xyte-cli ops watch incidents \
               <tr><td><code>xyte-cli doctor environment --format json</code></td><td><code>xyte.doctor.environment.v1</code></td><td>Choose installed, npx, workspace-local, or blocked setup path.</td></tr>
               <tr><td><code>xyte-cli status --mode fast --format json</code></td><td><code>xyte.status.v1</code></td><td>Decide whether a job can continue to operational commands.</td></tr>
               <tr><td><code>xyte-cli ops watch incidents --output json --strict-json</code></td><td><code>xyte.watch.frame.v1</code></td><td>Read snapshot, delta, heartbeat, and error frames.</td></tr>
-              <tr><td><code>xyte-cli ops inspect fleet --output json</code></td><td><code>xyte.inspect.fleet.v1</code></td><td>Store fleet counts and device context for dashboards or handoffs.</td></tr>
-              <tr><td><code>xyte-cli ops inspect deep-dive --output json</code></td><td><code>xyte.inspect.deep-dive.v1</code></td><td>Save report source data before rendering Markdown or PDF.</td></tr>
+              <tr><td><code>xyte-cli ops inspect fleet --render json --output json</code></td><td><code>xyte.inspect.fleet.v1</code></td><td>Store fleet counts and device context for dashboards or handoffs.</td></tr>
+              <tr><td><code>xyte-cli ops inspect deep-dive --render json --output json</code></td><td><code>xyte.inspect.deep-dive.v1</code></td><td>Save report source data before rendering Markdown or PDF.</td></tr>
               <tr><td><code>xyte-cli ops report generate --input &lt;source.json&gt; --out &lt;report.md&gt; --render markdown</code></td><td><code>xyte.report.v1</code></td><td>Track report path, input source, and render metadata.</td></tr>
               <tr><td><code>xyte-cli flow run &lt;flow-id&gt; --plan --strict-json</code></td><td><code>xyte.flow.run.v1</code></td><td>Read outcome, pause state, next action, and run bundle path.</td></tr>
               <tr><td><code>xyte-cli util prepare --action &lt;action-key&gt; --input &lt;file.xlsx&gt;</code></td><td><code>xyte.utility.prepare.v1</code></td><td>Count primary rows, rejected rows, generated files, and next command.</td></tr>
@@ -190,7 +191,7 @@ xyte-cli ops watch incidents \
   "nextAction": {
     "kind": "approve_gate",
     "stepId": "gate_send_command",
-    "title": "Review command and resume with --apply",
+    "title": "Approve Send Command",
     "requiresWrite": true,
     "artifactPaths": ["./tmp/flow-runs/flow.guided-remediation/run-001/manifest.json"],
     "command": "xyte-cli flow run flow.guided-remediation --tenant &lt;tenant-id&gt; --apply --resume ./tmp/flow-runs/flow.guided-remediation/run-001"
@@ -204,7 +205,7 @@ xyte-cli ops watch incidents \
           <h2 id="real-examples">Examples</h2>
           <div class="failure-grid">
             <div class="failure"><strong>Fail CI when setup is blocked</strong><p>Run <code>xyte-cli doctor environment --format json</code>, read the recommended mode, and fail when the mode is blocked.</p></div>
-            <div class="failure"><strong>Notify on incident delta</strong><p>Run incident watch with <code>--strict-json</code>, read <code>snapshot</code> or <code>delta</code> frames, and notify only when active incidents changed.</p></div>
+            <div class="failure"><strong>Notify on incident delta</strong><p>Run incident watch with <code>--output json --strict-json</code>, read <code>snapshot</code> or <code>delta</code> frames, and notify only when active incidents changed.</p></div>
             <div class="failure"><strong>Attach report sources</strong><p>Generate a Markdown or PDF report from saved deep-dive JSON, then attach both files so readers can trace the numbers.</p></div>
             <div class="failure"><strong>Resume paused flow</strong><p>Read <code>nextAction</code> from a flow summary and use the bundle path in the approved resume command.</p></div>
           </div>

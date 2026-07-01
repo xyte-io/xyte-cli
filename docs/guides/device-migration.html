@@ -101,8 +101,8 @@ xyte-cli api call organization.spaces.getSpaces \
           <li>Keep dry-run and apply reports separate so you can compare planned versus executed rows.</li>
           <li>After apply, inspect the moved devices rather than assuming the command output is the final tenant state.</li>
         </ul>
-        <div class="command"><pre><code>device_id,target_space_id,device_name,target_space_name
-&lt;device-id&gt;,&lt;space-id&gt;,"Room 101 Display","HQ / Floor 1 / Room 101"</code></pre></div>
+        <div class="command"><pre><code>device_id,device_name,target_space_id,target_space_name,confidence
+&lt;device-id&gt;,"Room 101 Display",&lt;space-id&gt;,"HQ / Floor 1 / Room 101",0.940</code></pre></div>
         <p class="section-copy">Close the move only after the apply report has no failed rows and the moved devices read back with the expected <code>space_id</code>. If matches are weak, target spaces are invalid, only part of the file applied, or rows still point to old spaces, fix the rows before continuing.</p>
 
         <h2 id="repeat">Make this repeatable</h2>

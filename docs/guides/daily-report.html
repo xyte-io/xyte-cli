@@ -66,6 +66,7 @@ How do I turn fleet JSON into a handoff?</code></pre></div>
   --tenant &lt;tenant-id&gt; \
   --provider-scope auto \
   --window 24 \
+  --render json \
   --output json \
   --out ./artifacts/xyte-deep-dive.daily.json \
   --strict-json</code></pre></div></li>
@@ -82,6 +83,7 @@ How do I turn fleet JSON into a handoff?</code></pre></div>
           <li class="step"><h3>Keep a compact fleet snapshot</h3><p>This is useful for dashboards and quick trend checks.</p><div class="command"><pre><code>xyte-cli ops inspect fleet \
   --tenant &lt;tenant-id&gt; \
   --provider-scope auto \
+  --render json \
   --output json \
   --out ./artifacts/xyte-fleet.daily.json</code></pre></div></li>
         </ol>
@@ -107,7 +109,7 @@ XYTE_TENANT=&lt;tenant-id&gt;
 REPORT_WINDOW_HOURS=24
 
 # Rerun path
-xyte-cli ops inspect deep-dive --tenant "$XYTE_TENANT" --window "$REPORT_WINDOW_HOURS" --output json --out ./artifacts/xyte-deep-dive.daily.json --strict-json
+xyte-cli ops inspect deep-dive --tenant "$XYTE_TENANT" --window "$REPORT_WINDOW_HOURS" --render json --output json --out ./artifacts/xyte-deep-dive.daily.json --strict-json
 xyte-cli ops report generate --tenant "$XYTE_TENANT" --input ./artifacts/xyte-deep-dive.daily.json --out ./reports/xyte-daily.md --render markdown</code></pre></div>
 
         <h2 id="failures">If it fails</h2>

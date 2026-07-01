@@ -101,6 +101,7 @@
           <div class="command"><pre><code># Terminal
 xyte-cli ops inspect fleet \
   --tenant &lt;tenant-id&gt; \
+  --render json \
   --output json \
   --out ./artifacts/fleet.json
 
@@ -116,7 +117,7 @@ npx -y @xyteai/cli@latest flow run flow.daily-deep-dive-report \
   --strict-json</code></pre></div>
 
           <h2 id="setup-path">Setup path</h2>
-          <p class="section-copy">When setup is missing, give the agent a path to an API key file outside the workspace. Do not paste the key text. If the machine manages more than one Xyte connection, include the local profile label.</p>
+          <p class="section-copy">When setup is missing, give the agent a path to an API key file outside the workspace. Do not paste the key text. If the machine manages more than one Xyte connection, include the local tenant id.</p>
           <div class="command"><pre><code>xyte-cli doctor environment --format json
 xyte-cli setup run \
   --non-interactive \
@@ -145,7 +146,7 @@ xyte-cli flow run &lt;flow-id&gt; --tenant &lt;tenant-id&gt; --apply --resume &l
 
           <h2 id="handoff">Handoff</h2>
           <p class="section-copy">A useful agent answer ends with what changed, what did not change, where the files are, and what the next decision is.</p>
-          <div class="command"><pre><code>Profile checked: default
+          <div class="command"><pre><code>Tenant checked: default
 Commands run: setup status, config doctor, ops inspect fleet
 Files written:
   ./artifacts/fleet.json

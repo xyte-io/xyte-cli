@@ -72,7 +72,6 @@ xyte-cli status --mode fast --format json</code></pre></div>
             <div class="failure"><strong>A flow paused at a gate</strong><p>That is expected for write-capable flows. Read <code>nextAction</code>, then resume the same run with <code>--apply --resume &lt;run-id-or-path&gt;</code> after approval. Do not retype an apply command from memory.</p></div>
             <div class="failure"><strong>Resume fails</strong><p>Use the original run id or bundle path from the plan output. If tenant state changed, run <code>--plan</code> again first.</p></div>
             <div class="failure"><strong>A batch was interrupted</strong><p>Rerun with the matching <code>--resume-artifact &lt;path&gt;</code> instead of starting over, so completed rows are not claimed twice.</p></div>
-            <div class="failure"><strong>No command is available to remediate</strong><p>Stop. List the device's real commands with <code>xyte-cli api call organization.commands.getCommands</code> and escalate if none fit. Do not guess a command from another device model.</p></div>
           </div>
 
           <h2 id="reset">Remove or reset</h2>
@@ -96,7 +95,7 @@ npm uninstall -g @xyteai/cli</code></pre></div>
           <p class="section-copy">After offboarding a machine, remove the tenant profile and delete any leftover key file you created during setup.</p>
 
           <h2 id="bug">Report a bug</h2>
-          <p class="section-copy">When you need to share what happened, capture the action logs instead of pasting secrets. Logs record commands, not key values.</p>
+          <p class="section-copy">When you need to share what happened, capture the action logs instead of pasting secrets. The CLI redacts key and secret option values in these logs automatically.</p>
           <div class="command"><pre><code>xyte-cli logs list --output text
 xyte-cli logs show --request-id &lt;request-id&gt; --output json</code></pre></div>
           <div class="failure-grid">

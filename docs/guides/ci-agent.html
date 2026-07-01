@@ -88,6 +88,7 @@ jobs:
             &gt; artifacts/xyte-doctor.json
           npx -y @xyteai/cli@latest ops inspect fleet \
             --tenant "$XYTE_TENANT" \
+            --render json \
             --output json \
             --strict-json \
             --out artifacts/xyte-fleet.ci.json
@@ -187,7 +188,7 @@ XYTE_TENANT=default
 
 # Rerun path
 printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@latest setup run --non-interactive --tenant "$XYTE_TENANT" --key-stdin --format json
-npx -y @xyteai/cli@latest ops inspect fleet --tenant "$XYTE_TENANT" --output json --strict-json --out ./artifacts/xyte-fleet.ci.json</code></pre></div>
+npx -y @xyteai/cli@latest ops inspect fleet --tenant "$XYTE_TENANT" --render json --output json --strict-json --out ./artifacts/xyte-fleet.ci.json</code></pre></div>
 
         <h2 id="failures">If it fails</h2>
         <div class="failure-list">

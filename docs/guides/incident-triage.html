@@ -89,12 +89,14 @@ How do I compare incidents since yesterday?</code></pre></div>
             <p>These files answer whether the incident is isolated or part of a broader tenant problem.</p>
             <div class="command"><pre><code>xyte-cli ops inspect fleet \
   --tenant &lt;tenant-id&gt; \
+  --render json \
   --output json \
   --out ./artifacts/xyte-fleet.triage.json
 
 xyte-cli ops inspect deep-dive \
   --tenant &lt;tenant-id&gt; \
   --window 24 \
+  --render json \
   --output json \
   --out ./artifacts/xyte-deep-dive.triage.json</code></pre></div>
           </li>
@@ -117,9 +119,10 @@ xyte-cli ops inspect deep-dive \
     "added": 0,
     "removed": 0,
     "updated": 0,
-    "changed": 0
+    "changed": false
   }
 }</code></pre></div>
+        <p class="section-copy">This snippet is abridged to the fields that matter for triage. A real frame also carries <code>timestamp</code>, <code>runId</code>, <code>sequence</code>, <code>pollIndex</code>, <code>intervalMs</code>, and <code>endpointKey</code>.</p>
         <p class="section-copy">A useful handoff names the active count, new or changed incidents, and the fleet context file. If frames repeat errors, the baseline is stale, or counts do not match the intended filters, fix those inputs before escalating.</p>
 
         <h2 id="repeat">Make this repeatable</h2>
@@ -128,7 +131,7 @@ XYTE_TENANT=&lt;tenant-id&gt;
 
 # Rerun path
 xyte-cli ops watch incidents --tenant "$XYTE_TENANT" --profile incidents-active --once --output json --strict-json
-xyte-cli ops inspect fleet --tenant "$XYTE_TENANT" --output json --out ./artifacts/xyte-fleet.triage.json</code></pre></div>
+xyte-cli ops inspect fleet --tenant "$XYTE_TENANT" --render json --output json --out ./artifacts/xyte-fleet.triage.json</code></pre></div>
 
         <h2 id="failures">If it fails</h2>
         <div class="failure-list">

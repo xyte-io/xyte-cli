@@ -72,6 +72,7 @@ How do I resume an approved remediation?</code></pre></div>
 
 xyte-cli ops inspect fleet \
   --tenant &lt;tenant-id&gt; \
+  --render json \
   --output json \
   --out ./artifacts/fleet.before-remediation.json</code></pre></div></li>
           <li class="step"><h3>Plan against the chosen target</h3><p>After the incident and device are chosen, the plan shows required context and where the workflow will pause before a write. Read <code>device_id</code> and <code>incident_id</code> from the saved frames in step 1 — each incident item carries both.</p><div class="command"><pre><code>xyte-cli flow run flow.guided-remediation \
@@ -81,7 +82,7 @@ xyte-cli ops inspect fleet \
   --var incident_id=&lt;incident-id&gt; \
   --once \
   --strict-json</code></pre></div></li>
-          <li class="step"><h3>List commands the device actually supports</h3><p>Choose from returned commands. Do not guess a command name from another device model.</p><div class="command"><pre><code>xyte-cli api call organization.commands.getCommands \
+          <li class="step"><h3>Read the device's command history</h3><p>This returns past commands sent to the device, not a catalog of what it supports — there is no such catalog. Reuse a <code>command</code> value you can see the device has accepted before. Do not invent or guess a command string from another device model.</p><div class="command"><pre><code>xyte-cli api call organization.commands.getCommands \
   --tenant &lt;tenant-id&gt; \
   --path-json '{"device_id":"&lt;device-id&gt;"}' \
   --query-json '{"page":1,"per_page":20}'</code></pre></div></li>
@@ -97,7 +98,8 @@ xyte-cli ops inspect fleet \
 xyte-cli ops watch incidents \
   --tenant &lt;tenant-id&gt; \
   --profile incidents-active \
-  --once</code></pre></div></li>
+  --once \
+  --output json</code></pre></div></li>
         </ol>
 
         <h2 id="gate">Approval gate</h2>
@@ -108,7 +110,7 @@ xyte-cli ops watch incidents \
   "nextAction": {
     "kind": "approve_gate",
     "stepId": "gate_send_command",
-    "title": "Review command and resume with --apply",
+    "title": "Approve Send Command",
     "requiresWrite": true,
     "artifactPaths": [],
     "command": "xyte-cli flow run flow.guided-remediation --tenant &lt;tenant-id&gt; --apply --resume &lt;run-id-or-path&gt;"

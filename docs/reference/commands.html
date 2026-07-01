@@ -77,6 +77,7 @@ xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-acti
 xyte-cli config doctor --tenant &lt;tenant-id&gt; --format json
 xyte-cli ops inspect fleet \
   --tenant &lt;tenant-id&gt; \
+  --render json \
   --output json \
   --strict-json \
   --out ./artifacts/fleet.json
@@ -129,12 +130,14 @@ xyte-cli init --scope project --agents all --force --no-setup</code></pre></div>
 xyte-cli ops inspect fleet \
   --tenant &lt;tenant-id&gt; \
   --provider-scope auto \
+  --render json \
   --output json \
   --out ./artifacts/fleet.json
 
 xyte-cli ops inspect deep-dive \
   --tenant &lt;tenant-id&gt; \
   --window 24 \
+  --render json \
   --output json \
   --out ./artifacts/deep-dive.json</code></pre></div>
 
