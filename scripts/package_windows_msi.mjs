@@ -20,11 +20,22 @@ function parseArgs(argv) {
     skipNode: false,
     skipNpmInstall: false
   };
+  const readValue = (index, flag) => {
+    const value = argv[index];
+    if (!value || value.startsWith('--')) {
+      throw new Error(`${flag} requires a value.`);
+    }
+    return value;
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--out-dir') args.outDir = resolve(argv[++i]);
-    else if (arg === '--node-version') args.nodeVersion = argv[++i]?.replace(/^v/, '');
-    else if (arg === '--skip-build') args.skipBuild = true;
+    if (arg === '--out-dir') {
+      i += 1;
+      args.outDir = resolve(readValue(i, arg));
+    } else if (arg === '--node-version') {
+      i += 1;
+      args.nodeVersion = readValue(i, arg).replace(/^v/, '');
+    } else if (arg === '--skip-build') args.skipBuild = true;
     else if (arg === '--skip-msi') args.skipMsi = true;
     else if (arg === '--skip-node') args.skipNode = true;
     else if (arg === '--skip-npm-install') args.skipNpmInstall = true;
