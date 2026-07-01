@@ -76,6 +76,10 @@ function sha256File(filePath) {
   return createHash('sha256').update(readFileSync(filePath)).digest('hex').toUpperCase();
 }
 
+function manifestRelativePath(outDir, filePath) {
+  return relative(outDir, filePath).split('\\').join('/');
+}
+
 function ensureBuilt() {
   if (!existsSync(join(repoRoot, 'dist', 'bin', 'xyte-cli.js'))) {
     throw new Error('dist/bin/xyte-cli.js is missing. Run npm run build first or omit --skip-build.');
@@ -371,10 +375,10 @@ async function main() {
     packageVersion: packageJson.version,
     nodeVersion: args.skipNode ? null : args.nodeVersion,
     wixEulaId,
-    payloadDir,
-    wxsPath,
-    msiPath: args.skipMsi ? null : msiPath,
-    wingetDir
+    payloadDir: manifestRelativePath(args.outDir, payloadDir),
+    wxsPath: manifestRelativePath(args.outDir, wxsPath),
+    msiPath: args.skipMsi ? null : manifestRelativePath(args.outDir, msiPath),
+    wingetDir: manifestRelativePath(args.outDir, wingetDir)
   };
   writeFileSync(join(args.outDir, 'windows-installer-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
   process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`);

@@ -55,4 +55,29 @@ describe('install channel detection', () => {
       updateCommand: 'winget upgrade --id Xyte.XyteCLI --exact'
     });
   });
+
+  it('trims optional Windows MSI channel metadata and ignores blanks', () => {
+    delete process.env.XYTE_CLI_INSTALL_CHANNEL;
+    delete process.env.XYTE_CLI_INSTALL_CHANNEL_FILE;
+
+    const root = mkdtempSync(join(tmpdir(), 'xyte-install-channel-'));
+    const nested = join(root, 'dist', 'utils');
+    mkdirSync(nested, { recursive: true });
+    writeFileSync(
+      join(root, 'install-channel.json'),
+      JSON.stringify({
+        kind: 'windows-msi',
+        packageId: '   ',
+        releaseUrl: '   ',
+        updateCommand: '  winget upgrade --id Xyte.XyteCLI --exact  '
+      })
+    );
+
+    expect(detectInstallChannel(nested)).toEqual({
+      kind: 'windows-msi',
+      updateCommand: 'winget upgrade --id Xyte.XyteCLI --exact',
+      packageId: undefined,
+      releaseUrl: undefined
+    });
+  });
 });

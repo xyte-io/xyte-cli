@@ -4,7 +4,7 @@ param(
 
   [string]$CertificateBase64 = $env:WINDOWS_CODESIGN_PFX_BASE64,
   [string]$CertificatePassword = $env:WINDOWS_CODESIGN_PFX_PASSWORD,
-  [string]$TimestampUrl = "http://timestamp.digicert.com"
+  [string]$TimestampUrl = "https://timestamp.digicert.com"
 )
 
 $ErrorActionPreference = "Stop"

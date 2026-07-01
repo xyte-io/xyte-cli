@@ -15,6 +15,14 @@ const DEFAULT_INSTALL_CHANNEL: InstallChannel = {
   updateCommand: 'npm install --global @xyteai/cli@latest'
 };
 
+function nonBlankString(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+}
+
 function parseInstallChannel(payload: unknown): InstallChannel | undefined {
   if (!payload || typeof payload !== 'object') {
     return undefined;
@@ -27,12 +35,9 @@ function parseInstallChannel(payload: unknown): InstallChannel | undefined {
 
   return {
     kind: 'windows-msi',
-    updateCommand:
-      typeof record.updateCommand === 'string' && record.updateCommand.trim()
-        ? record.updateCommand.trim()
-        : 'winget upgrade --id Xyte.XyteCLI --exact',
-    packageId: typeof record.packageId === 'string' ? record.packageId : undefined,
-    releaseUrl: typeof record.releaseUrl === 'string' ? record.releaseUrl : undefined
+    updateCommand: nonBlankString(record.updateCommand) ?? 'winget upgrade --id Xyte.XyteCLI --exact',
+    packageId: nonBlankString(record.packageId),
+    releaseUrl: nonBlankString(record.releaseUrl)
   };
 }
 
