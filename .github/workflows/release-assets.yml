@@ -132,7 +132,7 @@ jobs:
             checksums.txt
 
   windows-msi:
-    needs: meta
+    needs: [meta, release]
     runs-on: windows-latest
     steps:
       - name: Checkout tag
@@ -202,7 +202,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.meta.outputs.tag }}
-          generate_release_notes: true
           files: |
             artifacts/windows-installer/*.msi
             artifacts/windows-installer/windows-installer-manifest.json
