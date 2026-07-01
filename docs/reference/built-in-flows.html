@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Built-in flows | xyte-cli reference</title>
+    <meta name="description" content="Deterministic flow packs for setup, incident monitoring, remediation, migration, reporting, and Edge claims." />
+    <link rel="icon" type="image/png" href="../media/xyte-ai-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../guides/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-nav">
+      <div class="wrap nav-row">
+        <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Reference</span></a>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../guides/index.html">Guides</a><a href="../index.html#docs">Reference</a><a href="../glossary.html">Glossary</a><a href="../troubleshooting.html">Troubleshooting</a></nav>
+      </div>
+    </header>
+    <main class="page" id="main">
+      <div class="wrap guide-shell">
+        <aside class="toc" aria-label="On this page">
+          <strong>On this page</strong>
+          <a href="#what-flows-are">What flows are</a>
+          <a href="#ask-an-agent">Ask an agent</a>
+          <a href="#terminal-ci">Terminal and CI</a>
+          <a href="#flow-catalog">Flow catalog</a>
+          <a href="#real-examples">Examples</a>
+          <a href="#artifacts">Artifacts</a>
+          <a href="#retry">Retry</a>
+          <a href="#failures">Failures</a>
+        </aside>
+        <article class="article">
+          <p class="breadcrumb"><a href="../index.html">Overview</a> / <a href="../index.html#docs">Reference</a> / Built-in flows</p>
+          <figure class="guide-visual"><img src="./media/built-in-flows-reference.webp" alt="Built-in flow cards feed into a flow runner with plan mode, gates, resume state, and artifacts." /></figure>
+          <p class="eyebrow">Flows</p>
+          <h1>Built-in flows.</h1>
+          <p class="lead">Flows package common operator work into repeatable runs: setup checks, incident watch, triage, reporting, remediation, migration, and Edge onboarding.</p>
+
+          <div class="summary">
+            <div class="summary-card"><strong>Use when</strong><span>The task has multiple steps or a possible write gate.</span></div>
+            <div class="summary-card"><strong>Default mode</strong><span><code>--plan</code> is safe and shows what the run needs or would do.</span></div>
+            <div class="summary-card"><strong>Output</strong><span>A summary, run bundle, saved artifacts, and a resume command when paused.</span></div>
+          </div>
+
+          <h2 id="what-flows-are">What flows are</h2>
+          <p class="section-copy">A flow is a recorded sequence of normal CLI steps. It collects inputs, writes a run bundle, and pauses before sensitive changes so operators, agents, and CI jobs follow the same path each time.</p>
+          <div class="flow-diagram" aria-label="Flow execution workflow">
+            <h3>Workflow</h3>
+            <ol class="flow-steps">
+              <li><span class="flow-kicker">Select</span><strong>Choose flow</strong><span>Match the flow to the work that triggered it.</span></li>
+              <li><span class="flow-kicker">Plan</span><strong>Run dry path</strong><span>Collect inputs, check readiness, and stop at gates.</span></li>
+              <li><span class="flow-kicker">Review</span><strong>Read nextAction</strong><span>Use the summary to decide what to approve or fix.</span></li>
+              <li><span class="flow-kicker">Resume</span><strong>Apply one gate</strong><span>Advance one approved write with <code>--apply --resume</code>.</span></li>
+              <li><span class="flow-kicker">Handoff</span><strong>Use artifacts</strong><span>Share outputs, reports, and run paths.</span></li>
+            </ol>
+          </div>
+
+          <h2 id="ask-an-agent">Ask an agent</h2>
+          <p class="section-copy">Ask for the outcome. The agent can list available flows, choose the safest match, run a plan, and explain the next step.</p>
+          <div class="command"><pre><code>Show me the built-in xyte-cli flow that fits incident triage, then run it in plan mode.
+
+Plan a daily deep-dive report and show me the output files.
+
+I uploaded a spreadsheet of devices to claim. Plan the batch, tell me which rows are native/direct or Edge, explain rows that need more data, and stop before apply.</code></pre></div>
+
+          <h2 id="terminal-ci">Terminal and CI</h2>
+          <p class="section-copy">In a terminal, start with the catalog. In CI, run read-only or plan-mode flows by default and publish the run bundle as an artifact.</p>
+          <div class="command"><pre><code>xyte-cli flow list --format text
+
+xyte-cli flow run flow.daily-deep-dive-report \
+  --tenant &lt;tenant-id&gt; \
+  --plan \
+  --out-dir ./tmp/flow-runs \
+  --strict-json
+
+xyte-cli flow run flow.guided-remediation \
+  --tenant &lt;tenant-id&gt; \
+  --apply \
+  --resume &lt;run-id-or-path&gt;</code></pre></div>
+
+          <h2 id="flow-catalog">Flow catalog</h2>
+          <p class="section-copy">Choose the flow by the event that created the work: setup, incident change, report handoff, remediation, migration, or onboarding.</p>
+          <ul class="checklist">
+            <li><code>flow.setup-readiness-10m</code>: a machine, tenant, or agent session needs a readiness baseline.</li>
+            <li><code>flow.incidents-delta-watch</code>: incident state may have changed and you need a watch frame.</li>
+            <li><code>flow.watch-to-triage</code>: watch output needs fleet and report context.</li>
+            <li><code>flow.daily-deep-dive-report</code>: a daily or weekly handoff needs source JSON and a readable report.</li>
+            <li><code>flow.guided-remediation</code>: triage found a real issue and the next step may write state.</li>
+            <li><code>flow.device-migration</code>: device placement changed after a room import, rename, split, or reorganization.</li>
+            <li><code>flow.edge-claim</code> and <code>flow.edge-claim-batch</code>: Edge devices need planned claim runs.</li>
+            <li><code>flow.edge-ping</code>: check whether a device behind an Edge proxy is reachable, before or after a claim.</li>
+          </ul>
+          <p class="section-copy">Read-only flows (<code>flow.setup-readiness-10m</code>, <code>flow.incidents-delta-watch</code>, <code>flow.watch-to-triage</code>, <code>flow.daily-deep-dive-report</code>) never change tenant state. Write-capable flows (<code>flow.guided-remediation</code>, <code>flow.device-migration</code>, <code>flow.edge-claim</code>, <code>flow.edge-claim-batch</code>, <code>flow.edge-ping</code>) plan first and pause before any write. Run <code>xyte-cli flow list --format text</code> to see each flow&rsquo;s required context.</p>
+
+          <h2 id="real-examples">Examples</h2>
+          <div class="failure-grid">
+            <div class="failure"><strong>Shift handoff</strong><p>Run <code>flow.watch-to-triage</code> in plan mode so the next operator gets incident state, fleet context, and report files.</p></div>
+            <div class="failure"><strong>Customer report</strong><p>Run <code>flow.daily-deep-dive-report</code> to create the source JSON and readable report from the same tenant snapshot.</p></div>
+            <div class="failure"><strong>Approved remediation</strong><p>Run <code>flow.guided-remediation</code> to inspect the current issue and pause before any command, ticket, or incident write.</p></div>
+            <div class="failure"><strong>Deployment onboarding</strong><p>Run <code>flow.edge-claim-batch</code> after spreadsheet preparation so rejected rows and resume behavior are explicit.</p></div>
+          </div>
+
+          <h2 id="artifacts">Artifacts</h2>
+          <p class="section-copy">Every run writes a bundle. Keep this path when you need to resume, explain the run, or attach outputs to a support handoff.</p>
+          <div class="command"><pre><code>./tmp/flow-runs/&lt;flow-id&gt;/&lt;timestamp&gt;-&lt;run-id&gt;/
+  manifest.json
+  inputs.json
+  decisions.ndjson
+  errors.ndjson
+  watch-frames.ndjson
+  steps/
+  outputs/</code></pre></div>
+
+          <h2 id="retry">Retry and resume</h2>
+          <div class="failure-grid">
+            <div class="failure"><strong>Plan runs</strong><p>Rerun <code>--plan</code> whenever tenant state, input files, or operator intent changed. Plan mode does not change tenant state.</p></div>
+            <div class="failure"><strong>Paused gates</strong><p>Use the run bundle path or run id from the plan output. Do not create a new apply command from memory.</p></div>
+            <div class="failure"><strong><code>--apply --resume</code></strong><p>Resume the approved bundle only after the target and effect are still correct. If tenant state changed, run plan again first.</p></div>
+            <div class="failure"><strong>Interrupted runs</strong><p>Keep the bundle and error output. For batch work, use the matching resume artifact instead of starting over.</p></div>
+          </div>
+
+          <h2 id="failures">Common failures</h2>
+          <div class="failure-grid">
+            <div class="failure"><strong>Needs input</strong><p>The flow is missing a profile label, a file path, or a specific value. Add <code>--var key=value</code> or <code>--context-json</code>.</p></div>
+            <div class="failure"><strong>Paused at a gate</strong><p>Read <code>nextAction</code>. Resume only after the operator approves the specific change.</p></div>
+            <div class="failure"><strong>Resume fails</strong><p>Use the original run id or bundle path. If metadata was edited or moved incorrectly, start a fresh plan.</p></div>
+            <div class="failure"><strong>CI write gate</strong><p>Run <code>--plan</code> only and publish the run bundle for human review.</p></div>
+          </div>
+                <aside class="related-next" aria-label="Related guides"><h3>Related guides</h3><p class="section-copy"><a href="../guides/guided-remediation.html">Guided remediation</a>, <a href="../guides/daily-report.html">Daily fleet report</a>, or browse <a href="../guides/index.html">all guides</a>.</p></aside>
+        </article>
+      </div>
+    </main>
+    <footer class="footer"><div class="wrap footer-row"><span>Built-in flows</span><span><a href="../index.html#docs">Reference</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
+    <script src="../guides/guide.js?v=use-case-guides-3"></script>
+  </body>
+</html>

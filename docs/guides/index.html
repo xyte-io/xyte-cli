@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Xyte CLI use-case guides</title>
+    <meta name="description" content="Practical xyte-cli guides for setup, incidents, reports, remediation, migration, device claiming, utilities, CI, and agent workflows." />
+    <link rel="icon" type="image/png" href="../media/xyte-ai-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-nav">
+      <div class="wrap nav-row">
+        <a class="brand" href="../index.html" aria-label="xyte-cli home">
+          <img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" />
+          <span>Use-case guides</span>
+        </a>
+        <nav class="nav-links" aria-label="Primary">
+          <a href="../index.html#install">Install</a>
+          <a href="../index.html#start">Start</a>
+          <a href="./index.html">Guides</a>
+          <a href="../index.html#docs">Reference</a>
+          <a href="../glossary.html">Glossary</a>
+          <a href="../troubleshooting.html">Troubleshooting</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="page" id="main">
+      <div class="wrap guide-shell">
+        <aside class="toc" aria-label="Guide groups">
+          <strong>Start here</strong>
+          <a href="#daily-ops">Daily operations</a>
+          <a href="#changes">Changes and setup</a>
+          <a href="#automation">Automation</a>
+        </aside>
+
+        <article class="article">
+          <p class="breadcrumb"><a href="../index.html">Overview</a> / Guides</p>
+          <p class="eyebrow">Guides</p>
+          <h1>Operator workflows.</h1>
+          <p class="lead">
+            Choose the guide that matches the work in front of you: setup, incidents, reports,
+            remediation, device moves, device claiming, spreadsheet cleanup, or automation.
+          </p>
+
+          <div class="summary">
+            <div class="summary-card"><strong>AI-first</strong><span>Each guide starts with an agent prompt that discovers context before asking for exact ids.</span></div>
+            <div class="summary-card"><strong>Terminal-ready</strong><span>Switch views when you want the underlying commands and expected files.</span></div>
+            <div class="summary-card"><strong>Safe changes</strong><span>Write-capable workflows plan first and wait for explicit approval before apply.</span></div>
+          </div>
+
+          <h2 id="daily-ops">Daily operations</h2>
+          <p class="section-copy">For readiness checks, incident updates, daily reports, and handoffs that need current tenant data.</p>
+          <div class="grid">
+            <a class="card" href="./setup-readiness.html">
+              <h3>Set up and verify readiness</h3>
+              <p>Use when a machine, workspace, or tenant is new and every later workflow depends on connected credentials.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="card" href="./incident-triage.html">
+              <h3>Watch incidents and triage changes</h3>
+              <p>Use when an incident count changed, support needs a snapshot, or an operator needs to know what happened recently.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="card" href="./daily-report.html">
+              <h3>Generate a daily fleet report</h3>
+              <p>Use when a scheduled update or customer handoff needs current counts, source JSON, and a readable report.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="card" href="./guided-remediation.html">
+              <h3>Run guided remediation</h3>
+              <p>Use when triage found a real issue and the next step might change device, incident, or ticket state.</p>
+              <span>Open guide</span>
+            </a>
+          </div>
+
+          <h2 id="changes">Changes and setup</h2>
+          <p class="section-copy">For work that prepares or changes tenant state: moves, claims, and structured input files.</p>
+          <div class="grid">
+            <a class="card" href="./device-migration.html">
+              <h3>Move devices between spaces</h3>
+              <p>Use after a room plan, import, rename, or split makes existing device placement wrong.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="card" href="./edge-claim.html">
+              <h3>Claim devices</h3>
+              <p>Use when native/direct devices or Edge devices need the right claim path, real identifiers, and a reviewed result.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="card" href="./utility-prep.html">
+              <h3>Prepare spreadsheets</h3>
+              <p>Use when source files are human-readable but still missing the clean rows and identifiers a workflow needs.</p>
+              <span>Open guide</span>
+            </a>
+          </div>
+
+          <h2 id="automation">Automation</h2>
+          <p class="section-copy">For scheduled jobs, CI pipelines, and shell-capable agents running the CLI for you.</p>
+          <div class="grid">
+            <a class="card" href="./ci-agent.html">
+              <h3>Use CI or an AI agent</h3>
+              <p>Use when a pipeline or shell-capable agent needs repeatable checks, artifacts, and approval gates.</p>
+              <span>Open guide</span>
+            </a>
+          </div>
+        </article>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="wrap footer-row">
+        <span>xyte-cli use-case guides</span>
+        <span><a href="../index.html">Overview</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span>
+      </div>
+    </footer>
+  </body>
+</html>

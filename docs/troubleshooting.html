@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Troubleshooting | xyte-cli</title>
+    <meta name="description" content="Fix common xyte-cli problems: setup and connection, output and reading, write and flow gates, plus how to remove a stored key, remove a tenant, and uninstall." />
+    <link rel="icon" type="image/png" href="./media/xyte-ai-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./guides/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-nav">
+      <div class="wrap nav-row">
+        <a class="brand" href="./index.html"><img src="./media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Troubleshooting</span></a>
+        <nav class="nav-links" aria-label="Primary"><a href="./index.html#install">Install</a><a href="./index.html#start">Start</a><a href="./guides/index.html">Guides</a><a href="./index.html#docs">Reference</a><a href="./glossary.html">Glossary</a><a href="./troubleshooting.html" aria-current="page">Troubleshooting</a></nav>
+      </div>
+    </header>
+    <main class="page" id="main">
+      <div class="wrap guide-shell">
+        <aside class="toc" aria-label="On this page">
+          <strong>On this page</strong>
+          <a href="#first">Check this first</a>
+          <a href="#setup">Setup &amp; connection</a>
+          <a href="#output">Output &amp; reading</a>
+          <a href="#writes">Writes &amp; flow gates</a>
+          <a href="#reset">Remove or reset</a>
+          <a href="#bug">Report a bug</a>
+        </aside>
+        <article class="article">
+          <p class="breadcrumb"><a href="./index.html">Overview</a> / Troubleshooting</p>
+          <p class="eyebrow">Troubleshooting</p>
+          <h1>When something is not working.</h1>
+          <p class="lead">Start with one diagnostic command, then jump to the section that matches what you see. New to the terms here? Open the <a href="./glossary.html">glossary</a>.</p>
+
+          <h2 id="first">Check this first</h2>
+          <p class="section-copy">Most problems show up in one of these three read-only checks. Run them before anything else.</p>
+          <div class="command"><pre><code># Is this machine able to run the CLI at all?
+xyte-cli doctor environment --format json
+
+# Is a tenant connected, and can Xyte answer?
+xyte-cli config doctor --tenant &lt;tenant-id&gt; --format text
+
+# Fast readiness summary for operators and agents
+xyte-cli status --mode fast --format json</code></pre></div>
+          <p class="section-copy">If <code>xyte-cli</code> is not found, run any command with <code>npx -y @xyteai/cli@latest</code> in front, then fix your install. If a tenant is not connected, run <a href="./guides/setup-readiness.html">Set up and verify readiness</a>.</p>
+
+          <h2 id="setup">Setup &amp; connection</h2>
+          <div class="failure-grid">
+            <div class="failure"><strong>Node.js is missing or too old</strong><p>Install Node.js 22 or newer, or run the command in an environment that already has it. <code>doctor environment</code> reports the version it found.</p></div>
+            <div class="failure"><strong>The key file cannot be read</strong><p>Move the key file outside the repository, check its permissions, and rerun setup. Never paste a key on the command line.</p></div>
+            <div class="failure"><strong>Authentication is rejected</strong><p>Ask your Xyte admin for a fresh key with access to the tenant, then rerun <code>xyte-cli setup run</code>. Keys are created in Xyte under <strong>Settings &rarr; API Keys</strong>.</p></div>
+            <div class="failure"><strong>Network access fails</strong><p>Fix VPN, firewall, or proxy access, then run <code>xyte-cli config doctor --tenant &lt;tenant-id&gt;</code> again.</p></div>
+            <div class="failure"><strong>Results look incomplete</strong><p>The wrong provider scope may be in use. On a read command add <code>--provider-scope organization</code> or <code>--provider-scope partner</code> (on <code>flow run</code> use <code>--inspect-provider-scope</code>). See <a href="./glossary.html#concepts">provider scope</a>.</p></div>
+            <div class="failure"><strong>Native storage is unavailable</strong><p>A warning that the CLI fell back to file storage is not a failure. To inspect where credentials live, run <code>xyte-cli config path --format json</code>.</p></div>
+          </div>
+
+          <h2 id="output">Output &amp; reading</h2>
+          <div class="failure-grid">
+            <div class="failure"><strong>I get colored text, not JSON</strong><p>In an interactive terminal, output defaults to human-readable text. Add <code>--output json</code> (and <code>--strict-json</code> when a job parses it) to force machine-readable output.</p></div>
+            <div class="failure"><strong>Counts differ from the web view</strong><p>Compare filters first: status, date range, page size, and whether the UI hides older active incidents.</p></div>
+            <div class="failure"><strong>Repeated error frames in a watch</strong><p>Run <code>xyte-cli config doctor --tenant &lt;tenant-id&gt; --format text</code>, then retry the watch with <code>--once</code>. Keep the previous good snapshot until a clean frame returns.</p></div>
+            <div class="failure"><strong>A watch runs too long</strong><p>Bound it with <code>--max-polls</code>. Do not leave an unbounded watch running in a support handoff.</p></div>
+            <div class="failure"><strong>A report command rejects the input</strong><p>Confirm the input came from <code>xyte-cli ops inspect deep-dive</code>, not <code>ops inspect fleet</code>, and that you passed both <code>--input</code> and <code>--out</code>.</p></div>
+          </div>
+
+          <h2 id="writes">Writes &amp; flow gates</h2>
+          <div class="failure-grid">
+            <div class="failure"><strong>A flow paused at a gate</strong><p>That is expected for write-capable flows. Read <code>nextAction</code>, then resume the same run with <code>--apply --resume &lt;run-id-or-path&gt;</code> after approval. Do not retype an apply command from memory.</p></div>
+            <div class="failure"><strong>Resume fails</strong><p>Use the original run id or bundle path from the plan output. If tenant state changed, run <code>--plan</code> again first.</p></div>
+            <div class="failure"><strong>A batch was interrupted</strong><p>Rerun with the matching <code>--resume-artifact &lt;path&gt;</code> instead of starting over, so completed rows are not claimed twice.</p></div>
+            <div class="failure"><strong>No command is available to remediate</strong><p>Stop. List the device's real commands with <code>xyte-cli api call organization.commands.getCommands</code> and escalate if none fit. Do not guess a command from another device model.</p></div>
+          </div>
+
+          <h2 id="reset">Remove or reset</h2>
+          <p class="section-copy">These commands change local state. Removing a key or tenant requires <code>--confirm</code>; the CLI clears the stored secret.</p>
+          <div class="command"><pre><code># See what is stored locally
+xyte-cli config tenant list
+xyte-cli config key list --tenant &lt;tenant-id&gt;
+
+# Remove one stored key slot (clears its secret)
+xyte-cli config key remove \
+  --tenant &lt;tenant-id&gt; \
+  --provider &lt;xyte-org|xyte-partner&gt; \
+  --slot &lt;slot-id-or-name&gt; \
+  --confirm
+
+# Remove a whole tenant profile and clear its known key slots
+xyte-cli config tenant remove &lt;tenant-id&gt; --confirm
+
+# Uninstall the CLI (global install)
+npm uninstall -g @xyteai/cli</code></pre></div>
+          <p class="section-copy">After offboarding a machine, remove the tenant profile and delete any leftover key file you created during setup.</p>
+
+          <h2 id="bug">Report a bug</h2>
+          <p class="section-copy">When you need to share what happened, capture the action logs instead of pasting secrets. Logs record commands, not key values.</p>
+          <div class="command"><pre><code>xyte-cli logs list --output text
+xyte-cli logs show --request-id &lt;request-id&gt; --output json</code></pre></div>
+          <div class="failure-grid">
+            <div class="failure"><strong>Still stuck?</strong><p>Open an issue with the failing command, the redacted output, and the relevant log entry on <a href="https://github.com/xyte-io/xyte-cli">GitHub</a>.</p></div>
+            <div class="failure"><strong>Not sure what a term means</strong><p>Check the <a href="./glossary.html">glossary</a> for tenant, profile, space, incident, flow, and more.</p></div>
+          </div>
+        </article>
+      </div>
+    </main>
+    <footer class="footer"><div class="wrap footer-row"><span>Troubleshooting</span><span><a href="./index.html">Overview</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
+    <script src="./guides/guide.js?v=use-case-guides-3"></script>
+  </body>
+</html>

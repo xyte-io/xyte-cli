@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Glossary | xyte-cli</title>
+    <meta name="description" content="Plain-language definitions of the Xyte and xyte-cli terms used across the guides: tenant, space, incident, Edge proxy, claim, flow, plan/apply, and more." />
+    <link rel="icon" type="image/png" href="./media/xyte-ai-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./guides/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-nav">
+      <div class="wrap nav-row">
+        <a class="brand" href="./index.html"><img src="./media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Glossary</span></a>
+        <nav class="nav-links" aria-label="Primary"><a href="./index.html#install">Install</a><a href="./index.html#start">Start</a><a href="./guides/index.html">Guides</a><a href="./index.html#docs">Reference</a><a href="./glossary.html" aria-current="page">Glossary</a><a href="./troubleshooting.html">Troubleshooting</a></nav>
+      </div>
+    </header>
+    <main class="page" id="main">
+      <div class="wrap guide-shell">
+        <aside class="toc" aria-label="On this page">
+          <strong>On this page</strong>
+          <a href="#concepts">Xyte concepts</a>
+          <a href="#commands">Command &amp; output terms</a>
+          <a href="#more">Where to go next</a>
+        </aside>
+        <article class="article">
+          <p class="breadcrumb"><a href="./index.html">Overview</a> / Glossary</p>
+          <p class="eyebrow">Glossary</p>
+          <h1>Words used in these docs.</h1>
+          <p class="lead">New to Xyte or the command line? Start here. Every term below appears in the guides and reference pages, written in plain language for both non-technical operators and engineers.</p>
+
+          <div class="note prereq-note"><p><strong>Reading order:</strong> if you are brand new, skim <a href="#concepts">Xyte concepts</a> first, then open <a href="./guides/setup-readiness.html">Set up and verify readiness</a>.</p></div>
+
+          <h2 id="concepts">Xyte concepts</h2>
+          <p class="section-copy">The things in your Xyte account that commands read and change.</p>
+          <div class="table-wrap"><table class="matrix">
+            <thead><tr><th>Term</th><th>Plain meaning</th></tr></thead>
+            <tbody>
+              <tr><td>Tenant</td><td>Your Xyte organization or partner account &mdash; the remote system the CLI reads and writes. You pass it as <code>--tenant &lt;tenant-id&gt;</code>.</td></tr>
+              <tr><td>Profile</td><td>A local, named connection to one tenant: its stored API key and settings. <code>--tenant &lt;tenant-id&gt;</code> selects a profile; the default profile is named <code>default</code>.</td></tr>
+              <tr><td>Alias</td><td>A short local nickname for a tenant profile, handy when one machine manages more than one Xyte connection.</td></tr>
+              <tr><td>Space</td><td>A place in your Xyte location tree &mdash; a site, building, floor, or room. Devices live in spaces, and a path such as <code>Campus / Building A / Room 101</code> identifies one. "Move a device" means change its space.</td></tr>
+              <tr><td>Device</td><td>A piece of hardware Xyte manages, such as a display, room system, or sensor.</td></tr>
+              <tr><td>Fleet</td><td>All the devices in your tenant, taken together. A "fleet inspection" summarizes their state.</td></tr>
+              <tr><td>Incident</td><td>An open problem Xyte raised about a device or space &mdash; for example offline or faulty. "Triage" means understanding what is active and what changed.</td></tr>
+              <tr><td>Ticket</td><td>A support record attached to a device or incident, used to track and message about the issue.</td></tr>
+              <tr><td>Edge proxy</td><td>An Xyte Edge appliance on the local network that represents devices which are not directly cloud-connected. Those devices are "behind" the proxy and are reached through it by IP.</td></tr>
+              <tr><td>Claim</td><td>Registering a physical device into your tenant so Xyte can manage it.</td></tr>
+              <tr><td>Claim path</td><td>How a device is claimed. <strong>Native / direct</strong>: you have its serial, MAC, and cloud id. <strong>Edge</strong>: it sits behind an Edge proxy and is identified by IP plus a device model id. <strong>Cloud-to-Cloud (C2C)</strong>: not available through the public API today &mdash; claim it from the Xyte End Customer Portal.</td></tr>
+              <tr><td>Provider scope</td><td>Whether a read targets organization data or partner data. Setup picks the <em>key</em> provider (<code>xyte-org</code> or <code>xyte-partner</code>); read commands pick the <em>scope</em> with <code>--provider-scope organization|partner|auto</code>. Most people leave scope on <code>auto</code>.</td></tr>
+            </tbody>
+          </table></div>
+
+          <h2 id="commands">Command &amp; output terms</h2>
+          <p class="section-copy">How the CLI runs work and what it gives back.</p>
+          <div class="table-wrap"><table class="matrix">
+            <thead><tr><th>Term</th><th>Plain meaning</th></tr></thead>
+            <tbody>
+              <tr><td>Flow</td><td>A repeatable, multi-step workflow &mdash; such as remediation or a daily report &mdash; that you run with one command: <code>xyte-cli flow run &lt;flow-id&gt;</code>.</td></tr>
+              <tr><td>Plan / apply</td><td><code>--plan</code> previews what a change would do without doing it. <code>--apply</code> performs it, only after you approve.</td></tr>
+              <tr><td>Dry run</td><td>A preview that writes nothing. The utility imports (<code>util import-tree</code>, <code>util move-devices</code>) are dry-run by default &mdash; add <code>--apply</code> to write. Edge claims preview with <code>--plan</code>.</td></tr>
+              <tr><td>Approval gate</td><td>A pause a write-capable flow makes before a change. It shows <code>nextAction</code> and waits for you to resume with <code>--apply</code>.</td></tr>
+              <tr><td>Run id / resume path</td><td>The id or bundle path that identifies one flow run, used to continue a paused or interrupted run: <code>--apply --resume &lt;run-id-or-path&gt;</code>.</td></tr>
+              <tr><td>Artifact</td><td>A file a command writes &mdash; usually JSON, NDJSON, Markdown, PDF, or a run bundle &mdash; saved with <code>--out</code> or <code>--out-dir</code>.</td></tr>
+              <tr><td>Schema / contract</td><td>The JSON shape a command promises, named like <code>xyte.status.v1</code>, so automation can read fields instead of scraping terminal text.</td></tr>
+              <tr><td>Strict JSON</td><td>Machine-readable output with no terminal decoration. Pair <code>--output json</code> with <code>--strict-json</code> when a job will parse the result.</td></tr>
+              <tr><td>NDJSON</td><td>"Newline-delimited JSON" &mdash; one JSON object per line. Used for watches and batch reports; validate one line at a time.</td></tr>
+              <tr><td>Workspace</td><td>The folder where the agent or terminal runs commands.</td></tr>
+            </tbody>
+          </table></div>
+
+          <h2 id="more">Where to go next</h2>
+          <div class="failure-grid">
+            <div class="failure"><strong>I want to get set up</strong><p>Open <a href="./guides/setup-readiness.html">Set up and verify readiness</a> or the <a href="./reference/getting-started.html">Getting started reference</a>.</p></div>
+            <div class="failure"><strong>I need to do a task</strong><p>Browse the <a href="./guides/index.html">use-case guides</a> and pick the one that matches your work.</p></div>
+            <div class="failure"><strong>Something is not working</strong><p>See <a href="./troubleshooting.html">Troubleshooting</a> for fixes and reset steps.</p></div>
+          </div>
+        </article>
+      </div>
+    </main>
+    <footer class="footer"><div class="wrap footer-row"><span>Glossary</span><span><a href="./index.html">Overview</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
+    <script src="./guides/guide.js?v=use-case-guides-3"></script>
+  </body>
+</html>

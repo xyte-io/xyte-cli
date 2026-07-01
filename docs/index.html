@@ -6,7 +6,7 @@
     <title>Xyte AI CLI | Operate Xyte with command-line clarity</title>
     <meta
       name="description"
-      content="Install xyte-cli, connect a tenant key, inspect fleet state, open console workflows, and export shareable artifacts inside Xyte's design language."
+      content="Install xyte-cli, connect an API key, inspect fleet state, open console workflows, and export shareable artifacts inside Xyte's design language."
     />
     <link rel="icon" type="image/png" href="./media/xyte-ai-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -1146,6 +1146,23 @@
           background 240ms ease;
       }
 
+      .docs-card-thumb {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        margin-bottom: 16px;
+        border-radius: 16px;
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .docs-card-thumb img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: contain;
+      }
+
       .docs-card::after {
         content: "";
         position: absolute;
@@ -1600,9 +1617,11 @@
 
         <nav class="nav-links" aria-label="Primary">
           <a href="#install">Install</a>
-          <a href="#agents">Agents</a>
-          <a href="#workflow">Workflow</a>
-          <a href="#docs">Docs</a>
+          <a href="#start">Start</a>
+          <a href="#guides">Guides</a>
+          <a href="#docs">Reference</a>
+          <a href="./glossary.html">Glossary</a>
+          <a href="./troubleshooting.html">Troubleshooting</a>
         </nav>
 
         <a class="nav-cta" href="https://www.npmjs.com/package/@xyteai/cli">Install from npm</a>
@@ -1617,10 +1636,11 @@
             <p class="eyebrow">AI-powered orchestration in the terminal</p>
             <h1>Operate Xyte with <span class="gradient-text">command-line clarity.</span></h1>
             <p class="hero-lead">
-              <code>@xyteai/cli</code> is built for shell-capable AI agents and automated terminal workflows,
-              with manual terminal use supported for setup, debugging, and local testing. It exposes the real
+              <code>@xyteai/cli</code> operates your Xyte fleet from the terminal &mdash; for operators typing
+              commands and for shell-capable AI agents and CI jobs running them for you. It exposes the real
               commands from install to tenant setup, fleet inspection, console workflows, and exportable PDF or
-              JSON handoff artifacts.
+              JSON handoff artifacts. You need a Xyte account, an API key from your Xyte admin, and Node.js 22+.
+              <a href="./reference/getting-started.html#ask-admin">What to ask your admin &rarr;</a>
             </p>
 
             <div class="hero-actions">
@@ -1693,8 +1713,8 @@
             <h2 id="install-title">Three ways to get running.</h2>
             <p>
               Using an AI agent? Hand it the prompt &mdash; it runs <code>xyte-cli doctor environment --format json</code>
-              and follows the recommended install mode from the report. Manual terminals install the package globally, connect a
-              tenant key, and verify readiness. Then move into fleet inspection, incident watch, or report generation.
+              and follows the recommended install mode from the report. Manual terminals install the package globally, connect an
+              API key, and verify readiness. Then move into fleet inspection, incident watch, or report generation.
             </p>
           </header>
 
@@ -1718,7 +1738,7 @@
               <div class="command-shell">
                 <pre id="agent-prompt"><code><span class="p-line">Use @xyteai/cli in this workspace.</span><span class="p-line p-end">Never print secrets. Do not invent IDs or outputs.
 </span><span class="p-line p-cmd">First run `xyte-cli doctor environment --format json`.</span><span class="p-line p-cmd">If `xyte-cli` is missing, run `npx -y @xyteai/cli@latest doctor environment --format json`.</span><span class="p-line p-end">Follow the report's recommendations.nextCommand and recommendations.commands.
-</span><span class="p-line p-cmd">If `xyte-cli setup status` shows no connected tenant, ask me for the path to my API key file (never the key itself) and connect it with the report's setupKeyFile recipe.</span><span class="p-line">Do not ask me to paste API keys into chat.</span><span class="p-line">Do not store API keys inside the repo.</span><span class="p-line p-cmd p-end">After setup succeeds, offer to delete the key file, then run `xyte-cli init --scope project --agents all --force --no-setup`.
+</span><span class="p-line p-cmd">If `xyte-cli setup status` shows no connected profile, ask me for the path to my API key file (never the key itself) and connect it with the report's setupKeyFile recipe.</span><span class="p-line">Do not ask me to paste API keys into chat.</span><span class="p-line">Do not store API keys inside the repo.</span><span class="p-line p-cmd p-end">After setup succeeds, offer to delete the key file, then run `xyte-cli init --scope project --agents all --force --no-setup`.
 </span><span class="p-line">If this surface cannot run shell commands, stop and say I need a shell-capable terminal or agent.</span></code></pre>
               </div>
               <div class="action-row">
@@ -1730,7 +1750,7 @@
                 >
                   Copy AI prompt
                 </button>
-                <a class="inline-link" href="./agents.md">Open agent guidance</a>
+                <a class="inline-link" href="./reference/agents.html">Open agent guidance</a>
                 <span class="toast" id="prompt-toast" role="status" aria-live="polite"></span>
               </div>
             </div>
@@ -1740,14 +1760,14 @@
                 <li>In Xyte, open <strong>Settings &rarr; API Keys</strong> and create a key.</li>
                 <li>In your CI tool (GitHub Actions, GitLab CI, Jenkins), add a secret named <code>XYTE_CLI_KEY</code> and paste the key as its value.</li>
                 <li>Make sure the job receives the secret as an environment variable &mdash; in GitHub Actions add <code>env: XYTE_CLI_KEY: ${{ secrets.XYTE_CLI_KEY }}</code> to the step; GitLab CI passes variables automatically.</li>
-                <li>Add these commands to your pipeline (<code>acme</code> is just a name for this connection &mdash; use your company name):</li>
+                <li>Add these commands to your pipeline. The setup command stores the key under the default profile.</li>
               </ol>
               <div class="command-shell shell-lines">
-                <pre id="ci-snippet"><code><span class="cmd-line">npx -y @xyteai/cli@latest setup run --non-interactive --tenant acme --output json</span><span class="cmd-line">npx -y @xyteai/cli@latest setup status --tenant acme --field tenantId</span></code></pre>
+                <pre id="ci-snippet"><code><span class="cmd-line">printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@latest setup run --non-interactive --key-stdin --format json</span><span class="cmd-line">npx -y @xyteai/cli@latest setup status --field tenantId</span></code></pre>
               </div>
-              <p class="panel-note panel-note-after">For reproducible pipelines, replace <code>@latest</code> with a pinned version (e.g. <code>@0.10.7</code>).</p>
+              <p class="panel-note panel-note-after">This CI path is read-oriented by default. Use plan-mode flows for change workflows and reserve apply steps for a separate approved job. For reproducible builds, pin a known version (<code>@xyteai/cli@&lt;version&gt;</code>) instead of <code>@latest</code>.</p>
               <div class="action-row">
-                <a class="inline-link" href="./getting-started.md">Open setup guidance</a>
+                <a class="inline-link" href="./reference/getting-started.html">Open setup guidance</a>
                 <span class="toast" id="ci-toast" role="status" aria-live="polite"></span>
               </div>
             </div>
@@ -1765,7 +1785,7 @@
                 <li>
                   <span class="step-index">01</span>
                   <span class="step-copy">
-                    <strong>Connect the tenant key once</strong>
+                    <strong>Connect the API key once</strong>
                     <span>Create an API key in your Xyte tenant under <strong>Settings &rarr; API Keys</strong> and save it in a file outside your project folder. Run interactive setup once, or use the documented stdin flow for automation. The key prompt hides input and confirms with a <code>Received N characters.</code> line. Persisted credentials default to macOS Keychain, Windows DPAPI, or Linux Secret Service.</span>
                     <span class="detail-code">xyte-cli setup run</span>
                   </span>
@@ -1774,7 +1794,7 @@
                   <span class="step-index">02</span>
                   <span class="step-copy">
                     <strong>Read readiness back out</strong>
-                    <span>Confirm the tenant is connected and capture the tenant ID for subsequent commands.</span>
+                    <span>Confirm the profile is connected and use that profile label for subsequent commands.</span>
                     <span class="detail-code">xyte-cli setup status --field tenantId</span>
                   </span>
                 </li>
@@ -1790,100 +1810,116 @@
             </div>
           </div>
 
-          <div class="next-commands reveal">
-            <p class="card-label">Operate: next commands</p>
-            <ul class="mini-list next-grid">
-              <li>
-                <strong>Watch incidents once</strong>
-                <span><code>xyte-cli ops watch incidents --tenant &lt;tenant-id&gt; --profile incidents-active --once</code></span>
-              </li>
-              <li>
-                <strong>Export a deep-dive snapshot</strong>
-                <span><code>xyte-cli ops inspect deep-dive --tenant &lt;tenant-id&gt; --window 24 --output json --out ./artifacts/deep-dive.json</code></span>
-              </li>
-              <li>
-                <strong>Generate a report artifact</strong>
-                <span><code>xyte-cli ops report generate --tenant &lt;tenant-id&gt; --input ./artifacts/deep-dive.json --out ./reports/fleet-report.pdf</code></span>
-              </li>
-            </ul>
+        </div>
+      </section>
+
+      <section class="section" id="start" aria-labelledby="start-title">
+        <div class="wrap">
+          <header class="section-head reveal">
+            <p class="eyebrow">Start by situation</p>
+            <h2 id="start-title">Choose the state you are in.</h2>
+            <p>
+              Pick the path that matches why you opened the CLI. Each path starts with discovery,
+              uses rendered docs, and keeps write-capable actions behind a plan or approval gate.
+            </p>
+          </header>
+
+          <div class="docs-grid reveal">
+            <a class="docs-card surface" href="./guides/setup-readiness.html">
+              <strong>I’m setting up</strong>
+              <p>Connect the API key, verify readiness, and prepare the workspace for an agent, terminal, or CI job.</p>
+              <span>Start setup</span>
+            </a>
+            <a class="docs-card surface" href="./guides/daily-report.html">
+              <strong>I need today’s status</strong>
+              <p>Create current fleet source data and a readable report for a handoff or customer update.</p>
+              <span>Create report</span>
+            </a>
+            <a class="docs-card surface" href="./guides/incident-triage.html">
+              <strong>Something is broken</strong>
+              <p>Read active incidents, compare what changed, and collect fleet context before remediation.</p>
+              <span>Triage incidents</span>
+            </a>
+            <a class="docs-card surface" href="./guides/edge-claim.html">
+              <strong>I’m onboarding devices</strong>
+              <p>Choose native/direct or Edge claiming, collect the right identifiers, and run only after the target is clear.</p>
+              <span>Plan onboarding</span>
+            </a>
+            <a class="docs-card surface" href="./guides/ci-agent.html">
+              <strong>I want automation</strong>
+              <p>Run setup, reports, incident checks, and plan-only workflows from CI or a shell-capable agent.</p>
+              <span>Build automation</span>
+            </a>
           </div>
         </div>
       </section>
 
-      <section class="section" id="agents" aria-labelledby="agents-title">
+      <section class="section" id="guides" aria-labelledby="guides-title">
         <div class="wrap">
           <header class="section-head reveal">
-            <p class="eyebrow">Agents</p>
-            <h2 id="agents-title">First-class support for AI coding agents.</h2>
+            <p class="eyebrow">Guides</p>
+            <h2 id="guides-title">Start with what you need to do.</h2>
             <p>
-              Drop a structured prompt into Codex, Claude, or Copilot. The CLI provides deterministic,
-              machine-readable outputs that agents can parse and act on. Chat-only assistants can explain
-              commands, but they cannot install the CLI &mdash; use a shell-capable terminal or agent.
+              Start with what changed: setup is missing, incidents changed, a report is due,
+              spaces were reorganized, devices need onboarding, or a job needs automation.
             </p>
           </header>
 
-          <div class="reveal">
-            <article class="card-quiet">
-              <p class="card-label">Operator defaults</p>
-              <ul class="mini-list defaults-grid">
-                <li>
-                  <strong>Read-first by default</strong>
-                  <span>Human operators see readable terminal output. Agents add <code>--output json --strict-json</code> when they need machine-parseable results.</span>
-                </li>
-                <li>
-                  <strong>Strict JSON is opt-in</strong>
-                  <span>Machine output is enabled per command, not globally. The boundary between human and agent modes stays clear.</span>
-                </li>
-                <li>
-                  <strong>Copy-paste ready</strong>
-                  <span>One prompt covers install, setup, inspection, and reporting. Paste it into your agent and go.</span>
-                </li>
-              </ul>
-            </article>
-            <div class="action-row">
-              <a class="inline-link" href="#install">Get the AI prompt</a>
-              <a class="inline-link" href="./agents.md">Open agent guidance</a>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="section" id="workflow" aria-labelledby="workflow-title">
-        <div class="wrap">
-          <header class="section-head reveal">
-            <p class="eyebrow">Workflow</p>
-            <h2 id="workflow-title">From install to fleet report in four steps.</h2>
-            <p>
-              Install the CLI, connect tenant context, inspect fleet state, and generate artifacts.
-              Each step feeds the next.
-            </p>
-          </header>
-
-          <div class="workflow-grid reveal">
-            <article class="workflow-card">
-              <span class="workflow-index">01</span>
-              <h3>Install and init</h3>
-              <p>Install from npm, then scaffold agent configs for Codex, Claude, and Copilot.</p>
-              <code>xyte-cli init --no-setup</code>
-            </article>
-            <article class="workflow-card">
-              <span class="workflow-index">02</span>
-              <h3>Connect tenant</h3>
-              <p>Provide your API key once. If native secure storage is unavailable, <code>auto</code> warns and falls back to file storage. Verify with <code>setup status</code> before running operational commands.</p>
-              <code>xyte-cli setup run</code>
-            </article>
-            <article class="workflow-card">
-              <span class="workflow-index">03</span>
-              <h3>Inspect fleet state</h3>
-              <p>Watch incidents, inspect devices, and browse console screens before making changes.</p>
-              <code>xyte-cli ops inspect fleet --output json</code>
-            </article>
-            <article class="workflow-card">
-              <span class="workflow-index">04</span>
-              <h3>Export artifacts</h3>
-              <p>Generate deep-dive JSON snapshots and PDF reports you can share or feed into other tools.</p>
-              <code>xyte-cli ops report generate ...</code>
-            </article>
+          <div class="docs-grid reveal">
+            <a class="docs-card surface" href="./guides/setup-readiness.html">
+              <div class="docs-card-thumb"><img src="./guides/media/setup-readiness-workflow.webp" alt="" loading="lazy" /></div>
+              <strong>Setup and readiness</strong>
+              <p>Use when a machine, workspace, or profile is new and later workflows depend on connected credentials.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="docs-card surface" href="./guides/incident-triage.html">
+              <div class="docs-card-thumb"><img src="./guides/media/incident-triage-workflow.webp" alt="" loading="lazy" /></div>
+              <strong>Incident triage</strong>
+              <p>Use when incident state changed and support needs active counts, deltas, and fleet context.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="docs-card surface" href="./guides/daily-report.html">
+              <div class="docs-card-thumb"><img src="./guides/media/daily-report-workflow.webp" alt="" loading="lazy" /></div>
+              <strong>Daily fleet report</strong>
+              <p>Use when a scheduled update or customer handoff needs current counts and a reusable source file.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="docs-card surface" href="./guides/guided-remediation.html">
+              <div class="docs-card-thumb"><img src="./guides/media/guided-remediation-workflow.webp" alt="" loading="lazy" /></div>
+              <strong>Guided remediation</strong>
+              <p>Use when triage found a real issue and the next step might change device, incident, or ticket state.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="docs-card surface" href="./guides/device-migration.html">
+              <div class="docs-card-thumb"><img src="./guides/media/device-migration-workflow.webp" alt="" loading="lazy" /></div>
+              <strong>Device migration</strong>
+              <p>Use after a room plan, import, rename, or split makes existing device placement wrong.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="docs-card surface" href="./guides/edge-claim.html">
+              <div class="docs-card-thumb"><img src="./guides/media/edge-claim-workflow.webp" alt="" loading="lazy" /></div>
+              <strong>Device claiming</strong>
+              <p>Use when native/direct devices or Edge devices need a clear claim path, reviewed inputs, and a result to hand off.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="docs-card surface" href="./guides/utility-prep.html">
+              <div class="docs-card-thumb"><img src="./guides/media/utility-prep-workflow.webp" alt="" loading="lazy" /></div>
+              <strong>Utility preparation</strong>
+              <p>Use when a spreadsheet is understandable to people but still not ready for a CLI workflow.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="docs-card surface" href="./guides/ci-agent.html">
+              <div class="docs-card-thumb"><img src="./guides/media/ci-agent-workflow.webp" alt="" loading="lazy" /></div>
+              <strong>CI and agents</strong>
+              <p>Use when a pipeline or shell-capable agent needs repeatable checks, artifacts, and approval gates.</p>
+              <span>Open guide</span>
+            </a>
+            <a class="docs-card surface" href="./guides/index.html">
+              <div class="docs-card-thumb"><img src="./guides/media/setup-readiness-workflow.webp" alt="" loading="lazy" /></div>
+              <strong>All guides</strong>
+              <p>Browse the full guide library by operator goal.</p>
+              <span>Open library</span>
+            </a>
           </div>
         </div>
       </section>
@@ -1891,46 +1927,53 @@
       <section class="section" id="docs" aria-labelledby="docs-title">
         <div class="wrap">
           <header class="section-head reveal">
-            <p class="eyebrow">Docs and contracts</p>
-            <h2 id="docs-title">Reference and contracts.</h2>
+            <p class="eyebrow">Reference docs</p>
+            <h2 id="docs-title">Look up exact behavior.</h2>
             <p>
               Guides for first-run onboarding, full command reference, agent integration patterns,
-              flow authoring, and machine-readable JSON schemas.
+              flow authoring, and schema contracts for machine-readable outputs.
             </p>
           </header>
 
           <div class="docs-grid reveal">
-            <a class="docs-card surface" href="./getting-started.md">
+            <a class="docs-card surface" href="./reference/getting-started.html">
+              <div class="docs-card-thumb"><img src="./reference/media/getting-started-reference.webp" alt="" loading="lazy" /></div>
               <strong>Getting started</strong>
               <p>First-run prerequisites, onboarding order, and the recommended setup sequence.</p>
               <span>Open guide</span>
             </a>
-            <a class="docs-card surface" href="./commands.md">
+            <a class="docs-card surface" href="./reference/commands.html">
+              <div class="docs-card-thumb"><img src="./reference/media/commands-reference.webp" alt="" loading="lazy" /></div>
               <strong>Commands reference</strong>
               <p>Exact command behavior, operator-facing examples, and the practical CLI surface area.</p>
               <span>Open commands</span>
             </a>
-            <a class="docs-card surface" href="./agents.md">
+            <a class="docs-card surface" href="./reference/agents.html">
+              <div class="docs-card-thumb"><img src="./reference/media/agents-reference.webp" alt="" loading="lazy" /></div>
               <strong>Agent guidance</strong>
               <p>Patterns for using <code>xyte-cli</code> safely from Codex, Claude, or similar agent workflows.</p>
               <span>Open agents</span>
             </a>
-            <a class="docs-card surface" href="./flows/agent-ops.md">
+            <a class="docs-card surface" href="./reference/built-in-flows.html">
+              <div class="docs-card-thumb"><img src="./reference/media/built-in-flows-reference.webp" alt="" loading="lazy" /></div>
               <strong>Built-in flows</strong>
               <p>Deterministic operational flow packs for incident response and repeated operator scenarios.</p>
               <span>Open flows</span>
             </a>
-            <a class="docs-card surface" href="./flows/custom-workflows.md">
+            <a class="docs-card surface" href="./reference/custom-workflows.html">
+              <div class="docs-card-thumb"><img src="./reference/media/custom-workflows-reference.webp" alt="" loading="lazy" /></div>
               <strong>Custom workflows</strong>
               <p>Create, edit, share, and import reusable workflow definitions for your environment.</p>
               <span>Open authoring</span>
             </a>
-            <a class="docs-card surface" href="./schemas/flow-run.v1.schema.json">
+            <a class="docs-card surface" href="./reference/schema-contracts.html">
+              <div class="docs-card-thumb"><img src="./reference/media/schema-contracts-reference.webp" alt="" loading="lazy" /></div>
               <strong>Schema contracts</strong>
-              <p>Machine-readable JSON contracts in <code>docs/schemas</code> for validation and automation.</p>
+              <p>Machine-readable JSON contracts for agents, CI jobs, and integrations.</p>
               <span>Open schemas</span>
             </a>
           </div>
+          <p style="margin-top:28px;color:var(--text-soft)">New to the terms used here? See the <a href="./glossary.html">Glossary</a>. Something not working? See the <a href="./troubleshooting.html">Troubleshooting</a> guide.</p>
         </div>
       </section>
 
@@ -1941,7 +1984,7 @@
               <p class="eyebrow">Ready to run</p>
               <h2>Start operating.</h2>
               <p>
-                Install the CLI, connect your tenant, and run your first fleet inspection in under five minutes.
+                Install the CLI, connect the API key, and run your first fleet inspection in under five minutes.
               </p>
             </div>
             <div class="final-actions">
@@ -1969,6 +2012,28 @@
         var clipSVG = '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
         var checkSVG = '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
 
+        function copyText(text) {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(text);
+          }
+          return new Promise(function (resolve, reject) {
+            try {
+              var area = document.createElement("textarea");
+              area.value = text;
+              area.setAttribute("readonly", "");
+              area.style.position = "fixed";
+              area.style.left = "-9999px";
+              document.body.appendChild(area);
+              area.select();
+              var ok = document.execCommand("copy");
+              document.body.removeChild(area);
+              ok ? resolve() : reject(new Error("copy failed"));
+            } catch (err) {
+              reject(err);
+            }
+          });
+        }
+
         /* ── Floating copy icons on every code block ── */
         function wireCopyIcons() {
           var targets = document.querySelectorAll(".command-shell:not(.shell-lines), .detail-code, .mini-list code");
@@ -1988,7 +2053,7 @@
             btn.addEventListener("click", function (e) {
               e.stopPropagation();
               var text = (el.querySelector("pre") || el).innerText || "";
-              navigator.clipboard.writeText(text).then(function () {
+              copyText(text).then(function () {
                 btn.innerHTML = checkSVG;
                 btn.classList.add("copied");
                 setTimeout(function () {
@@ -2013,7 +2078,7 @@
             btn.addEventListener("click", function (e) {
               e.stopPropagation();
               var text = (line.innerText || "").replace(/^\$\s+/, "");
-              navigator.clipboard.writeText(text).then(function () {
+              copyText(text).then(function () {
                 btn.innerHTML = checkSVG;
                 btn.classList.add("copied");
                 var panel = line.closest('[role="tabpanel"]');
@@ -2039,7 +2104,7 @@
               var feedback = document.getElementById(button.getAttribute("data-copy-feedback"));
               if (!target || !feedback) return;
 
-              navigator.clipboard.writeText(target.innerText || "").then(
+              copyText(target.innerText || "").then(
                 function () { feedback.textContent = "Copied."; },
                 function () { feedback.textContent = "Copy failed."; }
               );

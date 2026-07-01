@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Getting started | xyte-cli reference</title>
+    <meta name="description" content="Set up xyte-cli for a tenant, check readiness, and choose the first workflow to run." />
+    <link rel="icon" type="image/png" href="../media/xyte-ai-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../guides/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-nav">
+      <div class="wrap nav-row">
+        <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Reference</span></a>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../guides/index.html">Guides</a><a href="../index.html#docs">Reference</a><a href="../glossary.html">Glossary</a><a href="../troubleshooting.html">Troubleshooting</a></nav>
+      </div>
+    </header>
+    <main class="page" id="main">
+      <div class="wrap guide-shell">
+        <aside class="toc" aria-label="On this page">
+          <strong>On this page</strong>
+          <a href="#what-you-need">What you need</a>
+          <a href="#ask-admin">Ask your admin</a>
+          <a href="#agent-path">AI agent path</a>
+          <a href="#terminal-path">Terminal and CI</a>
+          <a href="#ready">Ready state</a>
+          <a href="#next">What to run next</a>
+          <a href="#scope">Provider scope</a>
+          <a href="#glossary">Glossary</a>
+          <a href="#blockers">Common blockers</a>
+        </aside>
+        <article class="article">
+          <p class="breadcrumb"><a href="../index.html">Overview</a> / <a href="../index.html#docs">Reference</a> / Getting started</p>
+          <figure class="guide-visual"><img src="./media/getting-started-reference.webp" alt="Setup checks the runtime, reads the key safely, connects the tenant, and runs a first status command." /></figure>
+          <p class="eyebrow">Start</p>
+          <h1>Getting started.</h1>
+          <p class="lead">Set up one terminal, CI job, or shell-capable agent so it can run <code>xyte-cli</code> against your Xyte account.</p>
+
+          <h2 id="what-you-need">What you need</h2>
+          <p class="section-copy">First setup needs an API key. The CLI stores it under a local profile label, uses <code>default</code> when you do not choose one, and auto-detects whether the key can use organization or partner APIs.</p>
+          <div class="failure-grid">
+            <div class="failure"><strong>API key</strong><p>A Xyte API key. Save it outside this repository, for example <code>~/Desktop/xyte-api-key.txt</code>.</p></div>
+            <div class="failure"><strong>Profile label</strong><p>Optional. Use one only when the same machine or CI runner manages more than one Xyte connection.</p></div>
+            <div class="failure"><strong>Provider</strong><p>Usually auto-detected. Set <code>xyte-org</code> or <code>xyte-partner</code> only when your admin tells you to force one.</p></div>
+            <div class="failure"><strong>Artifact folder</strong><p>A place for command output, such as <code>./artifacts</code> or <code>./reports</code>.</p></div>
+          </div>
+
+          <h2 id="ask-admin">Ask your Xyte admin for</h2>
+          <p class="section-copy">Send this when you have the CLI installed but do not yet have the key and policy details.</p>
+          <div class="command"><pre><code>Please send the values I need to set up xyte-cli:
+
+API key delivery: key file or secret manager
+Provider, only if auto-detect is disabled: organization or partner
+Profile label, only if we use more than one Xyte connection:
+Default artifact folder:
+Allowed workflows: read-only reports, incident triage, device claiming, or approved writes</code></pre></div>
+
+          <h2 id="agent-path">AI agent path</h2>
+          <p class="section-copy">Give the agent the setup goal and a safe key source. It can run the checks, store the profile locally, and report whether the workspace is ready.</p>
+          <div class="command"><pre><code>Can you check whether this machine is ready to use xyte-cli?</code></pre></div>
+
+          <h2 id="terminal-path">Terminal and CI path</h2>
+          <ol class="steps">
+            <li class="step">
+              <h3>Check the runtime</h3>
+              <p>Start with the environment doctor. If a global install is not available, <code>npx</code> can run the CLI without changing the repository.</p>
+              <div class="command"><pre><code>xyte-cli doctor environment --format json
+npx -y @xyteai/cli@latest doctor environment --format json</code></pre></div>
+            </li>
+            <li class="step">
+              <h3>Connect the API key</h3>
+              <p>Use a key file outside the workspace for local setup. In CI, feed the key from the job secret through stdin. The CLI stores the key under the active profile, usually <code>default</code>.</p>
+              <div class="command"><pre><code>xyte-cli setup run \
+  --non-interactive \
+  --key-file &lt;path-outside-workspace&gt; \
+  --format json
+
+printf "%s" "$XYTE_CLI_KEY" | npx -y @xyteai/cli@latest setup run \
+  --non-interactive \
+  --key-stdin \
+  --format json</code></pre></div>
+            </li>
+            <li class="step">
+              <h3>Check readiness</h3>
+              <p>Run these before reports, incidents, device claiming, or approved writes.</p>
+              <div class="command"><pre><code>xyte-cli config doctor --format text
+xyte-cli status --mode fast --format json</code></pre></div>
+            </li>
+          </ol>
+
+          <div class="flow-diagram" aria-label="First-run setup workflow">
+            <h3>Workflow</h3>
+            <ol class="flow-steps">
+              <li><span class="flow-kicker">Runtime</span><strong>Can this shell run the CLI?</strong><span>Check Node.js and choose installed CLI, <code>npx</code>, or workspace-local execution.</span></li>
+              <li><span class="flow-kicker">Secret</span><strong>Where does the API key come from?</strong><span>Read it from a file, stdin, CI secret, or secret manager command.</span></li>
+              <li><span class="flow-kicker">Profile</span><strong>Where is the key stored?</strong><span>Save the key under the active profile, usually <code>default</code>.</span></li>
+              <li><span class="flow-kicker">Doctor</span><strong>Can Xyte answer?</strong><span>Confirm authentication, provider scope, and network access.</span></li>
+              <li><span class="flow-kicker">Operate</span><strong>Run the first useful command.</strong><span>Move to status, incidents, reports, device claiming, or automation.</span></li>
+            </ol>
+          </div>
+
+          <h2 id="ready">Ready state</h2>
+          <p class="section-copy">A ready setup has an active profile, a usable credential, and a live status response.</p>
+          <div class="command"><pre><code>Profile: default
+Provider: organization
+Credential: available
+Connectivity: connected
+Next: run a guide, inspect fleet state, or generate a report.</code></pre></div>
+
+          <h2 id="next">What to run next</h2>
+          <div class="failure-grid">
+            <div class="failure"><strong>I need today's status</strong><p>Run the <a href="../guides/daily-report.html">daily fleet report guide</a>.</p></div>
+            <div class="failure"><strong>Something is broken</strong><p>Run the <a href="../guides/incident-triage.html">incident triage guide</a>.</p></div>
+            <div class="failure"><strong>I am onboarding devices</strong><p>Run the <a href="../guides/edge-claim.html">device claiming guide</a>.</p></div>
+            <div class="failure"><strong>I want automation</strong><p>Use the <a href="../guides/ci-agent.html">CI and agent guide</a>.</p></div>
+          </div>
+
+          <h2 id="scope">Provider scope</h2>
+          <p class="section-copy">Two different settings use these words. <strong>Setup</strong> picks the key provider with <code>--provider xyte-org|xyte-partner</code>. <strong>Read commands</strong> pick the data scope with <code>--provider-scope organization|partner|auto</code> (on <code>flow run</code> it is <code>--inspect-provider-scope</code>). Most users leave the read scope on <code>auto</code> and only set a value when a key is organization-only or partner-only, or results look incomplete.</p>
+          <div class="table-wrap"><table class="matrix">
+            <thead><tr><th>Value</th><th>Used with</th><th>Use it when</th></tr></thead>
+            <tbody>
+              <tr><td><code>xyte-org</code></td><td>setup <code>--provider</code></td><td>Setup uses an organization API key.</td></tr>
+              <tr><td><code>xyte-partner</code></td><td>setup <code>--provider</code></td><td>Setup uses a partner API key.</td></tr>
+              <tr><td><code>organization</code></td><td>read <code>--provider-scope</code></td><td>Read organization devices, spaces, incidents, or reports.</td></tr>
+              <tr><td><code>partner</code></td><td>read <code>--provider-scope</code></td><td>Read partner-level data when the key allows it.</td></tr>
+              <tr><td><code>auto</code></td><td>read <code>--provider-scope</code></td><td>Let the CLI choose from the stored profile and command context.</td></tr>
+            </tbody>
+          </table></div>
+
+          <h2 id="glossary">Glossary</h2>
+          <p class="section-copy">Every Xyte and CLI term used across these docs &mdash; tenant, profile, space, incident, Edge proxy, claim path, provider scope, flow, plan/apply, and more &mdash; is defined in plain language on the <a href="../glossary.html">glossary page</a>.</p>
+
+          <h2 id="blockers">Common blockers</h2>
+          <div class="failure-grid">
+            <div class="failure"><strong>Node.js is missing or too old</strong><p>Install Node.js 22+ or run the command in an environment that already has it.</p></div>
+            <div class="failure"><strong>The key file cannot be read</strong><p>Move it outside the repository, check file permissions, and rerun setup.</p></div>
+            <div class="failure"><strong>Authentication is rejected</strong><p>Ask for a fresh key with access to the tenant, then rerun setup.</p></div>
+            <div class="failure"><strong>Results look incomplete</strong><p>Add an explicit scope to the read command: <code>--provider-scope organization</code> or <code>--provider-scope partner</code> (on <code>flow run</code> use <code>--inspect-provider-scope</code>).</p></div>
+            <div class="failure"><strong>Network access fails</strong><p>Run <code>xyte-cli config doctor</code> again after fixing VPN, firewall, or proxy access.</p></div>
+          </div>
+          <p class="section-copy">More fixes &mdash; including how to remove a stored key, remove a tenant, or uninstall &mdash; are on the <a href="../troubleshooting.html">Troubleshooting</a> page.</p>
+        </article>
+      </div>
+    </main>
+    <footer class="footer"><div class="wrap footer-row"><span>Getting started</span><span><a href="../index.html#docs">Reference</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
+    <script src="../guides/guide.js?v=use-case-guides-3"></script>
+  </body>
+</html>

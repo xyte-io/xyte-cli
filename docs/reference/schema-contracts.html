@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Schema contracts | xyte-cli reference</title>
+    <meta name="description" content="Machine-readable JSON contracts for CLI outputs used by agents, CI jobs, and integrations." />
+    <link rel="icon" type="image/png" href="../media/xyte-ai-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../guides/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-nav">
+      <div class="wrap nav-row">
+        <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Reference</span></a>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../guides/index.html">Guides</a><a href="../index.html#docs">Reference</a><a href="../glossary.html">Glossary</a><a href="../troubleshooting.html">Troubleshooting</a></nav>
+      </div>
+    </header>
+    <main class="page" id="main">
+      <div class="wrap guide-shell">
+        <aside class="toc" aria-label="On this page">
+          <strong>On this page</strong>
+          <a href="#what-schemas-do">What schemas do</a>
+          <a href="#ask-an-agent">Ask an agent</a>
+          <a href="#agent-ci">Agent and CI</a>
+          <a href="#common-outputs">Common outputs</a>
+          <a href="#mapping">Command mapping</a>
+          <a href="#compatibility">Compatibility</a>
+          <a href="#real-examples">Examples</a>
+          <a href="#validate">Validate JSON</a>
+          <a href="#schema-links">Schema links</a>
+        </aside>
+        <article class="article">
+          <p class="breadcrumb"><a href="../index.html">Overview</a> / <a href="../index.html#docs">Reference</a> / Schema contracts</p>
+          <figure class="guide-visual"><img src="./media/schema-contracts-reference.webp" alt="JSON contract documents flow through validation into automation and reporting consumers." /></figure>
+          <p class="eyebrow">Contracts</p>
+          <h1>Schema contracts.</h1>
+          <p class="lead">Schemas describe the JSON shape produced by CLI commands so agents, CI jobs, and integrations can depend on fields instead of scraping terminal text.</p>
+
+          <div class="summary">
+            <div class="summary-card"><strong>Use when</strong><span>A job parses CLI output, stores artifacts, or passes data to another tool.</span></div>
+            <div class="summary-card"><strong>Best input</strong><span>Use command JSON, strict JSON, or saved output files.</span></div>
+            <div class="summary-card"><strong>Avoid</strong><span>Do not parse colorful terminal summaries or human report text.</span></div>
+          </div>
+
+          <h2 id="what-schemas-do">What schemas do</h2>
+          <p class="section-copy">A schema tells another program which fields it can trust. Use schemas when a watch job reads incident frames, a report job stores source data, or an agent decides the next step from a flow summary.</p>
+          <div class="flow-diagram" aria-label="Schema usage workflow">
+            <h3>Workflow</h3>
+            <ol class="flow-steps">
+              <li><span class="flow-kicker">Command</span><strong>Run JSON mode</strong><span>Use structured CLI output or save a JSON file.</span></li>
+              <li><span class="flow-kicker">Schema</span><strong>Pick contract</strong><span>Match the command output to the schema family.</span></li>
+              <li><span class="flow-kicker">Parse</span><strong>Read fields</strong><span>Use fields like event, outcome, nextAction, totals, and paths.</span></li>
+              <li><span class="flow-kicker">Branch</span><strong>Decide action</strong><span>Notify, fail CI, create a report, or wait for approval.</span></li>
+              <li><span class="flow-kicker">Store</span><strong>Keep artifacts</strong><span>Attach JSON alongside human-readable output.</span></li>
+            </ol>
+          </div>
+
+          <h2 id="ask-an-agent">Ask an agent</h2>
+          <p class="section-copy">Ask for JSON whenever the result will drive a decision, a CI status, or another tool.</p>
+          <div class="command"><pre><code>Run the xyte-cli command with strict JSON or a saved output file.
+Tell me which schema applies.
+Read fields from the JSON, not from terminal text.
+Return the artifact path and the decision you made from it.</code></pre></div>
+
+          <h2 id="agent-ci">Agent and CI</h2>
+          <p class="section-copy">Agents use JSON when they need to reason over output. CI jobs save JSON as an artifact and fail only on clear machine-readable conditions.</p>
+          <div class="command"><pre><code>xyte-cli flow run flow.daily-deep-dive-report \
+  --tenant &lt;tenant-id&gt; \
+  --plan \
+  --strict-json \
+  --out-dir ./tmp/flow-runs
+
+xyte-cli ops inspect fleet \
+  --tenant &lt;tenant-id&gt; \
+  --output json \
+  --strict-json \
+  --out ./artifacts/fleet.json
+
+xyte-cli ops watch incidents \
+  --tenant &lt;tenant-id&gt; \
+  --profile incidents-active \
+  --once \
+  --output json \
+  --strict-json \
+  --out ./artifacts/incidents.ndjson</code></pre></div>
+
+          <h2 id="common-outputs">Common outputs</h2>
+          <p class="section-copy">Choose the schema by the command that produced the file.</p>
+          <ul class="checklist">
+            <li><code>xyte.doctor.environment.v1</code>: choose installed, npx, workspace-local, or blocked setup mode.</li>
+            <li><code>xyte.status.v1</code>: read fast tenant readiness from jobs and agents.</li>
+            <li><code>xyte.watch.frame.v1</code>: react to incident snapshots, deltas, heartbeats, and errors.</li>
+            <li><code>xyte.inspect.fleet.v1</code> and <code>xyte.inspect.deep-dive.v1</code>: store operational source data for reports.</li>
+            <li><code>xyte.report.v1</code>: track generated report paths and report metadata.</li>
+            <li><code>xyte.flow.run.v1</code>: read flow outcome, next action, run bundle path, and pause state.</li>
+            <li><code>xyte.utility.prepare.v1</code> and <code>xyte.utility.batch.v1</code>: process prepared rows, rejected rows, and batch dispositions.</li>
+          </ul>
+
+          <h2 id="mapping">Command-to-schema mapping</h2>
+          <div class="table-wrap"><table class="matrix">
+            <thead><tr><th>Command</th><th>Use this schema</th><th>Automation use</th></tr></thead>
+            <tbody>
+              <tr><td><code>xyte-cli doctor environment --format json</code></td><td><code>xyte.doctor.environment.v1</code></td><td>Choose installed, npx, workspace-local, or blocked setup path.</td></tr>
+              <tr><td><code>xyte-cli status --mode fast --format json</code></td><td><code>xyte.status.v1</code></td><td>Decide whether a job can continue to operational commands.</td></tr>
+              <tr><td><code>xyte-cli ops watch incidents --output json --strict-json</code></td><td><code>xyte.watch.frame.v1</code></td><td>Read snapshot, delta, heartbeat, and error frames.</td></tr>
+              <tr><td><code>xyte-cli ops inspect fleet --output json</code></td><td><code>xyte.inspect.fleet.v1</code></td><td>Store fleet counts and device context for dashboards or handoffs.</td></tr>
+              <tr><td><code>xyte-cli ops inspect deep-dive --output json</code></td><td><code>xyte.inspect.deep-dive.v1</code></td><td>Save report source data before rendering Markdown or PDF.</td></tr>
+              <tr><td><code>xyte-cli ops report generate --input &lt;source.json&gt; --out &lt;report.md&gt; --render markdown</code></td><td><code>xyte.report.v1</code></td><td>Track report path, input source, and render metadata.</td></tr>
+              <tr><td><code>xyte-cli flow run &lt;flow-id&gt; --plan --strict-json</code></td><td><code>xyte.flow.run.v1</code></td><td>Read outcome, pause state, next action, and run bundle path.</td></tr>
+              <tr><td><code>xyte-cli util prepare --action &lt;action-key&gt; --input &lt;file.xlsx&gt;</code></td><td><code>xyte.utility.prepare.v1</code></td><td>Count primary rows, rejected rows, generated files, and next command.</td></tr>
+              <tr><td><code>xyte-cli edge claim-batch --input &lt;prepared.csv&gt; --plan</code></td><td><code>xyte.utility.batch.v1</code></td><td>Track batch row dispositions, partial runs, and resume behavior.</td></tr>
+            </tbody>
+          </table></div>
+
+          <h2 id="compatibility">Compatibility notes</h2>
+          <ul class="checklist">
+            <li>The <code>.v1</code> suffix means consumers can expect additive changes, not arbitrary field renames, inside that version.</li>
+            <li>Automation can ignore unknown fields and require only the fields it needs for the decision.</li>
+            <li>Use <code>--strict-json</code> when a process reads stdout. Use <code>--out</code> when a process parses a saved artifact.</li>
+            <li>Watch and batch reports can be NDJSON. Validate one line at a time instead of treating the whole file as a JSON array.</li>
+          </ul>
+
+          <h2 id="payloads">Small payload examples</h2>
+          <div class="command"><pre><code>{
+  "schemaVersion": "xyte.status.v1",
+  "generatedAtUtc": "2026-06-30T00:00:00.000Z",
+  "mode": "fast",
+  "checkConnectivity": true,
+  "readiness": {
+    "state": "ready",
+    "tenantId": "&lt;tenant-id&gt;",
+    "missingItems": [],
+    "recommendedActions": [],
+    "providers": [
+      { "provider": "xyte-org", "slotCount": 1, "hasActiveSecret": true }
+    ],
+    "connectionState": "connected",
+    "connectivity": {
+      "state": "connected",
+      "message": "Connected",
+      "retriable": false
+    }
+  }
+}</code></pre></div>
+          <div class="command"><pre><code>{
+  "schemaVersion": "xyte.watch.frame.v1",
+  "timestamp": "2026-06-30T00:00:00.000Z",
+  "runId": "run-001",
+  "sequence": 0,
+  "pollIndex": 1,
+  "intervalMs": 2000,
+  "profile": "incidents-active",
+  "endpointKey": "organization.incidents.getIncidents",
+  "tenantId": "&lt;tenant-id&gt;",
+  "eventType": "snapshot",
+  "query": { "status": "active" },
+  "summary": {
+    "total": 12,
+    "added": 0,
+    "removed": 0,
+    "updated": 0,
+    "changed": false
+  },
+  "items": []
+}</code></pre></div>
+          <div class="command"><pre><code>{
+  "schemaVersion": "xyte.flow.run.v1",
+  "generatedAtUtc": "2026-06-30T00:00:00.000Z",
+  "runId": "run-001",
+  "flowId": "flow.guided-remediation",
+  "resolvedFlowId": "flow.guided-remediation",
+  "mode": "plan",
+  "tenantId": "&lt;tenant-id&gt;",
+  "bundleDir": "./tmp/flow-runs/flow.guided-remediation/run-001",
+  "manifestPath": "./tmp/flow-runs/flow.guided-remediation/run-001/manifest.json",
+  "inputsPath": "./tmp/flow-runs/flow.guided-remediation/run-001/inputs.json",
+  "decisionsPath": "./tmp/flow-runs/flow.guided-remediation/run-001/decisions.ndjson",
+  "errorsPath": "./tmp/flow-runs/flow.guided-remediation/run-001/errors.ndjson",
+  "watchFramesPath": "./tmp/flow-runs/flow.guided-remediation/run-001/watch-frames.ndjson",
+  "startedAtUtc": "2026-06-30T00:00:00.000Z",
+  "endedAtUtc": "2026-06-30T00:00:02.000Z",
+  "durationMs": 2000,
+  "outcome": "pending_gate",
+  "nextResumeStepId": "gate_send_command",
+  "resumeCommand": "xyte-cli flow run flow.guided-remediation --tenant &lt;tenant-id&gt; --apply --resume ./tmp/flow-runs/flow.guided-remediation/run-001",
+  "nextAction": {
+    "kind": "approve_gate",
+    "stepId": "gate_send_command",
+    "title": "Review command and resume with --apply",
+    "requiresWrite": true,
+    "artifactPaths": ["./tmp/flow-runs/flow.guided-remediation/run-001/manifest.json"],
+    "command": "xyte-cli flow run flow.guided-remediation --tenant &lt;tenant-id&gt; --apply --resume ./tmp/flow-runs/flow.guided-remediation/run-001"
+  },
+  "steps": [],
+  "decisions": { "pending": 1, "approved": 0, "blocked": 0 },
+  "classifications": { "needs_data": 0, "bug": 0 },
+  "cursor": { "nextStepIndex": 0, "nextStepId": "gate_send_command" }
+}</code></pre></div>
+
+          <h2 id="real-examples">Examples</h2>
+          <div class="failure-grid">
+            <div class="failure"><strong>Fail CI when setup is blocked</strong><p>Run <code>xyte-cli doctor environment --format json</code>, read the recommended mode, and fail when the mode is blocked.</p></div>
+            <div class="failure"><strong>Notify on incident delta</strong><p>Run incident watch with <code>--strict-json</code>, read <code>snapshot</code> or <code>delta</code> frames, and notify only when active incidents changed.</p></div>
+            <div class="failure"><strong>Attach report sources</strong><p>Generate a Markdown or PDF report from saved deep-dive JSON, then attach both files so readers can trace the numbers.</p></div>
+            <div class="failure"><strong>Resume paused flow</strong><p>Read <code>nextAction</code> from a flow summary and use the bundle path in the approved resume command.</p></div>
+          </div>
+
+          <h2 id="validate">Validate JSON with ajv</h2>
+          <p class="section-copy">Use schema validation when another system will depend on a CLI artifact. For NDJSON, validate each line separately.</p>
+          <div class="command"><pre><code>npm exec --yes ajv-cli validate \
+  -s ./docs/schemas/status.v1.schema.json \
+  -d ./artifacts/status.json
+
+while IFS= read -r line; do
+  printf "%s\n" "$line" | npm exec --yes ajv-cli validate \
+    -s ./docs/schemas/watch-frame.v1.schema.json \
+    -d /dev/stdin
+done &lt; ./artifacts/incidents.ndjson</code></pre></div>
+
+          <h2 id="schema-links">Schema links</h2>
+          <p class="section-copy">These files are the public machine-readable contracts shipped with the docs.</p>
+          <ul class="checklist">
+            <li><a href="../schemas/call-envelope.v1.schema.json">call-envelope.v1.schema.json</a></li>
+            <li><a href="../schemas/doctor-environment.v1.schema.json">doctor-environment.v1.schema.json</a></li>
+            <li><a href="../schemas/flow-run.v1.schema.json">flow-run.v1.schema.json</a></li>
+            <li><a href="../schemas/headless-frame.v1.schema.json">headless-frame.v1.schema.json</a></li>
+            <li><a href="../schemas/inspect-deep-dive.v1.schema.json">inspect-deep-dive.v1.schema.json</a></li>
+            <li><a href="../schemas/inspect-fleet.v1.schema.json">inspect-fleet.v1.schema.json</a></li>
+            <li><a href="../schemas/report.v1.schema.json">report.v1.schema.json</a></li>
+            <li><a href="../schemas/status.v1.schema.json">status.v1.schema.json</a></li>
+            <li><a href="../schemas/upgrade-check.v1.schema.json">upgrade-check.v1.schema.json</a></li>
+            <li><a href="../schemas/upgrade-result.v1.schema.json">upgrade-result.v1.schema.json</a></li>
+            <li><a href="../schemas/utility-batch.v1.schema.json">utility-batch.v1.schema.json</a></li>
+            <li><a href="../schemas/utility-prepare.v1.schema.json">utility-prepare.v1.schema.json</a></li>
+            <li><a href="../schemas/watch-frame.v1.schema.json">watch-frame.v1.schema.json</a></li>
+          </ul>
+                <aside class="related-next" aria-label="Related guides"><h3>Related guides</h3><p class="section-copy"><a href="../guides/incident-triage.html">Incident triage</a>, <a href="../guides/ci-agent.html">CI and agents</a>, or browse <a href="../guides/index.html">all guides</a>.</p></aside>
+        </article>
+      </div>
+    </main>
+    <footer class="footer"><div class="wrap footer-row"><span>Schema contracts</span><span><a href="../index.html#docs">Reference</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
+    <script src="../guides/guide.js?v=use-case-guides-3"></script>
+  </body>
+</html>

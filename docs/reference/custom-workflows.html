@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Custom workflows | xyte-cli reference</title>
+    <meta name="description" content="Create stable team aliases that pin defaults on top of built-in flow recipes." />
+    <link rel="icon" type="image/png" href="../media/xyte-ai-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../guides/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-nav">
+      <div class="wrap nav-row">
+        <a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Reference</span></a>
+        <nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="../guides/index.html">Guides</a><a href="../index.html#docs">Reference</a><a href="../glossary.html">Glossary</a><a href="../troubleshooting.html">Troubleshooting</a></nav>
+      </div>
+    </header>
+    <main class="page" id="main">
+      <div class="wrap guide-shell">
+        <aside class="toc" aria-label="On this page">
+          <strong>On this page</strong>
+          <a href="#what-custom-flows-are">What they are</a>
+          <a href="#ask-an-agent">Ask an agent</a>
+          <a href="#terminal-ci">Terminal and CI</a>
+          <a href="#real-examples">Examples</a>
+          <a href="#share-import">Share and import</a>
+          <a href="#rules">Rules</a>
+        </aside>
+        <article class="article">
+          <p class="breadcrumb"><a href="../index.html">Overview</a> / <a href="../index.html#docs">Reference</a> / Custom workflows</p>
+          <figure class="guide-visual"><img src="./media/custom-workflows-reference.webp" alt="A built-in flow template becomes a custom alias with defaults, a share file, and a safe plan run." /></figure>
+          <p class="eyebrow">Authoring</p>
+          <h1>Custom workflows.</h1>
+          <p class="lead">Use custom workflows when your team repeats the same built-in flow with the same defaults and wants one stable command.</p>
+
+          <div class="summary">
+            <div class="summary-card"><strong>What changes</strong><span>You create an alias with default context values.</span></div>
+            <div class="summary-card"><strong>What does not</strong><span>The built-in flow step graph stays the same.</span></div>
+            <div class="summary-card"><strong>Use for</strong><span>Team conventions, tenant defaults, report windows, poll settings, and shared runbooks.</span></div>
+          </div>
+
+          <h2 id="what-custom-flows-are">What they are</h2>
+          <p class="section-copy">A custom workflow is a named shortcut. It points to a built-in flow and pins defaults so operators and agents do not have to remember the same values every time.</p>
+          <div class="flow-diagram" aria-label="Custom workflow lifecycle">
+            <h3>Workflow</h3>
+            <ol class="flow-steps">
+              <li><span class="flow-kicker">Base</span><strong>Choose built-in flow</strong><span>Use the flow that already matches the task.</span></li>
+              <li><span class="flow-kicker">Alias</span><strong>Name it for the team</strong><span>Use a stable id such as <code>flow.noc-watch-triage</code>.</span></li>
+              <li><span class="flow-kicker">Defaults</span><strong>Pin context</strong><span>Store values like report window, region, or poll timeout.</span></li>
+              <li><span class="flow-kicker">Plan</span><strong>Run safely</strong><span>Check the alias in <code>--plan</code> before anyone relies on it.</span></li>
+              <li><span class="flow-kicker">Share</span><strong>Export JSON</strong><span>Move the alias to another workspace without sharing secrets.</span></li>
+            </ol>
+          </div>
+
+          <h2 id="ask-an-agent">Ask an agent</h2>
+          <p class="section-copy">Create a custom workflow when the repeated job is clear and the base flow is known.</p>
+          <div class="command"><pre><code>Create a custom xyte-cli workflow for our daily NOC triage.
+Use the built-in watch-to-triage flow, set the window to 12 hours, and run it in plan mode.
+
+Create an Edge claim batch alias for our rollout team.
+Pin the poll interval and timeout, then show the plan command.</code></pre></div>
+
+          <h2 id="terminal-ci">Terminal and CI</h2>
+          <p class="section-copy">Create the alias once, run it in plan mode, then use the shorter alias in terminal, CI, or agent prompts.</p>
+          <div class="command"><pre><code>xyte-cli flow create flow.noc-watch-triage \
+  --based-on flow.watch-to-triage \
+  --title "NOC Watch Triage" \
+  --description "NOC incident triage handoff" \
+  --var window_hours=12
+
+xyte-cli flow run flow.noc-watch-triage \
+  --tenant &lt;tenant-id&gt; \
+  --plan</code></pre></div>
+
+          <h2 id="real-examples">Examples</h2>
+          <div class="failure-grid">
+            <div class="failure"><strong>Daily NOC triage</strong><p>Create <code>flow.noc-watch-triage</code> from <code>flow.watch-to-triage</code> and pin the reporting window used by the shift.</p></div>
+            <div class="failure"><strong>Weekly customer report</strong><p>Create <code>flow.customer-weekly-report</code> from <code>flow.daily-deep-dive-report</code> and pin the report window your customer expects.</p></div>
+            <div class="failure"><strong>Edge rollout</strong><p>Create <code>flow.rollout-edge-claim-batch</code> from <code>flow.edge-claim-batch</code> and pin polling behavior for a longer deployment window.</p></div>
+            <div class="failure"><strong>Guided remediation</strong><p>Create a team alias for the remediation path, but pass incident and device context at runtime because those change per issue.</p></div>
+          </div>
+
+          <h2 id="share-import">Share and import</h2>
+          <p class="section-copy">Shared workflow files contain the alias, base flow, title, description, and defaults. Keep API keys and secrets out of them.</p>
+          <div class="command"><pre><code>xyte-cli flow share flow.noc-watch-triage --out ./artifacts/flow.noc-watch-triage.json
+xyte-cli flow import --file ./artifacts/flow.noc-watch-triage.json
+xyte-cli flow import --file ./artifacts/flow.noc-watch-triage.json --force</code></pre></div>
+
+          <h2 id="rules">Rules</h2>
+          <ul class="checklist">
+            <li>Use ids like <code>flow.&lt;team&gt;-&lt;intent&gt;</code> so humans understand the owner and purpose.</li>
+            <li>Use <code>--var</code> for small defaults and <code>--context-json</code> when values are easier to review in a file.</li>
+            <li>Runtime values override stored defaults. That is useful for incident ids, device ids, and one-off report windows.</li>
+            <li>Use <code>--replace-defaults</code> only when you want to remove old defaults instead of merging new ones.</li>
+            <li>After import or edit, run <code>--plan</code> before using the alias in automation.</li>
+          </ul>
+          <div class="command"><pre><code>xyte-cli flow edit flow.noc-watch-triage \
+  --description "NOC handoff triage flow" \
+  --var region=us
+
+xyte-cli flow edit flow.noc-watch-triage \
+  --replace-defaults \
+  --var region=us \
+  --var window_hours=6</code></pre></div>
+                <aside class="related-next" aria-label="Related guides"><h3>Related guides</h3><p class="section-copy"><a href="../guides/device-migration.html">Device migration</a>, <a href="../guides/utility-prep.html">Spreadsheet prep</a>, or browse <a href="../guides/index.html">all guides</a>.</p></aside>
+        </article>
+      </div>
+    </main>
+    <footer class="footer"><div class="wrap footer-row"><span>Custom workflows</span><span><a href="../index.html#docs">Reference</a> · <a href="https://github.com/xyte-io/xyte-cli">GitHub</a></span></div></footer>
+    <script src="../guides/guide.js?v=use-case-guides-3"></script>
+  </body>
+</html>
