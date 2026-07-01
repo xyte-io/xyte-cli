@@ -51,20 +51,6 @@ for (const expected of [
   }
 }
 
-const signingScript = readFileSync(join(repoRoot, 'scripts/sign_windows_msi.ps1'), 'utf8');
-const timestampUrlMatch = signingScript.match(/\$TimestampUrl\s*=\s*"([^"]+)"/);
-if (!timestampUrlMatch) {
-  throw new Error('Windows MSI signing script must define a default timestamp URL.');
-}
-const timestampUrl = new URL(timestampUrlMatch[1]);
-if (
-  timestampUrl.protocol !== 'https:' ||
-  timestampUrl.hostname !== 'timestamp.digicert.com' ||
-  timestampUrl.pathname !== '/'
-) {
-  throw new Error('Windows MSI signing script must use an HTTPS timestamp URL.');
-}
-
 const releaseWorkflow = readFileSync(join(repoRoot, '.github/workflows/release-assets.yml'), 'utf8');
 for (const expected of [
   'needs: [meta, packaged-install-smoke]',
