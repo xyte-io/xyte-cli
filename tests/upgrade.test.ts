@@ -53,6 +53,72 @@ describe('upgrade utilities', () => {
     expect(result.recommendedCommand).toBe('winget upgrade --id Xyte.XyteCLI --exact');
   });
 
+  it('derives Windows MSI update recommendations from package id instead of arbitrary updateCommand text', async () => {
+    const result = await checkForUpgrade(
+      {
+        packageName: '@xyteai/cli',
+        latestVersionOverride: '0.5.0'
+      },
+      {
+        getCurrentVersion: () => '0.4.0',
+        getInstallChannel: () => ({
+          kind: 'windows-msi',
+          updateCommand: 'winget upgrade --id Contoso.OtherTool --silent',
+          packageId: 'Xyte.CustomCLI'
+        })
+      }
+    );
+
+    expect(result.recommendedCommand).toBe('winget upgrade --id Xyte.CustomCLI --exact');
+  });
+
+  it('detects install channel once when applying an upgrade', async () => {
+    const getInstallChannel = vi.fn(() => ({
+      kind: 'npm' as const,
+      updateCommand: 'npm install --global @xyteai/cli@latest'
+    }));
+    const commandRunner = vi.fn(async (command: string) => {
+      if (/^npm(?:\.cmd)?$/.test(command)) {
+        return {
+          code: 0,
+          stdout: '',
+          stderr: ''
+        };
+      }
+      if (/^xyte-cli(?:\.cmd)?$/.test(command)) {
+        return {
+          code: 0,
+          stdout: 'xyte-cli 0.5.0\n',
+          stderr: ''
+        };
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+
+    await applyUpgrade(
+      {
+        packageName: '@xyteai/cli',
+        skillSourceDir: '/repo/skills/xyte-cli',
+        latestVersionOverride: '0.5.0'
+      },
+      {
+        fetchImpl: vi.fn() as any,
+        commandRunner,
+        getCurrentVersion: () => '0.4.0',
+        getInstallChannel,
+        installSkillsImpl: vi.fn().mockResolvedValue({
+          workspaceRoot: '/tmp/workspace',
+          homeRoot: '/tmp/home',
+          sourceDir: '/repo/skills/xyte-cli',
+          outcomes: [],
+          createdRoots: []
+        })
+      }
+    );
+
+    expect(getInstallChannel).toHaveBeenCalledTimes(1);
+  });
+
   it('applies upgrade using install spec and emits skill warning on partial failure', async () => {
     const commandRunner = vi.fn(async (command: string, args: string[]) => {
       if (/^npm(?:\.cmd)?$/.test(command)) {

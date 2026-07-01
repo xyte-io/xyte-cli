@@ -45,6 +45,31 @@ function parseVersionFromOutput(output: string): string | undefined {
   return match ? match[0] : undefined;
 }
 
+function buildRecommendedUpdateCommand(packageName: string, installChannel: InstallChannel): string {
+  if (installChannel.kind === 'windows-msi') {
+    return `winget upgrade --id ${installChannel.packageId ?? 'Xyte.XyteCLI'} --exact`;
+  }
+  return `npm install --global ${packageName}@latest`;
+}
+
+function buildExecutableUpdateCommand(args: {
+  installChannel: InstallChannel;
+  installSpec: string;
+  npmCommand: string;
+}): { command: string; args: string[] } {
+  if (args.installChannel.kind === 'windows-msi') {
+    return {
+      command: 'winget',
+      args: ['upgrade', '--id', args.installChannel.packageId ?? 'Xyte.XyteCLI', '--exact']
+    };
+  }
+
+  return {
+    command: args.npmCommand,
+    args: ['install', '--global', args.installSpec]
+  };
+}
+
 async function fetchLatestVersion(packageName: string, fetchImpl: typeof fetch): Promise<string> {
   const encodedName = encodeURIComponent(packageName);
   const response = await fetchImpl(`https://registry.npmjs.org/${encodedName}/latest`, {
@@ -80,7 +105,7 @@ export async function checkForUpgrade(
   return buildUpgradeCheck({
     packageName,
     installChannel: installChannel.kind,
-    recommendedCommand: installChannel.updateCommand,
+    recommendedCommand: buildRecommendedUpdateCommand(packageName, installChannel),
     currentVersion,
     latestVersion
   });
@@ -100,7 +125,10 @@ export async function applyUpgrade(
       packageName,
       latestVersionOverride: settings.latestVersionOverride
     },
-    deps
+    {
+      ...deps,
+      getInstallChannel: () => installChannel
+    }
   );
 
   const warnings: string[] = [];
@@ -109,22 +137,18 @@ export async function applyUpgrade(
     : typeof settings.latestVersionOverride === 'string' && settings.latestVersionOverride.trim()
       ? `${packageName}@${settings.latestVersionOverride.trim()}`
       : `${packageName}@latest`;
-  const updateArgs =
-    installChannel.kind === 'windows-msi'
-      ? ['upgrade', '--id', installChannel.packageId ?? 'Xyte.XyteCLI', '--exact']
-      : ['install', '--global', installSpec];
   let updateCommand: { command: string; args: string[] } | undefined;
 
   if (compareSemver(check.currentVersion, check.latestVersion) < 0) {
-    const command = installChannel.kind === 'windows-msi' ? 'winget' : npmCommand;
-    updateCommand = {
-      command,
-      args: updateArgs
-    };
-    const installResult = await runner(command, updateArgs);
+    updateCommand = buildExecutableUpdateCommand({
+      installChannel,
+      installSpec,
+      npmCommand
+    });
+    const installResult = await runner(updateCommand.command, updateCommand.args);
     if (installResult.code !== 0) {
       throw new CliUserError({
-        summary: `Upgrade failed while running "${command} ${updateArgs.join(' ')}": ${installResult.stderr.trim() || installResult.stdout.trim() || 'unknown error'}`
+        summary: `Upgrade failed while running "${updateCommand.command} ${updateCommand.args.join(' ')}": ${installResult.stderr.trim() || installResult.stdout.trim() || 'unknown error'}`
       });
     }
   }

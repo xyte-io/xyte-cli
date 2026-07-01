@@ -16,8 +16,18 @@ function Write-Step {
 }
 
 function Invoke-XyteCli {
-  param([string[]]$Arguments)
+  param(
+    [string[]]$Arguments,
+    [switch]$AllowFailure
+  )
   & $script:XyteCli @Arguments
+  $exitCode = $LASTEXITCODE
+  if ($exitCode -ne 0 -and !$AllowFailure) {
+    throw "xyte-cli $($Arguments -join ' ') failed with exit code $exitCode."
+  }
+  if ($AllowFailure) {
+    return $exitCode
+  }
 }
 
 function Test-Yes {
@@ -101,10 +111,13 @@ if (!$SkipApiKeySetup) {
 }
 
 Write-Step "Readiness"
-try {
-  Invoke-XyteCli @("setup", "status", "--field", "tenantId")
-} catch {
+$readinessExitCode = Invoke-XyteCli -Arguments @("setup", "status", "--field", "tenantId") -AllowFailure
+if ($readinessExitCode -ne 0) {
   Write-Host "No connected tenant was confirmed. Run this assistant again or run: xyte-cli setup run"
 }
 Write-Host ""
-Write-Host "Xyte CLI Windows setup is complete."
+if ($readinessExitCode -eq 0) {
+  Write-Host "Xyte CLI Windows setup is complete."
+} else {
+  Write-Host "Xyte CLI Windows install is complete, but setup still needs an API key."
+}

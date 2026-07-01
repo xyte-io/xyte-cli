@@ -84,6 +84,8 @@ Prerequisites:
 
 The MSI embeds a bundled Windows Node.js runtime, adds `C:\Program Files\Xyte CLI` to machine `PATH`, ships the post-install setup assistant, and marks the install channel as `windows-msi`. Users update MSI installs with `winget upgrade --id Xyte.XyteCLI --exact` or a newer MSI, not `npm install -g`.
 
+The Windows MSI release asset job publishes MSI-specific assets independently from the npm package release job. A Windows runner, WiX, signing, or Node runtime download failure should not block the npm tarball, SBOM, and npm checksums from being attached to the release.
+
 If Windows code-signing secrets are configured, the Windows packaging script signs the MSI before generating WinGet manifests, checksums, and upload. If they are not configured, the workflow still builds and uploads the MSI, but the asset is unsigned and should not be submitted to WinGet.
 
 CI currently pins the WiX .NET tool to `7.0.0` and the MSI build command passes WiX's `-acceptEula wix7` flag.

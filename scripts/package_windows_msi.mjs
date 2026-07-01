@@ -33,6 +33,15 @@ function parseArgs(argv) {
   return args;
 }
 
+function validateArgs(args) {
+  if (!args.skipMsi && args.skipNode) {
+    throw new Error('--skip-node is only valid with --skip-msi; real MSI builds must include the bundled Node runtime.');
+  }
+  if (!args.skipMsi && args.skipNpmInstall) {
+    throw new Error('--skip-npm-install is only valid with --skip-msi; real MSI builds must include production dependencies.');
+  }
+}
+
 function xmlEscape(value) {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -76,6 +85,16 @@ function sha256File(filePath) {
   return createHash('sha256').update(readFileSync(filePath)).digest('hex').toUpperCase();
 }
 
+function findExpectedSha256(shasumsText, fileName) {
+  for (const line of shasumsText.split(/\r?\n/)) {
+    const [hash, name] = line.trim().split(/\s+/, 2);
+    if (name === fileName && /^[a-fA-F0-9]{64}$/.test(hash)) {
+      return hash.toUpperCase();
+    }
+  }
+  return undefined;
+}
+
 function manifestRelativePath(outDir, filePath) {
   return relative(outDir, filePath).split('\\').join('/');
 }
@@ -103,6 +122,8 @@ async function downloadNode(args, payloadDir) {
   const nodeBase = `node-v${args.nodeVersion}-win-x64`;
   const zipPath = join(cacheDir, `${nodeBase}.zip`);
   const nodeUrl = `https://nodejs.org/dist/v${args.nodeVersion}/${nodeBase}.zip`;
+  const shasumsPath = join(cacheDir, `node-v${args.nodeVersion}-SHASUMS256.txt`);
+  const shasumsUrl = `https://nodejs.org/dist/v${args.nodeVersion}/SHASUMS256.txt`;
 
   if (!existsSync(zipPath)) {
     await runOrThrow(
@@ -110,6 +131,22 @@ async function downloadNode(args, payloadDir) {
       ['--fail', '--location', '--retry', '3', '--connect-timeout', '20', '--max-time', '300', '--output', zipPath, nodeUrl],
       'Download Node.js Windows runtime'
     );
+  }
+  if (!existsSync(shasumsPath)) {
+    await runOrThrow(
+      process.platform === 'win32' ? 'curl.exe' : 'curl',
+      ['--fail', '--location', '--retry', '3', '--connect-timeout', '20', '--max-time', '60', '--output', shasumsPath, shasumsUrl],
+      'Download Node.js runtime checksums'
+    );
+  }
+
+  const expectedSha256 = findExpectedSha256(readFileSync(shasumsPath, 'utf8'), `${nodeBase}.zip`);
+  if (!expectedSha256) {
+    throw new Error(`Could not find checksum for ${nodeBase}.zip in ${shasumsPath}.`);
+  }
+  const actualSha256 = sha256File(zipPath);
+  if (actualSha256 !== expectedSha256) {
+    throw new Error(`Node.js runtime checksum mismatch for ${nodeBase}.zip: expected ${expectedSha256}, got ${actualSha256}.`);
   }
 
   const extractDir = join(cacheDir, nodeBase);
@@ -345,6 +382,7 @@ async function signMsiIfConfigured(msiPath) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  validateArgs(args);
   if (!args.skipMsi) {
     ensureMsiBuildSupported();
   }

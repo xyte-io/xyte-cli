@@ -354,6 +354,14 @@ describe('schema contracts', () => {
     expect(validateStatus(status)).toBe(true);
     expect(validateUpgradeCheck(upgradeCheck)).toBe(true);
     expect(validateUpgradeResult(upgradeResult)).toBe(true);
+
+    const legacyUpgradeCheck = { ...upgradeCheck };
+    delete (legacyUpgradeCheck as Partial<typeof legacyUpgradeCheck>).installChannel;
+    const legacyUpgradeResult = { ...upgradeResult };
+    delete (legacyUpgradeResult as Partial<typeof legacyUpgradeResult>).installChannel;
+
+    expect(validateUpgradeCheck(legacyUpgradeCheck)).toBe(true);
+    expect(validateUpgradeResult(legacyUpgradeResult)).toBe(true);
   });
 
   it('validates watch frame payload', () => {

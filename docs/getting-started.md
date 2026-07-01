@@ -16,7 +16,7 @@ If `node --version` is missing or below 22:
 brew install node@22
 
 # Windows
-winget install -e --id OpenJS.NodeJS.LTS
+winget install OpenJS.NodeJS.LTS
 ```
 
 Other platforms: download from [nodejs.org](https://nodejs.org/en/download).
