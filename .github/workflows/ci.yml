@@ -154,6 +154,21 @@ jobs:
           xyte-cli --version
           xyte-cli doctor environment --format text
 
+      - name: Smoke Windows setup assistant
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+          $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+          $env:Path = @($machinePath, $userPath) -join ";"
+
+          $assistant = Join-Path $env:ProgramFiles "Xyte CLI\scripts\configure-xyte-cli.ps1"
+          if (!(Test-Path -LiteralPath $assistant)) {
+            throw "Installed setup assistant not found at $assistant."
+          }
+
+          & $assistant -NonInteractive
+
       - name: Upload Windows MSI artifact
         uses: actions/upload-artifact@v4
         with:

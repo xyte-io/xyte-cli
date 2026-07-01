@@ -68,13 +68,14 @@ if (!$SkipNpmMigration) {
   Write-Step "Check previous npm global install"
   $npm = Get-Command "npm.cmd" -ErrorAction SilentlyContinue
   if ($npm) {
-    $npmListOutput = & $npm.Source list -g @xyteai/cli --depth=0 2>$null
+    $npmPath = $npm.Definition
+    $npmListOutput = & $npmPath list -g @xyteai/cli --depth=0 2>$null
     $hasNpmGlobal = $LASTEXITCODE -eq 0 -and (($npmListOutput -join "`n") -match "@xyteai/cli@")
     if ($hasNpmGlobal) {
       Write-Host "Found previous global npm install of @xyteai/cli."
       Write-Host "The MSI install keeps config and API keys under the same user profile locations."
       if (Test-Yes "Remove the global npm copy so the Windows installer is the only update channel?") {
-        & $npm.Source uninstall -g @xyteai/cli
+        & $npmPath uninstall -g @xyteai/cli
         if ($LASTEXITCODE -ne 0) {
           throw "npm uninstall -g @xyteai/cli failed."
         }
