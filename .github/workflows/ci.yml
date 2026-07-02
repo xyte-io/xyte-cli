@@ -203,6 +203,78 @@ jobs:
             throw "Windows terminal transcript smoke failed with exit code $LASTEXITCODE."
           }
 
+      - name: Smoke setup assistant under Windows PowerShell 5.1
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $assistant = Join-Path $env:ProgramFiles "Xyte CLI\scripts\configure-xyte-cli.ps1"
+          $winPowerShell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+          & $winPowerShell -NoProfile -ExecutionPolicy Bypass -File $assistant -NonInteractive
+          if ($LASTEXITCODE -ne 0) {
+            throw "Setup assistant failed under Windows PowerShell 5.1 with exit code $LASTEXITCODE."
+          }
+
+      - name: Smoke Start Menu shortcuts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $shortcutDir = Join-Path ([Environment]::GetFolderPath("CommonPrograms")) "Xyte CLI"
+          $shell = New-Object -ComObject WScript.Shell
+
+          $configurePath = Join-Path $shortcutDir "Configure Xyte CLI.lnk"
+          if (!(Test-Path -LiteralPath $configurePath)) {
+            throw "Missing Start Menu shortcut: $configurePath"
+          }
+          $configure = $shell.CreateShortcut($configurePath)
+          if (!(Test-Path -LiteralPath $configure.TargetPath)) {
+            throw "Configure shortcut target not found: $($configure.TargetPath)"
+          }
+          $run = Start-Process -FilePath $configure.TargetPath -ArgumentList "$($configure.Arguments) -NonInteractive" -Wait -PassThru -NoNewWindow
+          if ($run.ExitCode -ne 0) {
+            throw "Configure shortcut command failed with exit code $($run.ExitCode)."
+          }
+
+          $consolePath = Join-Path $shortcutDir "Xyte CLI PowerShell.lnk"
+          if (!(Test-Path -LiteralPath $consolePath)) {
+            throw "Missing Start Menu shortcut: $consolePath"
+          }
+          $console = $shell.CreateShortcut($consolePath)
+          if (!(Test-Path -LiteralPath $console.TargetPath)) {
+            throw "PowerShell shortcut target not found: $($console.TargetPath)"
+          }
+          $consoleArgs = $console.Arguments -replace '^\s*-NoExit\s+', ''
+          $run = Start-Process -FilePath $console.TargetPath -ArgumentList $consoleArgs -Wait -PassThru -NoNewWindow
+          if ($run.ExitCode -ne 0) {
+            throw "PowerShell shortcut command failed with exit code $($run.ExitCode)."
+          }
+
+      - name: Smoke npm global migration
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm pack --silent
+          $tarball = Get-ChildItem -Filter "xyteai-cli-*.tgz" | Select-Object -First 1
+          if (!$tarball) {
+            throw "npm pack did not produce a tarball."
+          }
+          npm install -g $tarball.FullName
+          npm list -g "@xyteai/cli" --depth=0
+
+          $assistant = Join-Path $env:ProgramFiles "Xyte CLI\scripts\configure-xyte-cli.ps1"
+          $winPowerShell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+          $PSNativeCommandUseErrorActionPreference = $false
+          & $winPowerShell -NoProfile -ExecutionPolicy Bypass -File $assistant -AssumeYes -NonInteractive
+          if ($LASTEXITCODE -ne 0) {
+            throw "Setup assistant migration run failed with exit code $LASTEXITCODE."
+          }
+
+          & npm list -g "@xyteai/cli" --depth=0
+          if ($LASTEXITCODE -eq 0) {
+            throw "Assistant did not remove the previous npm global install."
+          }
+          exit 0
+
       - name: Upload Windows terminal transcript
         if: always()
         uses: actions/upload-artifact@v4
