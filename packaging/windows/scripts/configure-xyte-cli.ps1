@@ -65,7 +65,12 @@ if (!$SkipNpmMigration) {
   $npm = Get-Command "npm.cmd" -ErrorAction SilentlyContinue
   if ($npm) {
     $npmPath = $npm.Definition
+    # Windows PowerShell 5.1 turns redirected native stderr into terminating
+    # errors under "Stop"; npm warnings must not abort the migration probe.
+    $previousErrorPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
     $npmListOutput = & $npmPath list -g @xyteai/cli --depth=0 2>$null
+    $ErrorActionPreference = $previousErrorPreference
     $hasNpmGlobal = $LASTEXITCODE -eq 0 -and (($npmListOutput -join "`n") -match "@xyteai/cli@")
     if ($hasNpmGlobal) {
       Write-Host "Found previous global npm install of @xyteai/cli."

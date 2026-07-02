@@ -877,11 +877,10 @@ export function createCli(runtime: CliRuntime = {}): Command {
       });
       const latestVersionOverride = process.env.XYTE_CLI_UPGRADE_TARGET_VERSION?.trim() || undefined;
       const installSpec = process.env.XYTE_CLI_UPGRADE_SPEC?.trim() || undefined;
+      const loadCheck = () =>
+        checkForUpgrade({ packageName: '@xyteai/cli', latestVersionOverride }, runtime.upgradeDependencies);
       if (options.check) {
-        const check = await checkForUpgrade(
-          { packageName: '@xyteai/cli', latestVersionOverride },
-          runtime.upgradeDependencies
-        );
+        const check = await loadCheck();
         if (output === 'text') {
           stdout.write(`Package: ${check.packageName}\n`);
           stdout.write(`Install channel: ${check.installChannel}\n`);
@@ -914,11 +913,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
           if (output === 'text') {
             stdout.write('Upgrade canceled.\n');
           } else {
-            const check = await checkForUpgrade(
-              { packageName: '@xyteai/cli', latestVersionOverride },
-              runtime.upgradeDependencies
-            );
-            printJson(stdout, check, { strictJson: resolveStrictJson({ settings }) });
+            printJson(stdout, await loadCheck(), { strictJson: resolveStrictJson({ settings }) });
           }
           return;
         }

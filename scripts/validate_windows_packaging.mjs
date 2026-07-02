@@ -27,6 +27,7 @@ for (const expected of [
   'Get-Command "xyte-cli" -All',
   '$LASTEXITCODE',
   '"setup", "status", "--field", "state"',
+  '-eq "ready"',
   'setup still needs an API key'
 ]) {
   if (!assistant.includes(expected)) {

@@ -162,8 +162,9 @@ async function downloadNode(args, payloadDir) {
   const actualSha256 = sha256File(zipPath);
   if (actualSha256 !== expectedSha256) {
     rmSync(zipPath, { force: true });
+    rmSync(shasumsPath, { force: true });
     throw new Error(
-      `Node.js runtime checksum mismatch for ${nodeBase}.zip: expected ${expectedSha256}, got ${actualSha256}. Removed the cached download; re-run to download it again.`
+      `Node.js runtime checksum mismatch for ${nodeBase}.zip: expected ${expectedSha256}, got ${actualSha256}. Removed the cached files; re-run to download them again.`
     );
   }
 
