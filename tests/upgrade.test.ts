@@ -22,13 +22,95 @@ describe('upgrade utilities', () => {
       },
       {
         fetchImpl: fetchImpl as any,
-        getCurrentVersion: () => '0.4.0'
+        getCurrentVersion: () => '0.4.0',
+        getInstallChannel: () => ({ kind: 'npm' })
       }
     );
 
     expect(fetchImpl).not.toHaveBeenCalled();
+    expect(result.installChannel).toBe('npm');
     expect(result.latestVersion).toBe('0.5.0');
     expect(result.upToDate).toBe(false);
+  });
+
+  it('recommends winget updates for Windows MSI installs, defaulting the package id', async () => {
+    const result = await checkForUpgrade(
+      {
+        packageName: '@xyteai/cli',
+        latestVersionOverride: '0.5.0'
+      },
+      {
+        getCurrentVersion: () => '0.4.0',
+        getInstallChannel: () => ({ kind: 'windows-msi' })
+      }
+    );
+
+    expect(result.installChannel).toBe('windows-msi');
+    expect(result.recommendedCommand).toBe('winget upgrade --id Xyte.XyteCLI --exact');
+  });
+
+  it('derives winget recommendations from a custom package id', async () => {
+    const result = await checkForUpgrade(
+      {
+        packageName: '@xyteai/cli',
+        latestVersionOverride: '0.5.0'
+      },
+      {
+        getCurrentVersion: () => '0.4.0',
+        getInstallChannel: () => ({
+          kind: 'windows-msi',
+          packageId: 'Xyte.CustomCLI'
+        })
+      }
+    );
+
+    expect(result.recommendedCommand).toBe('winget upgrade --id Xyte.CustomCLI --exact');
+  });
+
+  it('detects install channel once when applying an upgrade', async () => {
+    const getInstallChannel = vi.fn(() => ({
+      kind: 'npm' as const
+    }));
+    const commandRunner = vi.fn(async (command: string) => {
+      if (/^npm(?:\.cmd)?$/.test(command)) {
+        return {
+          code: 0,
+          stdout: '',
+          stderr: ''
+        };
+      }
+      if (/^xyte-cli(?:\.cmd)?$/.test(command)) {
+        return {
+          code: 0,
+          stdout: 'xyte-cli 0.5.0\n',
+          stderr: ''
+        };
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+
+    await applyUpgrade(
+      {
+        packageName: '@xyteai/cli',
+        skillSourceDir: '/repo/skills/xyte-cli',
+        latestVersionOverride: '0.5.0'
+      },
+      {
+        fetchImpl: vi.fn() as any,
+        commandRunner,
+        getCurrentVersion: () => '0.4.0',
+        getInstallChannel,
+        installSkillsImpl: vi.fn().mockResolvedValue({
+          workspaceRoot: '/tmp/workspace',
+          homeRoot: '/tmp/home',
+          sourceDir: '/repo/skills/xyte-cli',
+          outcomes: [],
+          createdRoots: []
+        })
+      }
+    );
+
+    expect(getInstallChannel).toHaveBeenCalledTimes(1);
   });
 
   it('applies upgrade using install spec and emits skill warning on partial failure', async () => {
@@ -62,6 +144,7 @@ describe('upgrade utilities', () => {
         fetchImpl: vi.fn() as any,
         commandRunner,
         getCurrentVersion: () => '0.4.0',
+        getInstallChannel: () => ({ kind: 'npm' }),
         installSkillsImpl: vi.fn().mockResolvedValue({
           workspaceRoot: '/tmp/workspace',
           homeRoot: '/tmp/home',
@@ -89,6 +172,7 @@ describe('upgrade utilities', () => {
     );
 
     expect(result.updated).toBe(true);
+    expect(result.installChannel).toBe('npm');
     expect(result.verify.match).toBe(true);
     expect(result.skills.scope).toBe('user');
     expect(result.skills.failedCount).toBe(1);
@@ -125,6 +209,7 @@ describe('upgrade utilities', () => {
         fetchImpl: vi.fn() as any,
         commandRunner,
         getCurrentVersion: () => '0.5.0',
+        getInstallChannel: () => ({ kind: 'npm' }),
         installSkillsImpl: vi.fn().mockResolvedValue({
           workspaceRoot: '/tmp/workspace',
           homeRoot: '/tmp/home',
@@ -137,5 +222,57 @@ describe('upgrade utilities', () => {
 
     expect(result.updated).toBe(true);
     expect(result.updateCommand?.args).toEqual(['install', '--global', '@xyteai/cli@0.6.0']);
+  });
+
+  it('applies Windows MSI upgrades through winget', async () => {
+    const commandRunner = vi.fn(async (command: string, args: string[]) => {
+      if (command === 'winget') {
+        expect(args).toEqual(['upgrade', '--id', 'Xyte.XyteCLI', '--exact']);
+        return {
+          code: 0,
+          stdout: '',
+          stderr: ''
+        };
+      }
+      if (/^xyte-cli(?:\.cmd)?$/.test(command)) {
+        return {
+          code: 0,
+          stdout: 'xyte-cli 0.7.0\n',
+          stderr: ''
+        };
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+
+    const result = await applyUpgrade(
+      {
+        packageName: '@xyteai/cli',
+        skillSourceDir: '/repo/skills/xyte-cli',
+        latestVersionOverride: '0.7.0'
+      },
+      {
+        fetchImpl: vi.fn() as any,
+        commandRunner,
+        getCurrentVersion: () => '0.6.0',
+        getInstallChannel: () => ({
+          kind: 'windows-msi',
+          packageId: 'Xyte.XyteCLI'
+        }),
+        installSkillsImpl: vi.fn().mockResolvedValue({
+          workspaceRoot: '/tmp/workspace',
+          homeRoot: '/tmp/home',
+          sourceDir: '/repo/skills/xyte-cli',
+          outcomes: [],
+          createdRoots: []
+        })
+      }
+    );
+
+    expect(result.installChannel).toBe('windows-msi');
+    expect(result.updated).toBe(true);
+    expect(result.updateCommand).toEqual({
+      command: 'winget',
+      args: ['upgrade', '--id', 'Xyte.XyteCLI', '--exact']
+    });
   });
 });

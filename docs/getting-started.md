@@ -79,6 +79,8 @@ For reproducible pipelines, replace `@latest` with a pinned version (e.g. `@0.10
 
 ### Manual terminal
 
+On Windows, use the native MSI when you want a bundled runtime and normal Windows install/update behavior. The Node/npm path below remains supported for developers, agents, and environments that already standardize on Node.js. See [Windows Installer](./windows-installer.md).
+
 ```sh
 npm install -g @xyteai/cli@latest
 xyte-cli --help

@@ -4058,7 +4058,7 @@ describe('cli integration', () => {
 
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     const parsed = JSON.parse(output);
-    expect(parsed.schemaVersion).toBe('xyte.upgrade.check.v1');
+    expect(parsed.schemaVersion).toBe('xyte.upgrade.check.v2');
     expect(parsed.currentVersion).toBe('0.4.0');
     expect(parsed.latestVersion).toBe('0.5.0');
     expect(commandRunner).not.toHaveBeenCalled();
@@ -4214,7 +4214,7 @@ describe('cli integration', () => {
 
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     const parsed = JSON.parse(output);
-    expect(parsed.schemaVersion).toBe('xyte.upgrade.result.v1');
+    expect(parsed.schemaVersion).toBe('xyte.upgrade.result.v2');
     expect(parsed.updated).toBe(true);
     expect(parsed.skills.scope).toBe('user');
     expect(parsed.skills.failedCount).toBe(1);

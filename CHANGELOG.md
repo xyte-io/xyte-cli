@@ -6,6 +6,13 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+### Added
+- Windows MSI installer pipeline: WiX-based packaging with a bundled Node.js runtime (checksum-verified against nodejs.org SHASUMS256), machine `PATH` entry, Start Menu shortcuts, the Configure Xyte CLI post-install assistant, generated WinGet manifests for `Xyte.XyteCLI`, and optional Authenticode signing. Release assets include the MSI, WinGet manifests, and Windows checksums, published independently of the npm release. See `docs/windows-installer.md`.
+- Install-channel detection: `xyte-cli upgrade` reports `installChannel` (`npm` | `windows-msi`) and routes upgrade execution through `winget upgrade --id Xyte.XyteCLI --exact` on MSI installs while npm installs keep using `npm install --global`.
+
+### Changed
+- **Breaking (JSON contracts):** upgrade payloads moved to `xyte.upgrade.check.v2` and `xyte.upgrade.result.v2`, which add the required `installChannel` field. The v1 schemas remain published unchanged for legacy payloads; consumers validating upgrade JSON should adopt the v2 schemas in `docs/schemas/`.
+
 ## [0.11.0] - 2026-06-24
 
 ### Added

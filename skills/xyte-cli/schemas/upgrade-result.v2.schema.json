@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xyte.dev/schemas/upgrade-result.v2.schema.json",
+  "title": "Xyte Upgrade Result V2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generatedAtUtc",
+    "packageName",
+    "installChannel",
+    "currentVersion",
+    "latestVersion",
+    "upToDateBefore",
+    "updated",
+    "verify",
+    "skills",
+    "warnings"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "xyte.upgrade.result.v2"
+    },
+    "generatedAtUtc": {
+      "type": "string"
+    },
+    "packageName": {
+      "type": "string"
+    },
+    "installChannel": {
+      "enum": [
+        "npm",
+        "windows-msi"
+      ]
+    },
+    "currentVersion": {
+      "type": "string"
+    },
+    "latestVersion": {
+      "type": "string"
+    },
+    "upToDateBefore": {
+      "type": "boolean"
+    },
+    "updated": {
+      "type": "boolean"
+    },
+    "updateCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "args"
+      ],
+      "properties": {
+        "command": {
+          "type": "string"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "verify": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "detectedVersion",
+        "expectedVersion",
+        "match"
+      ],
+      "properties": {
+        "command": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "command",
+            "args"
+          ],
+          "properties": {
+            "command": {
+              "type": "string"
+            },
+            "args": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "detectedVersion": {
+          "type": "string"
+        },
+        "expectedVersion": {
+          "type": "string"
+        },
+        "match": {
+          "type": "boolean"
+        }
+      }
+    },
+    "skills": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "agents",
+        "force",
+        "sourceDir",
+        "outcomes",
+        "failedCount"
+      ],
+      "properties": {
+        "scope": {
+          "const": "user"
+        },
+        "agents": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "claude",
+              "copilot",
+              "codex"
+            ]
+          }
+        },
+        "force": {
+          "const": true
+        },
+        "sourceDir": {
+          "type": "string"
+        },
+        "failedCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "outcomes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scope",
+              "agent",
+              "rootDir",
+              "targetDir",
+              "status"
+            ],
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "project",
+                  "user"
+                ]
+              },
+              "agent": {
+                "type": "string",
+                "enum": [
+                  "claude",
+                  "copilot",
+                  "codex"
+                ]
+              },
+              "rootDir": {
+                "type": "string"
+              },
+              "targetDir": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "installed",
+                  "overwritten",
+                  "skipped",
+                  "failed"
+                ]
+              },
+              "error": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

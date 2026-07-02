@@ -89,6 +89,301 @@ jobs:
       - name: Certify Windows native secret-store path
         run: npm run smoke:windows:native-secret-store
 
+  windows-installer-package:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.x"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install WiX Toolset
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 7.0.0
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Validate Windows packaging metadata
+        run: npm run validate:windows-packaging
+
+      - name: Build Windows MSI
+        run: npm run package:windows-msi -- --out-dir artifacts/windows-installer
+
+      - name: Smoke installed MSI from PATH
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          $msi = Get-ChildItem -Path "artifacts/windows-installer" -Filter "*.msi" | Select-Object -First 1
+          if (!$msi) {
+            throw "MSI artifact was not produced."
+          }
+
+          $installLog = Join-Path $env:RUNNER_TEMP "xyte-cli-msi-install.log"
+          $installArgs = @("/i", "`"$($msi.FullName)`"", "/qn", "/norestart", "/L*V", "`"$installLog`"")
+          $install = Start-Process -FilePath "msiexec.exe" -ArgumentList $installArgs -Wait -PassThru
+          if ($install.ExitCode -ne 0) {
+            if (Test-Path -LiteralPath $installLog) {
+              Get-Content -LiteralPath $installLog -Tail 200
+            }
+            throw "MSI install failed with exit code $($install.ExitCode)."
+          }
+
+          $installDir = Join-Path $env:ProgramFiles "Xyte CLI"
+          $xyteCliCmd = Join-Path $installDir "xyte-cli.cmd"
+          if (!(Test-Path -LiteralPath $xyteCliCmd)) {
+            throw "Installed xyte-cli.cmd not found at $xyteCliCmd."
+          }
+
+          $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+          $machineEntries = ($machinePath -split ";") | ForEach-Object { $_.TrimEnd("\") }
+          if ($machineEntries -notcontains $installDir) {
+            throw "MSI did not add $installDir to the machine PATH."
+          }
+          $env:Path = @($machinePath, [Environment]::GetEnvironmentVariable("Path", "User")) -join ";"
+
+          where.exe xyte-cli
+          xyte-cli --version
+          xyte-cli doctor environment --format text
+
+          Add-Content -Path $env:GITHUB_PATH -Value $installDir
+
+      - name: Smoke setup assistant and record terminal transcript
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $transcript = Join-Path (Resolve-Path "artifacts/windows-installer") "xyte-cli-windows-pristine-terminal.log"
+          $demoScript = Join-Path $env:RUNNER_TEMP "xyte-cli-windows-pristine-terminal.ps1"
+          @'
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+
+          Write-Host "Windows: $([Environment]::OSVersion.VersionString)"
+          Write-Host "PowerShell: $($PSVersionTable.PSVersion)"
+          Write-Host ""
+
+          Write-Host "PS> where.exe xyte-cli"
+          where.exe xyte-cli
+          Write-Host ""
+
+          Write-Host "PS> xyte-cli --version"
+          xyte-cli --version
+          Write-Host ""
+
+          Write-Host "PS> xyte-cli doctor environment --format text"
+          xyte-cli doctor environment --format text
+          Write-Host ""
+
+          $assistant = Join-Path $env:ProgramFiles "Xyte CLI\scripts\configure-xyte-cli.ps1"
+          if (!(Test-Path -LiteralPath $assistant)) {
+            throw "Installed setup assistant not found at $assistant."
+          }
+          $PSNativeCommandUseErrorActionPreference = $false
+          Write-Host "PS> & `"$assistant`" -NonInteractive"
+          & $assistant -NonInteractive
+          if ($LASTEXITCODE -ne 0) {
+            throw "Setup assistant failed with exit code $LASTEXITCODE."
+          }
+          '@ | Set-Content -LiteralPath $demoScript -Encoding utf8
+
+          & pwsh -NoProfile -ExecutionPolicy Bypass -File $demoScript *>&1 | Tee-Object -FilePath $transcript
+          if ($LASTEXITCODE -ne 0) {
+            throw "Windows terminal transcript smoke failed with exit code $LASTEXITCODE."
+          }
+
+      - name: Smoke setup assistant under Windows PowerShell 5.1
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $assistant = Join-Path $env:ProgramFiles "Xyte CLI\scripts\configure-xyte-cli.ps1"
+          $winPowerShell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+          & $winPowerShell -NoProfile -ExecutionPolicy Bypass -File $assistant -NonInteractive
+          if ($LASTEXITCODE -ne 0) {
+            throw "Setup assistant failed under Windows PowerShell 5.1 with exit code $LASTEXITCODE."
+          }
+
+      - name: Smoke Start Menu shortcuts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $shortcutDir = Join-Path ([Environment]::GetFolderPath("CommonPrograms")) "Xyte CLI"
+          $shell = New-Object -ComObject WScript.Shell
+
+          $configurePath = Join-Path $shortcutDir "Configure Xyte CLI.lnk"
+          if (!(Test-Path -LiteralPath $configurePath)) {
+            throw "Missing Start Menu shortcut: $configurePath"
+          }
+          $configure = $shell.CreateShortcut($configurePath)
+          if (!(Test-Path -LiteralPath $configure.TargetPath)) {
+            throw "Configure shortcut target not found: $($configure.TargetPath)"
+          }
+          $run = Start-Process -FilePath $configure.TargetPath -ArgumentList "$($configure.Arguments) -NonInteractive" -Wait -PassThru -NoNewWindow
+          if ($run.ExitCode -ne 0) {
+            throw "Configure shortcut command failed with exit code $($run.ExitCode)."
+          }
+
+          $consolePath = Join-Path $shortcutDir "Xyte CLI PowerShell.lnk"
+          if (!(Test-Path -LiteralPath $consolePath)) {
+            throw "Missing Start Menu shortcut: $consolePath"
+          }
+          $console = $shell.CreateShortcut($consolePath)
+          if (!(Test-Path -LiteralPath $console.TargetPath)) {
+            throw "PowerShell shortcut target not found: $($console.TargetPath)"
+          }
+          $consoleArgs = $console.Arguments -replace '^\s*-NoExit\s+', ''
+          $run = Start-Process -FilePath $console.TargetPath -ArgumentList $consoleArgs -Wait -PassThru -NoNewWindow
+          if ($run.ExitCode -ne 0) {
+            throw "PowerShell shortcut command failed with exit code $($run.ExitCode)."
+          }
+
+      - name: Smoke npm global migration
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm pack --silent
+          $tarball = Get-ChildItem -Filter "xyteai-cli-*.tgz" | Select-Object -First 1
+          if (!$tarball) {
+            throw "npm pack did not produce a tarball."
+          }
+          npm install -g $tarball.FullName
+          npm list -g "@xyteai/cli" --depth=0
+
+          $assistant = Join-Path $env:ProgramFiles "Xyte CLI\scripts\configure-xyte-cli.ps1"
+          $winPowerShell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+          $PSNativeCommandUseErrorActionPreference = $false
+          & $winPowerShell -NoProfile -ExecutionPolicy Bypass -File $assistant -AssumeYes -NonInteractive
+          if ($LASTEXITCODE -ne 0) {
+            throw "Setup assistant migration run failed with exit code $LASTEXITCODE."
+          }
+
+          & npm list -g "@xyteai/cli" --depth=0
+          if ($LASTEXITCODE -eq 0) {
+            throw "Assistant did not remove the previous npm global install."
+          }
+          exit 0
+
+      - name: Upload Windows terminal transcript
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-terminal-transcript
+          path: artifacts/windows-installer/xyte-cli-windows-pristine-terminal.log
+          if-no-files-found: ignore
+
+      - name: Upload Windows MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-msi
+          path: |
+            artifacts/windows-installer/*.msi
+            artifacts/windows-installer/windows-installer-manifest.json
+            artifacts/windows-installer/winget/*.yaml
+
+  # Non-gating: records the interactive install (full msiexec UI, which
+  # fires the UILevel >= 5 assistant auto-launch that the silent smoke
+  # cannot reach) as a video + stills for human review.
+  windows-installer-demo:
+    needs: windows-installer-package
+    runs-on: windows-latest
+    continue-on-error: true
+    timeout-minutes: 15
+    steps:
+      - name: Download Windows MSI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-msi
+          path: msi
+
+      - name: Record interactive install demo
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path demo | Out-Null
+          $msi = Get-ChildItem -Path msi -Filter "*.msi" -Recurse | Select-Object -First 1
+          if (!$msi) {
+            throw "MSI artifact not found."
+          }
+
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+          function Save-Screenshot([string]$name) {
+            $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bitmap = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
+            $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+            $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+            $bitmap.Save("demo\$name.png", [System.Drawing.Imaging.ImageFormat]::Png)
+            $graphics.Dispose()
+            $bitmap.Dispose()
+          }
+
+          # Matroska stays playable even when the recorder is force-stopped.
+          $recorder = $null
+          if (Get-Command ffmpeg -ErrorAction SilentlyContinue) {
+            $recorder = Start-Process ffmpeg -ArgumentList "-y", "-f", "gdigrab", "-framerate", "5", "-i", "desktop", "-t", "300", "-pix_fmt", "yuv420p", "demo\xyte-cli-windows-install-demo.mkv" -PassThru -WindowStyle Hidden
+            Start-Sleep -Seconds 3
+          }
+
+          Save-Screenshot "01-before-install"
+          $install = Start-Process msiexec.exe -ArgumentList "/i", "`"$($msi.FullName)`"" -PassThru
+          $install.WaitForExit()
+          if ($install.ExitCode -ne 0) {
+            throw "Interactive MSI install failed with exit code $($install.ExitCode)."
+          }
+          Save-Screenshot "02-install-finished"
+
+          # The auto-launched assistant works through its checks before blocking
+          # on the interactive setup prompt.
+          Start-Sleep -Seconds 45
+          Save-Screenshot "03-assistant-prompt"
+
+          try {
+            $wshell = New-Object -ComObject WScript.Shell
+            $activated = $false
+            foreach ($title in @("Windows PowerShell", "powershell")) {
+              if ($wshell.AppActivate($title)) {
+                $activated = $true
+                break
+              }
+            }
+            if ($activated) {
+              Start-Sleep -Seconds 1
+              [System.Windows.Forms.SendKeys]::SendWait("n{ENTER}")
+              Start-Sleep -Seconds 10
+            } else {
+              Write-Host "Assistant window not found for keystroke automation; recording covers the prompt state."
+            }
+          } catch {
+            Write-Host "Could not drive the assistant window: $_"
+          }
+          Save-Screenshot "04-assistant-done"
+
+          if ($recorder) {
+            Start-Sleep -Seconds 2
+            Stop-Process -Id $recorder.Id -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+          }
+
+      - name: Upload install demo recording
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-install-demo
+          path: demo/
+          if-no-files-found: warn
+
   linux-native-secret-store-cert:
     runs-on: ubuntu-latest
     steps:

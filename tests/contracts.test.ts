@@ -11,8 +11,10 @@ import flowRunSchema from '../docs/schemas/flow-run.v1.schema.json';
 import headlessSchema from '../docs/schemas/headless-frame.v1.schema.json';
 import reportSchema from '../docs/schemas/report.v1.schema.json';
 import statusSchema from '../docs/schemas/status.v1.schema.json';
-import upgradeCheckSchema from '../docs/schemas/upgrade-check.v1.schema.json';
-import upgradeResultSchema from '../docs/schemas/upgrade-result.v1.schema.json';
+import upgradeCheckSchema from '../docs/schemas/upgrade-check.v2.schema.json';
+import upgradeCheckLegacySchema from '../docs/schemas/upgrade-check.v1.schema.json';
+import upgradeResultSchema from '../docs/schemas/upgrade-result.v2.schema.json';
+import upgradeResultLegacySchema from '../docs/schemas/upgrade-result.v1.schema.json';
 import watchFrameSchema from '../docs/schemas/watch-frame.v1.schema.json';
 import { buildCallEnvelope } from '../src/contracts/call-envelope';
 import { buildFlowRunSummary } from '../src/contracts/flow-run';
@@ -35,7 +37,9 @@ const validateFlowRun = ajv.compile(flowRunSchema);
 const validateReport = ajv.compile(reportSchema);
 const validateStatus = ajv.compile(statusSchema);
 const validateUpgradeCheck = ajv.compile(upgradeCheckSchema);
+const validateUpgradeCheckLegacy = ajv.compile(upgradeCheckLegacySchema);
 const validateUpgradeResult = ajv.compile(upgradeResultSchema);
+const validateUpgradeResultLegacy = ajv.compile(upgradeResultLegacySchema);
 const validateWatchFrame = ajv.compile(watchFrameSchema);
 const validateDoctorEnvironment = ajv.compile(doctorEnvironmentSchema);
 
@@ -311,9 +315,10 @@ describe('schema contracts', () => {
     });
 
     const upgradeResult = {
-      schemaVersion: 'xyte.upgrade.result.v1',
+      schemaVersion: 'xyte.upgrade.result.v2',
       generatedAtUtc: new Date().toISOString(),
       packageName: '@xyteai/cli',
+      installChannel: 'npm',
       currentVersion: '0.4.0',
       latestVersion: '0.4.1',
       upToDateBefore: false,
@@ -353,6 +358,14 @@ describe('schema contracts', () => {
     expect(validateStatus(status)).toBe(true);
     expect(validateUpgradeCheck(upgradeCheck)).toBe(true);
     expect(validateUpgradeResult(upgradeResult)).toBe(true);
+
+    const legacyUpgradeCheck: Record<string, unknown> = { ...upgradeCheck, schemaVersion: 'xyte.upgrade.check.v1' };
+    delete legacyUpgradeCheck.installChannel;
+    const legacyUpgradeResult: Record<string, unknown> = { ...upgradeResult, schemaVersion: 'xyte.upgrade.result.v1' };
+    delete legacyUpgradeResult.installChannel;
+
+    expect(validateUpgradeCheckLegacy(legacyUpgradeCheck)).toBe(true);
+    expect(validateUpgradeResultLegacy(legacyUpgradeResult)).toBe(true);
   });
 
   it('validates watch frame payload', () => {

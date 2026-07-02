@@ -360,8 +360,8 @@ Schema/version IDs:
 - inspect deep dive: `xyte.inspect.deep-dive.v1`
 - report metadata: `xyte.report.v1`
 - status: `xyte.status.v1`
-- upgrade check: `xyte.upgrade.check.v1`
-- upgrade result: `xyte.upgrade.result.v1`
+- upgrade check: `xyte.upgrade.check.v2`
+- upgrade result: `xyte.upgrade.result.v2`
 - utility batch summary: `xyte.utility.batch.v1`
 - utility prepare: `xyte.utility.prepare.v1`
 - watch frame: `xyte.watch.frame.v1`
