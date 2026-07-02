@@ -39,6 +39,11 @@ export interface XyteCallResult<T = unknown> {
 export type NamespaceCall = (args?: XyteCallArgs) => Promise<unknown>;
 
 export interface OrganizationNamespace {
+  getAssets: NamespaceCall;
+  getAsset: NamespaceCall;
+  createAsset: NamespaceCall;
+  updateAsset: NamespaceCall;
+  deleteAsset: NamespaceCall;
   closeIncident: NamespaceCall;
   cancelCommand: NamespaceCall;
   getCommands: NamespaceCall;

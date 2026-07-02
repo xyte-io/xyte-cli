@@ -4,6 +4,11 @@ export function createOrganizationNamespace(
   call: (endpointKey: string, args?: XyteCallArgs) => Promise<unknown>
 ): OrganizationNamespace {
   return {
+    getAssets: (args) => call('organization.assets.getAssets', args),
+    getAsset: (args) => call('organization.assets.getAsset', args),
+    createAsset: (args) => call('organization.assets.createAsset', args),
+    updateAsset: (args) => call('organization.assets.updateAsset', args),
+    deleteAsset: (args) => call('organization.assets.deleteAsset', args),
     closeIncident: (args) => call('organization.incidents.closeIncident', args),
     cancelCommand: (args) => call('organization.commands.cancelCommand', args),
     getCommands: (args) => call('organization.commands.getCommands', args),

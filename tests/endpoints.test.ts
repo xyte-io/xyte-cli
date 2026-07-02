@@ -239,6 +239,67 @@ describe('public endpoint catalog', () => {
     }
   });
 
+  it('includes organization asset endpoint metadata', () => {
+    const getAssets = endpoints.find((item) => item.key === 'organization.assets.getAssets');
+    expect(getAssets).toBeDefined();
+    expect(getAssets?.method).toBe('GET');
+    expect(getAssets?.base).toBe('hub');
+    expect(getAssets?.pathTemplate).toBe('/core/v1/organization/assets');
+    expect(getAssets?.pathParams).toEqual([]);
+    expect(getAssets?.queryParams).toEqual(['page', 'per_page', 'name', 'serial_number', 'space_id']);
+    expect(getAssets?.authScope).toBe('organization');
+    expect(getAssets?.bodyType).toBe('none');
+    expect(getAssets?.hasBody).toBe(false);
+    expect(getAssets?.sourceFile).toBe('https://docs.xyte.io/reference/get-assets');
+    expect(getAssets?.notes?.some((note) => note.includes('next_page'))).toBe(true);
+
+    const getAsset = endpoints.find((item) => item.key === 'organization.assets.getAsset');
+    expect(getAsset).toBeDefined();
+    expect(getAsset?.method).toBe('GET');
+    expect(getAsset?.pathTemplate).toBe('/core/v1/organization/assets/:id');
+    expect(getAsset?.pathParams).toEqual(['id']);
+    expect(getAsset?.queryParams).toEqual([]);
+    expect(getAsset?.authScope).toBe('organization');
+    expect(getAsset?.bodyType).toBe('none');
+    expect(getAsset?.hasBody).toBe(false);
+    expect(getAsset?.sourceFile).toBe('https://docs.xyte.io/reference/get-asset');
+
+    const createAsset = endpoints.find((item) => item.key === 'organization.assets.createAsset');
+    expect(createAsset).toBeDefined();
+    expect(createAsset?.method).toBe('POST');
+    expect(createAsset?.pathTemplate).toBe('/core/v1/organization/assets');
+    expect(createAsset?.pathParams).toEqual([]);
+    expect(createAsset?.queryParams).toEqual([]);
+    expect(createAsset?.authScope).toBe('organization');
+    expect(createAsset?.bodyType).toBe('json');
+    expect(createAsset?.hasBody).toBe(true);
+    expect(createAsset?.bodyExample).toContain('space_id');
+    expect(createAsset?.bodyExample).toContain('serial_number');
+    expect(createAsset?.sourceFile).toBe('https://docs.xyte.io/reference/create-asset');
+
+    const updateAsset = endpoints.find((item) => item.key === 'organization.assets.updateAsset');
+    expect(updateAsset).toBeDefined();
+    expect(updateAsset?.method).toBe('PUT');
+    expect(updateAsset?.pathTemplate).toBe('/core/v1/organization/assets/:id');
+    expect(updateAsset?.pathParams).toEqual(['id']);
+    expect(updateAsset?.queryParams).toEqual([]);
+    expect(updateAsset?.authScope).toBe('organization');
+    expect(updateAsset?.bodyType).toBe('json');
+    expect(updateAsset?.hasBody).toBe(true);
+    expect(updateAsset?.sourceFile).toBe('https://docs.xyte.io/reference/update-asset');
+
+    const deleteAsset = endpoints.find((item) => item.key === 'organization.assets.deleteAsset');
+    expect(deleteAsset).toBeDefined();
+    expect(deleteAsset?.method).toBe('DELETE');
+    expect(deleteAsset?.pathTemplate).toBe('/core/v1/organization/assets/:id');
+    expect(deleteAsset?.pathParams).toEqual(['id']);
+    expect(deleteAsset?.queryParams).toEqual([]);
+    expect(deleteAsset?.authScope).toBe('organization');
+    expect(deleteAsset?.bodyType).toBe('none');
+    expect(deleteAsset?.hasBody).toBe(false);
+    expect(deleteAsset?.sourceFile).toBe('https://docs.xyte.io/reference/delete-asset');
+  });
+
   it('includes organization edge startClaim endpoint metadata', () => {
     const endpoint = endpoints.find((item) => item.key === 'organization.edge.startClaim');
     expect(endpoint).toBeDefined();

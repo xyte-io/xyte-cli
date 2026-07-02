@@ -255,6 +255,72 @@ describe('client auth behavior', () => {
     expect(request.mock.calls[7][0].headers['Content-Type']).toBeUndefined();
   });
 
+  it('renders organization asset requests with path, query, and body semantics', async () => {
+    const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } });
+    const transport = { request } as unknown as HttpTransport;
+
+    const client = createXyteClient({
+      auth: { organization: 'org-key-123' },
+      hubBaseUrl: 'https://hub.example.test',
+      transport
+    });
+
+    await client.organization.getAssets({
+      query: { page: 2, per_page: 50, name: 'proj', serial_number: 'SN-1', space_id: 99592 }
+    });
+    await client.organization.getAsset({ path: { id: 'asset/one' } });
+    await client.organization.createAsset({
+      body: { name: 'Projector A1', serial_number: 'SN-1', space_id: 99592 }
+    });
+    await client.organization.updateAsset({
+      path: { id: 'asset/one' },
+      body: { name: 'Projector A1 Renamed' }
+    });
+    await client.organization.deleteAsset({
+      path: { id: 'asset/one' },
+      body: { ignored: true }
+    });
+
+    expect(request).toHaveBeenCalledTimes(5);
+
+    expect(request.mock.calls[0][0]).toMatchObject({
+      method: 'GET',
+      url: 'https://hub.example.test/core/v1/organization/assets?page=2&per_page=50&name=proj&serial_number=SN-1&space_id=99592'
+    });
+    expect(request.mock.calls[0][0].body).toBeUndefined();
+    expect(request.mock.calls[0][0].headers['Content-Type']).toBeUndefined();
+    expect(request.mock.calls[0][0].headers.Authorization).toBe('org-key-123');
+
+    expect(request.mock.calls[1][0]).toMatchObject({
+      method: 'GET',
+      url: 'https://hub.example.test/core/v1/organization/assets/asset%2Fone'
+    });
+    expect(request.mock.calls[1][0].body).toBeUndefined();
+    expect(request.mock.calls[1][0].headers['Content-Type']).toBeUndefined();
+
+    expect(request.mock.calls[2][0]).toMatchObject({
+      method: 'POST',
+      url: 'https://hub.example.test/core/v1/organization/assets',
+      body: JSON.stringify({ name: 'Projector A1', serial_number: 'SN-1', space_id: 99592 })
+    });
+    expect(request.mock.calls[2][0].headers['Content-Type']).toBe('application/json');
+    expect(request.mock.calls[2][0].headers.Authorization).toBe('org-key-123');
+
+    expect(request.mock.calls[3][0]).toMatchObject({
+      method: 'PUT',
+      url: 'https://hub.example.test/core/v1/organization/assets/asset%2Fone',
+      body: JSON.stringify({ name: 'Projector A1 Renamed' })
+    });
+    expect(request.mock.calls[3][0].headers['Content-Type']).toBe('application/json');
+
+    expect(request.mock.calls[4][0]).toMatchObject({
+      method: 'DELETE',
+      url: 'https://hub.example.test/core/v1/organization/assets/asset%2Fone'
+    });
+    expect(request.mock.calls[4][0].body).toBeUndefined();
+    expect(request.mock.calls[4][0].headers['Content-Type']).toBeUndefined();
+  });
+
   it('uses active slot secret when multiple slots exist', async () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });

@@ -135,6 +135,8 @@ xyte-cli api endpoints describe organization.devices.mergeDevice
 xyte-cli api endpoints describe organization.devices.splitDevice
 xyte-cli api endpoints describe organization.notes.getDeviceNotes
 xyte-cli api endpoints describe organization.notes.createDeviceNote
+xyte-cli api endpoints describe organization.assets.getAssets
+xyte-cli api endpoints describe organization.assets.createAsset
 xyte-cli api endpoints describe organization.users.getUsers
 xyte-cli api endpoints describe organization.groups.addUsers
 xyte-cli api endpoints describe partner.organizations.createOrganization
@@ -143,6 +145,8 @@ xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --output-
 xyte-cli api call organization.devices.mergeDevice --tenant <tenant-id> --path-json '{"device_id":"<primary-device-id>"}' --body-json '{"with_device_ids":["<shadow-device-id>"]}' --note "approved merge"
 xyte-cli api call organization.devices.splitDevice --tenant <tenant-id> --path-json '{"device_id":"<primary-device-id>"}' --body-json '{"shadow_device_id":"<shadow-device-id>"}' --note "approved split"
 xyte-cli api call organization.notes.getDeviceNotes --tenant <tenant-id> --path-json '{"device_id":"<device-id>"}' --query-json '{"page":1,"per_page":100}'
+xyte-cli api call organization.assets.getAssets --tenant <tenant-id> --query-json '{"page":1,"per_page":100,"name":"projector","space_id":99592}'
+xyte-cli api call organization.assets.getAsset --tenant <tenant-id> --path-json '{"id":"<asset-id>"}'
 xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once
 xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --interval-ms 2000 --max-polls 10
 ```
@@ -205,6 +209,19 @@ xyte-cli api call organization.notes.createDeviceNote \
 xyte-cli api call organization.notes.deleteDeviceNote \
   --tenant <tenant-id> \
   --path-json '{"device_id":"DEVICE_ID","id":"NOTE_ID"}'
+
+xyte-cli api call organization.assets.createAsset \
+  --tenant <tenant-id> \
+  --body-json '{"name":"Projector A1","serial_number":"SN-12345","space_id":99592,"status":{"id":"ENTITY_LABEL_UUID"}}'
+
+xyte-cli api call organization.assets.updateAsset \
+  --tenant <tenant-id> \
+  --path-json '{"id":"ASSET_ID"}' \
+  --body-json '{"name":"Projector A1 Renamed","space_id":99592}'
+
+xyte-cli api call organization.assets.deleteAsset \
+  --tenant <tenant-id> \
+  --path-json '{"id":"ASSET_ID"}'
 
 xyte-cli api call organization.groups.addUsers \
   --tenant <tenant-id> \

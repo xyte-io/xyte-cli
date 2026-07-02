@@ -275,6 +275,35 @@ describe('namespace endpoint mappings', () => {
     });
   });
 
+  it('maps organization asset methods to their endpoint keys', async () => {
+    const call = vi.fn().mockResolvedValue({ ok: true });
+    const organization = createOrganizationNamespace(call);
+
+    await organization.getAssets({ query: { page: 1, per_page: 100, name: 'proj', space_id: 99592 } });
+    await organization.getAsset({ path: { id: 'asset-1' } });
+    await organization.createAsset({
+      body: { name: 'Projector A1', serial_number: 'SN-1', space_id: 99592 }
+    });
+    await organization.updateAsset({
+      path: { id: 'asset-1' },
+      body: { name: 'Projector A1 Renamed' }
+    });
+    await organization.deleteAsset({ path: { id: 'asset-1' } });
+
+    expect(call).toHaveBeenNthCalledWith(1, 'organization.assets.getAssets', {
+      query: { page: 1, per_page: 100, name: 'proj', space_id: 99592 }
+    });
+    expect(call).toHaveBeenNthCalledWith(2, 'organization.assets.getAsset', { path: { id: 'asset-1' } });
+    expect(call).toHaveBeenNthCalledWith(3, 'organization.assets.createAsset', {
+      body: { name: 'Projector A1', serial_number: 'SN-1', space_id: 99592 }
+    });
+    expect(call).toHaveBeenNthCalledWith(4, 'organization.assets.updateAsset', {
+      path: { id: 'asset-1' },
+      body: { name: 'Projector A1 Renamed' }
+    });
+    expect(call).toHaveBeenNthCalledWith(5, 'organization.assets.deleteAsset', { path: { id: 'asset-1' } });
+  });
+
   it('maps partner.createOrganization to partner.organizations.createOrganization', async () => {
     const call = vi.fn().mockResolvedValue({ ok: true });
     const partner = createPartnerNamespace(call);

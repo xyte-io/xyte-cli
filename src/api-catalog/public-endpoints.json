@@ -1,5 +1,129 @@
 [
   {
+    "key": "organization.assets.getAssets",
+    "namespace": "organization",
+    "group": "assets",
+    "action": "getAssets",
+    "title": "Get Assets",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/assets",
+    "pathParams": [],
+    "queryParams": [
+      "page",
+      "per_page",
+      "name",
+      "serial_number",
+      "space_id"
+    ],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/get-assets",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-assets",
+      "Route verified against hub backend Core::V1::Organization::AssetsController#index.",
+      "Paginated response uses { items, next_page }; next_page is null on the last page.",
+      "name and serial_number are case-insensitive contains filters; space_id is an exact integer match.",
+      "per_page defaults to 100 and is capped at 100; page defaults to 1 and must be >= 1."
+    ]
+  },
+  {
+    "key": "organization.assets.getAsset",
+    "namespace": "organization",
+    "group": "assets",
+    "action": "getAsset",
+    "title": "Get Asset",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/assets/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/get-asset",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-asset",
+      "Route verified against hub backend Core::V1::Organization::AssetsController#show.",
+      "Returns 404 when the asset does not exist or belongs to another organization."
+    ]
+  },
+  {
+    "key": "organization.assets.createAsset",
+    "namespace": "organization",
+    "group": "assets",
+    "action": "createAsset",
+    "title": "Create Asset",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/assets",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/create-asset",
+    "bodyExample": "{\n  \"name\": \"Projector A1\",\n  \"serial_number\": \"SN-12345\",\n  \"space_id\": 99592,\n  \"purchased_at\": \"2026-01-15T00:00:00Z\",\n  \"comments\": \"Mounted in the main hall\",\n  \"icon_name\": \"projector\",\n  \"manufacturer\": { \"id\": \"<entity-label-uuid>\" },\n  \"device_model\": { \"id\": \"<entity-label-uuid>\" },\n  \"device_type\": { \"id\": \"<entity-label-uuid>\" },\n  \"status\": { \"id\": \"<entity-label-uuid>\" }\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/create-asset",
+      "Route verified against hub backend Core::V1::Organization::AssetsController#create.",
+      "space_id is required and must be an integer for a space in the caller's organization.",
+      "manufacturer, device_model, device_type, and status are objects { id: <entity_label_uuid> } and the entity label must belong to the caller's organization.",
+      "Returns 422 when space_id is missing or invalid, 404 when the space belongs to another organization, and 403 when an entity label belongs to another organization."
+    ]
+  },
+  {
+    "key": "organization.assets.updateAsset",
+    "namespace": "organization",
+    "group": "assets",
+    "action": "updateAsset",
+    "title": "Update Asset",
+    "method": "PUT",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/assets/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/update-asset",
+    "bodyExample": "{\n  \"name\": \"Projector A1\",\n  \"space_id\": 99592,\n  \"status\": { \"id\": \"<entity-label-uuid>\" }\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/update-asset",
+      "Route verified against hub backend Core::V1::Organization::AssetsController#update.",
+      "All body fields are optional on update and accept the same shapes as create.",
+      "Returns 404 when the asset does not exist or belongs to another organization."
+    ]
+  },
+  {
+    "key": "organization.assets.deleteAsset",
+    "namespace": "organization",
+    "group": "assets",
+    "action": "deleteAsset",
+    "title": "Delete Asset",
+    "method": "DELETE",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/assets/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/delete-asset",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/delete-asset",
+      "Route verified against hub backend Core::V1::Organization::AssetsController#destroy.",
+      "Returns 204 No Content on success and 404 when the asset does not exist or belongs to another organization."
+    ]
+  },
+  {
     "key": "organization.commands.cancelCommand",
     "namespace": "organization",
     "group": "commands",

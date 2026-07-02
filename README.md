@@ -141,6 +141,24 @@ xyte-cli api call organization.notes.deleteDeviceNote \
   --path-json '{"device_id":"<device-id>","id":"<note-id>"}'
 ```
 
+### 2c) Assets (full CRUD)
+
+`getAssets`/`getAsset` are safe reads. `createAsset`, `updateAsset`, and `deleteAsset` are writes; get explicit approval before running them. `space_id` is required on create and must reference a space in the caller's organization.
+
+```bash
+xyte-cli api call organization.assets.getAssets \
+  --tenant <tenant-id> \
+  --query-json '{"page":1,"per_page":100,"name":"projector","space_id":99592}'
+
+xyte-cli api call organization.assets.createAsset \
+  --tenant <tenant-id> \
+  --body-json '{"name":"Projector A1","serial_number":"SN-12345","space_id":99592,"status":{"id":"<entity-label-uuid>"}}'
+
+xyte-cli api call organization.assets.deleteAsset \
+  --tenant <tenant-id> \
+  --path-json '{"id":"<asset-id>"}'
+```
+
 ### 3) Incident watch (active incidents)
 
 ```bash

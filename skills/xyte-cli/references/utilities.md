@@ -310,3 +310,10 @@ Notes endpoints are generic call-loop actions:
 - `organization.notes.deleteSpaceNote`
 
 Prepare rows, inspect the generated `.notes.md` and rejected output, then ask the user for explicit approval before running any `xyte-cli api call` loop. There is no dedicated bulk notes executor.
+
+Asset write endpoints are generic call-loop actions:
+- `organization.assets.createAsset`
+- `organization.assets.updateAsset`
+- `organization.assets.deleteAsset`
+
+Prepare rows, inspect the generated `.notes.md` and rejected output, then ask the user for explicit approval before running any `xyte-cli api call` loop. Keep `space_id` numeric and do not guess entity-label ids. There is no dedicated bulk assets executor.

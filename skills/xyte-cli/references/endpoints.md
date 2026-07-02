@@ -42,6 +42,7 @@ Derived from the bundled public endpoint spec.
 | Endpoint Key | Query Fields | Pagination Fields | Notes |
 | --- | --- | --- | --- |
 | `organization.spaces.getSpaces` | `id`, `name`, `parent_id`, `space_type`, `created_before`, `created_after`, `path_includes` | none | Main listing endpoint with server-side filtering |
+| `organization.assets.getAssets` | `page`, `per_page`, `name`, `serial_number`, `space_id` | `page`, `per_page` | Paginated asset listing; `name`/`serial_number` are case-insensitive contains filters, `space_id` is an exact match. Response uses `{ items, next_page }` (`next_page` is null on the last page). |
 | `organization.devices.getDevices` | `space_id` | none | Filter devices by one space |
 | `organization.devices.getHistories` | `status`, `from`, `to`, `device_id`, `space_id`, `name` | none | Filtered history lookup; can be time-windowed |
 | `organization.commands.getCommands` | `status`, `page`, `per_page` | `page`, `per_page` | Command history pagination and status filter |
@@ -167,6 +168,37 @@ xyte-cli api call organization.notes.getSpaceNotes \
   --query-json '{"page":1,"per_page":100}'
 ```
 
+### `organization.assets.*`
+
+Full CRUD for organization assets. `getAssets`/`getAsset` are safe reads. `createAsset`, `updateAsset`, and `deleteAsset` are writes; run them only after explicit user approval.
+
+`space_id` is required on create and must reference a space in the caller's organization. `manufacturer`, `device_model`, `device_type`, and `status` are entity-label references shaped as `{ "id": "<entity-label-uuid>" }`, and each label must belong to the caller's organization.
+
+```bash
+xyte-cli api call organization.assets.getAssets \
+  --tenant <tenant-id> \
+  --query-json '{"page":1,"per_page":100,"name":"projector","serial_number":"SN-1","space_id":99592}'
+
+xyte-cli api call organization.assets.getAsset \
+  --tenant <tenant-id> \
+  --path-json '{"id":"<asset-id>"}'
+
+xyte-cli api call organization.assets.createAsset \
+  --tenant <tenant-id> \
+  --body-json '{"name":"Projector A1","serial_number":"SN-12345","space_id":99592,"purchased_at":"2026-01-15T00:00:00Z","comments":"Main hall","icon_name":"projector","manufacturer":{"id":"<entity-label-uuid>"},"status":{"id":"<entity-label-uuid>"}}'
+
+xyte-cli api call organization.assets.updateAsset \
+  --tenant <tenant-id> \
+  --path-json '{"id":"<asset-id>"}' \
+  --body-json '{"name":"Projector A1 Renamed","space_id":99592}'
+
+xyte-cli api call organization.assets.deleteAsset \
+  --tenant <tenant-id> \
+  --path-json '{"id":"<asset-id>"}'
+```
+
+Errors to expect on writes: `422` when `space_id` is missing or invalid, `404` when the space belongs to another organization, and `403` when an entity label belongs to another organization.
+
 ### `organization.groups.addUsers`
 
 ```bash
@@ -187,6 +219,11 @@ xyte-cli api call partner.organizations.createOrganization \
 ## Common Endpoint Keys
 
 Organization:
+- `organization.assets.getAssets`
+- `organization.assets.getAsset`
+- `organization.assets.createAsset`
+- `organization.assets.updateAsset`
+- `organization.assets.deleteAsset`
 - `organization.devices.getDevices`
 - `organization.devices.getDevice`
 - `organization.devices.claimDevice` (native claim)

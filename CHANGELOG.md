@@ -6,6 +6,17 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-07-02
+
+### Added
+- Added organization asset endpoints to the public endpoint catalog, typed client surface, docs, and shipped skill guidance:
+  - `organization.assets.getAssets` (paginated list; `name`/`serial_number` case-insensitive contains filters, `space_id` exact match; response uses `{ items, next_page }`)
+  - `organization.assets.getAsset`
+  - `organization.assets.createAsset` (`space_id` required; `manufacturer`/`device_model`/`device_type`/`status` are entity-label references)
+  - `organization.assets.updateAsset`
+  - `organization.assets.deleteAsset`
+- Asset write endpoints are available through generic `xyte-cli util prepare` (`call-loop-only`); there is no dedicated bulk assets executor.
+
 ## [0.11.0] - 2026-06-24
 
 ### Added

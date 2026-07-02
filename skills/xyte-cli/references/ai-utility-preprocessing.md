@@ -58,6 +58,7 @@ Friendly profiles:
 Generic profiles:
 1. `<path params...>,query_json,body_json`
 2. Note write/delete endpoints such as `organization.notes.createDeviceNote`, `organization.notes.createSpaceNote`, `organization.notes.deleteDeviceNote`, and `organization.notes.deleteSpaceNote` are generic `call-loop-only` actions. Prepare rows, review generated notes/rejects, then run controlled `xyte-cli api call` loops only after explicit approval.
+3. Asset write/delete endpoints `organization.assets.createAsset`, `organization.assets.updateAsset`, and `organization.assets.deleteAsset` are generic `call-loop-only` actions with the same prepare-then-approve workflow. On create, keep `space_id` numeric and never guess entity-label ids for `manufacturer`/`device_model`/`device_type`/`status`.
 
 ## Required AI rules
 
