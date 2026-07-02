@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { runOrThrow } from './run_command.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -122,6 +122,17 @@ function ensureMsiBuildSupported() {
   }
 }
 
+async function downloadFile(url, destination, description, maxTime) {
+  const partialPath = `${destination}.partial`;
+  rmSync(partialPath, { force: true });
+  await runOrThrow(
+    process.platform === 'win32' ? 'curl.exe' : 'curl',
+    ['--fail', '--location', '--retry', '3', '--connect-timeout', '20', '--max-time', maxTime, '--output', partialPath, url],
+    description
+  );
+  renameSync(partialPath, destination);
+}
+
 async function downloadNode(args, payloadDir) {
   if (args.skipNode) {
     writeFileSync(join(payloadDir, 'node.exe.placeholder'), 'Node runtime omitted by --skip-node.\n');
@@ -137,27 +148,25 @@ async function downloadNode(args, payloadDir) {
   const shasumsUrl = `https://nodejs.org/dist/v${args.nodeVersion}/SHASUMS256.txt`;
 
   if (!existsSync(zipPath)) {
-    await runOrThrow(
-      process.platform === 'win32' ? 'curl.exe' : 'curl',
-      ['--fail', '--location', '--retry', '3', '--connect-timeout', '20', '--max-time', '300', '--output', zipPath, nodeUrl],
-      'Download Node.js Windows runtime'
-    );
+    await downloadFile(nodeUrl, zipPath, 'Download Node.js Windows runtime', '300');
   }
   if (!existsSync(shasumsPath)) {
-    await runOrThrow(
-      process.platform === 'win32' ? 'curl.exe' : 'curl',
-      ['--fail', '--location', '--retry', '3', '--connect-timeout', '20', '--max-time', '60', '--output', shasumsPath, shasumsUrl],
-      'Download Node.js runtime checksums'
-    );
+    await downloadFile(shasumsUrl, shasumsPath, 'Download Node.js runtime checksums', '60');
   }
 
   const expectedSha256 = findExpectedSha256(readFileSync(shasumsPath, 'utf8'), `${nodeBase}.zip`);
   if (!expectedSha256) {
-    throw new Error(`Could not find checksum for ${nodeBase}.zip in ${shasumsPath}.`);
+    rmSync(shasumsPath, { force: true });
+    throw new Error(
+      `Could not find checksum for ${nodeBase}.zip in ${shasumsPath}. Removed the cached checksum file; re-run to download it again.`
+    );
   }
   const actualSha256 = sha256File(zipPath);
   if (actualSha256 !== expectedSha256) {
-    throw new Error(`Node.js runtime checksum mismatch for ${nodeBase}.zip: expected ${expectedSha256}, got ${actualSha256}.`);
+    rmSync(zipPath, { force: true });
+    throw new Error(
+      `Node.js runtime checksum mismatch for ${nodeBase}.zip: expected ${expectedSha256}, got ${actualSha256}. Removed the cached download; re-run to download it again.`
+    );
   }
 
   const extractDir = join(cacheDir, nodeBase);
@@ -220,9 +229,7 @@ function copyPayloadFiles(payloadDir) {
     `${JSON.stringify(
       {
         kind: 'windows-msi',
-        packageId: 'Xyte.XyteCLI',
-        updateCommand: 'winget upgrade --id Xyte.XyteCLI --exact',
-        releaseUrl: 'https://github.com/xyte-io/xyte-cli/releases/latest'
+        packageId: 'Xyte.XyteCLI'
       },
       null,
       2
@@ -433,7 +440,12 @@ async function main() {
   process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`);
 }
 
-main().catch((error) => {
-  process.stderr.write(`${error instanceof Error ? error.stack || error.message : String(error)}\n`);
-  process.exitCode = 1;
-});
+const invokedDirectly = process.argv[1] ? import.meta.url === pathToFileURL(resolve(process.argv[1])).href : false;
+if (invokedDirectly) {
+  main().catch((error) => {
+    process.stderr.write(`${error instanceof Error ? error.stack || error.message : String(error)}\n`);
+    process.exitCode = 1;
+  });
+}
+
+export { parseArgs, validateArgs, findExpectedSha256 };

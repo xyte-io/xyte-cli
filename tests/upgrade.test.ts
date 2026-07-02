@@ -23,7 +23,7 @@ describe('upgrade utilities', () => {
       {
         fetchImpl: fetchImpl as any,
         getCurrentVersion: () => '0.4.0',
-        getInstallChannel: () => ({ kind: 'npm', updateCommand: 'npm install --global @xyteai/cli@latest' })
+        getInstallChannel: () => ({ kind: 'npm' })
       }
     );
 
@@ -33,7 +33,7 @@ describe('upgrade utilities', () => {
     expect(result.upToDate).toBe(false);
   });
 
-  it('recommends winget updates for Windows MSI installs', async () => {
+  it('recommends winget updates for Windows MSI installs, defaulting the package id', async () => {
     const result = await checkForUpgrade(
       {
         packageName: '@xyteai/cli',
@@ -41,11 +41,7 @@ describe('upgrade utilities', () => {
       },
       {
         getCurrentVersion: () => '0.4.0',
-        getInstallChannel: () => ({
-          kind: 'windows-msi',
-          updateCommand: 'winget upgrade --id Xyte.XyteCLI --exact',
-          packageId: 'Xyte.XyteCLI'
-        })
+        getInstallChannel: () => ({ kind: 'windows-msi' })
       }
     );
 
@@ -53,7 +49,7 @@ describe('upgrade utilities', () => {
     expect(result.recommendedCommand).toBe('winget upgrade --id Xyte.XyteCLI --exact');
   });
 
-  it('derives Windows MSI update recommendations from package id instead of arbitrary updateCommand text', async () => {
+  it('derives winget recommendations from a custom package id', async () => {
     const result = await checkForUpgrade(
       {
         packageName: '@xyteai/cli',
@@ -63,7 +59,6 @@ describe('upgrade utilities', () => {
         getCurrentVersion: () => '0.4.0',
         getInstallChannel: () => ({
           kind: 'windows-msi',
-          updateCommand: 'winget upgrade --id Contoso.OtherTool --silent',
           packageId: 'Xyte.CustomCLI'
         })
       }
@@ -74,8 +69,7 @@ describe('upgrade utilities', () => {
 
   it('detects install channel once when applying an upgrade', async () => {
     const getInstallChannel = vi.fn(() => ({
-      kind: 'npm' as const,
-      updateCommand: 'npm install --global @xyteai/cli@latest'
+      kind: 'npm' as const
     }));
     const commandRunner = vi.fn(async (command: string) => {
       if (/^npm(?:\.cmd)?$/.test(command)) {
@@ -150,7 +144,7 @@ describe('upgrade utilities', () => {
         fetchImpl: vi.fn() as any,
         commandRunner,
         getCurrentVersion: () => '0.4.0',
-        getInstallChannel: () => ({ kind: 'npm', updateCommand: 'npm install --global @xyteai/cli@latest' }),
+        getInstallChannel: () => ({ kind: 'npm' }),
         installSkillsImpl: vi.fn().mockResolvedValue({
           workspaceRoot: '/tmp/workspace',
           homeRoot: '/tmp/home',
@@ -215,7 +209,7 @@ describe('upgrade utilities', () => {
         fetchImpl: vi.fn() as any,
         commandRunner,
         getCurrentVersion: () => '0.5.0',
-        getInstallChannel: () => ({ kind: 'npm', updateCommand: 'npm install --global @xyteai/cli@latest' }),
+        getInstallChannel: () => ({ kind: 'npm' }),
         installSkillsImpl: vi.fn().mockResolvedValue({
           workspaceRoot: '/tmp/workspace',
           homeRoot: '/tmp/home',
@@ -262,7 +256,6 @@ describe('upgrade utilities', () => {
         getCurrentVersion: () => '0.6.0',
         getInstallChannel: () => ({
           kind: 'windows-msi',
-          updateCommand: 'winget upgrade --id Xyte.XyteCLI --exact',
           packageId: 'Xyte.XyteCLI'
         }),
         installSkillsImpl: vi.fn().mockResolvedValue({

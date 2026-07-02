@@ -8,6 +8,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# This script inspects $LASTEXITCODE by hand (npm probes are allowed to fail);
+# PowerShell 7 hosts must not convert native exit codes into terminating errors.
+$PSNativeCommandUseErrorActionPreference = $false
 
 function Write-Step {
   param([string]$Message)
@@ -16,18 +19,10 @@ function Write-Step {
 }
 
 function Invoke-XyteCli {
-  param(
-    [string[]]$Arguments,
-    [switch]$AllowFailure
-  )
+  param([string[]]$Arguments)
   & $script:XyteCli @Arguments
-  $exitCode = $LASTEXITCODE
-  if ($exitCode -ne 0 -and !$AllowFailure) {
-    throw "xyte-cli $($Arguments -join ' ') failed with exit code $exitCode."
-  }
-  if ($AllowFailure) {
-    $global:LASTEXITCODE = 0
-    return $exitCode
+  if ($LASTEXITCODE -ne 0) {
+    throw "xyte-cli $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
   }
 }
 
@@ -113,13 +108,20 @@ if (!$SkipApiKeySetup) {
 }
 
 Write-Step "Readiness"
-$readinessExitCode = Invoke-XyteCli -Arguments @("setup", "status", "--format", "text") -AllowFailure
-if ($readinessExitCode -ne 0) {
-  Write-Host "No connected tenant was confirmed. Run this assistant again or run: xyte-cli setup run"
+Invoke-XyteCli @("setup", "status", "--format", "text")
+# setup status exits 0 in every state; the readiness signal is the state field.
+$setupState = (& $script:XyteCli @("setup", "status", "--field", "state") | Out-String).Trim()
+if (!$setupState) {
+  $setupState = "unknown"
 }
 Write-Host ""
-if ($readinessExitCode -eq 0) {
+if ($setupState -eq "ready") {
   Write-Host "Xyte CLI Windows setup is complete."
-} else {
+} elseif ($setupState -eq "needs_setup") {
   Write-Host "Xyte CLI Windows install is complete, but setup still needs an API key."
+  Write-Host "Run this assistant again or run: xyte-cli setup run"
+} else {
+  Write-Host "Xyte CLI Windows install is complete, but readiness reported '$setupState'."
+  Write-Host "Run: xyte-cli config doctor"
 }
+exit 0

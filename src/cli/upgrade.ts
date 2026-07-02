@@ -5,7 +5,7 @@ import { runProcess } from '../utils/run-command';
 import { getCliVersion } from '../utils/version';
 import { buildUpgradeCheck, type UpgradeCheckV1, type UpgradeResultV1 } from '../contracts/upgrade';
 import { UPGRADE_RESULT_SCHEMA_VERSION } from '../contracts/versions';
-import { detectInstallChannel, type InstallChannel } from '../utils/install-channel';
+import { detectInstallChannel, WINDOWS_MSI_PACKAGE_ID, type InstallChannel } from '../utils/install-channel';
 
 const DEFAULT_CLI_PACKAGE = '@xyteai/cli';
 const DEFAULT_SKILL_AGENTS: SkillAgent[] = ['claude', 'copilot', 'codex'];
@@ -47,7 +47,7 @@ function parseVersionFromOutput(output: string): string | undefined {
 
 function buildRecommendedUpdateCommand(packageName: string, installChannel: InstallChannel): string {
   if (installChannel.kind === 'windows-msi') {
-    return `winget upgrade --id ${installChannel.packageId ?? 'Xyte.XyteCLI'} --exact`;
+    return `winget upgrade --id ${installChannel.packageId ?? WINDOWS_MSI_PACKAGE_ID} --exact`;
   }
   return `npm install --global ${packageName}@latest`;
 }
@@ -60,7 +60,7 @@ function buildExecutableUpdateCommand(args: {
   if (args.installChannel.kind === 'windows-msi') {
     return {
       command: 'winget',
-      args: ['upgrade', '--id', args.installChannel.packageId ?? 'Xyte.XyteCLI', '--exact']
+      args: ['upgrade', '--id', args.installChannel.packageId ?? WINDOWS_MSI_PACKAGE_ID, '--exact']
     };
   }
 

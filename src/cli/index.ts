@@ -877,14 +877,14 @@ export function createCli(runtime: CliRuntime = {}): Command {
       });
       const latestVersionOverride = process.env.XYTE_CLI_UPGRADE_TARGET_VERSION?.trim() || undefined;
       const installSpec = process.env.XYTE_CLI_UPGRADE_SPEC?.trim() || undefined;
-      const check = await checkForUpgrade(
-        { packageName: '@xyteai/cli', latestVersionOverride },
-        runtime.upgradeDependencies
-      );
       if (options.check) {
+        const check = await checkForUpgrade(
+          { packageName: '@xyteai/cli', latestVersionOverride },
+          runtime.upgradeDependencies
+        );
         if (output === 'text') {
           stdout.write(`Package: ${check.packageName}\n`);
-          stdout.write(`Install channel: ${check.installChannel ?? 'unknown'}\n`);
+          stdout.write(`Install channel: ${check.installChannel}\n`);
           stdout.write(`Current: ${check.currentVersion}\n`);
           stdout.write(`Latest: ${check.latestVersion}\n`);
           stdout.write(`Up to date: ${check.upToDate}\n`);
@@ -914,6 +914,10 @@ export function createCli(runtime: CliRuntime = {}): Command {
           if (output === 'text') {
             stdout.write('Upgrade canceled.\n');
           } else {
+            const check = await checkForUpgrade(
+              { packageName: '@xyteai/cli', latestVersionOverride },
+              runtime.upgradeDependencies
+            );
             printJson(stdout, check, { strictJson: resolveStrictJson({ settings }) });
           }
           return;
@@ -922,7 +926,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
       const result = await applyUpgrade(
         {
-          packageName: check.packageName,
+          packageName: '@xyteai/cli',
           skillSourceDir: resolveSkillSourceDir(),
           installSpec,
           latestVersionOverride
@@ -932,7 +936,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
       if (output === 'text') {
         stdout.write(`Package: ${result.packageName}\n`);
-        stdout.write(`Install channel: ${result.installChannel ?? 'unknown'}\n`);
+        stdout.write(`Install channel: ${result.installChannel}\n`);
         stdout.write(`Current: ${result.currentVersion}\n`);
         stdout.write(`Latest: ${result.latestVersion}\n`);
         stdout.write(`Updated: ${result.updated}\n`);

@@ -28,8 +28,7 @@ describe('install channel detection', () => {
     delete process.env.XYTE_CLI_INSTALL_CHANNEL_FILE;
 
     expect(detectInstallChannel('/tmp/no-channel-here')).toEqual({
-      kind: 'npm',
-      updateCommand: 'npm install --global @xyteai/cli@latest'
+      kind: 'npm'
     });
   });
 
@@ -44,19 +43,17 @@ describe('install channel detection', () => {
       join(root, 'install-channel.json'),
       JSON.stringify({
         kind: 'windows-msi',
-        packageId: 'Xyte.XyteCLI',
-        updateCommand: 'winget upgrade --id Xyte.XyteCLI --exact'
+        packageId: 'Xyte.XyteCLI'
       })
     );
 
-    expect(detectInstallChannel(nested)).toMatchObject({
+    expect(detectInstallChannel(nested)).toEqual({
       kind: 'windows-msi',
-      packageId: 'Xyte.XyteCLI',
-      updateCommand: 'winget upgrade --id Xyte.XyteCLI --exact'
+      packageId: 'Xyte.XyteCLI'
     });
   });
 
-  it('trims optional Windows MSI channel metadata and ignores blanks', () => {
+  it('treats a blank packageId as absent', () => {
     delete process.env.XYTE_CLI_INSTALL_CHANNEL;
     delete process.env.XYTE_CLI_INSTALL_CHANNEL_FILE;
 
@@ -67,17 +64,13 @@ describe('install channel detection', () => {
       join(root, 'install-channel.json'),
       JSON.stringify({
         kind: 'windows-msi',
-        packageId: '   ',
-        releaseUrl: '   ',
-        updateCommand: '  winget upgrade --id Xyte.XyteCLI --exact  '
+        packageId: '   '
       })
     );
 
     expect(detectInstallChannel(nested)).toEqual({
       kind: 'windows-msi',
-      updateCommand: 'winget upgrade --id Xyte.XyteCLI --exact',
-      packageId: undefined,
-      releaseUrl: undefined
+      packageId: undefined
     });
   });
 });

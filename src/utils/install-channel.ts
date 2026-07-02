@@ -3,16 +3,15 @@ import path from 'node:path';
 
 export type InstallChannelKind = 'npm' | 'windows-msi';
 
+export const WINDOWS_MSI_PACKAGE_ID = 'Xyte.XyteCLI';
+
 export interface InstallChannel {
   kind: InstallChannelKind;
-  updateCommand: string;
   packageId?: string;
-  releaseUrl?: string;
 }
 
 const DEFAULT_INSTALL_CHANNEL: InstallChannel = {
-  kind: 'npm',
-  updateCommand: 'npm install --global @xyteai/cli@latest'
+  kind: 'npm'
 };
 
 function nonBlankString(value: unknown): string | undefined {
@@ -35,9 +34,7 @@ function parseInstallChannel(payload: unknown): InstallChannel | undefined {
 
   return {
     kind: 'windows-msi',
-    updateCommand: nonBlankString(record.updateCommand) ?? 'winget upgrade --id Xyte.XyteCLI --exact',
-    packageId: nonBlankString(record.packageId),
-    releaseUrl: nonBlankString(record.releaseUrl)
+    packageId: nonBlankString(record.packageId)
   };
 }
 
@@ -61,8 +58,7 @@ export function detectInstallChannel(startDir: string = __dirname): InstallChann
   if (process.env.XYTE_CLI_INSTALL_CHANNEL?.trim() === 'windows-msi') {
     return {
       kind: 'windows-msi',
-      updateCommand: 'winget upgrade --id Xyte.XyteCLI --exact',
-      packageId: 'Xyte.XyteCLI'
+      packageId: WINDOWS_MSI_PACKAGE_ID
     };
   }
 

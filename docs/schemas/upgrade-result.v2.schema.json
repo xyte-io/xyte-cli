@@ -1,13 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://xyte.dev/schemas/upgrade-result.v1.schema.json",
-  "title": "Xyte Upgrade Result V1",
+  "$id": "https://xyte.dev/schemas/upgrade-result.v2.schema.json",
+  "title": "Xyte Upgrade Result V2",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
     "generatedAtUtc",
     "packageName",
+    "installChannel",
     "currentVersion",
     "latestVersion",
     "upToDateBefore",
@@ -18,13 +19,19 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": "xyte.upgrade.result.v1"
+      "const": "xyte.upgrade.result.v2"
     },
     "generatedAtUtc": {
       "type": "string"
     },
     "packageName": {
       "type": "string"
+    },
+    "installChannel": {
+      "enum": [
+        "npm",
+        "windows-msi"
+      ]
     },
     "currentVersion": {
       "type": "string"

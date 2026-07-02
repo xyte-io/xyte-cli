@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "xyte.upgrade.check.v1",
+  "schemaVersion": "xyte.upgrade.check.v2",
   "generatedAtUtc": "<ISO_TIMESTAMP>",
   "packageName": "@xyteai/cli",
   "installChannel": "npm",

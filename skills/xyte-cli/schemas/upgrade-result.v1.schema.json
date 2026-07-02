@@ -26,12 +26,6 @@
     "packageName": {
       "type": "string"
     },
-    "installChannel": {
-      "enum": [
-        "npm",
-        "windows-msi"
-      ]
-    },
     "currentVersion": {
       "type": "string"
     },

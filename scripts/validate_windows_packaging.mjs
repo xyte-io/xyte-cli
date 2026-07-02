@@ -26,7 +26,7 @@ for (const expected of [
   '"doctor", "environment"',
   'Get-Command "xyte-cli" -All',
   '$LASTEXITCODE',
-  '-AllowFailure',
+  '"setup", "status", "--field", "state"',
   'setup still needs an API key'
 ]) {
   if (!assistant.includes(expected)) {
@@ -39,12 +39,10 @@ for (const expected of [
   "const wixEulaId = 'wix7'",
   "'-acceptEula', wixEulaId",
   'Building a Windows MSI with WiX is supported only on Windows',
-  '--skip-node is only valid with --skip-msi',
-  '--skip-npm-install is only valid with --skip-msi',
   'SHASUMS256.txt',
   'Node.js runtime checksum mismatch',
   "kind: 'windows-msi'",
-  'winget upgrade --id Xyte.XyteCLI --exact'
+  "packageId: 'Xyte.XyteCLI'"
 ]) {
   if (!packageScript.includes(expected)) {
     throw new Error(`Windows packaging script is missing expected behavior: ${expected}`);
@@ -52,11 +50,7 @@ for (const expected of [
 }
 
 const releaseWorkflow = readFileSync(join(repoRoot, '.github/workflows/release-assets.yml'), 'utf8');
-for (const expected of [
-  'needs: [meta, packaged-install-smoke]',
-  'Publish Windows release assets',
-  'windows-checksums.txt'
-]) {
+for (const expected of ['Publish Windows release assets', 'Verify Windows release assets', 'windows-checksums.txt']) {
   if (!releaseWorkflow.includes(expected)) {
     throw new Error(`Release workflow is missing expected Windows release behavior: ${expected}`);
   }

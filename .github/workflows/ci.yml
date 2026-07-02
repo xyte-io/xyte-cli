@@ -125,6 +125,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
           $msi = Get-ChildItem -Path "artifacts/windows-installer" -Filter "*.msi" | Select-Object -First 1
           if (!$msi) {
             throw "MSI artifact was not produced."
@@ -147,29 +148,19 @@ jobs:
           }
 
           $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
-          $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-          $env:Path = @($machinePath, $userPath) -join ";"
+          $machineEntries = ($machinePath -split ";") | ForEach-Object { $_.TrimEnd("\") }
+          if ($machineEntries -notcontains $installDir) {
+            throw "MSI did not add $installDir to the machine PATH."
+          }
+          $env:Path = @($machinePath, [Environment]::GetEnvironmentVariable("Path", "User")) -join ";"
 
           where.exe xyte-cli
           xyte-cli --version
           xyte-cli doctor environment --format text
 
-      - name: Smoke Windows setup assistant
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
-          $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-          $env:Path = @($machinePath, $userPath) -join ";"
+          Add-Content -Path $env:GITHUB_PATH -Value $installDir
 
-          $assistant = Join-Path $env:ProgramFiles "Xyte CLI\scripts\configure-xyte-cli.ps1"
-          if (!(Test-Path -LiteralPath $assistant)) {
-            throw "Installed setup assistant not found at $assistant."
-          }
-
-          & $assistant -NonInteractive
-
-      - name: Record pristine Windows terminal transcript
+      - name: Smoke setup assistant and record terminal transcript
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -177,9 +168,7 @@ jobs:
           $demoScript = Join-Path $env:RUNNER_TEMP "xyte-cli-windows-pristine-terminal.ps1"
           @'
           $ErrorActionPreference = "Stop"
-          $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
-          $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-          $env:Path = @($machinePath, $userPath) -join ";"
+          $PSNativeCommandUseErrorActionPreference = $true
 
           Write-Host "Windows: $([Environment]::OSVersion.VersionString)"
           Write-Host "PowerShell: $($PSVersionTable.PSVersion)"
@@ -198,13 +187,20 @@ jobs:
           Write-Host ""
 
           $assistant = Join-Path $env:ProgramFiles "Xyte CLI\scripts\configure-xyte-cli.ps1"
+          if (!(Test-Path -LiteralPath $assistant)) {
+            throw "Installed setup assistant not found at $assistant."
+          }
+          $PSNativeCommandUseErrorActionPreference = $false
           Write-Host "PS> & `"$assistant`" -NonInteractive"
           & $assistant -NonInteractive
+          if ($LASTEXITCODE -ne 0) {
+            throw "Setup assistant failed with exit code $LASTEXITCODE."
+          }
           '@ | Set-Content -LiteralPath $demoScript -Encoding utf8
 
           & pwsh -NoProfile -ExecutionPolicy Bypass -File $demoScript *>&1 | Tee-Object -FilePath $transcript
           if ($LASTEXITCODE -ne 0) {
-            throw "Pristine Windows terminal transcript failed with exit code $LASTEXITCODE."
+            throw "Windows terminal transcript smoke failed with exit code $LASTEXITCODE."
           }
 
       - name: Upload Windows terminal transcript
