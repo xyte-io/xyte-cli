@@ -292,6 +292,98 @@ jobs:
             artifacts/windows-installer/windows-installer-manifest.json
             artifacts/windows-installer/winget/*.yaml
 
+  # Non-gating: records the interactive install (full msiexec UI, which
+  # fires the UILevel >= 5 assistant auto-launch that the silent smoke
+  # cannot reach) as a video + stills for human review.
+  windows-installer-demo:
+    needs: windows-installer-package
+    runs-on: windows-latest
+    continue-on-error: true
+    timeout-minutes: 15
+    steps:
+      - name: Download Windows MSI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-msi
+          path: msi
+
+      - name: Record interactive install demo
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path demo | Out-Null
+          $msi = Get-ChildItem -Path msi -Filter "*.msi" -Recurse | Select-Object -First 1
+          if (!$msi) {
+            throw "MSI artifact not found."
+          }
+
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+          function Save-Screenshot([string]$name) {
+            $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bitmap = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
+            $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+            $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+            $bitmap.Save("demo\$name.png", [System.Drawing.Imaging.ImageFormat]::Png)
+            $graphics.Dispose()
+            $bitmap.Dispose()
+          }
+
+          # Matroska stays playable even when the recorder is force-stopped.
+          $recorder = $null
+          if (Get-Command ffmpeg -ErrorAction SilentlyContinue) {
+            $recorder = Start-Process ffmpeg -ArgumentList "-y", "-f", "gdigrab", "-framerate", "5", "-i", "desktop", "-t", "300", "-pix_fmt", "yuv420p", "demo\xyte-cli-windows-install-demo.mkv" -PassThru -WindowStyle Hidden
+            Start-Sleep -Seconds 3
+          }
+
+          Save-Screenshot "01-before-install"
+          $install = Start-Process msiexec.exe -ArgumentList "/i", "`"$($msi.FullName)`"" -PassThru
+          $install.WaitForExit()
+          if ($install.ExitCode -ne 0) {
+            throw "Interactive MSI install failed with exit code $($install.ExitCode)."
+          }
+          Save-Screenshot "02-install-finished"
+
+          # The auto-launched assistant works through its checks before blocking
+          # on the interactive setup prompt.
+          Start-Sleep -Seconds 45
+          Save-Screenshot "03-assistant-prompt"
+
+          try {
+            $wshell = New-Object -ComObject WScript.Shell
+            $activated = $false
+            foreach ($title in @("Windows PowerShell", "powershell")) {
+              if ($wshell.AppActivate($title)) {
+                $activated = $true
+                break
+              }
+            }
+            if ($activated) {
+              Start-Sleep -Seconds 1
+              [System.Windows.Forms.SendKeys]::SendWait("n{ENTER}")
+              Start-Sleep -Seconds 10
+            } else {
+              Write-Host "Assistant window not found for keystroke automation; recording covers the prompt state."
+            }
+          } catch {
+            Write-Host "Could not drive the assistant window: $_"
+          }
+          Save-Screenshot "04-assistant-done"
+
+          if ($recorder) {
+            Start-Sleep -Seconds 2
+            Stop-Process -Id $recorder.Id -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+          }
+
+      - name: Upload install demo recording
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-install-demo
+          path: demo/
+          if-no-files-found: warn
+
   linux-native-secret-store-cert:
     runs-on: ubuntu-latest
     steps:
