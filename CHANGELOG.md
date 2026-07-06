@@ -6,8 +6,6 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
-## [0.12.0] - 2026-07-06
-
 ### Added
 - Added Edge model discovery and already-claimed Edge custom-parameter update support:
   - endpoint catalog/client entries for `organization.models.getModels` and `organization.models.getModel`

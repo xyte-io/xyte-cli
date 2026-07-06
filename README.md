@@ -128,7 +128,7 @@ Key params:
 - `--tenant <tenant-id>`
 - `--output-mode envelope` for contract output
 - `--strict-json` for machine parsing
-- For `organization.devices.getDevices`, increment `page` until the response reports `has_next_page=false`.
+- For `organization.devices.getDevices`, increment `page` until `next_page` is null/absent or the response reports `has_next_page=false`.
 
 ### 2b) Device or space notes
 
