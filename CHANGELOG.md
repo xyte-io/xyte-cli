@@ -6,17 +6,39 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-07-06
+
 ### Added
-- Added Edge model discovery and already-claimed Edge custom-parameter update support:
-  - endpoint catalog/client entries for `organization.models.getModels` and `organization.models.getModel`
-  - `xyte-cli edge models list|describe`
-  - `xyte-cli edge update-params` and `xyte-cli edge update-params-batch`
-  - built-in flows `flow.edge-model-discovery`, `flow.edge-params-update`, and `flow.edge-params-update-batch`
-  - utility preparation action `edge.params.update`
+- Added organization Edge model discovery to the endpoint catalog and typed client:
+  - `organization.models.getModels`
+  - `organization.models.getModel`
+- Added `xyte-cli edge models list|describe` for read-only Edge model discovery. Model listing sends `edge_only=true` and supports explicit `page`, `per_page`, and `search` filters.
+- Added safe already-claimed Edge custom-parameter update commands:
+  - `xyte-cli edge update-params`
+  - `xyte-cli edge update-params-batch`
+- Added built-in flows for the new Edge workflows:
+  - `flow.edge-model-discovery`
+  - `flow.edge-params-update`
+  - `flow.edge-params-update-batch`
+- Added `flow.device-command` so agents fetch a device, read model command metadata, validate command params, and pause for approval before sending a command.
+- Added utility preparation support for Edge parameter updates via `edge.params.update`.
+- Added JSON schemas for Edge model discovery, Edge claim batch, and Edge params update outputs in both docs and the shipped `xyte-cli` skill bundle.
+- Added GH Pages/user-facing guides for already-claimed Edge custom-parameter updates and refreshed Edge claim/model discovery guidance.
 
 ### Changed
-- Updated `organization.devices.getDevices` pagination metadata, Edge claim `mac`/`sn` support, and `organization.devices.updateDevice` guidance for Edge `custom_parameters` complete-replacement writes.
-- Updated Markdown docs, GH Pages guides/reference pages, and shipped skill guidance for Edge model discovery, Edge claim preparation, and already-claimed Edge custom-parameter workflows.
+- Updated `organization.devices.getDevices` metadata for `page`/`per_page` pagination and documented both `next_page` and `has_next_page` response shapes.
+- Extended `edge claim` and `edge claim-batch` with optional `mac`, `sn`, and model-backed custom-parameter validation.
+- Updated Edge claim workflows to discover Edge models before claim writes so operators can choose real model IDs and supported `custom_parameters` labels.
+- Documented Edge `custom_parameters` updates as complete-replacement writes and routed operators through the safe Edge params commands instead of raw `updateDevice` loops.
+- Updated command-send guidance, CLI/TUI preflight behavior, docs, and shipped skills to derive supported device commands from `organization.models.getModel.commands[]` instead of command history.
+- Updated Markdown docs, GH Pages reference pages, and shipped skill guidance for Edge model discovery, Edge claim preparation, already-claimed Edge params updates, device command workflows, reports, resume artifacts, and approval gates.
+
+### Fixed
+- Edge claim batch model discovery now retries later rows after a transient model lookup failure instead of caching the failed lookup for the whole run.
+- Edge params batch reports blank or missing `set_json` as `missing_set_json` while preserving `invalid_set_json` for malformed or non-object JSON.
+
+### Upgrade notes
+- Existing workspaces that already installed the shipped skill bundle should run `xyte-cli skills refresh` after upgrading so agents receive the new Edge model, params, claim, and device-command guidance.
 
 ## [0.11.0] - 2026-06-24
 
