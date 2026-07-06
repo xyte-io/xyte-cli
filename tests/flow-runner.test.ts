@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -132,6 +132,18 @@ describe('flow runner', () => {
           }
         );
       }
+      if (url.includes('/organization/devices/dev-1') && !url.includes('/commands')) {
+        return new Response(JSON.stringify({ id: 'dev-1', model: { id: 'model-1' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', commands: [{ name: 'restart' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
       if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'POST') {
         return new Response(JSON.stringify({ ok: true }), {
           status: 200,
@@ -164,6 +176,34 @@ describe('flow runner', () => {
           }
         },
         {
+          kind: 'task',
+          id: 'command_device_get',
+          title: 'Get Device For Command',
+          command: 'xyte-cli api call organization.devices.getDevice',
+          task: 'call',
+          mutating: false,
+          requiresContext: ['device_id'],
+          call: {
+            endpointKey: 'organization.devices.getDevice',
+            path: { device_id: '{{device_id}}' },
+            outputMode: 'envelope'
+          }
+        },
+        {
+          kind: 'task',
+          id: 'command_model_describe',
+          title: 'Describe Command Model',
+          command: 'xyte-cli edge models describe',
+          task: 'call',
+          mutating: false,
+          requiresContext: ['device_model_id'],
+          call: {
+            endpointKey: 'organization.models.getModel',
+            path: { id: '{{device_model_id}}' },
+            outputMode: 'envelope'
+          }
+        },
+        {
           kind: 'gate',
           id: 'gate_1',
           title: 'Gate One',
@@ -182,7 +222,7 @@ describe('flow runner', () => {
           call: {
             endpointKey: 'organization.commands.sendCommand',
             path: { device_id: '{{device_id}}' },
-            body: { command: '{{command}}' },
+            body: { name: '{{command}}' },
             outputMode: 'envelope'
           }
         },
@@ -254,7 +294,7 @@ describe('flow runner', () => {
   it('persists derived guided remediation context across resume boundaries', async () => {
     const { profileStore, secretStore, client } = await makeClient();
 
-    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+    const fetchMock = vi.fn(async (url: string) => {
       if (url.includes('/organization/incidents')) {
         return new Response(
           JSON.stringify({ items: [{ id: 'inc-1', uuid: 'inc-1', device_id: 'dev-1', status: 'active' }] }),
@@ -264,8 +304,14 @@ describe('flow runner', () => {
           }
         );
       }
-      if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'GET') {
-        return new Response(JSON.stringify({ items: [{ command: 'restart' }] }), {
+      if (url.includes('/organization/devices/dev-1') && !url.includes('/commands')) {
+        return new Response(JSON.stringify({ id: 'dev-1', model: { id: 'model-1' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', commands: [{ name: 'restart' }] }), {
           status: 200,
           headers: { 'content-type': 'application/json' }
         });
@@ -402,6 +448,18 @@ describe('flow runner', () => {
     const { profileStore, secretStore, client } = await makeClient();
 
     const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/organization/devices/dev-1') && !url.includes('/commands') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ id: 'dev-1', model: { id: 'model-1' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/models/model-1') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ id: 'model-1', commands: [{ name: 'restart' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
       if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'POST') {
         return new Response(JSON.stringify({ error: 'Either a valid command or friendly_name is required' }), {
           status: 422,
@@ -421,6 +479,34 @@ describe('flow runner', () => {
       steps: [
         {
           kind: 'task',
+          id: 'command_device_get',
+          title: 'Get Device For Command',
+          command: 'xyte-cli api call organization.devices.getDevice',
+          task: 'call',
+          mutating: false,
+          requiresContext: ['device_id'],
+          call: {
+            endpointKey: 'organization.devices.getDevice',
+            path: { device_id: '{{device_id}}' },
+            outputMode: 'envelope'
+          }
+        },
+        {
+          kind: 'task',
+          id: 'command_model_describe',
+          title: 'Describe Command Model',
+          command: 'xyte-cli edge models describe',
+          task: 'call',
+          mutating: false,
+          requiresContext: ['device_model_id'],
+          call: {
+            endpointKey: 'organization.models.getModel',
+            path: { id: '{{device_model_id}}' },
+            outputMode: 'envelope'
+          }
+        },
+        {
+          kind: 'task',
           id: 'send_command',
           title: 'Send Command',
           command: 'xyte-cli api call organization.commands.sendCommand',
@@ -430,7 +516,7 @@ describe('flow runner', () => {
           call: {
             endpointKey: 'organization.commands.sendCommand',
             path: { device_id: '{{device_id}}' },
-            body: { command: '{{command}}' },
+            body: { name: '{{command}}' },
             outputMode: 'envelope'
           }
         }
@@ -458,6 +544,66 @@ describe('flow runner', () => {
     expect(result.outcome).toBe('needs_input');
     expect(result.classifications.needs_data).toBe(1);
     expect(result.classifications.bug).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('rejects legacy sendCommand body.command before calling the API', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const fetchMock = vi.fn(async () => {
+      throw new Error('legacy sendCommand body.command must fail before fetch');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.guided-remediation',
+      title: 'Legacy command body only',
+      intent: 'send command',
+      writeCapable: true,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'task',
+          id: 'send_command',
+          title: 'Send Command',
+          command: 'xyte-cli api call organization.commands.sendCommand',
+          task: 'call',
+          mutating: true,
+          requiresContext: ['device_id', 'command'],
+          call: {
+            endpointKey: 'organization.commands.sendCommand',
+            path: { device_id: '{{device_id}}' },
+            body: { command: '{{command}}' },
+            outputMode: 'envelope'
+          }
+        }
+      ]
+    };
+
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-legacy-command-body`);
+    const result = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      context: {
+        device_id: 'dev-1',
+        command: 'restart'
+      },
+      once: false,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(result.outcome).toBe('needs_input');
+    expect(result.classifications.needs_data).toBe(1);
+    expect(result.classifications.bug).toBe(0);
+    expect(String(result.steps.find((item) => item.stepId === 'send_command')?.error?.detail ?? '')).toContain(
+      'body.command is not supported'
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('reuses the transport requestId in flow call envelopes', async () => {
@@ -1502,14 +1648,447 @@ describe('flow runner', () => {
     expect(summary.steps.find((item) => item.stepId === 'edge_ping_single')?.status).toBe('pending');
   });
 
-  it('pauses flow.edge-claim in plan mode before the mutating claim step', async () => {
+  it('pauses flow.device-command after fetching model-supported commands', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition = getBuiltInFlowDefinition('flow.device-command');
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-command-plan`);
+
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      expect(init?.method ?? 'GET').toBe('GET');
+      if (url.includes('/organization/devices/dev-1') && !url.includes('/commands')) {
+        return new Response(JSON.stringify({ id: 'dev-1', model: { id: 'model-1' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', commands: [{ name: 'reboot' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in flow.device-command plan test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const summary = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: {
+        device_id: 'dev-1'
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('pending_gate');
+    expect(summary.cursor.nextStepId).toBe('gate_device_command_send');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(summary.steps.find((item) => item.stepId === 'device_command_device_get')?.status).toBe('completed');
+    expect(summary.steps.find((item) => item.stepId === 'device_command_model_describe')?.status).toBe('completed');
+    expect(summary.steps.find((item) => item.stepId === 'gate_device_command_send')?.status).toBe('gate_pending');
+    expect(summary.steps.find((item) => item.stepId === 'device_command_send')?.status).toBe('pending');
+  });
+
+  it('runs flow.device-command apply after an explicit command is provided', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition = getBuiltInFlowDefinition('flow.device-command');
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-command-apply`);
+    const sentBodies: Array<Record<string, unknown>> = [];
+
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/organization/devices/dev-1') && !url.includes('/commands') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ id: 'dev-1', model: { id: 'model-1' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/models/model-1') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ id: 'model-1', commands: [{ name: 'reboot' }, { name: 'identify' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'POST') {
+        sentBodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+        return new Response(JSON.stringify({ id: 'cmd-1', command: 'identify' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in flow.device-command apply test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const summary = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      context: {
+        device_id: 'dev-1',
+        command: 'identify'
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('completed');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(sentBodies).toEqual([{ name: 'identify' }]);
+    expect(summary.steps.map((item) => item.status)).toEqual([
+      'completed',
+      'completed',
+      'gate_approved',
+      'completed'
+    ]);
+  });
+
+  it('passes command extra_params only after validating model custom_fields', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition = getBuiltInFlowDefinition('flow.device-command');
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-command-params`);
+    const sentBodies: Array<Record<string, unknown>> = [];
+
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/organization/devices/dev-1') && !url.includes('/commands') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ id: 'dev-1', model: { id: 'model-1' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/models/model-1') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(
+          JSON.stringify({
+            id: 'model-1',
+            commands: [{ name: 'identify', custom_fields: [{ name: 'delay', type: 'number', required: true }] }]
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
+      }
+      if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'POST') {
+        sentBodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+        return new Response(JSON.stringify({ id: 'cmd-1', name: 'identify' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in flow.device-command params test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const summary = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      context: {
+        device_id: 'dev-1',
+        command: 'identify',
+        command_extra_params_json: '{"delay":5}'
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('completed');
+    expect(sentBodies).toEqual([{ name: 'identify', extra_params: { delay: 5 } }]);
+  });
+
+  it('passes command_file_id when the model command requires a file', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition = getBuiltInFlowDefinition('flow.device-command');
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-command-file`);
+    const sentBodies: Array<Record<string, unknown>> = [];
+
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/organization/devices/dev-1') && !url.includes('/commands') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ id: 'dev-1', model: { id: 'model-1' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/models/model-1') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ id: 'model-1', commands: [{ name: 'upload', with_file: true }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'POST') {
+        sentBodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+        return new Response(JSON.stringify({ id: 'cmd-1', name: 'upload' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in flow.device-command file test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const summary = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      context: {
+        device_id: 'dev-1',
+        command: 'upload',
+        command_file_id: 'file-1'
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('completed');
+    expect(sentBodies).toEqual([{ name: 'upload', file_id: 'file-1' }]);
+  });
+
+  it('blocks flow.device-command when a file-required command has no file id', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition = getBuiltInFlowDefinition('flow.device-command');
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-command-missing-file`);
+
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/organization/devices/dev-1') && !url.includes('/commands') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ id: 'dev-1', model: { id: 'model-1' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/models/model-1') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ id: 'model-1', commands: [{ name: 'upload', with_file: true }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'POST') {
+        throw new Error('flow.device-command must not POST a file-required command without file_id');
+      }
+      throw new Error(`Unexpected URL in flow.device-command missing-file test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const summary = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      context: {
+        device_id: 'dev-1',
+        command: 'upload'
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('needs_input');
+    expect(String(summary.steps.find((item) => item.stepId === 'device_command_send')?.error?.detail ?? '')).toContain(
+      'requires command_file_id/file_id'
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('blocks flow.device-command when required command params are missing', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition = getBuiltInFlowDefinition('flow.device-command');
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-command-missing-param`);
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.includes('/organization/devices/dev-1') && !url.includes('/commands') && (init?.method ?? 'GET') === 'GET') {
+          return new Response(JSON.stringify({ id: 'dev-1', model: { id: 'model-1' } }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/organization/models/model-1') && (init?.method ?? 'GET') === 'GET') {
+          return new Response(
+            JSON.stringify({
+              id: 'model-1',
+              commands: [{ name: 'identify', custom_fields: [{ name: 'delay', required: true }] }]
+            }),
+            {
+              status: 200,
+              headers: { 'content-type': 'application/json' }
+            }
+          );
+        }
+        if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'POST') {
+          throw new Error('flow.device-command must not POST without required custom_fields');
+        }
+        throw new Error(`Unexpected URL in flow.device-command missing-param test: ${url}`);
+      })
+    );
+
+    const summary = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      context: {
+        device_id: 'dev-1',
+        command: 'identify'
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('needs_input');
+    expect(String(summary.steps.find((item) => item.stepId === 'device_command_send')?.error?.detail ?? '')).toContain(
+      'requires extra_params'
+    );
+  });
+
+  it('blocks flow.device-command apply when the selected command is not in fetched evidence', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition = getBuiltInFlowDefinition('flow.device-command');
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-command-invalid`);
+
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/organization/devices/dev-1') && !url.includes('/commands') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ id: 'dev-1', model: { id: 'model-1' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/models/model-1') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ id: 'model-1', commands: [{ name: 'reboot' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'POST') {
+        throw new Error('flow.device-command must not POST a command that was not fetched');
+      }
+      throw new Error(`Unexpected URL in flow.device-command invalid test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const summary = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      context: {
+        device_id: 'dev-1',
+        command: 'identify'
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('needs_input');
+    expect(summary.steps.find((item) => item.stepId === 'device_command_send')?.status).toBe('failed');
+    expect(String(summary.steps.find((item) => item.stepId === 'device_command_send')?.error?.detail ?? '')).toContain(
+      'was not found'
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not treat model commands[].command as supported-command evidence', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition = getBuiltInFlowDefinition('flow.device-command');
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-command-no-legacy-model-command`);
+
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/organization/devices/dev-1') && !url.includes('/commands') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ id: 'dev-1', model: { id: 'model-1' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/models/model-1') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ id: 'model-1', commands: [{ command: 'identify' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'POST') {
+        throw new Error('flow.device-command must not POST commands[].command aliases');
+      }
+      throw new Error(`Unexpected URL in flow.device-command legacy model command test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const summary = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      context: {
+        device_id: 'dev-1',
+        command: 'identify'
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('needs_input');
+    expect(String(summary.steps.find((item) => item.stepId === 'device_command_send')?.error?.detail ?? '')).toContain(
+      'requires supported-command evidence'
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('pauses flow.edge-claim after model discovery and before the mutating claim step', async () => {
     const { profileStore, secretStore, client } = await makeClient();
     const definition = getBuiltInFlowDefinition('flow.edge-claim');
     builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-claim-plan`);
 
-    const fetchMock = vi.fn(async () => {
-      throw new Error('flow.edge-claim --plan must not call fetch');
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/models?')) {
+        expect(url).toContain('edge_only=true');
+        return new Response(JSON.stringify({ items: [{ id: 'model-from-list', model: 'Sensor' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', parameters: [{ name: 'Port', type: 'number' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in flow.edge-claim plan test: ${url}`);
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -1533,9 +2112,84 @@ describe('flow runner', () => {
 
     expect(summary.outcome).toBe('pending_gate');
     expect(summary.cursor.nextStepId).toBe('gate_edge_claim');
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(summary.steps.find((item) => item.stepId === 'edge_claim_models_list')?.status).toBe('completed');
+    expect(summary.steps.find((item) => item.stepId === 'edge_claim_model_describe')?.status).toBe('completed');
     expect(summary.steps.find((item) => item.stepId === 'gate_edge_claim')?.status).toBe('gate_pending');
     expect(summary.steps.find((item) => item.stepId === 'edge_claim_single')?.status).toBe('pending');
+  });
+
+  it('runs flow.edge-model-discovery through model list and describe calls', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-model-discovery`);
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/models?')) {
+        expect(url).toContain('edge_only=true');
+        return new Response(JSON.stringify({ items: [{ id: 'model-1', model: 'Sensor' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', parameters: [{ name: 'Port', type: 'number' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in edge-model-discovery flow test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const summary = await runDeterministicFlow({
+      flowId: 'flow.edge-model-discovery',
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('completed');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(summary.steps.map((step) => step.status)).toEqual(['completed', 'completed']);
+  });
+
+  it('pauses flow.edge-model-discovery when the model list is ambiguous', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-model-discovery-ambiguous`);
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/models?')) {
+        return new Response(
+          JSON.stringify({ items: [{ id: 'model-1' }, { id: 'model-2' }] }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      throw new Error(`Unexpected URL in ambiguous edge-model-discovery flow test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const summary = await runDeterministicFlow({
+      flowId: 'flow.edge-model-discovery',
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('needs_input');
+    expect(summary.classifications.needs_data).toBe(1);
+    expect(summary.classifications.bug).toBe(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(summary.steps.find((item) => item.stepId === 'edge_model_describe')?.status).toBe('failed');
   });
 
   it.each([
@@ -1566,11 +2220,17 @@ describe('flow runner', () => {
     };
     builtInDefinitionOverride = definition;
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-claim-apply`);
-    const bodies: Array<Record<string, unknown>> = [];
-    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
-      if (url.includes('/core/v1/organization/edges/devices/start_claim')) {
-        bodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
-        return new Response(null, { status: 204 });
+	    const bodies: Array<Record<string, unknown>> = [];
+	    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+	      if (url.includes('/core/v1/organization/models/model-1')) {
+	        return new Response(JSON.stringify({ id: 'model-1', parameters: [] }), {
+	          status: 200,
+	          headers: { 'content-type': 'application/json' }
+	        });
+	      }
+	      if (url.includes('/core/v1/organization/edges/devices/start_claim')) {
+	        bodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
+	        return new Response(null, { status: 204 });
       }
       if (url.includes('/core/v1/organization/edges/devices/get_claim_status')) {
         return new Response(JSON.stringify({ result: 'success' }), {
@@ -1586,7 +2246,9 @@ describe('flow runner', () => {
       proxy_id: 'proxy-1',
       device_ip: '192.168.1.10',
       device_model_id: 'model-1',
-      space_id: '99'
+      space_id: '99',
+      mac: 'aa:bb:cc:dd:ee:ff',
+      sn: 'SN-12345'
     };
     if (contextValue !== undefined) {
       context.skip_connectivity_check = contextValue;
@@ -1611,6 +2273,250 @@ describe('flow runner', () => {
     } else {
       expect(bodies[0]?.skip_connectivity_check).toBe(expected);
     }
+    expect(bodies[0]).toMatchObject({ mac: 'aa:bb:cc:dd:ee:ff', sn: 'SN-12345' });
+  });
+
+  it('plans flow.edge-params-update and pauses before the apply gate', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-params-update`);
+    const methods: string[] = [];
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      methods.push(String(init?.method ?? 'GET'));
+      if (url.includes('/core/v1/organization/devices/dev-1')) {
+        return new Response(
+          JSON.stringify({
+            id: 'dev-1',
+            model: { id: 'model-1' },
+            custom_parameters: { Port: '162' }
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', parameters: [{ name: 'Port', type: 'number' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in edge-params-update flow test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const summary = await runDeterministicFlow({
+      flowId: 'flow.edge-params-update',
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: { device_id: 'dev-1', set_json: '{"Port":"161"}' },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('pending_gate');
+    expect(summary.cursor.nextStepId).toBe('gate_edge_params_apply');
+    expect(methods).toEqual(['GET', 'GET']);
+    expect(summary.steps.find((item) => item.stepId === 'edge_params_plan')?.status).toBe('completed');
+  });
+
+  it('classifies flow.edge-params-update rejected input as needs_input', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-params-update-rejected`);
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/devices/dev-1')) {
+        return new Response(
+          JSON.stringify({
+            id: 'dev-1',
+            model: { id: 'model-1' },
+            custom_parameters: { Port: '162' }
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', parameters: [{ name: 'Port', type: 'number' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in edge-params-update rejected flow test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const summary = await runDeterministicFlow({
+      flowId: 'flow.edge-params-update',
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: { device_id: 'dev-1', set_json: '{"Unknown":true}' },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('needs_input');
+    expect(summary.classifications.needs_data).toBe(1);
+    expect(summary.classifications.bug).toBe(0);
+  });
+
+  it('classifies flow edge params batch row rejects as needs_input', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const root = mkdtempSync(join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-params-batch-rejected`));
+    const inputPath = join(root, 'edge-params.csv');
+    const outDir = join(root, 'runs');
+    writeFileSync(inputPath, 'device_id,set_json\n' + 'dev-1,"{""Unknown"":true}"\n');
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.edge-params-update-batch',
+      title: 'Edge Params Batch Reject Test',
+      intent: 'test batch rejected classification',
+      writeCapable: true,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'task',
+          id: 'edge_params_dry_run',
+          title: 'Dry Run',
+          task: 'edge.params-update-batch',
+          edgeParamsUpdateBatch: {
+            inputPath: '{{edge_params_input_path}}',
+            apply: false,
+            reportPath: './artifacts/edge-params.plan.ndjson',
+            resumePath: './artifacts/edge-params.resume.ndjson'
+          },
+          requiresContext: ['edge_params_input_path'],
+          mutating: false,
+          command: 'xyte-cli edge update-params-batch --plan'
+        }
+      ]
+    };
+    builtInDefinitionOverride = definition;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/devices/dev-1')) {
+        return new Response(
+          JSON.stringify({
+            id: 'dev-1',
+            model: { id: 'model-1' },
+            custom_parameters: { Port: '162' }
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', parameters: [{ name: 'Port', type: 'number' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in edge-params-update-batch rejected flow test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const summary = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: { edge_params_input_path: inputPath },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('needs_input');
+    expect(summary.classifications.needs_data).toBe(1);
+    expect(summary.classifications.bug).toBe(0);
+  });
+
+  it('classifies edge claim batch validation rejects as needs_input', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const root = mkdtempSync(join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-claim-batch-rejected`));
+    const inputPath = join(root, 'edge-claim.csv');
+    const outDir = join(root, 'runs');
+    writeFileSync(inputPath, 'proxy_id,device_ip,device_model_id,space_id\n,192.168.1.10,model-1,space-1\n');
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.edge-claim-batch',
+      title: 'Edge Claim Batch Reject Test',
+      intent: 'test claim batch rejected classification',
+      writeCapable: true,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'task',
+          id: 'edge_claim_dry_run',
+          title: 'Dry Run',
+          task: 'edge.claim-batch',
+          edgeClaimBatch: {
+            inputPath: '{{edge_claim_input_path}}',
+            apply: false,
+            reportPath: './artifacts/edge-claim.plan.ndjson',
+            resumePath: './artifacts/edge-claim.resume.ndjson'
+          },
+          requiresContext: ['edge_claim_input_path'],
+          mutating: false,
+          command: 'xyte-cli edge claim-batch --plan'
+        }
+      ]
+    };
+    builtInDefinitionOverride = definition;
+    const fetchMock = vi.fn(async () => {
+      throw new Error('edge claim validation rejects must not call the API');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const summary = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: { edge_claim_input_path: inputPath },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('needs_input');
+    expect(summary.classifications.needs_data).toBe(1);
+    expect(summary.classifications.bug).toBe(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('pauses flow.edge-params-update-batch after preparing the CSV scaffold', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const root = mkdtempSync(join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-params-batch`));
+    const inputPath = join(root, 'edge-params.xlsx');
+    const outDir = join(root, 'runs');
+    writeFileSync(inputPath, 'source', 'utf8');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const summary = await runDeterministicFlow({
+      flowId: 'flow.edge-params-update-batch',
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: { edge_params_input_path: inputPath },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('pending_gate');
+    expect(summary.cursor.nextStepId).toBe('gate_edge_params_prepare_review');
+    const prepareStep = summary.steps.find((item) => item.stepId === 'edge_params_prepare');
+    expect(prepareStep?.status).toBe('completed');
+    expect(prepareStep?.artifactPath).toBeDefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(readFileSync(prepareStep!.artifactPath!, 'utf8')).toContain('edge-params-update.csv');
   });
 
   it('reports the resolved custom poll key name when edge poll timing is invalid', async () => {
@@ -2630,6 +3536,22 @@ describe('flow runner', () => {
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-claim-batch`);
     const sourcePath = join(tmpdir(), `edge-claim-source-${Date.now()}.csv`);
     writeFileSync(sourcePath, 'source\nplaceholder\n');
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/models?')) {
+        return new Response(JSON.stringify({ items: [{ id: 'model-1', model: 'Sensor' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', parameters: [{ name: 'Port', type: 'number' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in edge-claim-batch prepare test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
 
     const plan = await runDeterministicFlow({
       flowId: 'flow.edge-claim-batch',
@@ -2637,6 +3559,7 @@ describe('flow runner', () => {
       mode: 'plan',
       outDir,
       context: {
+        device_model_id: 'model-1',
         edge_claim_input_path: sourcePath
       },
       once: true,
@@ -2648,6 +3571,9 @@ describe('flow runner', () => {
 
     expect(plan.outcome).toBe('pending_gate');
     expect(plan.cursor.nextStepId).toBe('gate_edge_claim_prepare_review');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(plan.steps.find((item) => item.stepId === 'edge_claim_batch_models_list')?.status).toBe('completed');
+    expect(plan.steps.find((item) => item.stepId === 'edge_claim_batch_model_describe')?.status).toBe('completed');
     expect(plan.steps.find((item) => item.stepId === 'edge_claim_prepare')?.status).toBe('completed');
     expect(plan.steps.find((item) => item.stepId === 'edge_claim_dry_run')?.status).toBe('pending');
     const plannedInputs = JSON.parse(readFileSync(plan.inputsPath, 'utf8'));
@@ -2662,6 +3588,22 @@ describe('flow runner', () => {
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-claim-batch-apply`);
     const sourcePath = join(tmpdir(), `edge-claim-source-${Date.now()}-apply.csv`);
     writeFileSync(sourcePath, 'source\nplaceholder\n');
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/models?')) {
+        return new Response(JSON.stringify({ items: [{ id: 'model-1', model: 'Sensor' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', parameters: [{ name: 'Port', type: 'number' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in edge-claim-batch fresh apply test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
 
     const apply = await runDeterministicFlow({
       flowId: 'flow.edge-claim-batch',
@@ -2669,6 +3611,7 @@ describe('flow runner', () => {
       mode: 'apply',
       outDir,
       context: {
+        device_model_id: 'model-1',
         edge_claim_input_path: sourcePath
       },
       once: true,
@@ -2680,6 +3623,9 @@ describe('flow runner', () => {
 
     expect(apply.outcome).toBe('pending_gate');
     expect(apply.cursor.nextStepId).toBe('gate_edge_claim_prepare_review');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(apply.steps.find((item) => item.stepId === 'edge_claim_batch_models_list')?.status).toBe('completed');
+    expect(apply.steps.find((item) => item.stepId === 'edge_claim_batch_model_describe')?.status).toBe('completed');
     expect(apply.steps.find((item) => item.stepId === 'edge_claim_prepare')?.status).toBe('completed');
     expect(apply.steps.find((item) => item.stepId === 'gate_edge_claim_prepare_review')?.status).toBe('gate_pending');
     expect(apply.steps.find((item) => item.stepId === 'edge_claim_dry_run')?.status).toBe('pending');
@@ -2690,6 +3636,22 @@ describe('flow runner', () => {
     const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-edge-claim-batch-resume`);
     const sourcePath = join(tmpdir(), `edge-claim-source-${Date.now()}-resume.csv`);
     writeFileSync(sourcePath, 'source\nplaceholder\n');
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/models?')) {
+        return new Response(JSON.stringify({ items: [{ id: 'model-1', model: 'Sensor' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', parameters: [{ name: 'Port', type: 'number' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in edge-claim-batch resume test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
 
     const firstApply = await runDeterministicFlow({
       flowId: 'flow.edge-claim-batch',
@@ -2697,6 +3659,7 @@ describe('flow runner', () => {
       mode: 'apply',
       outDir,
       context: {
+        device_model_id: 'model-1',
         edge_claim_input_path: sourcePath
       },
       once: true,
@@ -2713,6 +3676,7 @@ describe('flow runner', () => {
       outDir,
       resume: firstApply.runId,
       context: {
+        device_model_id: 'model-1',
         edge_claim_input_path: sourcePath
       },
       once: true,
@@ -2742,6 +3706,18 @@ describe('flow runner', () => {
         url,
         body: typeof init?.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : undefined
       });
+      if (url.includes('/core/v1/organization/models?')) {
+        return new Response(JSON.stringify({ items: [{ id: 'model-1', model: 'Sensor' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', parameters: [{ name: 'Port', type: 'number' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
       if (url.includes('/core/v1/organization/edges/devices/start_ping')) {
         return new Response(null, { status: 204 });
       }
@@ -2770,6 +3746,7 @@ describe('flow runner', () => {
       mode: 'apply',
       outDir,
       context: {
+        device_model_id: 'model-1',
         edge_claim_input_path: sourcePath
       },
       once: true,
@@ -2799,6 +3776,7 @@ describe('flow runner', () => {
       outDir,
       resume: firstApply.runId,
       context: {
+        device_model_id: 'model-1',
         edge_claim_input_path: sourcePath
       },
       once: true,
@@ -2817,6 +3795,7 @@ describe('flow runner', () => {
       outDir,
       resume: dryRunApproved.runId,
       context: {
+        device_model_id: 'model-1',
         edge_claim_input_path: sourcePath
       },
       once: true,
@@ -2850,6 +3829,18 @@ describe('flow runner', () => {
     writeFileSync(sourcePath, 'source\nplaceholder\n');
 
     const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/models?')) {
+        return new Response(JSON.stringify({ items: [{ id: 'model-1', model: 'Sensor' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', parameters: [{ name: 'Port', type: 'number' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
       if (url.includes('/core/v1/organization/edges/devices/start_ping')) {
         return new Response(null, { status: 204 });
       }
@@ -2869,6 +3860,7 @@ describe('flow runner', () => {
       mode: 'apply',
       outDir,
       context: {
+        device_model_id: 'model-1',
         edge_claim_input_path: sourcePath
       },
       once: true,
@@ -2893,6 +3885,7 @@ describe('flow runner', () => {
       outDir,
       resume: firstApply.runId,
       context: {
+        device_model_id: 'model-1',
         edge_claim_input_path: sourcePath
       },
       once: true,
@@ -2909,6 +3902,7 @@ describe('flow runner', () => {
       outDir,
       resume: dryRunApproved.runId,
       context: {
+        device_model_id: 'model-1',
         edge_claim_input_path: sourcePath
       },
       once: true,

@@ -154,6 +154,90 @@ describe('client auth behavior', () => {
     expect(request.mock.calls[1][0].headers['Content-Type']).toBe('application/json');
   });
 
+  it('renders Edge model discovery, paginated devices, claim identity, and custom params update requests', async () => {
+    const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } });
+    const transport = { request } as unknown as HttpTransport;
+
+    const client = createXyteClient({
+      auth: { organization: 'org-key-123' },
+      hubBaseUrl: 'https://hub.example.test',
+      transport
+    });
+
+    await client.organization.getModels({
+      query: { page: 2, per_page: 50, search: 'Sony Pro', edge_only: true },
+      body: { ignored: true }
+    });
+    await client.organization.getModel({
+      path: { id: 'model/one' },
+      body: { ignored: true }
+    });
+    await client.organization.getDevices({
+      query: { page: 3, per_page: 100, space_id: 42 },
+      body: { ignored: true }
+    });
+    await client.organization.startEdgeClaim({
+      body: {
+        proxy_id: 'proxy-1',
+        device_ip: '10.0.0.10',
+        device_model_id: 'model-1',
+        space_id: 42,
+        mac: 'aa:bb:cc:dd:ee:ff',
+        sn: 'SN-123'
+      }
+    });
+    await client.organization.updateDevice({
+      path: { device_id: 'device/one' },
+      body: { custom_parameters: { Port: '161' } }
+    });
+
+    expect(request).toHaveBeenCalledTimes(5);
+    expect(request.mock.calls[0][0]).toMatchObject({
+      method: 'GET',
+      url: 'https://hub.example.test/core/v1/organization/models?page=2&per_page=50&search=Sony+Pro&edge_only=true'
+    });
+    expect(request.mock.calls[0][0].body).toBeUndefined();
+    expect(request.mock.calls[0][0].headers.Authorization).toBe('org-key-123');
+    expect(request.mock.calls[0][0].headers['Content-Type']).toBeUndefined();
+
+    expect(request.mock.calls[1][0]).toMatchObject({
+      method: 'GET',
+      url: 'https://hub.example.test/core/v1/organization/models/model%2Fone'
+    });
+    expect(request.mock.calls[1][0].body).toBeUndefined();
+    expect(request.mock.calls[1][0].headers['Content-Type']).toBeUndefined();
+
+    expect(request.mock.calls[2][0]).toMatchObject({
+      method: 'GET',
+      url: 'https://hub.example.test/core/v1/organization/devices?page=3&per_page=100&space_id=42'
+    });
+    expect(request.mock.calls[2][0].body).toBeUndefined();
+    expect(request.mock.calls[2][0].headers['Content-Type']).toBeUndefined();
+
+    expect(request.mock.calls[3][0]).toMatchObject({
+      method: 'POST',
+      url: 'https://hub.example.test/core/v1/organization/edges/devices/start_claim',
+      body: JSON.stringify({
+        proxy_id: 'proxy-1',
+        device_ip: '10.0.0.10',
+        device_model_id: 'model-1',
+        space_id: 42,
+        mac: 'aa:bb:cc:dd:ee:ff',
+        sn: 'SN-123'
+      })
+    });
+    expect(request.mock.calls[3][0].headers.Authorization).toBe('org-key-123');
+    expect(request.mock.calls[3][0].headers['Content-Type']).toBe('application/json');
+
+    expect(request.mock.calls[4][0]).toMatchObject({
+      method: 'PATCH',
+      url: 'https://hub.example.test/core/v1/organization/devices/device%2Fone',
+      body: JSON.stringify({ custom_parameters: { Port: '161' } })
+    });
+    expect(request.mock.calls[4][0].headers.Authorization).toBe('org-key-123');
+    expect(request.mock.calls[4][0].headers['Content-Type']).toBe('application/json');
+  });
+
   it('renders organization note requests with path, pagination, and body semantics', async () => {
     const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } });
     const transport = { request } as unknown as HttpTransport;

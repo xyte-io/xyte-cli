@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xyte-io.github.io/xyte-cli/schemas/edge-models-list.v1.schema.json",
+  "title": "Xyte CLI Edge Models List Result",
+  "type": "object",
+  "required": ["schemaVersion", "tenantId", "query", "response"],
+  "properties": {
+    "schemaVersion": {
+      "const": "xyte.edge.models.list.v1"
+    },
+    "tenantId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "query": {
+      "type": "object",
+      "required": ["edge_only"],
+      "properties": {
+        "edge_only": {
+          "const": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "response": {
+      "type": "object",
+      "required": ["items", "next_page"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/modelListItem" }
+        },
+        "next_page": {
+          "type": ["integer", "null"]
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "modelParameter": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "enum": ["text", "textarea", "password", "number", "file"] },
+        "required": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "modelListItem": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "vendor": { "type": "string" },
+        "model": { "type": "string" },
+        "aliases": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "parameters": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/modelParameter" }
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

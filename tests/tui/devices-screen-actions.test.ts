@@ -27,8 +27,8 @@ describe('devices screen actions', () => {
       tenantId: 'acme',
       path: { device_id: 'dev-1' },
       body: {
-        command: 'reboot',
-        params: { wait_ms: 5000 }
+        name: 'reboot',
+        extra_params: { wait_ms: 5000 }
       }
     });
   });

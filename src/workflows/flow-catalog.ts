@@ -5,10 +5,14 @@ export type BuiltInFlowId =
   | 'flow.incidents-delta-watch'
   | 'flow.watch-to-triage'
   | 'flow.guided-remediation'
+  | 'flow.device-command'
   | 'flow.device-migration'
   | 'flow.daily-deep-dive-report'
+  | 'flow.edge-model-discovery'
   | 'flow.edge-claim'
   | 'flow.edge-claim-batch'
+  | 'flow.edge-params-update'
+  | 'flow.edge-params-update-batch'
   | 'flow.edge-ping';
 
 export type FlowTaskType =
@@ -28,6 +32,8 @@ export type FlowTaskType =
   | 'space.import-tree'
   | 'edge.claim'
   | 'edge.claim-batch'
+  | 'edge.params-update'
+  | 'edge.params-update-batch'
   | 'edge.ping';
 
 interface FlowStepBase {
@@ -106,6 +112,15 @@ export interface FlowTaskStep extends FlowStepBase {
     resumePath: string;
     pollIntervalMsKey?: string;
     pollTimeoutMsKey?: string;
+  };
+  edgeParamsUpdate?: {
+    apply: boolean;
+  };
+  edgeParamsUpdateBatch?: {
+    inputPath: string;
+    apply: boolean;
+    reportPath: string;
+    resumePath: string;
   };
   edgePing?: {
     pollIntervalMsKey?: string;
@@ -302,16 +317,20 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
     recipeCommands: [
       'xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json --out ./artifacts/xyte-watch.before.ndjson',
       [
-        'xyte-cli api call organization.commands.getCommands \\',
+        'xyte-cli api call organization.devices.getDevice \\',
         '  --tenant <tenant-id> \\',
-        `  --path-json '{"device_id":"<device-id>"}' \\`,
-        `  --query-json '{"page":1,"per_page":20}'`
+        `  --path-json '{"device_id":"<device-id>"}'`
+      ].join('\n'),
+      [
+        'xyte-cli edge models describe \\',
+        '  --tenant <tenant-id> \\',
+        '  --model-id <model-id-from-device>'
       ].join('\n'),
       [
         'xyte-cli api call organization.commands.sendCommand \\',
         '  --tenant <tenant-id> \\',
         `  --path-json '{"device_id":"<device-id>"}' \\`,
-        `  --body-json '{"command":"<valid-command-from-history>"}'`
+        `  --body-json '{"name":"<commands[].name>","extra_params":{}}'`
       ].join('\n'),
       [
         'xyte-cli api call organization.devices.updateDevice \\',
@@ -353,32 +372,45 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
       },
       {
         kind: 'task',
-        id: 'commands_get',
-        title: 'Get Commands',
+        id: 'command_device_get',
+        title: 'Get Device For Command',
         task: 'call',
         call: {
-          endpointKey: 'organization.commands.getCommands',
+          endpointKey: 'organization.devices.getDevice',
           path: {
             device_id: '{{device_id}}'
           },
-          query: {
-            page: 1,
-            per_page: 20
-          },
-          outputMode: 'envelope',
-          outputContext: { contextKey: 'command', arrayPath: 'items', valueField: 'command' }
+          outputMode: 'envelope'
         },
         requiresContext: ['device_id'],
         mutating: false,
         command:
-          'xyte-cli api call organization.commands.getCommands --tenant <tenant-id> --path-json {"device_id":"<device-id>"} --query-json {"page":1,"per_page":20}'
+          'xyte-cli api call organization.devices.getDevice --tenant <tenant-id> --path-json {"device_id":"<device-id>"}'
+      },
+      {
+        kind: 'task',
+        id: 'command_model_describe',
+        title: 'Describe Command Model',
+        task: 'call',
+        call: {
+          endpointKey: 'organization.models.getModel',
+          path: {
+            id: '{{device_model_id}}'
+          },
+          outputMode: 'envelope',
+          outputContext: { contextKey: 'command', arrayPath: 'commands', valueField: 'name' }
+        },
+        requiresContext: ['device_model_id'],
+        mutating: false,
+        command: 'xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>'
       },
       {
         kind: 'gate',
         id: 'gate_send_command',
         title: 'Approve Send Command',
         mutating: true,
-        detail: 'Human approval required before organization.commands.sendCommand.',
+        detail:
+          'Human approval required before organization.commands.sendCommand. Choose commands[].name from organization.models.getModel; pass command_extra_params_json for custom_fields and command_file_id when with_file is true.',
         command: 'Human decision gate before sendCommand'
       },
       {
@@ -392,14 +424,14 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
             device_id: '{{device_id}}'
           },
           body: {
-            command: '{{command}}'
+            name: '{{command}}'
           },
           outputMode: 'envelope'
         },
         requiresContext: ['device_id', 'command'],
         mutating: true,
         command:
-          'xyte-cli api call organization.commands.sendCommand --tenant <tenant-id> --path-json {"device_id":"<device-id>"} --body-json {"command":"<valid-command-from-history>"}'
+          'xyte-cli api call organization.commands.sendCommand --tenant <tenant-id> --path-json {"device_id":"<device-id>"} --body-json {"name":"<commands[].name>","extra_params":{}}'
       },
       {
         kind: 'gate',
@@ -514,6 +546,96 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
       }
     ]
   },
+  'flow.device-command': {
+    id: 'flow.device-command',
+    title: 'Device Command',
+    intent:
+      'Fetch model-supported commands for one device and send a selected command only after explicit approval.',
+    writeCapable: true,
+    recipeCommands: [
+      [
+        'xyte-cli api call organization.devices.getDevice \\',
+        '  --tenant <tenant-id> \\',
+        `  --path-json '{"device_id":"<device-id>"}'`
+      ].join('\n'),
+      [
+        'xyte-cli edge models describe \\',
+        '  --tenant <tenant-id> \\',
+        '  --model-id <model-id-from-device>'
+      ].join('\n'),
+      [
+        'xyte-cli api call organization.commands.sendCommand \\',
+        '  --tenant <tenant-id> \\',
+        `  --path-json '{"device_id":"<device-id>"}' \\`,
+        `  --body-json '{"name":"<commands[].name>","extra_params":{}}'`
+      ].join('\n')
+    ],
+    steps: [
+      {
+        kind: 'task',
+        id: 'device_command_device_get',
+        title: 'Get Device For Command',
+        task: 'call',
+        call: {
+          endpointKey: 'organization.devices.getDevice',
+          path: {
+            device_id: '{{device_id}}'
+          },
+          outputMode: 'envelope'
+        },
+        requiresContext: ['device_id'],
+        mutating: false,
+        command:
+          'xyte-cli api call organization.devices.getDevice --tenant <tenant-id> --path-json {"device_id":"<device-id>"}'
+      },
+      {
+        kind: 'task',
+        id: 'device_command_model_describe',
+        title: 'Describe Command Model',
+        task: 'call',
+        call: {
+          endpointKey: 'organization.models.getModel',
+          path: {
+            id: '{{device_model_id}}'
+          },
+          outputMode: 'envelope',
+          outputContext: { contextKey: 'command', arrayPath: 'commands', valueField: 'name' }
+        },
+        requiresContext: ['device_model_id'],
+        mutating: false,
+        command: 'xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>'
+      },
+      {
+        kind: 'gate',
+        id: 'gate_device_command_send',
+        title: 'Approve Device Command',
+        mutating: true,
+        detail:
+          'Human approval required before organization.commands.sendCommand. Provide --var command=<commands[].name>; pass command_extra_params_json for custom_fields and command_file_id when with_file is true.',
+        command: 'Human decision gate before device sendCommand'
+      },
+      {
+        kind: 'task',
+        id: 'device_command_send',
+        title: 'Send Device Command',
+        task: 'call',
+        call: {
+          endpointKey: 'organization.commands.sendCommand',
+          path: {
+            device_id: '{{device_id}}'
+          },
+          body: {
+            name: '{{command}}'
+          },
+          outputMode: 'envelope'
+        },
+        requiresContext: ['device_id', 'command'],
+        mutating: true,
+        command:
+          'xyte-cli api call organization.commands.sendCommand --tenant <tenant-id> --path-json {"device_id":"<device-id>"} --body-json {"name":"<commands[].name>","extra_params":{}}'
+      }
+    ]
+  },
   'flow.device-migration': {
     id: 'flow.device-migration',
     title: 'Device Migration',
@@ -521,7 +643,8 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
     writeCapable: true,
     recipeCommands: [
       'mkdir -p ./artifacts ./reports',
-      'xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id> --output json > ./artifacts/source-devices.json',
+      `xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query-json '{"space_id":"<source-space-id>","page":1,"per_page":100}' --output-mode envelope --output json > ./artifacts/source-devices.page-1.json`,
+      '# Repeat page 2, 3, ... until the response reports no continuation (`next_page` is null/absent, or `has_next_page=false` on tenants that return that field), then combine items into ./artifacts/source-devices.json.',
       'xyte-cli api call organization.spaces.getSpaces --tenant <tenant-id> --query path_includes=<target-path> --output json > ./artifacts/target-spaces.json',
       'xyte-cli util match --tenant <tenant-id> --source ./artifacts/source-devices.json --target ./artifacts/target-spaces.json --source-field name --target-field name --out ./artifacts/device-moves.csv',
       'xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/device-moves.csv.summary.json --out ./reports/device-migration-pre.md --render markdown',
@@ -538,14 +661,16 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         call: {
           endpointKey: 'organization.devices.getDevices',
           query: {
-            space_id: '{{source_space_id}}'
+            space_id: '{{source_space_id}}',
+            page: 1,
+            per_page: 100
           },
           outputMode: 'envelope'
         },
         requiresContext: ['source_space_id'],
         mutating: false,
         command:
-          'xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id> --output json > ./artifacts/source-devices.json'
+          `xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query-json '{"space_id":"<source-space-id>","page":1,"per_page":100}' --output-mode envelope --output json > ./artifacts/source-devices.page-1.json`
       },
       {
         kind: 'task',
@@ -677,16 +802,98 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
       }
     ]
   },
+  'flow.edge-model-discovery': {
+    id: 'flow.edge-model-discovery',
+    title: 'Edge Model Discovery',
+    intent: 'List Edge-capable models and describe one model to discover supported custom parameters and commands.',
+    writeCapable: false,
+    recipeCommands: [
+      'xyte-cli edge models list --tenant <tenant-id> --page 1 --per-page 100',
+      'xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>'
+    ],
+    steps: [
+      {
+        kind: 'task',
+        id: 'edge_models_list',
+        title: 'List Edge Models',
+        task: 'call',
+        call: {
+          endpointKey: 'organization.models.getModels',
+          query: {
+            edge_only: true,
+            page: 1,
+            per_page: 100
+          },
+          outputMode: 'envelope',
+          outputContext: { contextKey: 'edge_model_id', arrayPath: 'items', valueField: 'id' }
+        },
+        mutating: false,
+        command: 'xyte-cli edge models list --tenant <tenant-id> --page 1 --per-page 100'
+      },
+      {
+        kind: 'task',
+        id: 'edge_model_describe',
+        title: 'Describe Edge Model',
+        task: 'call',
+        call: {
+          endpointKey: 'organization.models.getModel',
+          path: {
+            id: '{{edge_model_id}}'
+          },
+          outputMode: 'envelope'
+        },
+        requiresContext: ['edge_model_id'],
+        mutating: false,
+        command: 'xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>'
+      }
+    ]
+  },
   'flow.edge-claim': {
     id: 'flow.edge-claim',
     title: 'Edge Claim',
     intent: 'Claim a single device behind an Edge proxy and poll to terminal state.',
     writeCapable: true,
     recipeCommands: [
-      'xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --plan',
-      'xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --apply'
+      'xyte-cli edge models list --tenant <tenant-id> --search <model-or-alias> --page 1 --per-page 100',
+      'xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>',
+      "xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> [--mac <mac>] [--sn <serial>] [--custom-parameters '<json>'] --plan",
+      "xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> [--mac <mac>] [--sn <serial>] [--custom-parameters '<json>'] --apply"
     ],
     steps: [
+      {
+        kind: 'task',
+        id: 'edge_claim_models_list',
+        title: 'List Edge Models',
+        task: 'call',
+        call: {
+          endpointKey: 'organization.models.getModels',
+          query: {
+            edge_only: true,
+            page: 1,
+            per_page: 100
+          },
+          outputMode: 'envelope',
+          outputContext: { contextKey: 'device_model_id', arrayPath: 'items', valueField: 'id' }
+        },
+        mutating: false,
+        command: 'xyte-cli edge models list --tenant <tenant-id> --page 1 --per-page 100'
+      },
+      {
+        kind: 'task',
+        id: 'edge_claim_model_describe',
+        title: 'Describe Edge Model',
+        task: 'call',
+        call: {
+          endpointKey: 'organization.models.getModel',
+          path: {
+            id: '{{device_model_id}}'
+          },
+          outputMode: 'envelope'
+        },
+        requiresContext: ['device_model_id'],
+        mutating: false,
+        command: 'xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>'
+      },
       {
         kind: 'gate',
         id: 'gate_edge_claim',
@@ -704,7 +911,7 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         requiresContext: ['proxy_id', 'device_ip', 'device_model_id', 'space_id'],
         mutating: true,
         command:
-          'xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --apply'
+          "xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> [--mac <mac>] [--sn <serial>] [--custom-parameters '<json>'] --apply"
       }
     ]
   },
@@ -715,11 +922,47 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
       'Claim many devices behind one or more Edge proxies from a prepared CSV; rows that do not skip connectivity checks run a pre-claim ping inside the batch.',
     writeCapable: true,
     recipeCommands: [
+      'xyte-cli edge models list --tenant <tenant-id> --search <model-or-alias> --page 1 --per-page 100',
+      'xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>',
       'xyte-cli util prepare --action organization.edge.startClaim --tenant <tenant-id> --input ./devices.xlsx --output-dir ./prepared',
       'xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --plan',
       'xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --apply --report ./artifacts/edge-claim.report.ndjson --resume-artifact ./artifacts/edge-claim.resume.ndjson'
     ],
     steps: [
+      {
+        kind: 'task',
+        id: 'edge_claim_batch_models_list',
+        title: 'List Edge Models',
+        task: 'call',
+        call: {
+          endpointKey: 'organization.models.getModels',
+          query: {
+            edge_only: true,
+            page: 1,
+            per_page: 100
+          },
+          outputMode: 'envelope',
+          outputContext: { contextKey: 'device_model_id', arrayPath: 'items', valueField: 'id' }
+        },
+        mutating: false,
+        command: 'xyte-cli edge models list --tenant <tenant-id> --page 1 --per-page 100'
+      },
+      {
+        kind: 'task',
+        id: 'edge_claim_batch_model_describe',
+        title: 'Describe Edge Model',
+        task: 'call',
+        call: {
+          endpointKey: 'organization.models.getModel',
+          path: {
+            id: '{{device_model_id}}'
+          },
+          outputMode: 'envelope'
+        },
+        requiresContext: ['device_model_id'],
+        mutating: false,
+        command: 'xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>'
+      },
       {
         kind: 'task',
         id: 'edge_claim_prepare',
@@ -782,6 +1025,133 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         mutating: true,
         command:
           'xyte-cli edge claim-batch --tenant <tenant-id> --input ./artifacts/edge-claim/organization-edge-startclaim.csv --apply --report ./artifacts/edge-claim.apply.ndjson --resume-artifact ./artifacts/edge-claim.resume.ndjson'
+      }
+    ]
+  },
+  'flow.edge-params-update': {
+    id: 'flow.edge-params-update',
+    title: 'Edge Params Update',
+    intent:
+      'Safely update custom parameters on one already-claimed Edge device by planning a full replacement, applying it, and verifying read-back.',
+    writeCapable: true,
+    recipeCommands: [
+      'xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>',
+      'xyte-cli edge update-params --tenant <tenant-id> --device-id <device-id> --set-json \'{"Port":"161"}\' --plan',
+      'xyte-cli edge update-params --tenant <tenant-id> --device-id <device-id> --set-json \'{"Port":"161"}\' --apply'
+    ],
+    steps: [
+      {
+        kind: 'task',
+        id: 'edge_params_plan',
+        title: 'Plan Edge Params Update',
+        task: 'edge.params-update',
+        edgeParamsUpdate: {
+          apply: false
+        },
+        requiresContext: ['device_id', 'set_json'],
+        mutating: false,
+        command:
+          'xyte-cli edge update-params --tenant <tenant-id> --device-id <device-id> --set-json \'{"Port":"161"}\' --plan'
+      },
+      {
+        kind: 'gate',
+        id: 'gate_edge_params_apply',
+        title: 'Approve Edge Params Update',
+        mutating: true,
+        detail:
+          'Human approval required before applying the full custom_parameters replacement to the already-claimed Edge device.',
+        command: 'Human decision gate before edge custom-parameter update'
+      },
+      {
+        kind: 'task',
+        id: 'edge_params_apply',
+        title: 'Apply Edge Params Update',
+        task: 'edge.params-update',
+        edgeParamsUpdate: {
+          apply: true
+        },
+        requiresContext: ['device_id', 'set_json'],
+        mutating: true,
+        command:
+          'xyte-cli edge update-params --tenant <tenant-id> --device-id <device-id> --set-json \'{"Port":"161"}\' --apply'
+      }
+    ]
+  },
+  'flow.edge-params-update-batch': {
+    id: 'flow.edge-params-update-batch',
+    title: 'Edge Params Update Batch',
+    intent:
+      'Safely update custom parameters on many already-claimed Edge devices with prepared rows, dry-run reports, apply reports, and resume artifacts.',
+    writeCapable: true,
+    recipeCommands: [
+      'xyte-cli util prepare --action edge.params.update --tenant <tenant-id> --input ./edge-params.xlsx --output-dir ./prepared',
+      'xyte-cli edge update-params-batch --tenant <tenant-id> --input ./prepared/edge-params-update.csv --plan --report ./artifacts/edge-params.plan.ndjson',
+      'xyte-cli edge update-params-batch --tenant <tenant-id> --input ./prepared/edge-params-update.csv --apply --report ./artifacts/edge-params.apply.ndjson --resume-artifact ./artifacts/edge-params.resume.ndjson'
+    ],
+    steps: [
+      {
+        kind: 'task',
+        id: 'edge_params_prepare',
+        title: 'Prepare Edge Params CSV',
+        task: 'utility.prepare',
+        utilityPrepare: {
+          actionKey: 'edge.params.update',
+          inputPath: '{{edge_params_input_path}}',
+          outputDir: 'edge-params-update'
+        },
+        requiresContext: ['edge_params_input_path'],
+        mutating: false,
+        command:
+          'xyte-cli util prepare --action edge.params.update --tenant <tenant-id> --input ./edge-params.xlsx --output-dir ./artifacts/edge-params-update'
+      },
+      {
+        kind: 'gate',
+        id: 'gate_edge_params_prepare_review',
+        title: 'Review Prepared Edge Params CSV',
+        mutating: false,
+        pauseOnFirstApply: true,
+        detail:
+          'Populate and review device_id,set_json,expected_model_id rows before the dry run; set_json must contain explicit parameter labels and must not contain masked passwords.',
+        command: 'Human decision gate after reviewing edge-params-update.csv'
+      },
+      {
+        kind: 'task',
+        id: 'edge_params_dry_run',
+        title: 'Edge Params Dry Run',
+        task: 'edge.params-update-batch',
+        edgeParamsUpdateBatch: {
+          inputPath: '{{edge_params_update_csv}}',
+          apply: false,
+          reportPath: 'edge-params.dry-run.ndjson',
+          resumePath: 'edge-params.resume.ndjson'
+        },
+        mutating: false,
+        command:
+          'xyte-cli edge update-params-batch --tenant <tenant-id> --input ./artifacts/edge-params-update/edge-params-update.csv --plan --report ./artifacts/edge-params.dry-run.ndjson'
+      },
+      {
+        kind: 'gate',
+        id: 'gate_edge_params_batch_apply',
+        title: 'Approve Edge Params Batch',
+        mutating: true,
+        detail:
+          'Human approval required before applying already-claimed Edge custom-parameter updates; every row sends a full replacement body.',
+        command: 'Human decision gate before edge params batch apply'
+      },
+      {
+        kind: 'task',
+        id: 'edge_params_apply',
+        title: 'Edge Params Apply',
+        task: 'edge.params-update-batch',
+        edgeParamsUpdateBatch: {
+          inputPath: '{{edge_params_update_csv}}',
+          apply: true,
+          reportPath: 'edge-params.apply.ndjson',
+          resumePath: 'edge-params.resume.ndjson'
+        },
+        mutating: true,
+        command:
+          'xyte-cli edge update-params-batch --tenant <tenant-id> --input ./artifacts/edge-params-update/edge-params-update.csv --apply --report ./artifacts/edge-params.apply.ndjson --resume-artifact ./artifacts/edge-params.resume.ndjson'
       }
     ]
   },
@@ -889,7 +1259,8 @@ export const UTILITY_PREPARE_CONTEXT_KEY: Record<string, string> = {
   'space.import-tree': 'space_import_tree_csv',
   'organization.devices.claimDevice': 'claim_prepare_csv',
   'device.move': 'device_move_csv',
-  'organization.edge.startClaim': 'edge_claim_prepare_csv'
+  'organization.edge.startClaim': 'edge_claim_prepare_csv',
+  'edge.params.update': 'edge_params_update_csv'
 };
 
 export function listBuiltInFlowDefinitions(): BuiltInFlowDefinition[] {

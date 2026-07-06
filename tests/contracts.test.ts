@@ -6,6 +6,11 @@ import Ajv2020 from 'ajv/dist/2020';
 import callEnvelopeSchema from '../docs/schemas/call-envelope.v1.schema.json';
 import deepDiveSchema from '../docs/schemas/inspect-deep-dive.v1.schema.json';
 import doctorEnvironmentSchema from '../docs/schemas/doctor-environment.v1.schema.json';
+import edgeClaimBatchSchema from '../docs/schemas/edge-claim-batch.v1.schema.json';
+import edgeModelsDescribeSchema from '../docs/schemas/edge-models-describe.v1.schema.json';
+import edgeModelsListSchema from '../docs/schemas/edge-models-list.v1.schema.json';
+import edgeParamsUpdateBatchSchema from '../docs/schemas/edge-params-update-batch.v1.schema.json';
+import edgeParamsUpdateSchema from '../docs/schemas/edge-params-update.v1.schema.json';
 import fleetSchema from '../docs/schemas/inspect-fleet.v1.schema.json';
 import flowRunSchema from '../docs/schemas/flow-run.v1.schema.json';
 import headlessSchema from '../docs/schemas/headless-frame.v1.schema.json';
@@ -38,6 +43,11 @@ const validateUpgradeCheck = ajv.compile(upgradeCheckSchema);
 const validateUpgradeResult = ajv.compile(upgradeResultSchema);
 const validateWatchFrame = ajv.compile(watchFrameSchema);
 const validateDoctorEnvironment = ajv.compile(doctorEnvironmentSchema);
+const validateEdgeClaimBatch = ajv.compile(edgeClaimBatchSchema);
+const validateEdgeModelsList = ajv.compile(edgeModelsListSchema);
+const validateEdgeModelsDescribe = ajv.compile(edgeModelsDescribeSchema);
+const validateEdgeParamsUpdate = ajv.compile(edgeParamsUpdateSchema);
+const validateEdgeParamsUpdateBatch = ajv.compile(edgeParamsUpdateBatchSchema);
 
 describe('schema contracts', () => {
   it('validates environment doctor payloads across modes', async () => {
@@ -81,6 +91,155 @@ describe('schema contracts', () => {
     ) as Record<string, unknown>;
     expect(skillSchema).toEqual(doctorEnvironmentSchema);
   });
+
+  it('validates Edge claim batch payloads and keeps skill schema copy in sync', () => {
+    const payload = {
+      schemaVersion: 'xyte.edge.claim-batch.v1',
+      generatedAtUtc: '2026-07-06T00:00:00.000Z',
+      tenantId: 'acme',
+      mode: 'plan',
+      runId: 'edge-claim-1',
+      reportPath: './artifacts/edge-claim.plan.ndjson',
+      resumePath: './artifacts/edge-claim.resume.ndjson',
+      totals: {
+        rows: 1,
+        succeeded: 0,
+        failed: 0,
+        rejected: 0,
+        timeout: 0,
+        alreadyClaimed: 0,
+        proxyOffline: 0,
+        pingFailed: 0,
+        skipped: 0,
+        aborted: 0
+      },
+      stoppedEarly: false,
+      rows: [
+        {
+          rowIndex: 1,
+          proxy_id: 'proxy-1',
+          device_ip: '192.168.1.100',
+          disposition: 'skipped',
+          attempts: 0,
+          elapsedMs: 0,
+          planned: {
+            preClaimPing: 'required',
+            claimBody: {
+              proxy_id: 'proxy-1',
+              device_ip: '192.168.1.100'
+            }
+          }
+        }
+      ]
+    };
+
+    expect(validateEdgeClaimBatch(payload)).toBe(true);
+    expect(validateEdgeClaimBatch.errors ?? []).toEqual([]);
+    const skillSchema = JSON.parse(
+      readFileSync(join(__dirname, '../skills/xyte-cli/schemas/edge-claim-batch.v1.schema.json'), 'utf8')
+    ) as Record<string, unknown>;
+    expect(skillSchema).toEqual(edgeClaimBatchSchema);
+  });
+
+  it('validates Edge model discovery payloads and keeps skill schema copies in sync', () => {
+    const listPayload = {
+      schemaVersion: 'xyte.edge.models.list.v1',
+      tenantId: 'acme',
+      query: { edge_only: true, page: 1, per_page: 100 },
+      response: {
+        items: [
+          {
+            id: 'model-1',
+            vendor: 'Acme',
+            model: 'Sensor 100',
+            aliases: ['Sensor'],
+            parameters: [{ name: 'Port', type: 'number', required: false }]
+          }
+        ],
+        next_page: null
+      }
+    };
+    const describePayload = {
+      schemaVersion: 'xyte.edge.models.describe.v1',
+      tenantId: 'acme',
+      modelId: 'model-1',
+      response: {
+        id: 'model-1',
+        vendor: 'Acme',
+        model: 'Sensor 100',
+        aliases: [],
+        parameters: [{ name: 'Port', type: 'number', required: false }],
+        commands: [
+          {
+            id: 'cmd-1',
+            name: 'reboot',
+            friendly_name: 'Reboot device',
+            custom_fields: [{ name: 'delay', type: 'number' }],
+            with_file: false
+          }
+        ]
+      }
+    };
+
+    expect(validateEdgeModelsList(listPayload)).toBe(true);
+    expect(validateEdgeModelsList.errors ?? []).toEqual([]);
+    expect(validateEdgeModelsDescribe(describePayload)).toBe(true);
+    expect(validateEdgeModelsDescribe.errors ?? []).toEqual([]);
+    expect(
+      JSON.parse(readFileSync(join(__dirname, '../skills/xyte-cli/schemas/edge-models-list.v1.schema.json'), 'utf8'))
+    ).toEqual(edgeModelsListSchema);
+    expect(
+      JSON.parse(
+        readFileSync(join(__dirname, '../skills/xyte-cli/schemas/edge-models-describe.v1.schema.json'), 'utf8')
+      )
+    ).toEqual(edgeModelsDescribeSchema);
+  });
+
+  it('validates Edge params update payloads and keeps skill schema copies in sync', () => {
+    const outcome = {
+      device_id: 'dev-1',
+      disposition: 'planned',
+      plan: {
+        device_id: 'dev-1',
+        model_id: 'model-1',
+        set: { Port: '161' },
+        current_custom_parameters: { Port: '162' },
+        merged_custom_parameters: { Port: '161' },
+        requestBody: { custom_parameters: { Port: '161' } },
+        supportedParameters: [{ name: 'Port', type: 'number', required: false }]
+      }
+    };
+    const singlePayload = {
+      schemaVersion: 'xyte.edge.params-update.v1',
+      generatedAtUtc: '2026-07-06T00:00:00.000Z',
+      tenantId: 'acme',
+      mode: 'plan',
+      outcome
+    };
+    const batchPayload = {
+      schemaVersion: 'xyte.edge.params-update-batch.v1',
+      generatedAtUtc: '2026-07-06T00:00:00.000Z',
+      tenantId: 'acme',
+      mode: 'plan',
+      runId: 'edge-params-1',
+      totals: { rows: 1, planned: 1, succeeded: 0, failed: 0, rejected: 0, skipped: 0 },
+      rows: [{ rowIndex: 1, ...outcome }]
+    };
+
+    expect(validateEdgeParamsUpdate(singlePayload)).toBe(true);
+    expect(validateEdgeParamsUpdate.errors ?? []).toEqual([]);
+    expect(validateEdgeParamsUpdateBatch(batchPayload)).toBe(true);
+    expect(validateEdgeParamsUpdateBatch.errors ?? []).toEqual([]);
+    expect(
+      JSON.parse(readFileSync(join(__dirname, '../skills/xyte-cli/schemas/edge-params-update.v1.schema.json'), 'utf8'))
+    ).toEqual(edgeParamsUpdateSchema);
+    expect(
+      JSON.parse(
+        readFileSync(join(__dirname, '../skills/xyte-cli/schemas/edge-params-update-batch.v1.schema.json'), 'utf8')
+      )
+    ).toEqual(edgeParamsUpdateBatchSchema);
+  });
+
   it('validates call envelope payload', () => {
     const envelope = buildCallEnvelope({
       requestId: 'req-1',

@@ -236,7 +236,7 @@ One-liners:
 xyte-cli api call organization.devices.claimDevice --tenant <tenant-id> --body-json '{"name":"<name>","space_id":<space-id>,"sn":"<sn>","mac":"<mac>","cloud_id":"<cloud-id>"}'
 
 # Edge (behind an Xyte Edge proxy):
-xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip> --device-model-id <model-id> --space-id <space-id> --plan
+xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip> --device-model-id <model-id> --space-id <space-id> --custom-parameters '{"SNMP community":"public","Port":"161"}' --plan
 
 # Bulk edge (blank skip_connectivity_check rows ping before claim):
 xyte-cli util prepare --action organization.edge.startClaim --input ./edge-devices.xlsx --output-dir ./prepared

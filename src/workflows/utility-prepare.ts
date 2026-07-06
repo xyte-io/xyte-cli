@@ -44,7 +44,14 @@ const UtilityPrepareResultSchema = z.object({
     apply: z.string(),
     verify: z.string()
   }),
-  executionSupport: z.enum(['space.import-tree', 'device.move', 'edge.claim-batch', 'prepare-only', 'call-loop-only'])
+  executionSupport: z.enum([
+    'space.import-tree',
+    'device.move',
+    'edge.claim-batch',
+    'edge.params-update-batch',
+    'prepare-only',
+    'call-loop-only'
+  ])
 });
 
 type UtilityPrepareResult = z.infer<typeof UtilityPrepareResultSchema>;
@@ -95,10 +102,11 @@ function buildSuggestedCommands(
     return {
       next: [
         `Review ${primaryPath}.`,
-        'Preflight gate: for each device_id, run organization.commands.getCommands first and pick only valid command/friendly_name values.',
-        'If no valid command/friendly_name is known for a device, skip writes for that row.'
+        'Preflight gate: for each device_id, run organization.devices.getDevice, then organization.models.getModel with the returned model.id.',
+        'Choose command names only from model commands[].name or friendly names only from commands[].friendly_name.',
+        'Fill extra_params only from commands[].custom_fields[].name and provide file_id when commands[].with_file is true.'
       ].join(' '),
-      apply: `xyte-cli api call organization.commands.sendCommand --tenant ${tenant} --path-json '{"device_id":"<device_id>"}' --body-json '{"command":"<valid-command>"}'`,
+      apply: `xyte-cli api call organization.commands.sendCommand --tenant ${tenant} --path-json '{"device_id":"<device_id>"}' --body-json '{"name":"<commands[].name>","extra_params":{}}'`,
       verify: `xyte-cli api call organization.commands.getCommands --tenant ${tenant} --path-json '{"device_id":"<device_id>"}' --query-json '{"page":1,"per_page":20}'`
     };
   }
@@ -155,6 +163,22 @@ function buildSuggestedCommands(
     };
   }
 
+  if (profile.actionKey === 'edge.params.update') {
+    const reportPath = path.join(outputDir, 'edge-params-update.apply.ndjson');
+    const resumePath = path.join(outputDir, 'edge-params-update.resume.ndjson');
+    return {
+      next: [
+        `Review ${primaryPath}.`,
+        'Run xyte-cli edge update-params-batch with --plan first; apply only after the planned full replacement bodies look correct.',
+        'Rows are rejected when parameter keys are not declared on the current model or a password value is masked.'
+      ].join(' '),
+      apply:
+        `xyte-cli edge update-params-batch --tenant ${tenant} --input ${primaryPath} --apply ` +
+        `--report ${reportPath} --resume-artifact ${resumePath}`,
+      verify: `xyte-cli api call organization.devices.getDevice --tenant ${tenant} --path-json '{"device_id":"<device_id>"}'`
+    };
+  }
+
   if (profile.executionSupport === 'space.import-tree') {
     return {
       next: `xyte-cli util import-tree --tenant ${tenant} --input ${primaryPath}`,
@@ -206,6 +230,9 @@ function requiredHeadersForProfile(profile: UtilityActionProfile): string[] {
   if (profile.actionKey === 'organization.edge.startClaim') {
     return ['proxy_id', 'device_ip', 'device_model_id', 'space_id'];
   }
+  if (profile.actionKey === 'edge.params.update') {
+    return ['device_id', 'set_json'];
+  }
   if (profile.actionKey === 'device.move') {
     return ['device_id', 'target_space_id'];
   }
@@ -245,11 +272,32 @@ function exampleForHeader(profile: UtilityActionProfile, header: string): string
 function rejectTaxonomy(profile: UtilityActionProfile, requiredHeaders: string[]): string[] {
   const reasons = requiredHeaders.map((header) => `missing_${header}`);
   const jsonHeaders = profile.headers.filter(
-    (header) => header.endsWith('_json') || header === 'config' || header === 'custom_parameters'
+    (header) =>
+      header.endsWith('_json') ||
+      header === 'config' ||
+      header === 'custom_parameters' ||
+      header === 'set_json'
   );
   reasons.push(...jsonHeaders.map((header) => `invalid_${header}`));
   if (profile.actionKey === 'organization.edge.startClaim') {
-    reasons.push('invalid_device_ip', 'invalid_space_id', 'invalid_skip_connectivity_check');
+    reasons.push(
+      'invalid_device_ip',
+      'invalid_space_id',
+      'invalid_skip_connectivity_check',
+      'unknown_custom_parameter',
+      'missing_required_custom_parameter',
+      'masked_password_requires_value'
+    );
+  }
+  if (profile.actionKey === 'edge.params.update') {
+    reasons.push(
+      'unknown_parameter',
+      'unsupported_current_parameter',
+      'missing_required_parameter',
+      'masked_password_requires_value',
+      'model_mismatch',
+      'duplicate_device_id'
+    );
   }
   if (profile.actionKey === 'device.move') {
     reasons.push('invalid_target_space_id');

@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xyte-io.github.io/xyte-cli/schemas/edge-models-describe.v1.schema.json",
+  "title": "Xyte CLI Edge Model Describe Result",
+  "type": "object",
+  "required": ["schemaVersion", "tenantId", "modelId", "response"],
+  "properties": {
+    "schemaVersion": {
+      "const": "xyte.edge.models.describe.v1"
+    },
+    "tenantId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "modelId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "response": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "vendor": { "type": "string" },
+        "model": { "type": "string" },
+        "aliases": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "parameters": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/modelParameter" }
+        },
+        "commands": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/modelCommand" }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "modelParameter": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "enum": ["text", "textarea", "password", "number", "file"] },
+        "required": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "commandCustomField": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "type": "string" },
+        "required": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "modelCommand": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "minLength": 1 },
+        "friendly_name": { "type": "string" },
+        "custom_fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/commandCustomField" }
+        },
+        "with_file": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    }
+  }
+}

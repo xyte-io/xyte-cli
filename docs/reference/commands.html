@@ -98,7 +98,9 @@ xyte-cli flow run &lt;flow-id&gt; --tenant &lt;tenant-id&gt; --plan --strict-jso
               <tr><td>flow run --plan</td><td>Shows planned actions and stops before applying changes.</td><td>Strict JSON or text summary.</td><td>Run bundle under <code>--out-dir</code>.</td><td>Yes.</td><td><code>xyte.flow.run.v1</code></td><td>Missing input, paused gate, unresolved target.</td></tr>
               <tr><td>flow run --apply --resume</td><td>Continues an approved flow from its saved run id or bundle path.</td><td>Strict JSON or text summary.</td><td>Reads original run id or bundle path.</td><td>Only in jobs with an approval step.</td><td><code>xyte.flow.run.v1</code></td><td>Wrong resume path, rejected write, stale target.</td></tr>
               <tr><td>util prepare</td><td>Reads source files and writes local prepared files.</td><td>JSON summary plus CSV/notes outputs.</td><td>Writes primary, rejected, and notes files.</td><td>Yes.</td><td><code>xyte.utility.prepare.v1</code></td><td>Unsupported action, unreadable input, rejected rows.</td></tr>
-              <tr><td>edge claim-batch</td><td>Plans or runs an Edge claim batch from prepared rows.</td><td>NDJSON report and summary.</td><td>Writes report and resume artifact.</td><td>Use plan in scheduled jobs; run apply only from an approved job.</td><td><code>xyte.utility.batch.v1</code></td><td>Offline proxy, timeout, partial batch, rejected row.</td></tr>
+              <tr><td>edge claim-batch</td><td>Plans or runs an Edge claim batch from prepared rows.</td><td>NDJSON report and summary.</td><td>Writes report and resume artifact.</td><td>Use plan in scheduled jobs; run apply only from an approved job.</td><td><code>xyte.edge.claim-batch.v1</code></td><td>Offline proxy, timeout, partial batch, rejected row.</td></tr>
+              <tr><td>edge models</td><td>Reads Edge-capable model ids, parameters, and commands.</td><td>JSON summary.</td><td>No required files.</td><td>Yes.</td><td><code>xyte.edge.models.list.v1</code>, <code>xyte.edge.models.describe.v1</code></td><td>Auth failure, empty model access, wrong model id.</td></tr>
+              <tr><td>edge update-params</td><td>Plans or applies a full-replacement custom parameter update on claimed Edge devices.</td><td>JSON summary and optional NDJSON report for batch.</td><td>Batch writes report and resume artifact.</td><td>Use plan in scheduled jobs; run apply only from an approved job.</td><td><code>xyte.edge.params-update.v1</code></td><td>Unknown label, unsupported current label, missing required parameter, duplicate device row, masked password, model mismatch, read-back mismatch.</td></tr>
               <tr><td>ops report generate</td><td>Renders a report from saved source data.</td><td>Markdown or PDF.</td><td>Reads saved JSON, writes report file.</td><td>Yes.</td><td><code>xyte.report.v1</code></td><td>Wrong input type, output path missing.</td></tr>
             </tbody>
           </table></div>
@@ -145,12 +147,23 @@ xyte-cli api endpoints describe organization.devices.getDevices
 xyte-cli api call organization.devices.getDevices \
   --tenant &lt;tenant-id&gt; \
   --query-json '{"space_id":"&lt;space-id&gt;"}'</code></pre></div>
-          <p class="section-copy">For write-capable endpoints, prefer a guide or flow first. If you use <code>xyte-cli api call &lt;endpoint-key&gt;</code> directly, choose the target from endpoint output and read the state back afterward.</p>
+          <p class="section-copy">For write-capable endpoints, prefer a guide or flow first. For one-device command sends, use <code>flow.device-command</code> so the device model&rsquo;s supported commands, <code>custom_fields</code>, and <code>with_file</code> requirements are captured before the approval gate. If you use <code>xyte-cli api call &lt;endpoint-key&gt;</code> directly, choose the target from endpoint output and read the state back afterward.</p>
           <div class="command"><pre><code>xyte-cli api endpoints describe organization.commands.sendCommand
-xyte-cli api call organization.commands.getCommands \
+xyte-cli api call organization.devices.getDevice \
   --tenant &lt;tenant-id&gt; \
-  --path-json '{"device_id":"&lt;device-id&gt;"}' \
-  --query-json '{"page":1,"per_page":20}'</code></pre></div>
+  --path-json '{"device_id":"&lt;device-id&gt;"}'
+
+xyte-cli edge models describe \
+  --tenant &lt;tenant-id&gt; \
+  --model-id &lt;model-id-from-device&gt;
+
+xyte-cli flow run flow.device-command \
+  --tenant &lt;tenant-id&gt; \
+  --plan \
+  --var device_id=&lt;device-id&gt; \
+  --var command=&lt;command&gt; \
+  --var command_extra_params_json='{"delay":5}' \
+  --var command_file_id=&lt;file-id-if-with_file&gt;</code></pre></div>
 
           <h2 id="flows-utilities">Flows and utilities</h2>
           <p class="section-copy">Flows run repeatable operator work. Utilities prepare messy input files as structured rows for later commands.</p>
@@ -176,8 +189,11 @@ xyte-cli util prepare \
           </div>
 
           <h2 id="edge-reports">Edge and reports</h2>
-          <p class="section-copy">Edge claim and ping are async operations. Start in plan mode, then apply after approval. Generate reports from saved source files.</p>
-          <div class="command"><pre><code>xyte-cli api endpoints describe organization.edge.startClaim
+          <p class="section-copy">Edge model discovery is read-only. Edge claim, ping, and custom parameter updates start in plan mode, then apply after approval. Generate reports from saved source files.</p>
+          <div class="command"><pre><code>xyte-cli edge models list --tenant &lt;tenant-id&gt; --page 1 --per-page 100
+xyte-cli edge models describe --tenant &lt;tenant-id&gt; --model-id &lt;model-id&gt;
+
+xyte-cli api endpoints describe organization.edge.startClaim
 xyte-cli api call organization.edges.getEdges --tenant &lt;tenant-id&gt; --query-json '{"page":1,"per_page":100}' &gt; ./artifacts/edge-proxies.json
 xyte-cli api call organization.spaces.getSpaces --tenant &lt;tenant-id&gt; --query-json '{"path_includes":"&lt;target-path&gt;"}' &gt; ./artifacts/edge-target-spaces.json
 
@@ -187,12 +203,27 @@ xyte-cli edge claim \
   --device-ip &lt;device-ip&gt; \
   --device-model-id &lt;device-model-id&gt; \
   --space-id &lt;space-id&gt; \
+  --mac aa:bb:cc:dd:ee:ff \
+  --sn SN-12345 \
+  --custom-parameters '{"SNMP community":"public","Port":"161"}' \
   --plan
 
 xyte-cli edge claim-status \
   --tenant &lt;tenant-id&gt; \
   --proxy-id &lt;proxy-id&gt; \
   --device-ip &lt;device-ip&gt;
+
+xyte-cli edge update-params \
+  --tenant &lt;tenant-id&gt; \
+  --device-id &lt;device-id&gt; \
+  --set-json '{"Port":"161"}' \
+  --plan
+
+xyte-cli edge update-params-batch \
+  --tenant &lt;tenant-id&gt; \
+  --input ./prepared/edge-params-update.csv \
+  --report ./artifacts/edge-params.plan.ndjson \
+  --plan
 
 xyte-cli ops report generate \
   --tenant &lt;tenant-id&gt; \

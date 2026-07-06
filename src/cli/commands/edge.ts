@@ -2,7 +2,19 @@ import type { Command } from 'commander';
 
 import { CliUserError } from '../../contracts/user-error';
 import type { UtilityInputFormat } from '../../utils/input-parser';
-import { runEdgeClaim, runEdgeClaimBatch, validateEdgeClaimRow } from '../../workflows/edge-claim';
+import {
+  runEdgeClaim,
+  runEdgeClaimBatch,
+  validateEdgeClaimModelParameters,
+  validateEdgeClaimRow
+} from '../../workflows/edge-claim';
+import { buildEdgeModelsListQuery, runEdgeModelsList, runEdgeModelDescribe } from '../../workflows/edge-models';
+import {
+  edgeParamsBatchExitedClean,
+  parseEdgeParamsSetJson,
+  runEdgeParamsUpdate,
+  runEdgeParamsUpdateBatch
+} from '../../workflows/edge-params-update';
 import { runEdgePing } from '../../workflows/edge-ping';
 import { parsePositiveInt } from '../../workflows/edge-poll';
 import {
@@ -22,6 +34,8 @@ interface EdgeClaimOptions {
   deviceModelId: string;
   spaceId: string;
   displayName?: string;
+  mac?: string;
+  sn?: string;
   skipConnectivityCheck?: boolean;
   customParameters?: string;
   customPartnerName?: string;
@@ -61,6 +75,45 @@ interface EdgePingOptions extends EdgeStatusOptions {
   pollTimeoutMs?: string;
   plan?: boolean;
   apply?: boolean;
+}
+
+interface EdgeModelsListOptions {
+  tenant?: string;
+  output?: string;
+  search?: string;
+  page?: string;
+  perPage?: string;
+  strictJson?: boolean;
+}
+
+interface EdgeModelDescribeOptions {
+  tenant?: string;
+  output?: string;
+  modelId: string;
+  strictJson?: boolean;
+}
+
+interface EdgeUpdateParamsOptions {
+  tenant?: string;
+  output?: string;
+  deviceId: string;
+  setJson: string;
+  expectedModelId?: string;
+  plan?: boolean;
+  apply?: boolean;
+  strictJson?: boolean;
+}
+
+interface EdgeUpdateParamsBatchOptions {
+  tenant?: string;
+  output?: string;
+  input: string;
+  inputFormat?: string;
+  plan?: boolean;
+  apply?: boolean;
+  report?: string;
+  resumeArtifact?: string;
+  strictJson?: boolean;
 }
 
 function parseEdgeInputFormat(value: string | undefined): UtilityInputFormat {
@@ -110,6 +163,8 @@ async function handleEdgeClaim(ctx: CliContext, options: EdgeClaimOptions): Prom
       device_model_id: options.deviceModelId,
       space_id: options.spaceId,
       display_name: options.displayName,
+      mac: options.mac,
+      sn: options.sn,
       skip_connectivity_check: options.skipConnectivityCheck,
       custom_parameters: options.customParameters,
       custom_partner_name: options.customPartnerName,
@@ -122,12 +177,22 @@ async function handleEdgeClaim(ctx: CliContext, options: EdgeClaimOptions): Prom
   }
   const pollOptions = resolveEdgePollOptions(options);
   const strictJson = resolveStrictJson({ strictJson: options.strictJson, settings });
+  const client = await ctx.withClient({ tenantId });
   if (!apply) {
+    const modelValidation = await validateEdgeClaimModelParameters({
+      client,
+      tenantId,
+      row: validation.row
+    });
+    if (!modelValidation.ok) {
+      throw new CliUserError({ summary: `Invalid edge claim model parameters: ${modelValidation.detail}` });
+    }
     const payload = {
       schemaVersion: 'xyte.edge.claim.plan.v1',
       tenantId,
       mode: 'plan',
-      planned: validation.row
+      planned: validation.row,
+      supportedParameters: modelValidation.parameters
     };
     if (output === 'text') {
       writeEdgeText(ctx, payload);
@@ -136,7 +201,6 @@ async function handleEdgeClaim(ctx: CliContext, options: EdgeClaimOptions): Prom
     printJson(ctx.stdout, payload, { strictJson });
     return;
   }
-  const client = await ctx.withClient({ tenantId });
   const outcome = await runEdgeClaim({
     client,
     tenantId,
@@ -284,6 +348,124 @@ async function handleEdgePingStatus(ctx: CliContext, options: EdgeStatusOptions)
   }
 }
 
+async function handleEdgeModelsList(ctx: CliContext, options: EdgeModelsListOptions): Promise<void> {
+  const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
+  const tenantId = options.tenant ?? settings.values.defaults.tenant;
+  requireTenantId(tenantId, 'edge models list');
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
+  const client = await ctx.withClient({ tenantId });
+  const page = parsePositiveInt(options.page, '--page');
+  const perPage = parsePositiveInt(options.perPage, '--per-page');
+  const response = await runEdgeModelsList({
+    client,
+    tenantId,
+    search: options.search,
+    page,
+    perPage
+  });
+  const payload = {
+    schemaVersion: 'xyte.edge.models.list.v1',
+    tenantId,
+    query: buildEdgeModelsListQuery({
+      search: options.search,
+      page,
+      perPage
+    }),
+    response
+  };
+  if (output === 'text') {
+    writeEdgeText(ctx, payload);
+  } else {
+    printJson(ctx.stdout, payload, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+  }
+}
+
+async function handleEdgeModelDescribe(ctx: CliContext, options: EdgeModelDescribeOptions): Promise<void> {
+  const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
+  const tenantId = options.tenant ?? settings.values.defaults.tenant;
+  requireTenantId(tenantId, 'edge models describe');
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
+  const client = await ctx.withClient({ tenantId });
+  const response = await runEdgeModelDescribe({
+    client,
+    tenantId,
+    modelId: options.modelId
+  });
+  const payload = { schemaVersion: 'xyte.edge.models.describe.v1', tenantId, modelId: options.modelId, response };
+  if (output === 'text') {
+    writeEdgeText(ctx, payload);
+  } else {
+    printJson(ctx.stdout, payload, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+  }
+}
+
+async function handleEdgeUpdateParams(ctx: CliContext, options: EdgeUpdateParamsOptions): Promise<void> {
+  const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
+  const tenantId = options.tenant ?? settings.values.defaults.tenant;
+  requireTenantId(tenantId, 'edge update-params');
+  const apply = validateMutationMode(options.plan, options.apply, 'edge update-params');
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
+  const client = await ctx.withClient({ tenantId });
+  const result = await runEdgeParamsUpdate({
+    client,
+    tenantId,
+    deviceId: options.deviceId,
+    set: parseEdgeParamsSetJson(options.setJson),
+    expectedModelId: options.expectedModelId,
+    apply
+  });
+  if (output === 'text') {
+    writeEdgeText(ctx, result);
+  } else {
+    printJson(ctx.stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+  }
+  if (result.outcome.disposition !== 'planned' && result.outcome.disposition !== 'succeeded') {
+    process.exitCode = 1;
+  }
+}
+
+async function handleEdgeUpdateParamsBatch(ctx: CliContext, options: EdgeUpdateParamsBatchOptions): Promise<void> {
+  const settings = await ctx.resolveSettings(options.tenant ? { 'defaults.tenant': options.tenant } : {});
+  const tenantId = options.tenant ?? settings.values.defaults.tenant;
+  requireTenantId(tenantId, 'edge update-params-batch');
+  const apply = validateMutationMode(options.plan, options.apply, 'edge update-params-batch');
+  const output = resolveTextJsonOutput({
+    output: options.output,
+    stdoutIsTTY: ctx.stdoutIsTTY,
+    settings
+  });
+  const client = await ctx.withClient({ tenantId });
+  const result = await runEdgeParamsUpdateBatch({
+    client,
+    tenantId,
+    inputPath: options.input,
+    inputFormat: parseEdgeInputFormat(options.inputFormat),
+    apply,
+    reportPath: options.report,
+    resumePath: options.resumeArtifact
+  });
+  if (output === 'text') {
+    writeEdgeText(ctx, result);
+  } else {
+    printJson(ctx.stdout, result, { strictJson: resolveStrictJson({ strictJson: options.strictJson, settings }) });
+  }
+  if (!edgeParamsBatchExitedClean(result)) {
+    process.exitCode = 1;
+  }
+}
+
 export function registerEdgeCommands(parent: Command, ctx: CliContext): void {
   const edge = parent
     .command('edge')
@@ -293,11 +475,15 @@ export function registerEdgeCommands(parent: Command, ctx: CliContext): void {
     [
       '',
       'Examples:',
-      '  xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 10.0.0.10 --device-model-id <model-id> --space-id 123 --plan',
+      '  xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 10.0.0.10 --device-model-id <model-id> --space-id 123 --custom-parameters \'{"SNMP community":"public","Port":"161"}\' --plan',
       '  xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --plan --report ./artifacts/edge-claim.plan.ndjson',
       '  xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --apply --report ./artifacts/edge-claim.report.ndjson --resume-artifact ./artifacts/edge-claim.resume.ndjson',
       '  xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --plan --skip-connectivity-check',
       '  xyte-cli edge claim-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 10.0.0.10',
+      '  xyte-cli edge models list --tenant <tenant-id> --search sony --page 1 --per-page 50',
+      '  xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>',
+      '  xyte-cli edge update-params --tenant <tenant-id> --device-id <device-id> --set-json \'{"Port":"161"}\' --plan',
+      '  xyte-cli edge update-params-batch --tenant <tenant-id> --input ./prepared/edge-params-update.csv --plan --report ./artifacts/edge-params.plan.ndjson',
       '  xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 10.0.0.10 --plan',
       '  xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 10.0.0.10 --apply',
       '  xyte-cli edge ping-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip 10.0.0.10'
@@ -313,6 +499,8 @@ export function registerEdgeCommands(parent: Command, ctx: CliContext): void {
     .requiredOption('--space-id <id>', 'Target space id (positive integer)')
     .option('--tenant <tenantId>', 'Tenant id override')
     .option('--display-name <name>', 'Optional display name override')
+    .option('--mac <mac>', 'Optional MAC address assigned during claim')
+    .option('--sn <serial>', 'Optional serial number assigned during claim')
     .option('--skip-connectivity-check', 'Skip edge connectivity check')
     .option('--custom-parameters <json>', 'JSON object of custom parameters')
     .option('--custom-partner-name <name>', 'Custom partner name override')
@@ -353,6 +541,61 @@ export function registerEdgeCommands(parent: Command, ctx: CliContext): void {
     .option('--strict-json', 'Fail on non-serializable output')
     .action(async function (options: EdgeStatusOptions) {
       await handleEdgeClaimStatus(ctx, { ...options, output: getExplicitGlobalOutput(this) });
+    });
+
+  const models = edge
+    .command('models')
+    .description('Discover Edge device models and supported custom parameters');
+
+  models
+    .command('list')
+    .description('List claimable Edge models with edge_only=true')
+    .option('--tenant <tenantId>', 'Tenant id override')
+    .option('--search <text>', 'Filter by model or alias text')
+    .option('--page <n>', 'Page number, starting at 1')
+    .option('--per-page <n>', 'Results per page, max 100')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(async function (options: EdgeModelsListOptions) {
+      await handleEdgeModelsList(ctx, { ...options, output: getExplicitGlobalOutput(this) });
+    });
+
+  models
+    .command('describe')
+    .description('Describe one Edge model, including custom parameters and supported commands')
+    .requiredOption('--model-id <id>', 'Device model id')
+    .option('--tenant <tenantId>', 'Tenant id override')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(async function (options: EdgeModelDescribeOptions) {
+      await handleEdgeModelDescribe(ctx, { ...options, output: getExplicitGlobalOutput(this) });
+    });
+
+  edge
+    .command('update-params')
+    .description('Plan or apply a full-replacement custom_parameters update for an already-claimed Edge device')
+    .requiredOption('--device-id <id>', 'Claimed Edge device id')
+    .requiredOption('--set-json <json>', 'JSON object of parameter values to merge into current custom_parameters')
+    .option('--tenant <tenantId>', 'Tenant id override')
+    .option('--expected-model-id <id>', 'Reject if the current device model id differs')
+    .option('--plan', 'Read device/model state and print the planned complete replacement body')
+    .option('--apply', 'Apply the complete replacement body and verify with getDevice')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(async function (options: EdgeUpdateParamsOptions) {
+      await handleEdgeUpdateParams(ctx, { ...options, output: getExplicitGlobalOutput(this) });
+    });
+
+  edge
+    .command('update-params-batch')
+    .description('Plan or apply many already-claimed Edge custom_parameters updates from CSV/JSON/JSONL')
+    .requiredOption('--input <path>', 'CSV/JSON/JSONL rows with device_id,set_json[,expected_model_id]')
+    .option('--tenant <tenantId>', 'Tenant id override')
+    .option('--input-format <format>', 'auto|csv|json|jsonl', 'auto')
+    .option('--plan', 'Read device/model state and print planned complete replacement bodies')
+    .option('--apply', 'Apply each complete replacement body and verify with getDevice')
+    .option('--report <path>', 'Write NDJSON row report file')
+    .option('--resume-artifact <path>', 'NDJSON resume artifact (skip rows already marked succeeded)')
+    .option('--strict-json', 'Fail on non-serializable output')
+    .action(async function (options: EdgeUpdateParamsBatchOptions) {
+      await handleEdgeUpdateParamsBatch(ctx, { ...options, output: getExplicitGlobalOutput(this) });
     });
 
   edge

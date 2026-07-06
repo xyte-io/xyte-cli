@@ -81,10 +81,13 @@ xyte-cli ops inspect fleet \
   --var incident_id=&lt;incident-id&gt; \
   --once \
   --strict-json</code></pre></div></li>
-          <li class="step"><h3>List commands the device actually supports</h3><p>Choose from returned commands. Do not guess a command name from another device model.</p><div class="command"><pre><code>xyte-cli api call organization.commands.getCommands \
+          <li class="step"><h3>List commands the device actually supports</h3><p>Read the device model, then choose from <code>commands[].name</code> or <code>commands[].friendly_name</code>. Use <code>custom_fields</code> for command arguments and provide <code>command_file_id</code> when <code>with_file</code> is true. Do not guess a command name from another model.</p><div class="command"><pre><code>xyte-cli api call organization.devices.getDevice \
   --tenant &lt;tenant-id&gt; \
-  --path-json '{"device_id":"&lt;device-id&gt;"}' \
-  --query-json '{"page":1,"per_page":20}'</code></pre></div></li>
+  --path-json '{"device_id":"&lt;device-id&gt;"}'
+
+xyte-cli edge models describe \
+  --tenant &lt;tenant-id&gt; \
+  --model-id &lt;model-id-from-device&gt;</code></pre></div></li>
           <li class="step"><h3>Apply the approved step</h3><p>Resume the planned run only after the operator approves the write.</p><div class="command"><pre><code>xyte-cli flow run flow.guided-remediation \
   --tenant &lt;tenant-id&gt; \
   --apply \

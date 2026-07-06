@@ -56,7 +56,7 @@ Use when the request involves any of:
 ## Mandatory Safety Rules
 
 - Default to read-only.
-- Require explicit user intent before endpoint writes, `util import-tree --apply`, `util move-devices --apply`, `edge claim --apply`, `edge claim-batch --apply`, or `edge ping --apply`.
+- Require explicit user intent before endpoint writes, `util import-tree --apply`, `util move-devices --apply`, `edge claim --apply`, `edge claim-batch --apply`, `edge update-params --apply`, `edge update-params-batch --apply`, or `edge ping --apply`.
 - Headless console is read-only; never treat frames as mutation execution.
 - Util preprocessing is external: AI prepares files, `xyte-cli` remains AI-free.
 - For util workflows, always do `xyte-cli util prepare` first.
@@ -64,6 +64,7 @@ Use when the request involves any of:
 - Never auto-apply and never infer permission to create or update from context.
 - In automation, always pass `--tenant <tenant-id>`.
 - For `organization.incidents.getIncidents`, prefer explicit integer time bounds (`from=0`, `to=<unix-now>`) to avoid empty responses from null or omitted bounds in some environments.
+- When the user asks to send a command to a specific device, use `flow.device-command`: read `organization.devices.getDevice`, read `organization.models.getModel` for that device model, choose or ask for the exact `commands[].name`, validate any `command_extra_params_json` against `commands[].custom_fields`, then stop at the approval gate before `organization.commands.sendCommand`.
 
 ## Claiming Devices (Mandatory Disambiguation)
 
@@ -83,19 +84,23 @@ Rules:
 | Path | Catalog key | One-off command | Batch command |
 | --- | --- | --- | --- |
 | Native | `organization.devices.claimDevice` | `xyte-cli api call organization.devices.claimDevice --tenant <tenant-id> --body-json '{"name":"<name>","space_id":<space-id>,"sn":"<sn>","mac":"<mac>","cloud_id":"<cloud-id>"}'` | `xyte-cli util prepare --action organization.devices.claimDevice ...` then call per row |
-| Edge | `organization.edge.startClaim` | `xyte-cli edge claim --proxy-id <proxy-id> --device-ip <ip> --device-model-id <model-id> --space-id <space-id> --plan` | `xyte-cli util prepare --action organization.edge.startClaim ...` then `xyte-cli edge claim-batch --input ./prepared/organization-edge-startclaim.csv --plan` |
+| Edge | `organization.edge.startClaim` | `xyte-cli edge models list --tenant <tenant-id> --page 1 --per-page 100` then `xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip> --device-model-id <model-id> --space-id <space-id> --custom-parameters '<json>' --plan` | `xyte-cli util prepare --tenant <tenant-id> --action organization.edge.startClaim ...` then `xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --plan` |
 | C2C | (none — not public) | Point the user at the End Customer Portal | Same |
 
 Edge-claim safety:
-- `edge claim`, `edge claim-batch`, and `edge ping` are mutating. Default to `--plan`; only run `--apply` after explicit user approval.
-- `edge claim-status` and `edge ping-status` are read-only.
+- `edge models list`, `edge models describe`, `edge claim-status`, and `edge ping-status` are read-only.
+- `edge claim`, `edge claim-batch`, `edge update-params`, `edge update-params-batch`, and `edge ping` are mutating. Default to `--plan`; only run `--apply` after explicit user approval.
+- Use model discovery (`edge models list` / `edge models describe`) as the primary source for Edge model ids and supported `custom_parameters` labels.
+- `flow.edge-claim` and `flow.edge-claim-batch` fetch Edge models and describe `device_model_id` before the claim or batch preparation gate; if the model list is ambiguous, provide `--var device_model_id=<model-id>`.
 - After `xyte-cli util prepare --action organization.edge.startClaim`, populate the generated `organization-edge-startclaim.csv` before running `edge claim-batch --plan`.
+- Edge claim rows support optional `mac` and `sn`; copy explicit source values only.
 - In `edge claim-batch`, blank or `skip_connectivity_check=false` rows run a pre-claim `edge ping` inside the batch before `startClaim`; `skip_connectivity_check=true` skips that ping.
 - `edge claim-batch --skip-connectivity-check` makes blank rows skip ping and send `skip_connectivity_check: true`; explicit row `false` conflicts and is rejected.
 - If a batch is interrupted (ctrl-C, network blip), resume with `xyte-cli edge claim-batch --input <primary-csv> --apply --resume-artifact <path>`; never re-run without `--resume-artifact` on a half-finished run.
 - The resume artifact records completed row dispositions only; it does not checkpoint in-flight claim IDs. If the CLI exits after `startClaim` but before the row result is written, check `edge claim-status` / logs before rerunning because resume may dispatch `startClaim` again for that row.
 - Heartbeat device model id: `5dc4ba6c-c323-4118-a4e4-504f074426f2`. `proxy_id` lives in the End Customer Portal.
 - Poll defaults: 5 s interval, 10 min timeout. Override with `--poll-interval-ms` / `--poll-timeout-ms`.
+- For already-claimed Edge devices, use `edge update-params --set-json <json>` or `edge update-params-batch`, not a raw generic `updateDevice` loop. These commands read current device values, read the model schema, validate keys against `parameters[].name`, send a complete replacement `custom_parameters` object, block `"*****"` password masks, and verify read-back.
 
 Edge-claim terminal-state decision tree:
 - `pending` past timeout → row disposition `timeout` with the last-polled payload; increase `--poll-timeout-ms` for slow claims. Resume retries non-terminal rows.
@@ -107,7 +112,7 @@ Edge-claim terminal-state decision tree:
 - 429 → exponential backoff with jitter; honor `Retry-After`.
 - Pre-claim ping rejected/failed/timeout in batch → row marked `ping-failed`; no `startClaim`; resume retries the row.
 - Partial batch failure or `proxy-offline` rows → exit code 1 with a per-row audit NDJSON report (`--report`); fix rejects, re-run with the separate `--resume-artifact` path.
-- `--plan` over a batch → zero API calls; exit 0 only if every row would succeed.
+- `--plan` over an Edge claim batch → model-read validation only; no ping or `startClaim`; exit 0 means every row passed local/model validation, not that the claim would succeed.
 
 Full recipes and the 20-row edge-case matrix: `references/claim-playbook.md`.
 
@@ -163,7 +168,7 @@ Provider/report behavior:
 - partner deep-dive/report enrichment is best-effort; optional enrichment failures should not block report generation
 
 5. Util preprocessing and execution:
-- `xyte-cli util list-actions [--output text|json] [--mode friendly|generic] [--execution-support space.import-tree|device.move|edge.claim-batch|prepare-only|call-loop-only]`
+- `xyte-cli util list-actions [--output text|json] [--mode friendly|generic] [--execution-support space.import-tree|device.move|edge.claim-batch|edge.params-update-batch|prepare-only|call-loop-only]`
 - `xyte-cli util prepare --action <action-key> --input <file> [--tenant <tenant-id>] [--output-dir <dir>] [--force]`
 - stop and ask for a user decision before any execution command
 - `xyte-cli util import-tree --tenant <tenant-id> --input <file> [--input-format auto|csv|json|jsonl] [--apply] [--continue-on-error] [--report <path>]`
@@ -200,8 +205,13 @@ Provider/report behavior:
 | Space tree import | `xyte-cli util import-tree --tenant <tenant-id> --input <file> [--apply]` |
 | Device-to-space matching | `xyte-cli util match --source <path> --target <path> --source-field <name> --target-field <name> --out <path>` |
 | Batch device move | `xyte-cli util move-devices --tenant <tenant-id> --input <file> [--apply]` |
-| Claim one edge device | `xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip> --device-model-id <model-id> --space-id <space-id> --plan` |
+| Send a command to one device | `xyte-cli flow run flow.device-command --tenant <tenant-id> --plan --var device_id=<device-id> [--var command=<command>]` |
+| Discover Edge models | `xyte-cli edge models list --tenant <tenant-id> --page 1 --per-page 100` |
+| Describe Edge model parameters | `xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>` |
+| Claim one edge device | `xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip> --device-model-id <model-id> --space-id <space-id> --custom-parameters '<json>' --plan` |
 | Bulk claim edge devices | `xyte-cli util prepare --action organization.edge.startClaim --input <file> --output-dir ./prepared` then `xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --plan [--skip-connectivity-check]` |
+| Update claimed Edge custom params | `xyte-cli edge update-params --tenant <tenant-id> --device-id <device-id> --set-json '{"Port":"161"}' --plan` |
+| Bulk update claimed Edge custom params | `xyte-cli util prepare --action edge.params.update --input <file> --output-dir ./prepared` then `xyte-cli edge update-params-batch --tenant <tenant-id> --input ./prepared/edge-params-update.csv --plan` |
 | Edge claim status | `xyte-cli edge claim-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip>` |
 | Edge connectivity probe | `xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip> --plan` |
 | Edge ping status | `xyte-cli edge ping-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <ip>` |
@@ -222,11 +232,15 @@ Use this selector when the user asks for repeatable operator workflows. Full rec
 | Readiness check in a new or stale environment | `flow.setup-readiness-10m` | `xyte-cli status --mode fast --output json` |
 | Continuous incident monitoring | `flow.incidents-delta-watch` | `xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json` |
 | Convert watch deltas into triage artifacts | `flow.watch-to-triage` | `xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json` |
+| Send an approved command to a specific device | `flow.device-command` | `xyte-cli flow run flow.device-command --tenant <tenant-id> --plan --var device_id=<device-id> [--var command=<command>]` |
 | Operator-approved remediation writes | `flow.guided-remediation` | `xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json` |
 | Deterministic device migration with human gates | `flow.device-migration` | `xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id>` |
 | Daily analytics summary and report artifact | `flow.daily-deep-dive-report` | `xyte-cli setup status --tenant <tenant-id> --output json` |
+| Discover Edge model ids and parameter labels | `flow.edge-model-discovery` | `xyte-cli flow run flow.edge-model-discovery --tenant <tenant-id> --plan` |
 | Claim a single edge device end-to-end | `flow.edge-claim` | `xyte-cli flow run flow.edge-claim --tenant <tenant-id> --plan --var proxy_id=<proxy-id> --var device_ip=<ip> --var device_model_id=<model-id> --var space_id=<space-id>` |
-| Bulk claim edge devices (plan/apply with resume) | `flow.edge-claim-batch` | `xyte-cli flow run flow.edge-claim-batch --tenant <tenant-id> --plan --var edge_claim_input_path=<file>` |
+| Bulk claim edge devices (plan/apply with resume) | `flow.edge-claim-batch` | `xyte-cli flow run flow.edge-claim-batch --tenant <tenant-id> --plan --var device_model_id=<model-id> --var edge_claim_input_path=<file>` |
+| Update one claimed Edge device custom params | `flow.edge-params-update` | `xyte-cli flow run flow.edge-params-update --tenant <tenant-id> --plan --var device_id=<device-id> --var set_json='{"Port":"161"}'` |
+| Bulk update claimed Edge custom params | `flow.edge-params-update-batch` | `xyte-cli flow run flow.edge-params-update-batch --tenant <tenant-id> --plan --var edge_params_input_path=<file>` |
 | Edge connectivity probe | `flow.edge-ping` | `xyte-cli flow run flow.edge-ping --tenant <tenant-id> --plan --var proxy_id=<proxy-id> --var device_ip=<ip>` |
 
 ## Agent-Only Flow Authoring
@@ -278,15 +292,18 @@ xyte-cli api call organization.incidents.getIncidents \
 Write call:
 
 ```bash
-xyte-cli api call organization.commands.getCommands \
+xyte-cli api call organization.devices.getDevice \
   --tenant <tenant-id> \
-  --path-json '{"device_id":"<device-id>"}' \
-  --query-json '{"page":1,"per_page":20}'
+  --path-json '{"device_id":"<device-id>"}'
+
+xyte-cli edge models describe \
+  --tenant <tenant-id> \
+  --model-id <model-id-from-device>
 
 xyte-cli api call organization.commands.sendCommand \
   --tenant <tenant-id> \
   --path-json '{"device_id":"<device-id>"}' \
-  --body-json '{"command":"<valid-command-from-history>"}'
+  --body-json '{"name":"<commands[].name>","extra_params":{}}'
 ```
 
 Delete call:
@@ -352,6 +369,11 @@ Schema/version IDs:
 - device match: `xyte.device.match.v1`
 - device move verification: `xyte.device.move-verification.v1`
 - doctor environment: `xyte.doctor.environment.v1`
+- edge claim batch: `xyte.edge.claim-batch.v1`
+- edge model describe: `xyte.edge.models.describe.v1`
+- edge model list: `xyte.edge.models.list.v1`
+- edge params batch update: `xyte.edge.params-update-batch.v1`
+- edge params single update: `xyte.edge.params-update.v1`
 - flow catalog: `xyte.flow.catalog.v1`
 - flow definition: `xyte.flow.definition.v1`
 - flow run summary: `xyte.flow.run.v1`
@@ -369,6 +391,11 @@ Schema/version IDs:
 Canonical schemas:
 - `schemas/call-envelope.v1.schema.json`
 - `schemas/doctor-environment.v1.schema.json`
+- `schemas/edge-claim-batch.v1.schema.json`
+- `schemas/edge-models-describe.v1.schema.json`
+- `schemas/edge-models-list.v1.schema.json`
+- `schemas/edge-params-update-batch.v1.schema.json`
+- `schemas/edge-params-update.v1.schema.json`
 - `schemas/headless-frame.v1.schema.json`
 - `schemas/inspect-fleet.v1.schema.json`
 - `schemas/inspect-deep-dive.v1.schema.json`

@@ -231,11 +231,16 @@ describe('tui data loaders', () => {
     });
   });
 
-  it('loads command templates from organization getCommands', async () => {
+  it('loads command templates from the selected device model', async () => {
     const client: any = {
       organization: {
-        getCommands: async () => ({
-          items: [{ command: 'reboot' }, { friendly_name: 'power_cycle' }]
+        getDevice: async () => ({
+          id: 'dev-1',
+          model: { id: 'model-1' }
+        }),
+        getModel: async () => ({
+          id: 'model-1',
+          commands: [{ name: 'reboot' }, { friendly_name: 'power_cycle' }]
         })
       }
     };
@@ -243,7 +248,7 @@ describe('tui data loaders', () => {
     const templates = await loadCommandTemplates(client, 'acme', { deviceId: 'dev-1' });
     expect(templates.connectionState).toBe('connected');
     expect(templates.data).toEqual([
-      { mode: 'command', value: 'reboot', label: 'command: reboot' },
+      { mode: 'command', value: 'reboot', label: 'name: reboot' },
       { mode: 'friendly_name', value: 'power_cycle', label: 'friendly_name: power_cycle' }
     ]);
   });

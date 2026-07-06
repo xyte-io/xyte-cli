@@ -80,7 +80,9 @@ xyte-cli flow run flow.noc-watch-triage \
           <div class="failure-grid">
             <div class="failure"><strong>Daily NOC triage</strong><p>Create <code>flow.noc-watch-triage</code> from <code>flow.watch-to-triage</code> and pin the reporting window used by the shift.</p></div>
             <div class="failure"><strong>Weekly customer report</strong><p>Create <code>flow.customer-weekly-report</code> from <code>flow.daily-deep-dive-report</code> and pin the report window your customer expects.</p></div>
+            <div class="failure"><strong>Device command</strong><p>Create <code>flow.ops-device-command</code> from <code>flow.device-command</code> when a team repeatedly targets the same device but still needs a command approval gate.</p></div>
             <div class="failure"><strong>Edge rollout</strong><p>Create <code>flow.rollout-edge-claim-batch</code> from <code>flow.edge-claim-batch</code> and pin polling behavior for a longer deployment window.</p></div>
+            <div class="failure"><strong>Edge parameter rollout</strong><p>Create <code>flow.rollout-edge-params</code> from <code>flow.edge-params-update-batch</code> and pin the prepared input path used by the rollout team.</p></div>
             <div class="failure"><strong>Guided remediation</strong><p>Create a team alias for the remediation path, but pass incident and device context at runtime because those change per issue.</p></div>
           </div>
 

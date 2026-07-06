@@ -111,6 +111,21 @@ describe('namespace endpoint mappings', () => {
     });
   });
 
+  it('maps organization model discovery methods', async () => {
+    const call = vi.fn().mockResolvedValue({ ok: true });
+    const organization = createOrganizationNamespace(call);
+
+    await organization.getModels({ query: { edge_only: true, page: 1, per_page: 100 } });
+    await organization.getModel({ path: { id: 'model-1' } });
+
+    expect(call).toHaveBeenNthCalledWith(1, 'organization.models.getModels', {
+      query: { edge_only: true, page: 1, per_page: 100 }
+    });
+    expect(call).toHaveBeenNthCalledWith(2, 'organization.models.getModel', {
+      path: { id: 'model-1' }
+    });
+  });
+
   it('maps organization.getEdgeClaimStatus to organization.edge.getClaimStatus', async () => {
     const call = vi.fn().mockResolvedValue({ result: 'pending' });
     const organization = createOrganizationNamespace(call);

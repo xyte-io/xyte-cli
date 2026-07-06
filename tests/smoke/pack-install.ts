@@ -284,6 +284,11 @@ export async function runPackInstallSmoke(options: PackInstallSmokeOptions = {})
       path.join(root, 'scripts', 'check_headless.mjs'),
       path.join(root, 'templates', 'ai-utility-prepare-generic.prompt.md'),
       path.join(root, 'templates', 'ai-space-import.prompt.md'),
+      path.join(root, 'schemas', 'edge-claim-batch.v1.schema.json'),
+      path.join(root, 'schemas', 'edge-models-describe.v1.schema.json'),
+      path.join(root, 'schemas', 'edge-models-list.v1.schema.json'),
+      path.join(root, 'schemas', 'edge-params-update-batch.v1.schema.json'),
+      path.join(root, 'schemas', 'edge-params-update.v1.schema.json'),
       path.join(root, 'schemas', 'headless-frame.v1.schema.json'),
       path.join(root, 'data', 'public-endpoints.json')
     ]);

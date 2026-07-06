@@ -95,7 +95,17 @@ xyte-cli api call organization.spaces.getSpaces \
 
         <h2 id="single">Single Edge claim</h2>
         <ol class="steps">
-          <li class="step"><h3>Discover the Edge claim fields</h3><p>Describe the claim endpoint, list Edge proxies, and search target spaces before choosing ids for the claim.</p><div class="command"><pre><code>xyte-cli api endpoints describe organization.edge.startClaim
+          <li class="step"><h3>Discover the Edge claim fields</h3><p>List Edge models first so the model id and custom parameter labels come from the model API. Describe the chosen model before planning the claim; use <code>parameters[].name</code> as the only supported custom parameter labels, include required parameters, and do not use masked password placeholders. Then list Edge proxies and target spaces.</p><div class="command"><pre><code>xyte-cli edge models list \
+  --tenant &lt;tenant-id&gt; \
+  --search &lt;model-or-alias&gt; \
+  --page 1 \
+  --per-page 100
+
+xyte-cli edge models describe \
+  --tenant &lt;tenant-id&gt; \
+  --model-id &lt;model-id&gt;
+
+xyte-cli api endpoints describe organization.edge.startClaim
 
 xyte-cli api call organization.edges.getEdges \
   --tenant &lt;tenant-id&gt; \
@@ -106,13 +116,16 @@ xyte-cli api call organization.spaces.getSpaces \
   --tenant &lt;tenant-id&gt; \
   --query-json '{"path_includes":"&lt;target-path&gt;"}' \
   &gt; ./artifacts/edge-target-spaces.json</code></pre></div></li>
-          <li class="step"><h3>Plan the claim</h3><p>Planning checks the inputs without starting the claim.</p><div class="command"><pre><code>xyte-cli edge claim \
+          <li class="step"><h3>Plan the claim</h3><p>Planning reads the model and checks the inputs without starting the claim.</p><div class="command"><pre><code>xyte-cli edge claim \
   --tenant &lt;tenant-id&gt; \
   --proxy-id &lt;proxy-id&gt; \
   --device-ip 192.168.1.100 \
   --device-model-id &lt;device-model-id&gt; \
   --space-id &lt;space-id&gt; \
   --display-name "Room 101 Display" \
+  --mac aa:bb:cc:dd:ee:ff \
+  --sn SN-12345 \
+  --custom-parameters '{"SNMP community":"public","Port":"161"}' \
   --plan</code></pre></div></li>
           <li class="step"><h3>Apply after approval</h3><p>Apply starts the async claim and polls until success, failure, or timeout.</p><div class="command"><pre><code>xyte-cli edge claim \
   --tenant &lt;tenant-id&gt; \
@@ -121,6 +134,9 @@ xyte-cli api call organization.spaces.getSpaces \
   --device-model-id &lt;device-model-id&gt; \
   --space-id &lt;space-id&gt; \
   --display-name "Room 101 Display" \
+  --mac aa:bb:cc:dd:ee:ff \
+  --sn SN-12345 \
+  --custom-parameters '{"SNMP community":"public","Port":"161"}' \
   --apply</code></pre></div></li>
           <li class="step"><h3>Check status without starting a new claim</h3><p>Use this after an interruption or when you need to inspect the current claim state.</p><div class="command"><pre><code>xyte-cli edge claim-status \
   --tenant &lt;tenant-id&gt; \
@@ -130,7 +146,16 @@ xyte-cli api call organization.spaces.getSpaces \
 
         <h2 id="batch">Batch Edge claim</h2>
         <ol class="steps">
-          <li class="step"><h3>Prepare the spreadsheet</h3><p>Review the primary CSV and rejected CSV before running the batch. Keep rows with missing proxy, model, or space values rejected until someone provides real tenant values.</p><div class="command"><pre><code>xyte-cli util prepare \
+          <li class="step"><h3>Discover every model in the batch</h3><p>Before preparing rows, list Edge models and describe each model that appears in the source file. Use the returned model ids and <code>parameters[].name</code> labels when filling <code>device_model_id</code> and <code>custom_parameters</code>. Required parameters must be present before claim, and password fields need real values rather than <code>*****</code>.</p><div class="command"><pre><code>xyte-cli edge models list \
+  --tenant &lt;tenant-id&gt; \
+  --search &lt;model-or-alias&gt; \
+  --page 1 \
+  --per-page 100
+
+xyte-cli edge models describe \
+  --tenant &lt;tenant-id&gt; \
+  --model-id &lt;model-id&gt;</code></pre></div></li>
+          <li class="step"><h3>Prepare the spreadsheet</h3><p>Review the primary CSV and rejected CSV before running the batch. Keep rows with missing proxy, model, or space rejected until someone provides real tenant values. MAC and serial are optional; fill them only when the source data provides them.</p><div class="command"><pre><code>xyte-cli util prepare \
   --action organization.edge.startClaim \
   --tenant &lt;tenant-id&gt; \
   --input &lt;input.xlsx&gt; \
@@ -148,6 +173,7 @@ xyte-cli edge claim-batch \
   --resume-artifact ./artifacts/edge-claim.resume.ndjson \
   --apply</code></pre></div></li>
         </ol>
+        <div class="note"><p><strong>Already claimed?</strong> Use <a href="./edge-custom-params.html">Edge custom parameter updates</a> to change supported parameters on claimed Edge devices. The update workflow reads the model schema, sends a complete replacement <code>custom_parameters</code> object, and verifies read-back.</p></div>
 
         <h2 id="confirm">Confirm the result</h2>
         <div class="command"><pre><code>{

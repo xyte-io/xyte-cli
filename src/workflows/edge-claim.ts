@@ -34,10 +34,18 @@ export interface EdgeClaimRow {
   device_model_id: string;
   space_id: number;
   display_name?: string;
+  mac?: string;
+  sn?: string;
   custom_parameters?: Record<string, unknown>;
   custom_partner_name?: string;
   custom_model_name?: string;
   skip_connectivity_check?: boolean;
+}
+
+export interface EdgeClaimModelParameter {
+  name: string;
+  type?: string;
+  required?: boolean;
 }
 
 export interface EdgeRowOutcome {
@@ -58,6 +66,7 @@ export interface EdgeRowOutcome {
 export interface EdgeRowPlan {
   preClaimPing: 'required' | 'skipped';
   claimBody: Record<string, unknown>;
+  supportedParameters?: EdgeClaimModelParameter[];
 }
 
 export interface EdgeBatchTotals {
@@ -122,6 +131,36 @@ function parseCustomParameters(value: unknown): { value?: Record<string, unknown
   } catch {
     return { error: 'custom_parameters must be valid JSON.' };
   }
+}
+
+function hasOwn(record: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(record, key);
+}
+
+function extractModelParameters(model: unknown): EdgeClaimModelParameter[] {
+  if (!model || typeof model !== 'object' || Array.isArray(model)) {
+    return [];
+  }
+  const rec = model as Record<string, unknown>;
+  if (!Array.isArray(rec.parameters)) {
+    return [];
+  }
+  const parameters: EdgeClaimModelParameter[] = [];
+  for (const item of rec.parameters) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      continue;
+    }
+    const parameter = item as Record<string, unknown>;
+    if (typeof parameter.name !== 'string' || !parameter.name.trim()) {
+      continue;
+    }
+    parameters.push({
+      name: parameter.name.trim(),
+      ...(typeof parameter.type === 'string' && parameter.type.trim() ? { type: parameter.type.trim() } : {}),
+      ...(typeof parameter.required === 'boolean' ? { required: parameter.required } : {})
+    });
+  }
+  return parameters;
 }
 
 function isValidHostname(value: string): boolean {
@@ -207,6 +246,12 @@ export function validateEdgeClaimRow(
   if (typeof raw.display_name === 'string' && raw.display_name.trim()) {
     row.display_name = raw.display_name.trim();
   }
+  if (typeof raw.mac === 'string' && raw.mac.trim()) {
+    row.mac = raw.mac.trim();
+  }
+  if (typeof raw.sn === 'string' && raw.sn.trim()) {
+    row.sn = raw.sn.trim();
+  }
   if (customParams.value) row.custom_parameters = customParams.value;
   if (typeof raw.custom_partner_name === 'string' && raw.custom_partner_name.trim()) {
     row.custom_partner_name = raw.custom_partner_name.trim();
@@ -219,6 +264,115 @@ export function validateEdgeClaimRow(
   return { ok: true, row };
 }
 
+export type EdgeClaimModelValidation =
+  | { ok: true; parameters: EdgeClaimModelParameter[] }
+  | { ok: false; disposition: 'failed' | 'rejected'; detail: string; rejectReason?: string };
+
+type EdgeClaimModelLookup =
+  | { ok: true; parameters: EdgeClaimModelParameter[] }
+  | { ok: false; disposition: 'failed'; detail: string };
+
+type EdgeClaimModelCache = Map<string, Promise<EdgeClaimModelLookup>>;
+
+async function validateClaimModelParameters(args: {
+  client: XyteClient;
+  tenantId: string;
+  row: EdgeClaimRow;
+  cache?: EdgeClaimModelCache;
+}): Promise<EdgeClaimModelValidation> {
+  const cacheKey = args.row.device_model_id;
+  const existing = args.cache?.get(cacheKey);
+  let lookupPromise = existing;
+
+  if (!lookupPromise) {
+    lookupPromise = (async (): Promise<EdgeClaimModelLookup> => {
+      let model: unknown;
+      try {
+        const response = await args.client.callWithMeta('organization.models.getModel', {
+          tenantId: args.tenantId,
+          path: { id: args.row.device_model_id }
+        });
+        model = response.data;
+      } catch (error) {
+        const problem = toProblemDetails(error);
+        return {
+          ok: false,
+          disposition: 'failed',
+          detail: problem.detail || errorMessage(error)
+        };
+      }
+
+      return { ok: true, parameters: extractModelParameters(model) };
+    })();
+    args.cache?.set(cacheKey, lookupPromise);
+  }
+
+  const lookup = await lookupPromise;
+  if (!lookup.ok) {
+    args.cache?.delete(cacheKey);
+    return lookup;
+  }
+
+  const parameters = lookup.parameters;
+  const supportedNames = new Set(parameters.map((parameter) => parameter.name));
+  const customParameters = args.row.custom_parameters ?? {};
+  const unknownKeys = Object.keys(customParameters).filter((key) => !supportedNames.has(key));
+  if (unknownKeys.length > 0) {
+    return {
+      ok: false,
+      disposition: 'rejected',
+      detail: `Unsupported custom parameter(s) for model ${args.row.device_model_id}: ${unknownKeys.join(', ')}.`,
+      rejectReason: 'unknown_custom_parameter'
+    };
+  }
+
+  const missingRequired = parameters
+    .filter(
+      (parameter) =>
+        parameter.required &&
+        (!hasOwn(customParameters, parameter.name) ||
+          customParameters[parameter.name] === undefined ||
+          customParameters[parameter.name] === null ||
+          customParameters[parameter.name] === '')
+    )
+    .map((parameter) => parameter.name);
+  if (missingRequired.length > 0) {
+    return {
+      ok: false,
+      disposition: 'rejected',
+      detail: `Required custom parameter(s) missing for model ${args.row.device_model_id}: ${missingRequired.join(', ')}.`,
+      rejectReason: 'missing_required_custom_parameter'
+    };
+  }
+
+  const maskedPasswords = parameters
+    .filter(
+      (parameter) =>
+        parameter.type === 'password' &&
+        hasOwn(customParameters, parameter.name) &&
+        customParameters[parameter.name] === '*****'
+    )
+    .map((parameter) => parameter.name);
+  if (maskedPasswords.length > 0) {
+    return {
+      ok: false,
+      disposition: 'rejected',
+      detail: `Password custom parameter(s) for model ${args.row.device_model_id} cannot use masked value *****: ${maskedPasswords.join(', ')}.`,
+      rejectReason: 'masked_password_requires_value'
+    };
+  }
+
+  return { ok: true, parameters };
+}
+
+export async function validateEdgeClaimModelParameters(args: {
+  client: XyteClient;
+  tenantId: string;
+  row: EdgeClaimRow;
+}): Promise<EdgeClaimModelValidation> {
+  return validateClaimModelParameters(args);
+}
+
 function buildClaimBody(row: EdgeClaimRow): Record<string, unknown> {
   const body: Record<string, unknown> = {
     proxy_id: row.proxy_id,
@@ -227,6 +381,8 @@ function buildClaimBody(row: EdgeClaimRow): Record<string, unknown> {
     space_id: row.space_id
   };
   if (row.display_name) body.display_name = row.display_name;
+  if (row.mac) body.mac = row.mac;
+  if (row.sn) body.sn = row.sn;
   if (row.custom_parameters) body.custom_parameters = row.custom_parameters;
   if (row.custom_partner_name) body.custom_partner_name = row.custom_partner_name;
   if (row.custom_model_name) body.custom_model_name = row.custom_model_name;
@@ -244,7 +400,8 @@ interface ResolvedBatchClaim {
 
 function resolveBatchClaim(
   row: EdgeClaimRow,
-  forceSkipConnectivityCheck: boolean
+  forceSkipConnectivityCheck: boolean,
+  supportedParameters?: EdgeClaimModelParameter[]
 ): ResolvedBatchClaim | { rejectReason: string } {
   if (forceSkipConnectivityCheck && row.skip_connectivity_check === false) {
     return {
@@ -263,7 +420,8 @@ function resolveBatchClaim(
     requiresPing,
     planned: {
       preClaimPing: requiresPing ? 'required' : 'skipped',
-      claimBody: buildClaimBody(effectiveRow)
+      claimBody: buildClaimBody(effectiveRow),
+      ...(supportedParameters ? { supportedParameters } : {})
     }
   };
 }
@@ -298,6 +456,7 @@ export interface RunEdgeClaimArgs {
   client: XyteClient;
   tenantId: string;
   row: EdgeClaimRow;
+  modelValidationCache?: EdgeClaimModelCache;
   pollOptions?: EdgePollOptions;
   sleeper?: (ms: number) => Promise<void>;
   now?: () => number;
@@ -306,6 +465,24 @@ export interface RunEdgeClaimArgs {
 
 export async function runEdgeClaim(args: RunEdgeClaimArgs): Promise<EdgeRowOutcome> {
   const startedAt = (args.now ?? Date.now)();
+  const modelValidation = await validateClaimModelParameters({
+    client: args.client,
+    tenantId: args.tenantId,
+    row: args.row,
+    cache: args.modelValidationCache
+  });
+  if (!modelValidation.ok) {
+    return {
+      rowIndex: args.row.rowIndex,
+      proxy_id: args.row.proxy_id,
+      device_ip: args.row.device_ip,
+      disposition: modelValidation.disposition,
+      attempts: 0,
+      elapsedMs: (args.now ?? Date.now)() - startedAt,
+      detail: modelValidation.detail,
+      ...(modelValidation.rejectReason ? { rejectReason: modelValidation.rejectReason } : {})
+    };
+  }
 
   try {
     await args.client.callWithMeta('organization.edge.startClaim', {
@@ -514,6 +691,7 @@ export async function runEdgeClaimBatch(args: RunEdgeClaimBatchArgs): Promise<Ed
   let abortDetail: string | undefined;
   const resumeMap = loadResumeEntries(args.resumePath);
   const isResuming = resumeMap.size > 0 || (!!args.resumePath && existsSync(args.resumePath));
+  const modelValidationCache: EdgeClaimModelCache = new Map();
 
   if (args.reportPath && !isResuming) {
     ensureParentDir(args.reportPath);
@@ -558,7 +736,34 @@ export async function runEdgeClaimBatch(args: RunEdgeClaimBatchArgs): Promise<Ed
       continue;
     }
 
-    const resolved = resolveBatchClaim(validation.row, args.skipConnectivityCheck === true);
+    const modelValidation = await validateClaimModelParameters({
+      client: args.client,
+      tenantId: args.tenantId,
+      row: validation.row,
+      cache: modelValidationCache
+    });
+    if (!modelValidation.ok) {
+      const outcome: EdgeRowOutcome = {
+        rowIndex,
+        proxy_id: validation.row.proxy_id,
+        device_ip: validation.row.device_ip,
+        disposition: modelValidation.disposition,
+        attempts: 0,
+        elapsedMs: 0,
+        detail: modelValidation.detail,
+        ...(modelValidation.rejectReason ? { rejectReason: modelValidation.rejectReason } : {})
+      };
+      outcomes.push(outcome);
+      if (modelValidation.disposition === 'rejected') {
+        totals.rejected += 1;
+      } else {
+        totals.failed += 1;
+      }
+      appendReportLine(args.reportPath, { ...outcome, input: raw, runId, mode });
+      continue;
+    }
+
+    const resolved = resolveBatchClaim(validation.row, args.skipConnectivityCheck === true, modelValidation.parameters);
     if ('rejectReason' in resolved) {
       const outcome: EdgeRowOutcome = {
         rowIndex,
@@ -641,6 +846,7 @@ export async function runEdgeClaimBatch(args: RunEdgeClaimBatchArgs): Promise<Ed
         client: args.client,
         tenantId: args.tenantId,
         row: resolved.row,
+        modelValidationCache,
         pollOptions: args.pollOptions,
         sleeper: args.sleeper,
         now: args.now
