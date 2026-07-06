@@ -741,6 +741,43 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
     expect(claimBodies(calls).map((body) => body.skip_connectivity_check)).toEqual([true, true]);
   });
 
+  it('retries model discovery after a transient lookup failure for a later row', async () => {
+    const tmp = makeTempDir();
+    const inputPath = writeCsv(
+      tmp,
+      [
+        `${CSV_HEADER},skip_connectivity_check`,
+        'proxy-1,192.168.1.10,model-1,99,true',
+        'proxy-1,192.168.1.11,model-1,99,true'
+      ].join('\n')
+    );
+    const { client, calls } = buildEdgeClaimClientFromScript({
+      'organization.models.getModel': [
+        { ok: false, status: 503, detail: 'model lookup temporarily unavailable' },
+        modelResponse()
+      ],
+      'organization.edge.startClaim': [{ ok: true, data: null }],
+      'organization.edge.getClaimStatus': [{ ok: true, data: { result: 'success' } }]
+    });
+
+    const result = await runEdgeClaimBatch({
+      client,
+      tenantId: 'acme',
+      inputPath,
+      apply: true,
+      runId: 'run-model-lookup-retry',
+      pollOptions: { intervalMs: 1, timeoutMs: 1_000 },
+      sleeper: async () => undefined,
+      now: () => 0
+    });
+
+    expect(result.rows.map((row) => row.disposition)).toEqual(['failed', 'succeeded']);
+    expect(result.rows[0]?.detail).toContain('model lookup temporarily unavailable');
+    expect(result.totals).toMatchObject({ failed: 1, succeeded: 1 });
+    expect(endpointCalls(calls, 'organization.models.getModel')).toHaveLength(2);
+    expect(endpointCalls(calls, 'organization.edge.startClaim')).toHaveLength(1);
+  });
+
   it('reports ping-failed and does not claim when pre-claim ping fails', async () => {
     const tmp = makeTempDir();
     const inputPath = writeCsv(tmp, [CSV_HEADER, 'proxy-1,192.168.1.10,model-1,99'].join('\n'));

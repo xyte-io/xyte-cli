@@ -324,6 +324,30 @@ describe('runEdgeParamsUpdateBatch', () => {
     expect(readNdjson(reportPath).map((row) => row.disposition)).toEqual(['planned', 'rejected']);
   });
 
+  it('reports missing_set_json separately from invalid_set_json', async () => {
+    const root = tempDir();
+    const inputPath = join(root, 'rows.csv');
+    writeFileSync(
+      inputPath,
+      'device_id,set_json\n' + 'dev-1,\n' + 'dev-2,"[]"\n' + 'dev-3,"{not valid json"\n'
+    );
+    const { client } = buildClientFromScript({});
+
+    const result = await runEdgeParamsUpdateBatch({
+      client,
+      tenantId: 'acme',
+      inputPath,
+      apply: false
+    });
+
+    expect(result.totals).toMatchObject({ rows: 3, rejected: 3 });
+    expect(result.rows.map((row) => row.rejectReason)).toEqual([
+      'missing_set_json',
+      'invalid_set_json',
+      'invalid_set_json'
+    ]);
+  });
+
   it('writes resume entries on apply and skips previously succeeded rows', async () => {
     const root = tempDir();
     const inputPath = join(root, 'rows.csv');

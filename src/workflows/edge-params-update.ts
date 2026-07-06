@@ -565,7 +565,8 @@ export async function runEdgeParamsUpdateBatch(
 
     const parsedSet = parseSetJson(raw.set_json);
     if (!parsedSet.value) {
-      const outcome = reject(deviceId, parsedSet.error ?? 'set_json is invalid.', 'invalid_set_json', rowIndex);
+      const rejectReason = parsedSet.error === 'set_json is required.' ? 'missing_set_json' : 'invalid_set_json';
+      const outcome = reject(deviceId, parsedSet.error ?? 'set_json is invalid.', rejectReason, rowIndex);
       outcomes.push(outcome);
       incrementTotals(totals, outcome.disposition);
       appendReportLine(args.reportPath, { ...outcome, input: raw, runId, mode });

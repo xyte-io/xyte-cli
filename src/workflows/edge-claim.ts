@@ -309,6 +309,7 @@ async function validateClaimModelParameters(args: {
 
   const lookup = await lookupPromise;
   if (!lookup.ok) {
+    args.cache?.delete(cacheKey);
     return lookup;
   }
 

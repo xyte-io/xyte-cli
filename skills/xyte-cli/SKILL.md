@@ -112,7 +112,7 @@ Edge-claim terminal-state decision tree:
 - 429 → exponential backoff with jitter; honor `Retry-After`.
 - Pre-claim ping rejected/failed/timeout in batch → row marked `ping-failed`; no `startClaim`; resume retries the row.
 - Partial batch failure or `proxy-offline` rows → exit code 1 with a per-row audit NDJSON report (`--report`); fix rejects, re-run with the separate `--resume-artifact` path.
-- `--plan` over an Edge claim batch → model-read validation only; no `startClaim`; exit 0 only if every row would succeed.
+- `--plan` over an Edge claim batch → model-read validation only; no ping or `startClaim`; exit 0 means every row passed local/model validation, not that the claim would succeed.
 
 Full recipes and the 20-row edge-case matrix: `references/claim-playbook.md`.
 
