@@ -280,7 +280,11 @@ describe('utility prepare workflow', () => {
     });
 
     expect(result.suggestedCommands.next).toContain('Preflight gate');
+    expect(result.suggestedCommands.next).toContain('organization.devices.getDevice');
+    expect(result.suggestedCommands.next).toContain('organization.models.getModel');
+    expect(result.suggestedCommands.next).toContain('extra_params');
     expect(result.suggestedCommands.apply).toContain('organization.commands.sendCommand');
+    expect(result.suggestedCommands.apply).toContain('"name"');
     expect(result.suggestedCommands.verify).toContain('organization.commands.getCommands');
   });
 
@@ -339,6 +343,39 @@ describe('utility prepare workflow', () => {
     expect(notes).toContain('invalid_skip_connectivity_check');
   });
 
+  it('uses the generated edge params scaffold path and batch update guidance', () => {
+    const root = makeTempRoot('xyte-prepare-edge-params-');
+    const inputPath = join(root, 'source.csv');
+    const outDir = join(root, 'out');
+    writeFileSync(inputPath, 'x', 'utf8');
+
+    const result = runUtilityPrepare({
+      inputPath,
+      actionKey: 'edge.params.update',
+      outputDir: outDir,
+      tenantId: 'acme'
+    });
+
+    expect(result.executionSupport).toBe('edge.params-update-batch');
+    expect(result.artifacts.primary).toBe(join(outDir, 'edge-params-update.csv'));
+    expect(result.canonical.headers).toEqual(['device_id', 'set_json', 'expected_model_id']);
+    expect(readFileSync(result.artifacts.primary, 'utf8')).toContain('set_json');
+    expect(result.suggestedCommands.apply).toContain('xyte-cli edge update-params-batch');
+    expect(result.suggestedCommands.apply).toContain('--report');
+    expect(result.suggestedCommands.apply).toContain('--resume-artifact');
+    expect(result.decodeRules.join(' ')).toContain('full replacement');
+    const notes = readFileSync(result.artifacts.notes, 'utf8');
+    expect(notes).toContain('device_id: required');
+    expect(notes).toContain('set_json: required');
+    expect(notes).toContain('invalid_set_json');
+    expect(notes).toContain('unknown_parameter');
+    expect(notes).toContain('unsupported_current_parameter');
+    expect(notes).toContain('missing_required_parameter');
+    expect(notes).toContain('masked_password_requires_value');
+    expect(notes).toContain('model_mismatch');
+    expect(notes).toContain('duplicate_device_id');
+  });
+
   it('fails on unknown action and on scaffold collision without force', () => {
     const root = makeTempRoot('xyte-prepare-force-');
     const inputPath = join(root, 'source.csv');
@@ -385,10 +422,14 @@ describe('utility prepare workflow', () => {
     expect(actions.some((item) => item.actionKey === 'organization.teamAccess.users')).toBe(true);
     expect(actions.some((item) => item.actionKey === 'organization.teamAccess.memberships')).toBe(true);
     expect(actions.some((item) => item.actionKey === 'device.move')).toBe(true);
+    expect(actions.some((item) => item.actionKey === 'edge.params.update')).toBe(true);
     expect(actions.some((item) => item.actionKey === 'space.import-tree')).toBe(true);
     expect(listUtilityPrepareActions({ mode: 'friendly' }).every((item) => item.mode === 'friendly')).toBe(true);
     expect(listUtilityPrepareActions({ executionSupport: 'edge.claim-batch' }).map((item) => item.actionKey)).toEqual([
       'organization.edge.startClaim'
+    ]);
+    expect(listUtilityPrepareActions({ executionSupport: 'edge.params-update-batch' }).map((item) => item.actionKey)).toEqual([
+      'edge.params.update'
     ]);
     expect(listUtilityPrepareActions({ executionSupport: 'prepare-only' }).map((item) => item.actionKey)).toEqual([
       'organization.connectors.prepareSetup',

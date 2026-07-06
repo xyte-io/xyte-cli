@@ -42,7 +42,7 @@ Derived from the bundled public endpoint spec.
 | Endpoint Key | Query Fields | Pagination Fields | Notes |
 | --- | --- | --- | --- |
 | `organization.spaces.getSpaces` | `id`, `name`, `parent_id`, `space_type`, `created_before`, `created_after`, `path_includes` | none | Main listing endpoint with server-side filtering |
-| `organization.devices.getDevices` | `space_id` | none | Filter devices by one space |
+| `organization.devices.getDevices` | `page`, `per_page`, `space_id` | `page`, `per_page` | Filter devices by one space; shared docs mention `has_next_page`, live Verve/Playground responses returned `next_page`; handle either continuation field |
 | `organization.devices.getHistories` | `status`, `from`, `to`, `device_id`, `space_id`, `name` | none | Filtered history lookup; can be time-windowed |
 | `organization.commands.getCommands` | `status`, `page`, `per_page` | `page`, `per_page` | Command history pagination and status filter |
 | `organization.incidents.getIncidents` | `from`, `to`, `status`, `priority`, `title`, `description`, `issue`, `device_model`, `partner_name`, `sub_model`, `space_id`, `page`, `per_page` | `page`, `per_page` | Incident filtering matrix. Use integer `from` and `to`; for reliable active-incident fetches use both (`from=0`, `to=<now>`). |
@@ -53,6 +53,7 @@ Derived from the bundled public endpoint spec.
 | `organization.edges.getEdges` | `page`, `per_page` | `page`, `per_page` | Paginated Edge records |
 | `organization.groups.getGroups` | `page`, `per_page` | `page`, `per_page` | Paginated team access groups |
 | `organization.users.getUsers` | `page`, `per_page` | `page`, `per_page` | Paginated active users |
+| `organization.models.getModels` | `page`, `per_page`, `search`, `edge_only` | `page`, `per_page` | Use `edge_only=true` for Edge model discovery and custom parameter labels |
 
 For the complete current query-param set, run `xyte-cli api endpoints describe <endpoint-key>` before calling.
 
@@ -105,11 +106,23 @@ xyte-cli api call organization.incidents.closeIncident \
 
 ### `organization.commands.sendCommand`
 
+Prefer `flow.device-command` for user requests like "send command X to device Y"; it first reads `organization.devices.getDevice`, describes the returned model with `organization.models.getModel`, validates the selected `commands[].name` plus any command parameters, and pauses before `organization.commands.sendCommand`.
+
 ```bash
+xyte-cli flow run flow.device-command --tenant <tenant-id> --plan --var device_id=<device-id> --var command=reboot
+
+xyte-cli api call organization.devices.getDevice \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}'
+
+xyte-cli edge models describe \
+  --tenant <tenant-id> \
+  --model-id <model-id-from-device>
+
 xyte-cli api call organization.commands.sendCommand \
   --tenant <tenant-id> \
   --path-json '{"device_id":"<device-id>"}' \
-  --body-json '{"command":"reboot"}'
+  --body-json '{"name":"reboot","extra_params":{}}'
 ```
 
 ### `organization.devices.mergeDevice` / `organization.devices.splitDevice`
@@ -226,6 +239,12 @@ Partner:
 
 Edge devices sit behind an Xyte Edge proxy. Claim/ping are **asynchronous**: the start endpoint returns 204, then you poll the matching status endpoint until terminal (`success` or `failed`). Prefer the `xyte-cli edge` command group or `flow.edge-claim*` flows over raw `api call` — they handle polling, backoff, and resume.
 
+Model discovery:
+- `organization.models.getModels` -> `GET /core/v1/organization/models` with `edge_only=true`, `page`, `per_page`, and optional `search`.
+- `organization.models.getModel` -> `GET /core/v1/organization/models/:id`; returns `parameters[]` and model-supported `commands[]`.
+- Use `parameters[].name` as the accepted `custom_parameters` labels for Edge claim and already-claimed parameter updates.
+- Use `commands[].name` or `commands[].friendly_name` for `organization.commands.sendCommand`; use `commands[].custom_fields[].name` for `extra_params`, and provide `file_id` when `commands[].with_file` is true.
+
 Verified raw route mapping:
 - `organization.edge.startClaim` -> `POST /core/v1/organization/edges/devices/start_claim`
 - `organization.edge.getClaimStatus` -> `GET /core/v1/organization/edges/devices/get_claim_status`
@@ -243,6 +262,8 @@ xyte-cli api call organization.edge.startClaim \
     "device_model_id":"<device-model-id>",
     "space_id":<space-id>,
     "display_name":"Conference Room Display",
+    "mac":"aa:bb:cc:dd:ee:ff",
+    "sn":"SN-12345",
     "skip_connectivity_check":false
   }'
 
@@ -264,10 +285,25 @@ xyte-cli api call organization.edge.getPingStatus \
 ```
 
 Ergonomic wrappers (recommended):
+- Model discovery: `xyte-cli edge models list --tenant <tenant-id> --page 1 --per-page 100` and `xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>`.
 - Single claim: `xyte-cli edge claim --plan`, then `--apply` after explicit approval.
 - Bulk claim: `xyte-cli edge claim-batch --input <primary-csv> --plan [--skip-connectivity-check]`, then `--apply --resume-artifact <path>` after explicit approval.
 - In bulk claim, blank or `skip_connectivity_check=false` rows run an internal pre-claim ping; standalone `edge ping` is diagnostic.
 - Batch resume skips completed rows from `--resume-artifact`; it does not store in-flight claim IDs.
+
+### Already-Claimed Edge `custom_parameters`
+
+Use `organization.devices.updateDevice` for already-claimed Edge custom parameters only through the dedicated CLI wrappers unless the user explicitly requests raw calls:
+
+```bash
+xyte-cli edge update-params --tenant <tenant-id> --device-id <device-id> --set-json '{"Port":"161"}' --plan
+xyte-cli edge update-params-batch --tenant <tenant-id> --input ./prepared/edge-params-update.csv --plan --report ./artifacts/edge-params.plan.ndjson
+```
+
+Safety rules:
+- `custom_parameters` is a complete replacement write. The request body must include every value to preserve.
+- The wrapper reads `organization.devices.getDevice`, reads `organization.models.getModel`, validates keys against `parameters[].name`, merges requested changes into current values, sends `{"custom_parameters": ...}` to `organization.devices.updateDevice`, and verifies with `getDevice`.
+- Block unknown requested labels, unsupported existing labels, missing required model parameters, duplicate `device_id` batch rows, model mismatch, read-back mismatch, and masked password placeholders (`"*****"`) unless a real replacement value is supplied.
 - Status peek: `xyte-cli edge claim-status`, `xyte-cli edge ping-status`
 - Connectivity probe: `xyte-cli edge ping --plan`, then `--apply` after explicit approval.
 

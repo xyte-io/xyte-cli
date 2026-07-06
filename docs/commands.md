@@ -9,10 +9,14 @@ Use it as a unified map for flow runner execution, utility pipelines, and endpoi
 - [`flow.incidents-delta-watch`](flows/agent-ops.md#flowincidents-delta-watch): stream incident snapshots and deltas as watch frames.
 - [`flow.watch-to-triage`](flows/agent-ops.md#flowwatch-to-triage): convert watch output into inspect/report triage artifacts.
 - [`flow.guided-remediation`](flows/agent-ops.md#flowguided-remediation): execute org command/ticket/incident actions with verification.
+- [`flow.device-command`](flows/agent-ops.md#flowdevice-command): read the device model commands and send one approved command.
 - [`flow.device-migration`](flows/agent-ops.md#flowdevice-migration): inventory, match, dry-run, execute, and verify device migration.
 - [`flow.daily-deep-dive-report`](flows/agent-ops.md#flowdaily-deep-dive-report): produce daily deep-dive JSON and markdown report outputs.
+- [`flow.edge-model-discovery`](flows/agent-ops.md#flowedge-model-discovery): list Edge-capable models and describe supported parameters.
 - [`flow.edge-claim`](flows/agent-ops.md#flowedge-claim): claim a single edge device end-to-end (async start + poll).
 - [`flow.edge-claim-batch`](flows/agent-ops.md#flowedge-claim-batch): bulk-claim edge devices from a prepared CSV with plan/apply and resume.
+- [`flow.edge-params-update`](flows/agent-ops.md#flowedge-params-update): update one already-claimed Edge device's custom parameters safely.
+- [`flow.edge-params-update-batch`](flows/agent-ops.md#flowedge-params-update-batch): update claimed Edge custom parameters from prepared rows with reports and resume.
 - [`flow.edge-ping`](flows/agent-ops.md#flowedge-ping): async connectivity probe for a device behind an Edge proxy.
 
 ## Flow Commands
@@ -138,8 +142,9 @@ xyte-cli api endpoints describe organization.notes.createDeviceNote
 xyte-cli api endpoints describe organization.users.getUsers
 xyte-cli api endpoints describe organization.groups.addUsers
 xyte-cli api endpoints describe partner.organizations.createOrganization
-xyte-cli api call organization.devices.getDevices --tenant <tenant-id>
-xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --output-mode envelope --strict-json [--note <text>]
+xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query-json '{"page":1,"per_page":100}'
+xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query-json '{"page":1,"per_page":100}' --output-mode envelope --strict-json [--note <text>]
+# For complete device inventories, increment page until the envelope response reports no continuation (`next_page` is null/absent, or `has_next_page=false` on tenants that return that field).
 xyte-cli api call organization.devices.mergeDevice --tenant <tenant-id> --path-json '{"device_id":"<primary-device-id>"}' --body-json '{"with_device_ids":["<shadow-device-id>"]}' --note "approved merge"
 xyte-cli api call organization.devices.splitDevice --tenant <tenant-id> --path-json '{"device_id":"<primary-device-id>"}' --body-json '{"shadow_device_id":"<shadow-device-id>"}' --note "approved split"
 xyte-cli api call organization.notes.getDeviceNotes --tenant <tenant-id> --path-json '{"device_id":"<device-id>"}' --query-json '{"page":1,"per_page":100}'
@@ -181,13 +186,28 @@ Frame event types:
 
 ## Write Examples
 
-These raw API examples are shell-specific because inline JSON quoting differs across shells.
+These raw API examples are shell-specific because inline JSON quoting differs across shells. For one-device command sends, prefer `flow.device-command`; it reads the device model's supported commands first and pauses before `sendCommand`.
 
 ```bash
+xyte-cli flow run flow.device-command --tenant <tenant-id> --plan --var device_id=DEVICE_ID --var command=reboot
+
+xyte-cli api call organization.devices.getDevice \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"DEVICE_ID"}'
+
+xyte-cli edge models describe \
+  --tenant <tenant-id> \
+  --model-id MODEL_ID_FROM_DEVICE
+
 xyte-cli api call organization.commands.sendCommand \
   --tenant <tenant-id> \
   --path-json '{"device_id":"DEVICE_ID"}' \
-  --body-json '{"command":"reboot"}'
+  --body-json '{"name":"reboot","extra_params":{}}'
+
+xyte-cli api call organization.commands.getCommands \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"DEVICE_ID"}' \
+  --query-json '{"page":1,"per_page":20}'
 
 xyte-cli api call organization.commands.cancelCommand \
   --tenant <tenant-id> \
@@ -219,7 +239,7 @@ xyte-cli api call partner.organizations.createOrganization \
 ## Utility Pipelines, Space Import, And Device Migration
 
 ```bash
-xyte-cli util list-actions --output text [--mode friendly|generic] [--execution-support space.import-tree|device.move|edge.claim-batch|prepare-only|call-loop-only]
+xyte-cli util list-actions --output text [--mode friendly|generic] [--execution-support space.import-tree|device.move|edge.claim-batch|edge.params-update-batch|prepare-only|call-loop-only]
 
 xyte-cli util prepare \
   --action organization.devices.claimDevice \
@@ -275,13 +295,23 @@ Edge devices sit behind an Xyte Edge proxy. Claim and ping are asynchronous: a s
 See [`docs/claim-devices.md`](claim-devices.md) for the full native-vs-edge-vs-C2C decision guide before you pick a command.
 
 ```bash
+xyte-cli edge models list \
+  --tenant <tenant-id> \
+  [--search <text>] [--page <n>] [--per-page <n>] \
+  [--output json|text]
+
+xyte-cli edge models describe \
+  --tenant <tenant-id> \
+  --model-id <model-id> \
+  [--output json|text]
+
 xyte-cli edge claim \
   --tenant <tenant-id> \
   --proxy-id <proxy-id> \
   --device-ip <device-ip> \
   --device-model-id <device-model-id> \
   --space-id <space-id> \
-  [--display-name <name>] [--skip-connectivity-check] \
+  [--display-name <name>] [--mac <mac>] [--sn <serial>] [--custom-parameters <json>] [--skip-connectivity-check] \
   [--poll-interval-ms 5000] [--poll-timeout-ms 600000] \
   [--plan|--apply] [--output json|text]
 
@@ -295,6 +325,20 @@ xyte-cli edge claim-batch \
 
 xyte-cli edge claim-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> [--output json|text]
 
+xyte-cli edge update-params \
+  --tenant <tenant-id> \
+  --device-id <device-id> \
+  --set-json '{"Port":"161"}' \
+  [--expected-model-id <model-id>] \
+  [--plan|--apply] [--output json|text]
+
+xyte-cli edge update-params-batch \
+  --tenant <tenant-id> \
+  --input ./prepared/edge-params-update.csv \
+  [--input-format auto|csv|json|jsonl] \
+  [--report <path>] [--resume-artifact <path>] \
+  [--plan|--apply] [--output json|text]
+
 xyte-cli edge ping \
   --tenant <tenant-id> \
   --proxy-id <proxy-id> \
@@ -306,16 +350,22 @@ xyte-cli edge ping-status --tenant <tenant-id> --proxy-id <proxy-id> --device-ip
 ```
 
 Notes:
-- `edge claim`, `edge claim-batch`, and `edge ping` are mutating. `--plan` is the safe default; `--apply` only after explicit user approval.
-- `edge claim-status` and `edge ping-status` are read-only.
+- `edge models list` always sends `edge_only=true`. Use it before claim or parameter updates to choose real model ids and supported `parameters[].name` labels.
+- Built-in `flow.edge-claim` and `flow.edge-claim-batch` list Edge models and describe `device_model_id` before any claim write; if the tenant has multiple possible models, pass `--var device_model_id=<model-id>`.
+- `edge claim`, `edge claim-batch`, `edge update-params`, `edge update-params-batch`, and `edge ping` are mutating. `--plan` is the safe default; `--apply` only after explicit user approval.
+- `edge models list`, `edge models describe`, `edge claim-status`, and `edge ping-status` are read-only.
 - Poll defaults: 5 s interval, 10 min timeout.
+- `edge claim` and `edge claim-batch` accept optional `mac` and `sn`; copy them from source data only, never invent them.
 - `edge claim-batch` runs `edge ping` internally before `startClaim` for blank or `skip_connectivity_check=false` rows. Rows with `skip_connectivity_check=true` skip that ping and send `skip_connectivity_check: true`.
 - `edge claim-batch --skip-connectivity-check` makes blank rows skip ping and send `skip_connectivity_check: true`; rows that explicitly set `skip_connectivity_check=false` are rejected as conflicts.
 - `edge claim-batch` on a half-finished run requires `--resume-artifact <ndjson-artifact>`; it skips rows previously recorded as `succeeded` or `already-claimed` and re-runs all other rows from the prior artifact. The resume artifact records completed row results, not in-flight claim IDs.
 - `edge claim-batch` exits with code 1 if any row ends in `failed`, `rejected`, `timeout`, `proxy-offline`, `ping-failed`, or `aborted`; per-row dispositions are written to `--report`.
+- `edge update-params` reads the current device, reads the current model, validates `--set-json` keys against `parameters[].name`, merges changes into current `custom_parameters`, sends the full replacement object to `organization.devices.updateDevice`, then reads back the device to verify.
+- `custom_parameters` is a complete replacement write. The CLI sends every value it can safely preserve from current state plus the requested changes; unknown requested labels, unsupported existing labels, missing required model parameters, model mismatches, read-back mismatches, and masked password placeholders (`"*****"`) fail closed.
+- `edge update-params-batch` uses `device_id,set_json,expected_model_id` rows, writes per-row reports, rejects duplicate `device_id` rows in the same input, and skips previously `succeeded` rows when resumed with the same `--resume-artifact`.
 - `edge ping` remains a standalone diagnostic command; batch does not rely on ping evidence from a separate command.
-- Raw endpoints remain available for advanced cases: `organization.edge.startClaim`, `organization.edge.getClaimStatus`, `organization.edge.startPing`, `organization.edge.getPingStatus`.
-- Raw route mapping: `startClaim` -> `POST /core/v1/organization/edges/devices/start_claim`, `getClaimStatus` -> `GET /core/v1/organization/edges/devices/get_claim_status`, `startPing` -> `POST /core/v1/organization/edges/devices/start_ping`, `getPingStatus` -> `GET /core/v1/organization/edges/devices/get_ping_status`.
+- Raw endpoints remain available for advanced cases: `organization.models.getModels`, `organization.models.getModel`, `organization.edge.startClaim`, `organization.edge.getClaimStatus`, `organization.edge.startPing`, `organization.edge.getPingStatus`, `organization.devices.updateDevice`.
+- Raw route mapping: `organization.models.getModels` -> `GET /core/v1/organization/models`, `organization.models.getModel` -> `GET /core/v1/organization/models/:id`, `organization.devices.updateDevice` -> `PATCH /core/v1/organization/devices/:device_id`, `startClaim` -> `POST /core/v1/organization/edges/devices/start_claim`, `getClaimStatus` -> `GET /core/v1/organization/edges/devices/get_claim_status`, `startPing` -> `POST /core/v1/organization/edges/devices/start_ping`, `getPingStatus` -> `GET /core/v1/organization/edges/devices/get_ping_status`.
 
 ## Insights And Reports
 

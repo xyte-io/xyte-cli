@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Update Edge custom parameters with xyte-cli</title>
+    <meta name="description" content="Plan, apply, and verify custom parameter updates on already-claimed Xyte Edge devices." />
+    <link rel="icon" type="image/png" href="../media/xyte-ai-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+    <noscript><style>.guide-view[hidden]{display:block !important}</style></noscript>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-nav"><div class="wrap nav-row"><a class="brand" href="../index.html"><img src="../media/xyte-ai-logo-white-color.svg" alt="XYTE AI" /><span>Use-case guides</span></a><nav class="nav-links" aria-label="Primary"><a href="../index.html#install">Install</a><a href="../index.html#start">Start</a><a href="./index.html">Guides</a><a href="../index.html#docs">Reference</a><a href="../glossary.html">Glossary</a><a href="../troubleshooting.html">Troubleshooting</a></nav></div></header>
+    <main class="page" id="main"><div class="wrap guide-shell">
+      <aside class="toc" aria-label="On this page"><strong>On this page</strong><a href="#ai-agent">Ask an agent</a><a href="#single">Single device</a><a href="#batch">Batch update</a><a href="#safety">Safety checks</a><a href="#failures">If it fails</a></aside>
+      <article class="article">
+        <p class="breadcrumb"><a href="../index.html">Overview</a> / <a href="./index.html">Guides</a> / Edge custom parameters</p>
+        <figure class="guide-visual">
+          <img src="./media/edge-claim-workflow.webp" alt="Edge parameter updates discover the model, plan a full replacement, apply after approval, and verify read-back." />
+        </figure>
+        <p class="eyebrow">Edge devices</p>
+        <h1>Update Edge custom parameters.</h1>
+        <p class="lead">For devices already claimed through Xyte Edge. The workflow reads current values, reads the model schema, plans the complete replacement object, applies after approval, and verifies the device afterward.</p>
+        <div class="view-switch" role="tablist" aria-label="Guide view">
+          <button class="view-tab" type="button" role="tab" id="tab-ai" aria-controls="ai-agent" aria-selected="true" data-view="ai">AI agent</button>
+          <button class="view-tab" type="button" role="tab" id="tab-terminal" aria-controls="terminal" aria-selected="false" data-view="terminal" tabindex="-1">Terminal commands</button>
+        </div>
+        <div class="note prereq-note"><p><strong>Before you start:</strong> You need the claimed Edge device id and the parameter values to change. Use <a href="./edge-claim.html">Device claiming</a> for unclaimed Edge devices.</p></div>
+
+        <section class="guide-view" data-view="ai" id="ai-agent" role="tabpanel" aria-labelledby="tab-ai" tabindex="0">
+          <h2>Ask an agent</h2>
+          <p class="section-copy">Point the agent at the device id or spreadsheet and ask it to build a plan. It should stop after showing the complete replacement body.</p>
+          <div class="agent-prompt"><div class="command"><pre><code>I need to update custom parameters on already-claimed Edge devices. Read the source rows, discover each device model, validate parameter labels, and show the plan. Do not apply anything yet.</code></pre></div></div>
+          <div class="flow-diagram" aria-label="Edge custom parameter workflow">
+            <h3>What the agent will do</h3>
+            <ol class="flow-steps">
+              <li><span class="flow-kicker">Read</span><strong>Get device</strong><span>Fetch current model id and current custom parameters.</span></li>
+              <li><span class="flow-kicker">Discover</span><strong>Get model</strong><span>Use parameters[].name and password types from the model schema.</span></li>
+              <li><span class="flow-kicker">Plan</span><strong>Merge values</strong><span>Merge requested changes into current values and show the full replacement body.</span></li>
+              <li><span class="flow-kicker">Approve</span><strong>Apply</strong><span>Send updateDevice only after explicit approval.</span></li>
+              <li><span class="flow-kicker">Verify</span><strong>Read back</strong><span>Confirm the device reports the expected parameter values.</span></li>
+            </ol>
+          </div>
+        </section>
+
+        <section class="guide-view" data-view="terminal" id="terminal" role="tabpanel" aria-labelledby="tab-terminal" tabindex="0" hidden>
+          <h2 id="single">Single device</h2>
+          <ol class="steps">
+            <li class="step"><h3>Plan the replacement</h3><p>Start with the claimed device id. The command reads the current device and model, then prints the model id and full <code>custom_parameters</code> body.</p><div class="command"><pre><code>xyte-cli edge update-params \
+  --tenant &lt;tenant-id&gt; \
+  --device-id &lt;device-id&gt; \
+  --set-json '{"Port":"161"}' \
+  --plan</code></pre></div></li>
+            <li class="step"><h3>Inspect the model when needed</h3><p>Use the model id from the plan output to confirm labels, required parameters, and password fields.</p><div class="command"><pre><code>xyte-cli edge models describe \
+  --tenant &lt;tenant-id&gt; \
+  --model-id &lt;model-id-from-plan&gt;</code></pre></div></li>
+            <li class="step"><h3>Apply after approval</h3><p>Apply sends the complete replacement object and performs read-back verification.</p><div class="command"><pre><code>xyte-cli edge update-params \
+  --tenant &lt;tenant-id&gt; \
+  --device-id &lt;device-id&gt; \
+  --set-json '{"Port":"161"}' \
+  --apply</code></pre></div></li>
+          </ol>
+
+          <h2 id="batch">Batch update</h2>
+          <ol class="steps">
+            <li class="step"><h3>Prepare rows</h3><p>Use <code>device_id,set_json,expected_model_id</code>. The expected model id column is optional, but useful for blocking stale spreadsheets.</p><div class="command"><pre><code>xyte-cli util prepare \
+  --action edge.params.update \
+  --tenant &lt;tenant-id&gt; \
+  --input &lt;input.xlsx&gt; \
+  --output-dir ./prepared</code></pre></div></li>
+            <li class="step"><h3>Plan and apply</h3><p>Keep report and resume files together. Resume skips rows that already succeeded.</p><div class="command"><pre><code>xyte-cli edge update-params-batch \
+  --tenant &lt;tenant-id&gt; \
+  --input ./prepared/edge-params-update.csv \
+  --report ./artifacts/edge-params.plan.ndjson \
+  --plan
+
+xyte-cli edge update-params-batch \
+  --tenant &lt;tenant-id&gt; \
+  --input ./prepared/edge-params-update.csv \
+  --report ./artifacts/edge-params.apply.ndjson \
+  --resume-artifact ./artifacts/edge-params.resume.ndjson \
+  --apply</code></pre></div></li>
+          </ol>
+
+          <h2 id="safety">Safety checks</h2>
+          <ul class="checklist">
+            <li><code>set_json</code> keys must match <code>parameters[].name</code> from the device model.</li>
+            <li><code>custom_parameters</code> is a complete replacement write; omitted model parameters are reset by the API.</li>
+            <li>The CLI merges requested values into current values before sending the full replacement object.</li>
+            <li>Existing device parameters that are not supported by the current model are blocked instead of being preserved blindly.</li>
+            <li>Required model parameters must be present in the merged replacement body.</li>
+            <li>Password masks such as <code>"*****"</code> are blocked unless a real replacement value is supplied.</li>
+            <li>Batch input rejects duplicate <code>device_id</code> rows so two replacements cannot target the same device in one run.</li>
+            <li>Apply mode reads the device again and fails if the expected values are not present.</li>
+          </ul>
+
+          <h2 id="failures">If it fails</h2>
+          <div class="failure-list">
+            <div class="failure"><strong>Unknown parameter</strong><p>Use <code>edge models describe</code> and update the source row to the human-readable label from <code>parameters[].name</code>.</p></div>
+            <div class="failure"><strong>Unsupported current parameter</strong><p>The device already contains a label that is not in the model schema. Refresh the model/device data and decide whether to remove or remap that value before applying.</p></div>
+            <div class="failure"><strong>Missing required parameter</strong><p>Add the required model parameter to <code>set_json</code> or confirm it is already present on the device before retrying.</p></div>
+            <div class="failure"><strong>Masked password</strong><p>Ask for the real password value. Do not send <code>"*****"</code> as a replacement.</p></div>
+            <div class="failure"><strong>Model mismatch</strong><p>Refresh the device row. The device model changed or the spreadsheet targeted the wrong device.</p></div>
+            <div class="failure"><strong>Duplicate device row</strong><p>Keep one row per <code>device_id</code> in a batch. Split conflicting changes into separate reviewed runs.</p></div>
+            <div class="failure"><strong>Read-back mismatch</strong><p>Inspect the device and do not assume the write landed. Re-plan after checking current state.</p></div>
+          </div>
+        </section>
+        <aside class="related-next" aria-label="Next steps"><h3>Do this next</h3><p class="section-copy"><a class="next-link" href="./utility-prep.html">Spreadsheet prep &rarr;</a> Prepare batch rows from messy input files.</p><p class="section-copy">Reference: <a href="../reference/commands.html">Commands reference</a>, <a href="../reference/built-in-flows.html">Built-in flows</a>, <a href="../troubleshooting.html">Troubleshooting</a>.</p></aside>
+      </article>
+    </div></main>
+    <footer class="footer"><div class="wrap footer-row"><span>Edge custom parameters</span><span><a href="./index.html">Guides</a> · <a href="../index.html">Overview</a></span></div></footer>
+    <script src="./guide.js?v=use-case-guides-3"></script>
+  </body>
+</html>

@@ -292,7 +292,7 @@ describe('cli integration', () => {
       '--path-json',
       '{"device_id":"dev-1"}',
       '--body-json',
-      '{"command":"reboot"}'
+      '{"name":"reboot"}'
     ]);
 
     expect(fetchMock).toHaveBeenCalled();
@@ -578,6 +578,7 @@ describe('cli integration', () => {
     expect(parsed.some((item: any) => item.actionKey === 'organization.teamAccess.users')).toBe(true);
     expect(parsed.some((item: any) => item.actionKey === 'organization.teamAccess.memberships')).toBe(true);
     expect(parsed.some((item: any) => item.actionKey === 'organization.devices.claimDevice')).toBe(true);
+    expect(parsed.some((item: any) => item.actionKey === 'edge.params.update')).toBe(true);
     expect(parsed.some((item: any) => item.actionKey === 'organization.notes.createDeviceNote')).toBe(true);
     expect(parsed.some((item: any) => item.actionKey === 'organization.notes.deleteDeviceNote')).toBe(true);
     expect(parsed.some((item: any) => item.actionKey === 'space.import-tree')).toBe(true);
@@ -604,6 +605,22 @@ describe('cli integration', () => {
     ]);
     const filtered = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
     expect(filtered.map((item: any) => item.actionKey)).toEqual(['organization.edge.startClaim']);
+
+    stdout.write.mockClear();
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'util',
+      'list-actions',
+      '--format',
+      'json',
+      '--mode',
+      'friendly',
+      '--execution-support',
+      'edge.params-update-batch'
+    ]);
+    const paramsFiltered = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(paramsFiltered.map((item: any) => item.actionKey)).toEqual(['edge.params.update']);
 
     stdout.write.mockClear();
     await program.parseAsync(['node', 'xyte-cli', 'util', 'list-actions', '--format', 'text', '--mode', 'friendly']);
@@ -4744,8 +4761,14 @@ describe('cli integration', () => {
             }
           );
         }
-        if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'GET') {
-          return new Response(JSON.stringify({ items: [{ command: 'restart' }] }), {
+        if (url.includes('/organization/devices/dev-1') && !url.includes('/commands') && (init?.method ?? 'GET') === 'GET') {
+          return new Response(JSON.stringify({ id: 'dev-1', model: { id: 'model-1', name: 'Model 1' } }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/organization/models/model-1') && (init?.method ?? 'GET') === 'GET') {
+          return new Response(JSON.stringify({ id: 'model-1', commands: [{ name: 'restart' }] }), {
             status: 200,
             headers: { 'content-type': 'application/json' }
           });
@@ -4835,7 +4858,8 @@ describe('cli integration', () => {
     expect(third.nextResumeStepId).toBe('gate_ticket_message');
     const thirdStepStatus = new Map<string, string>(third.steps.map((item: any) => [item.stepId, item.status]));
     expect(thirdStepStatus.get('watch_before')).toBe('completed');
-    expect(thirdStepStatus.get('commands_get')).toBe('completed');
+    expect(thirdStepStatus.get('command_device_get')).toBe('completed');
+    expect(thirdStepStatus.get('command_model_describe')).toBe('completed');
     expect(thirdStepStatus.get('gate_send_command')).toBe('gate_approved');
     expect(thirdStepStatus.get('commands_send')).toBe('completed');
     expect(thirdStepStatus.get('gate_update_device')).toBe('gate_approved');
@@ -4866,8 +4890,14 @@ describe('cli integration', () => {
             headers: { 'content-type': 'application/json' }
           });
         }
-        if (url.includes('/organization/devices/dev-from-var/commands')) {
-          return new Response(JSON.stringify({ items: [] }), {
+        if (url.includes('/organization/devices/dev-from-var') && !url.includes('/commands')) {
+          return new Response(JSON.stringify({ id: 'dev-from-var', model: { id: 'model-1' } }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/organization/models/model-1')) {
+          return new Response(JSON.stringify({ id: 'model-1', commands: [{ name: 'restart' }] }), {
             status: 200,
             headers: { 'content-type': 'application/json' }
           });

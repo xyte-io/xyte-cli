@@ -6,6 +6,20 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-07-06
+
+### Added
+- Added Edge model discovery and already-claimed Edge custom-parameter update support:
+  - endpoint catalog/client entries for `organization.models.getModels` and `organization.models.getModel`
+  - `xyte-cli edge models list|describe`
+  - `xyte-cli edge update-params` and `xyte-cli edge update-params-batch`
+  - built-in flows `flow.edge-model-discovery`, `flow.edge-params-update`, and `flow.edge-params-update-batch`
+  - utility preparation action `edge.params.update`
+
+### Changed
+- Updated `organization.devices.getDevices` pagination metadata, Edge claim `mac`/`sn` support, and `organization.devices.updateDevice` guidance for Edge `custom_parameters` complete-replacement writes.
+- Updated Markdown docs, GH Pages guides/reference pages, and shipped skill guidance for Edge model discovery, Edge claim preparation, and already-claimed Edge custom-parameter workflows.
+
 ## [0.11.0] - 2026-06-24
 
 ### Added

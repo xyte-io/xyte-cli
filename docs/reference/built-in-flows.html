@@ -88,19 +88,24 @@ xyte-cli flow run flow.guided-remediation \
             <li><code>flow.incidents-delta-watch</code>: incident state may have changed and you need a watch frame.</li>
             <li><code>flow.watch-to-triage</code>: watch output needs fleet and report context.</li>
             <li><code>flow.daily-deep-dive-report</code>: a daily or weekly handoff needs source JSON and a readable report.</li>
+            <li><code>flow.device-command</code>: a user wants to send one command to one device after model command metadata, <code>custom_fields</code> / <code>with_file</code> validation, and approval.</li>
             <li><code>flow.guided-remediation</code>: triage found a real issue and the next step may write state.</li>
             <li><code>flow.device-migration</code>: device placement changed after a room import, rename, split, or reorganization.</li>
-            <li><code>flow.edge-claim</code> and <code>flow.edge-claim-batch</code>: Edge devices need planned claim runs.</li>
+            <li><code>flow.edge-model-discovery</code>: Edge model ids and custom parameter labels need to be discovered before claim or update work.</li>
+            <li><code>flow.edge-claim</code> and <code>flow.edge-claim-batch</code>: Edge devices need model discovery, parameter review, and planned claim runs.</li>
+            <li><code>flow.edge-params-update</code> and <code>flow.edge-params-update-batch</code>: already-claimed Edge devices need full-replacement custom parameter updates with read-back verification.</li>
             <li><code>flow.edge-ping</code>: check whether a device behind an Edge proxy is reachable, before or after a claim.</li>
           </ul>
-          <p class="section-copy">Read-only flows (<code>flow.setup-readiness-10m</code>, <code>flow.incidents-delta-watch</code>, <code>flow.watch-to-triage</code>, <code>flow.daily-deep-dive-report</code>) never change tenant state. Write-capable flows (<code>flow.guided-remediation</code>, <code>flow.device-migration</code>, <code>flow.edge-claim</code>, <code>flow.edge-claim-batch</code>, <code>flow.edge-ping</code>) plan first and pause before any write. Run <code>xyte-cli flow list --format text</code> to see each flow&rsquo;s required context.</p>
+          <p class="section-copy">Read-only flows (<code>flow.setup-readiness-10m</code>, <code>flow.incidents-delta-watch</code>, <code>flow.watch-to-triage</code>, <code>flow.daily-deep-dive-report</code>, <code>flow.edge-model-discovery</code>) never change tenant state. Write-capable flows (<code>flow.device-command</code>, <code>flow.guided-remediation</code>, <code>flow.device-migration</code>, <code>flow.edge-claim</code>, <code>flow.edge-claim-batch</code>, <code>flow.edge-params-update</code>, <code>flow.edge-params-update-batch</code>, <code>flow.edge-ping</code>) plan first and pause before any write. Edge claim flows fetch Edge model data before the claim gate, so operators can inspect model ids and supported parameter labels before applying. Run <code>xyte-cli flow list --format text</code> to see each flow&rsquo;s required context.</p>
 
           <h2 id="real-examples">Examples</h2>
           <div class="failure-grid">
             <div class="failure"><strong>Shift handoff</strong><p>Run <code>flow.watch-to-triage</code> in plan mode so the next operator gets incident state, fleet context, and report files.</p></div>
             <div class="failure"><strong>Customer report</strong><p>Run <code>flow.daily-deep-dive-report</code> to create the source JSON and readable report from the same tenant snapshot.</p></div>
+            <div class="failure"><strong>Device command</strong><p>Run <code>flow.device-command</code> so model command metadata is captured before the approved send step. Provide <code>command_extra_params_json</code> for <code>custom_fields</code> and <code>command_file_id</code> when <code>with_file</code> is true.</p></div>
             <div class="failure"><strong>Approved remediation</strong><p>Run <code>flow.guided-remediation</code> to inspect the current issue and pause before any command, ticket, or incident write.</p></div>
             <div class="failure"><strong>Deployment onboarding</strong><p>Run <code>flow.edge-claim-batch</code> after spreadsheet preparation so rejected rows and resume behavior are explicit.</p></div>
+            <div class="failure"><strong>Edge parameter rollout</strong><p>Run <code>flow.edge-params-update-batch</code> after spreadsheet preparation so model validation, reports, and resume behavior are explicit.</p></div>
           </div>
 
           <h2 id="artifacts">Artifacts</h2>

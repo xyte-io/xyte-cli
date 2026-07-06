@@ -403,7 +403,7 @@ function normalizeCommandTemplates(items: unknown[]): CommandTemplate[] {
 
   for (const item of items) {
     const rec = item && typeof item === 'object' ? (item as Record<string, unknown>) : undefined;
-    const command = String(rec?.command ?? '').trim();
+    const command = String(rec?.name ?? rec?.command ?? '').trim();
     const friendlyName = String(rec?.friendly_name ?? '').trim();
 
     if (command) {
@@ -413,7 +413,7 @@ function normalizeCommandTemplates(items: unknown[]): CommandTemplate[] {
         templates.push({
           mode: 'command',
           value: command,
-          label: `command: ${command}`
+          label: `name: ${command}`
         });
       }
     }
@@ -440,11 +440,23 @@ export async function loadCommandTemplates(
   options: { deviceId: string }
 ): Promise<LoadOutcome<CommandTemplate[]>> {
   return withOutcome(async () => {
-    const raw = await client.organization.getCommands({
+    const device = await client.organization.getDevice({
       tenantId,
       path: { device_id: options.deviceId }
     });
-    const commands = extractArray(raw, ['commands', 'data', 'items']);
+    const deviceRec = device && typeof device === 'object' ? (device as Record<string, unknown>) : undefined;
+    const model = deviceRec?.model && typeof deviceRec.model === 'object'
+      ? (deviceRec.model as Record<string, unknown>)
+      : undefined;
+    const modelId = String(model?.id ?? deviceRec?.device_model_id ?? deviceRec?.model_id ?? '').trim();
+    if (!modelId) {
+      return [];
+    }
+    const rawModel = await client.organization.getModel({
+      tenantId,
+      path: { id: modelId }
+    });
+    const commands = extractArray(rawModel, ['commands', 'data', 'items']);
     return normalizeCommandTemplates(commands);
   }, []);
 }

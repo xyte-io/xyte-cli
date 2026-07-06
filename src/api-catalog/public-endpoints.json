@@ -142,6 +142,7 @@
     "sourceFile": "https://docs.xyte.io/reference/merge-device",
     "bodyExample": "{\n  \"with_device_ids\": [\n    \"shadow-device-id\"\n  ]\n}",
     "notes": [
+      "Docs page: https://docs.xyte.io/reference/merge-device",
       "Merges one or more shadow devices under this primary device.",
       "Merge group capped at 4 devices (1 primary + up to 3 shadows)."
     ]
@@ -165,6 +166,7 @@
     "sourceFile": "https://docs.xyte.io/reference/split-device",
     "bodyExample": "{\n  \"shadow_device_id\": \"shadow-device-id\"\n}",
     "notes": [
+      "Docs page: https://docs.xyte.io/reference/split-device",
       "Detaches a shadow device from its primary."
     ]
   },
@@ -236,6 +238,8 @@
       "Docs category: /branches/2.0/categories/reference/API Access",
       "Docs parent: /branches/2.0/reference/devices-2",
       "Docs raw path params: device_id",
+      "Edge devices support custom_parameters in this update endpoint. custom_parameters is a complete replacement write: send every parameter value you want to keep, not only changed values.",
+      "Validate custom_parameters keys against organization.models.getModel parameters[].name before writing. Masked password sentinels such as ***** must not be re-sent as real values.",
       "Live local route check confirms /core/v1/organization/devices/:device_id is callable; /core/v1/organization/:device_id returns 404."
     ]
   },
@@ -299,6 +303,8 @@
     "pathTemplate": "/core/v1/organization/devices",
     "pathParams": [],
     "queryParams": [
+      "page",
+      "per_page",
       "space_id"
     ],
     "authScope": "organization",
@@ -309,6 +315,7 @@
       "Docs page: https://docs.xyte.io/reference/get-devices",
       "Docs category: /branches/2.0/categories/reference/API Access",
       "Docs parent: /branches/2.0/reference/devices-2",
+      "Paginated response includes items plus a continuation field. Shared docs describe has_next_page; live Verve/Playground responses on 2026-07-06 returned next_page. Handle either field. page starts at 1; per_page defaults to 100 and is capped at 100.",
       "Response includes effective_status (nullable string): one of ok, warning, error, offline, disconnected, never_seen. Computed device status reflecting incident priority, connectivity, telemetry-seen state, and raw device status."
     ]
   },
@@ -355,13 +362,14 @@
     "bodyType": "json",
     "hasBody": true,
     "sourceFile": "https://docs.xyte.io/reference/edgeclaim-device",
-    "bodyExample": "{\n  \"proxy_id\": \"proxy-uuid\",\n  \"device_ip\": \"192.168.1.100\",\n  \"device_model_id\": \"model-uuid\",\n  \"space_id\": 10000,\n  \"display_name\": \"Conference Room Display\",\n  \"custom_parameters\": {},\n  \"skip_connectivity_check\": false\n}",
+    "bodyExample": "{\n  \"proxy_id\": \"proxy-uuid\",\n  \"device_ip\": \"192.168.1.100\",\n  \"device_model_id\": \"model-uuid\",\n  \"space_id\": 10000,\n  \"display_name\": \"Conference Room Display\",\n  \"mac\": \"aa:bb:cc:dd:ee:ff\",\n  \"sn\": \"SN-12345\",\n  \"custom_parameters\": {},\n  \"skip_connectivity_check\": false\n}",
     "notes": [
       "Docs page: https://docs.xyte.io/reference/edgeclaim-device",
       "Docs category: Edge Devices",
       "Async endpoint: returns 204; poll organization.edge.getClaimStatus until pending/success/failed.",
-      "Legacy route live-verified on 2026-04-19: POST /core/v1/organization/edge/devices/start_claim returns 400 \"Must provide proxy id\" when called with an empty JSON body.",
-      "Server PR xyte-io/server#8732 made /core/v1/organization/edges/devices the canonical route; /core/v1/organization/edge/devices is legacy server compatibility and is not used by the CLI catalog."
+      "Optional mac accepts common MAC formats and is normalized by the server; invalid mac returns 422. Optional sn assigns a serial number at claim time.",
+      "Use organization.models.getModels with edge_only=true and organization.models.getModel to discover model ids and supported custom_parameters keys before claims.",
+      "Catalog uses the documented plural /core/v1/organization/edges/devices/start_claim route."
     ]
   },
   {
@@ -386,8 +394,7 @@
       "Docs page: https://docs.xyte.io/reference/edgeget-claim-status",
       "Docs category: Edge Devices",
       "Response: { \"result\": \"pending\" | \"success\" | \"failed\" }.",
-      "Legacy route live-verified on 2026-04-19: GET /core/v1/organization/edge/devices/get_claim_status returns 400 \"Proxy not found\" for an unknown proxy_id/device_ip pair.",
-      "Server PR xyte-io/server#8732 made /core/v1/organization/edges/devices the canonical route; /core/v1/organization/edge/devices is legacy server compatibility and is not used by the CLI catalog."
+      "Catalog uses the documented plural /core/v1/organization/edges/devices/get_claim_status route."
     ]
   },
   {
@@ -410,8 +417,7 @@
       "Docs page: https://docs.xyte.io/reference/edgestart-ping",
       "Docs category: Edge Devices",
       "Async endpoint: returns 204; poll organization.edge.getPingStatus until pending/success/failed.",
-      "Legacy route live-verified on 2026-04-19: POST /core/v1/organization/edge/devices/start_ping returns 400 \"Must provide proxy id\" when called with an empty JSON body.",
-      "Server PR xyte-io/server#8732 made /core/v1/organization/edges/devices the canonical route; /core/v1/organization/edge/devices is legacy server compatibility and is not used by the CLI catalog."
+      "Catalog uses the documented plural /core/v1/organization/edges/devices/start_ping route."
     ]
   },
   {
@@ -436,8 +442,7 @@
       "Docs page: https://docs.xyte.io/reference/edgeget-ping-status",
       "Docs category: Edge Devices",
       "Response: { \"status\": \"pending\" | \"success\" | \"failed\" }.",
-      "Legacy route live-verified on 2026-04-19: GET /core/v1/organization/edge/devices/get_ping_status returns 400 \"Proxy not found\" for an unknown proxy_id/device_ip pair.",
-      "Server PR xyte-io/server#8732 made /core/v1/organization/edges/devices the canonical route; /core/v1/organization/edge/devices is legacy server compatibility and is not used by the CLI catalog."
+      "Catalog uses the documented plural /core/v1/organization/edges/devices/get_ping_status route."
     ]
   },
   {
@@ -750,6 +755,58 @@
       "Docs page: https://docs.xyte.io/reference/get-incidents",
       "Docs category: /branches/2.0/categories/reference/API Access",
       "Docs parent: /branches/2.0/reference/incidents-1"
+    ]
+  },
+  {
+    "key": "organization.models.getModel",
+    "namespace": "organization",
+    "group": "models",
+    "action": "getModel",
+    "title": "Get Model",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/models/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/get-model",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-model",
+      "Returns one accessible, published device model including parameters and commands.",
+      "Use parameters[].name as the accepted key set for Edge custom_parameters. Parameter types include text, textarea, password, number, and file.",
+      "Model commands returned here describe model-supported commands; device-specific command history and queue state remain under organization.commands.getCommands."
+    ]
+  },
+  {
+    "key": "organization.models.getModels",
+    "namespace": "organization",
+    "group": "models",
+    "action": "getModels",
+    "title": "Get Models",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/models",
+    "pathParams": [],
+    "queryParams": [
+      "page",
+      "per_page",
+      "search",
+      "edge_only"
+    ],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/get-models",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-models",
+      "Paginated list of accessible, published device models. page defaults to 1; per_page defaults to 100 and is capped at 100.",
+      "Response shape is { items: Model[], next_page: number | null }.",
+      "Use edge_only=true for Edge model discovery before edge claims and already-claimed Edge custom-parameter updates.",
+      "Response items include parameters[].name, parameters[].type, and parameters[].required for custom parameter planning."
     ]
   },
   {

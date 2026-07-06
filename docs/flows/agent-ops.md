@@ -131,15 +131,18 @@ xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/xyte-deep-
 ```bash
 xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json --out ./artifacts/xyte-watch.before.ndjson
 
-xyte-cli api call organization.commands.getCommands \
+xyte-cli api call organization.devices.getDevice \
   --tenant <tenant-id> \
-  --path-json '{"device_id":"<device-id>"}' \
-  --query-json '{"page":1,"per_page":20}'
+  --path-json '{"device_id":"<device-id>"}'
+
+xyte-cli edge models describe \
+  --tenant <tenant-id> \
+  --model-id <model-id-from-device>
 
 xyte-cli api call organization.commands.sendCommand \
   --tenant <tenant-id> \
   --path-json '{"device_id":"<device-id>"}' \
-  --body-json '{"command":"<valid-command-from-history>"}'
+  --body-json '{"name":"<commands[].name>","extra_params":{}}'
 
 xyte-cli api call organization.devices.updateDevice \
   --tenant <tenant-id> \
@@ -164,12 +167,12 @@ xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --o
 
 - Expected artifacts:
   - pre/post watch snapshots for remediation verification.
-  - command preflight history and command dispatch response.
+  - device model command metadata and command dispatch response.
   - update-device response plus read-back verification from `organization.devices.getDevice`.
   - ticket message response, incident close response.
 - Stop/decision gates:
   - Mandatory human decision gate before each write command or write loop.
-  - Stop if command preflight has no valid command/friendly_name for the target device.
+  - Stop if `organization.models.getModel` has no matching `commands[].name` or `commands[].friendly_name` for the target device model.
   - Stop if update-device read-back does not reflect the expected field changes.
   - Stop immediately on any non-2xx write response.
   - Stop if post-remediation watch still shows unchanged high-priority incidents.
@@ -186,6 +189,48 @@ xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --o
   - Human decision gate is mandatory before any write/apply loop.
   - Re-run dry-run import before any `--apply`.
 
+## flow.device-command
+
+- Flow ID: `flow.device-command`
+- Intent: fetch model-supported commands for one device, choose a valid command, and send it only after explicit human approval.
+- Prerequisites:
+  - `<tenant-id>` is active and authorized.
+  - `<device-id>` is the exact target device id.
+  - If the model returns more than one command, provide the selected command as `--var command=<commands[].name>` when running the flow.
+  - If the selected command has `custom_fields`, provide `--var command_extra_params_json='<json-object>'`; if it has `with_file=true`, provide `--var command_file_id=<file-id>`.
+- Shell note:
+  - the raw `api call ... --path-json/--body-json` examples below are Bash/zsh-shaped because inline JSON quoting still differs by shell.
+  - on PowerShell or CMD, prefer `xyte-cli flow run flow.device-command --tenant <tenant-id> --plan --var device_id=<device-id>`.
+- Exact commands:
+
+```bash
+xyte-cli api call organization.devices.getDevice \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}'
+
+xyte-cli edge models describe \
+  --tenant <tenant-id> \
+  --model-id <model-id-from-device>
+
+xyte-cli api call organization.commands.sendCommand \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}' \
+  --body-json '{"name":"<commands[].name>","extra_params":{}}'
+```
+
+- Expected artifacts:
+  - device read response with `model.id`.
+  - model response with `commands[]`, `custom_fields`, and `with_file`.
+  - command dispatch response from `organization.commands.sendCommand` when the gate is approved.
+- Stop/decision gates:
+  - Default to `--plan`. Only advance to `--apply` after the operator approves the exact command.
+  - Stop if the model has no usable `commands[]` for the target device.
+  - Stop if the desired command is ambiguous or absent; ask for `--var command=<commands[].name>`.
+  - Stop if `command_extra_params_json` contains keys not declared in `commands[].custom_fields[].name` or omits a required field.
+- Failure handling:
+  - 401 aborts the flow — fix with `xyte-cli setup run` or `xyte-cli config key`.
+  - Non-2xx send response stops the flow; re-read the device and command response before retrying.
+
 ## flow.device-migration
 
 - Flow ID: `flow.device-migration`
@@ -198,7 +243,8 @@ xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --o
 
 ```bash
 mkdir -p ./artifacts ./reports
-xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query space_id=<source-space-id> --output json > ./artifacts/source-devices.json
+xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query-json '{"space_id":"<source-space-id>","page":1,"per_page":100}' --output-mode envelope --output json > ./artifacts/source-devices.page-1.json
+# Repeat page 2, 3, ... until the response reports no continuation (`next_page` is null/absent, or `has_next_page=false` on tenants that return that field), then combine items into ./artifacts/source-devices.json.
 xyte-cli api call organization.spaces.getSpaces --tenant <tenant-id> --query path_includes=<target-path> --output json > ./artifacts/target-spaces.json
 xyte-cli util match --tenant <tenant-id> --source ./artifacts/source-devices.json --target ./artifacts/target-spaces.json --source-field name --target-field name --out ./artifacts/device-moves.csv
 xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/device-moves.csv.summary.json --out ./reports/device-migration-pre.md --render markdown
@@ -208,7 +254,7 @@ xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/
 ```
 
 - Expected artifacts:
-  - source device inventory JSON and target space inventory JSON.
+  - complete source device inventory JSON, collected across all `getDevices` pages until no `next_page` / `has_next_page` continuation remains, and target space inventory JSON.
   - deterministic move CSV at `./artifacts/device-moves.csv` plus summary JSON sidecar.
   - pre-migration markdown report at `./reports/device-migration-pre.md`.
   - dry-run and apply NDJSON row reports for move execution.
@@ -262,17 +308,23 @@ xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/
 - Disambiguation: only run this flow after confirming the user means **edge** claim (not native direct claim via `organization.devices.claimDevice`, and not C2C which is unsupported). See [`../claim-devices.md`](../claim-devices.md).
 - Prerequisites:
   - `<tenant-id>` is active and authorized.
-  - `proxy_id`, `device_ip`, `device_model_id`, `space_id` are known.
+  - Use model discovery first so `device_model_id` and supported `custom_parameters` keys come from `organization.models.getModels` / `getModel`.
+  - `proxy_id`, `device_ip`, `device_model_id`, `space_id` are known. `mac` and `sn` are optional explicit source fields.
 - Exact commands:
 
 ```bash
-xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --plan
-xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> --apply
+xyte-cli edge models list --tenant <tenant-id> --search <model-or-alias> --page 1 --per-page 100
+xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>
+xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> [--mac <mac>] [--sn <serial>] [--custom-parameters '<json>'] --plan
+xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --device-model-id <model-id> --space-id <space-id> [--mac <mac>] [--sn <serial>] [--custom-parameters '<json>'] --apply
 ```
 
 - Expected artifacts:
+  - Edge model list and model describe step artifacts before the approval gate.
   - `xyte.edge.claim.v1` single-row summary on stdout (JSON) and under `./tmp/flow-runs/flow.edge-claim/...`.
 - Stop/decision gates:
+  - The built-in flow lists Edge models and describes `device_model_id` before the claim gate. If the model list is ambiguous, supply `--var device_model_id=<model-id>`.
+  - Inspect `parameters[].name` from the model describe artifact before choosing custom parameter labels.
   - Default to `--plan`. Only advance to `--apply` after explicit user approval.
 - Failure handling:
   - 401 aborts the flow — fix with `xyte-cli setup run` or `xyte-cli config key`.
@@ -286,19 +338,23 @@ xyte-cli edge claim --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <devi
 - Prerequisites:
   - `<tenant-id>` is active and authorized.
   - A messy or clean spreadsheet/CSV is available for `util prepare`.
+  - Use model discovery first so prepared rows use real Edge model ids and model-supported `custom_parameters` keys. The built-in flow lists Edge models and describes `device_model_id` before preparation; if the batch spans multiple models, run `flow.edge-model-discovery` for each model and populate rows explicitly.
 - Exact commands:
 
 ```bash
+xyte-cli edge models list --tenant <tenant-id> --search <model-or-alias> --page 1 --per-page 100
+xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>
 xyte-cli util prepare --action organization.edge.startClaim --tenant <tenant-id> --input ./devices.xlsx --output-dir ./prepared
 xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --plan
 xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --apply --report ./artifacts/edge-claim.report.ndjson --resume-artifact ./artifacts/edge-claim.resume.ndjson
 ```
 
-Before `--plan`, populate `./prepared/organization-edge-startclaim.csv` from the source material and review the rejected/notes artifacts. Blank `skip_connectivity_check` means the batch will ping before claim; `true` skips that ping.
+Before `--plan`, populate `./prepared/organization-edge-startclaim.csv` from the source material and review the rejected/notes artifacts. The prepared columns include optional `mac` and `sn`. Blank `skip_connectivity_check` means the batch will ping before claim; `true` skips that ping.
 
 Resume after interruption: re-run the `--apply` line with the same `--resume-artifact` path. Never re-run a half-finished batch without `--resume-artifact`. The resume artifact records completed row results, not in-flight claim IDs.
 
 - Expected artifacts:
+  - Edge model list and model describe step artifacts before utility preparation.
   - `./prepared/organization-edge-startclaim.csv`, `organization-edge-startclaim.rejected.csv`, `organization-edge-startclaim.notes.md`.
   - `./artifacts/edge-claim.report.ndjson` — per-row audit NDJSON from `--report`.
   - `./artifacts/edge-claim.resume.ndjson` — completed row resume state from `--resume-artifact`.
@@ -312,6 +368,77 @@ Resume after interruption: re-run the `--apply` line with the same `--resume-art
   - 429 → automatic exponential backoff with jitter, honors `Retry-After`.
   - `ping-failed` → fix Edge-to-device connectivity; resume retries the row.
   - Never re-run a half-finished batch without `--resume-artifact`.
+
+## flow.edge-model-discovery
+
+- Flow ID: `flow.edge-model-discovery`
+- Intent: list Edge-capable models and describe one model so operators can use real model ids, custom parameter labels, parameter types, and supported commands.
+- Prerequisites:
+  - `<tenant-id>` is active and authorized.
+- Exact commands:
+
+```bash
+xyte-cli edge models list --tenant <tenant-id> --page 1 --per-page 100
+xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>
+```
+
+- Expected artifacts:
+  - `xyte.edge.models.list.v1` and `xyte.edge.models.describe.v1` JSON in CLI output or flow step artifacts.
+- Stop/decision gates:
+  - Read-only; no approval gate is required.
+- Failure handling:
+  - 401 → fix org auth.
+  - Empty list → confirm the tenant has access to Edge models or narrow the search differently.
+
+## flow.edge-params-update
+
+- Flow ID: `flow.edge-params-update`
+- Intent: update custom parameters on one already-claimed Edge device by reading current values, reading the model schema, planning a full replacement body, applying it, and verifying read-back.
+- Prerequisites:
+  - `<device-id>` is an already-claimed Edge device.
+  - The `set_json` keys are model parameter labels, for example `Port`, not template variables such as `{$PORT}`.
+- Exact commands:
+
+```bash
+xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>
+xyte-cli edge update-params --tenant <tenant-id> --device-id <device-id> --set-json '{"Port":"161"}' --plan
+xyte-cli edge update-params --tenant <tenant-id> --device-id <device-id> --set-json '{"Port":"161"}' --apply
+```
+
+- Expected artifacts:
+  - `xyte.edge.params-update.v1` plan/apply output.
+  - Planned `requestBody.custom_parameters` is the complete replacement object sent to `organization.devices.updateDevice`.
+- Stop/decision gates:
+  - Always run `--plan` first and approve the complete replacement body before `--apply`.
+- Failure handling:
+  - Unknown parameter label → reject before write.
+  - Current password value is masked as `*****` and no replacement was supplied → reject before write.
+  - Read-back mismatch after apply → failed result; inspect the device and do not assume the update landed.
+
+## flow.edge-params-update-batch
+
+- Flow ID: `flow.edge-params-update-batch`
+- Intent: update custom parameters on many already-claimed Edge devices with spreadsheet prep, plan/apply reports, and resume artifacts.
+- Prerequisites:
+  - Source rows include `device_id` and `set_json`; `expected_model_id` is optional and recommended.
+- Exact commands:
+
+```bash
+xyte-cli util prepare --action edge.params.update --tenant <tenant-id> --input ./edge-params.xlsx --output-dir ./prepared
+xyte-cli edge update-params-batch --tenant <tenant-id> --input ./prepared/edge-params-update.csv --plan --report ./artifacts/edge-params.plan.ndjson
+xyte-cli edge update-params-batch --tenant <tenant-id> --input ./prepared/edge-params-update.csv --apply --report ./artifacts/edge-params.apply.ndjson --resume-artifact ./artifacts/edge-params.resume.ndjson
+```
+
+- Expected artifacts:
+  - `./prepared/edge-params-update.csv`, rejected rows, and notes from `util prepare`.
+  - `./artifacts/edge-params.plan.ndjson` and `./artifacts/edge-params.apply.ndjson`.
+  - `./artifacts/edge-params.resume.ndjson` for interrupted apply runs.
+- Stop/decision gates:
+  - Human review after preparation.
+  - Human approval after dry-run report and before apply.
+- Failure handling:
+  - Row-level rejects are written to the report; fix rows and re-run with the same resume artifact.
+  - Previously succeeded rows are skipped on resume.
 
 ## flow.edge-ping
 

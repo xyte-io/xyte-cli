@@ -34,6 +34,16 @@ function buildClientFromScript(scriptByKey: Record<string, ScriptedResponse[]>):
     calls.push({ endpointKey, args });
     const queue = scriptByKey[endpointKey];
     if (!queue || queue.length === 0) {
+      if (endpointKey === 'organization.models.getModel') {
+        return {
+          status: 200,
+          headers: {},
+          data: { id: String(args?.path?.id ?? 'model-1'), parameters: [] } as T,
+          durationMs: 1,
+          retryCount: 0,
+          attempts: 1
+        };
+      }
       throw new Error(`No scripted response for ${endpointKey}`);
     }
     const index = cursors[endpointKey] ?? 0;
@@ -139,6 +149,26 @@ describe('runEdgeClaim edge-case matrix', () => {
     expect(outcome.disposition).toBe('succeeded');
     expect(outcome.attempts).toBe(3);
     expect(outcome.lastState).toBe('success');
+  });
+
+  it('forwards optional mac and sn in the startClaim body', async () => {
+    const { client, calls } = buildClientFromScript({
+      'organization.edge.startClaim': [{ ok: true, data: null }],
+      'organization.edge.getClaimStatus': [{ ok: true, data: { result: 'success' } }]
+    });
+
+    await runEdgeClaim({
+      client,
+      tenantId: 'acme',
+      row: makeRow({ mac: 'aa:bb:cc:dd:ee:ff', sn: 'SN-12345' }),
+      pollOptions: { intervalMs: 1, timeoutMs: 10 },
+      sleeper: async () => undefined
+    });
+
+    expect(claimBodies(calls)[0]).toMatchObject({
+      mac: 'aa:bb:cc:dd:ee:ff',
+      sn: 'SN-12345'
+    });
   });
 
   it('case 1: stays pending past timeoutMs → timeout with last payload preserved', async () => {
@@ -427,7 +457,13 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
     return file;
   }
 
-  it('case 16: plan mode issues zero API calls and marks every row skipped', async () => {
+  function writeJson(tmp: string, rows: Array<Record<string, unknown>>): string {
+    const file = join(tmp, 'edge-claim-primary.json');
+    writeFileSync(file, JSON.stringify(rows), 'utf8');
+    return file;
+  }
+
+  it('case 16: plan mode validates model parameters and marks every row skipped', async () => {
     const tmp = makeTempDir();
     const inputPath = writeCsv(
       tmp,
@@ -445,7 +481,8 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       now: () => 0
     });
 
-    expect(calls).toHaveLength(0);
+    expect(endpointCalls(calls, 'organization.models.getModel')).toHaveLength(1);
+    expect(endpointCalls(calls, 'organization.edge.startClaim')).toHaveLength(0);
     expect(result.mode).toBe('plan');
     expect(result.totals).toMatchObject({ rows: 2, skipped: 2, succeeded: 0 });
     expect(result.rows.every((row) => row.disposition === 'skipped')).toBe(true);
@@ -477,7 +514,8 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       now: () => 0
     });
 
-    expect(calls).toHaveLength(0);
+    expect(endpointCalls(calls, 'organization.models.getModel')).toHaveLength(1);
+    expect(endpointCalls(calls, 'organization.edge.startClaim')).toHaveLength(0);
     expect(result.rows.map((row) => row.planned?.preClaimPing)).toEqual(['skipped', 'required', 'required']);
     expect(result.rows[0]?.planned?.claimBody.skip_connectivity_check).toBe(true);
     expect(result.rows[1]?.planned?.claimBody.skip_connectivity_check).toBe(false);
@@ -514,7 +552,8 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       now: () => 0
     });
 
-    expect(calls).toHaveLength(0);
+    expect(endpointCalls(calls, 'organization.models.getModel')).toHaveLength(1);
+    expect(endpointCalls(calls, 'organization.edge.startClaim')).toHaveLength(0);
     expect(result.rows[0]?.planned?.preClaimPing).toBe('skipped');
     expect(result.rows[0]?.planned?.claimBody.skip_connectivity_check).toBe(true);
     expect(result.rows[1]?.planned?.preClaimPing).toBe('skipped');
@@ -523,6 +562,66 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
     expect(result.rows[2]?.rejectReason).toContain('conflicts with --skip-connectivity-check');
     expect(readNdjson(reportPath)).toHaveLength(3);
     expect(existsSync(resumePath)).toBe(false);
+  });
+
+  it('rejects edge claim custom_parameters that do not match model parameters', async () => {
+    const tmp = makeTempDir();
+    const inputPath = writeJson(tmp, [
+      {
+        proxy_id: 'proxy-1',
+        device_ip: '192.168.1.10',
+        device_model_id: 'model-1',
+        space_id: 99,
+        custom_parameters: { Port: '161', Wrong: 'x' }
+      },
+      {
+        proxy_id: 'proxy-1',
+        device_ip: '192.168.1.11',
+        device_model_id: 'model-1',
+        space_id: 99,
+        custom_parameters: { Port: '161' }
+      },
+      {
+        proxy_id: 'proxy-1',
+        device_ip: '192.168.1.12',
+        device_model_id: 'model-1',
+        space_id: 99,
+        custom_parameters: { Port: '161', 'SNMP community': 'public', Secret: '*****' }
+      }
+    ]);
+    const { client } = buildClientFromScript({
+      'organization.models.getModel': [
+        {
+          ok: true,
+          data: {
+            id: 'model-1',
+            parameters: [
+              { name: 'Port', type: 'number', required: true },
+              { name: 'SNMP community', type: 'text', required: true },
+              { name: 'Secret', type: 'password' }
+            ]
+          }
+        }
+      ]
+    });
+
+    const result = await runEdgeClaimBatch({
+      client,
+      tenantId: 'acme',
+      inputPath,
+      inputFormat: 'json',
+      apply: false,
+      runId: 'run-claim-params-validation',
+      sleeper: async () => undefined,
+      now: () => 0
+    });
+
+    expect(result.rows.map((row) => row.rejectReason)).toEqual([
+      'unknown_custom_parameter',
+      'missing_required_custom_parameter',
+      'masked_password_requires_value'
+    ]);
+    expect(result.totals.rejected).toBe(3);
   });
 
   it('runs pre-claim ping for non-skip rows and forwards effective claim bodies', async () => {
@@ -1065,8 +1164,9 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
 
     expect(result.rows[0]?.disposition).toBe('skipped');
     expect(result.rows[1]?.disposition).toBe('succeeded');
-    expect(calls.filter((call) => call.endpointKey === 'organization.edge.startClaim')).toHaveLength(1);
-    expect(calls[0]?.args?.body && (calls[0].args.body as Record<string, unknown>).device_ip).toBe('192.168.1.11');
+    const startCalls = endpointCalls(calls, 'organization.edge.startClaim');
+    expect(startCalls).toHaveLength(1);
+    expect((startCalls[0]?.args?.body as Record<string, unknown>).device_ip).toBe('192.168.1.11');
   });
 
   it('resume terminal-success skip happens before batch skip-connectivity conflict checks', async () => {
@@ -1270,8 +1370,9 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
 
     expect(result.rows[0]?.disposition).toBe('succeeded');
     expect(result.rows[1]?.disposition).toBe('skipped');
-    expect(calls.filter((call) => call.endpointKey === 'organization.edge.startClaim')).toHaveLength(1);
-    expect(calls[0]?.args?.body && (calls[0].args.body as Record<string, unknown>).device_ip).toBe('10.0.0.50');
+    const startCalls = endpointCalls(calls, 'organization.edge.startClaim');
+    expect(startCalls).toHaveLength(1);
+    expect((startCalls[0]?.args?.body as Record<string, unknown>).device_ip).toBe('10.0.0.50');
   });
 
   it('fails closed when the resume artifact contains a malformed line', async () => {

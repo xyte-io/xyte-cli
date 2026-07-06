@@ -76,9 +76,9 @@ export async function sendCommandWithGuard(args: SendCommandWithGuardArgs): Prom
   }
 
   const body: Record<string, unknown> =
-    args.template.mode === 'command' ? { command: args.template.value } : { friendly_name: args.template.value };
+    args.template.mode === 'command' ? { name: args.template.value } : { friendly_name: args.template.value };
   if (args.params && Object.keys(args.params).length > 0) {
-    body.params = args.params;
+    body.extra_params = args.params;
   }
 
   return runGuardedAction(args.context, 'Sending command...', async (tenantId) => {

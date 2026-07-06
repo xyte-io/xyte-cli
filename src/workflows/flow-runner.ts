@@ -38,6 +38,12 @@ import { runDeviceMatch } from './device-match';
 import { runMoveDevices } from './move-devices';
 import { runVerifyMovedDevices } from './verify-device-moves';
 import { runEdgeClaim, runEdgeClaimBatch, validateEdgeClaimRow, batchExitedClean } from './edge-claim';
+import {
+  edgeParamsBatchExitedClean,
+  parseEdgeParamsSetJson,
+  runEdgeParamsUpdate,
+  runEdgeParamsUpdateBatch
+} from './edge-params-update';
 import { runEdgePing } from './edge-ping';
 import { parsePositiveInt as parseEdgePollPositiveInt } from './edge-poll';
 import {
@@ -83,7 +89,7 @@ interface RunContext {
 
 type TaskExecutionResult =
   | { ok: true; output?: unknown; artifactPath?: string; primaryOutputPath?: string; watchFrames?: WatchFrameV1[]; contextUpdates?: Record<string, string> }
-  | { ok: false; failureDetail: string; output?: unknown; artifactPath?: string; primaryOutputPath?: string; contextUpdates?: Record<string, string> };
+  | { ok: false; failureDetail: string; needsInput?: boolean; output?: unknown; artifactPath?: string; primaryOutputPath?: string; contextUpdates?: Record<string, string> };
 
 interface FlowRunInputsPayload {
   flowId?: string;
@@ -399,13 +405,287 @@ function buildReportInputNeedsDataMessage(stepId: string, inputStepId: string, c
 
 function extractCallOutputContext(
   data: unknown,
-  spec: { contextKey: string; arrayPath: string; valueField: string }
+  spec: { contextKey: string; arrayPath: string; valueField: string },
+  context: Record<string, string>
 ): Record<string, string> | undefined {
+  if (context[spec.contextKey]) return undefined;
   if (!isRecord(data)) return undefined;
   const arr = data[spec.arrayPath];
   if (!Array.isArray(arr)) return undefined;
-  const first = arr.find((item): item is Record<string, unknown> => isRecord(item) && typeof item[spec.valueField] === 'string');
-  return first ? { [spec.contextKey]: first[spec.valueField] as string } : undefined;
+  const candidates = arr.filter(
+    (item): item is Record<string, unknown> => isRecord(item) && typeof item[spec.valueField] === 'string'
+  );
+  return candidates.length === 1 ? { [spec.contextKey]: candidates[0][spec.valueField] as string } : undefined;
+}
+
+function extractDeviceModelIdFromResponse(data: unknown): string | undefined {
+  if (!isRecord(data)) return undefined;
+  if (isRecord(data.model) && typeof data.model.id === 'string' && data.model.id.trim()) {
+    return data.model.id.trim();
+  }
+  if (typeof data.device_model_id === 'string' && data.device_model_id.trim()) {
+    return data.device_model_id.trim();
+  }
+  if (typeof data.model_id === 'string' && data.model_id.trim()) {
+    return data.model_id.trim();
+  }
+  return undefined;
+}
+
+function extractEndpointContext(
+  endpointKey: string,
+  data: unknown,
+  context: Record<string, string>
+): Record<string, string> | undefined {
+  if (endpointKey === 'organization.devices.getDevice' && !context.device_model_id) {
+    const modelId = extractDeviceModelIdFromResponse(data);
+    return modelId ? { device_model_id: modelId } : undefined;
+  }
+  return undefined;
+}
+
+interface ModelCommandDefinition {
+  name?: string;
+  friendlyName?: string;
+  customFields: Set<string>;
+  requiredFields: Set<string>;
+  withFile: boolean;
+}
+
+interface ModelCommandCandidates {
+  names: Set<string>;
+  friendlyNames: Set<string>;
+  byName: Map<string, ModelCommandDefinition>;
+  byFriendlyName: Map<string, ModelCommandDefinition>;
+}
+
+function extractModelCommandCandidates(data: unknown): ModelCommandCandidates {
+  const rows = isRecord(data) && Array.isArray(data.commands) ? data.commands : [];
+  const names = new Set<string>();
+  const friendlyNames = new Set<string>();
+  const byName = new Map<string, ModelCommandDefinition>();
+  const byFriendlyName = new Map<string, ModelCommandDefinition>();
+  for (const row of rows) {
+    if (typeof row === 'string' && row.trim()) {
+      const name = row.trim();
+      const definition: ModelCommandDefinition = {
+        name,
+        customFields: new Set<string>(),
+        requiredFields: new Set<string>(),
+        withFile: false
+      };
+      names.add(name);
+      byName.set(name, definition);
+      continue;
+    }
+    if (!isRecord(row)) {
+      continue;
+    }
+    const customFields = new Set<string>();
+    const requiredFields = new Set<string>();
+    if (Array.isArray(row.custom_fields)) {
+      for (const field of row.custom_fields) {
+        if (!isRecord(field) || typeof field.name !== 'string' || !field.name.trim()) {
+          continue;
+        }
+        const fieldName = field.name.trim();
+        customFields.add(fieldName);
+        if (field.required === true) {
+          requiredFields.add(fieldName);
+        }
+      }
+    }
+    const definition: ModelCommandDefinition = {
+      customFields,
+      requiredFields,
+      withFile: row.with_file === true
+    };
+    if (typeof row.name === 'string' && row.name.trim()) {
+      definition.name = row.name.trim();
+      names.add(definition.name);
+      byName.set(definition.name, definition);
+    }
+    if (typeof row.friendly_name === 'string' && row.friendly_name.trim()) {
+      definition.friendlyName = row.friendly_name.trim();
+      friendlyNames.add(definition.friendlyName);
+      byFriendlyName.set(definition.friendlyName, definition);
+    }
+  }
+  return { names, friendlyNames, byName, byFriendlyName };
+}
+
+function findPriorDeviceModelId(ctx: RunContext, deviceId: string): string | undefined {
+  for (const output of ctx.taskOutputs.values()) {
+    if (!isRecord(output) || output.endpointKey !== 'organization.devices.getDevice') {
+      continue;
+    }
+    const request = output.request;
+    if (!isRecord(request) || !isRecord(request.path) || String(request.path.device_id ?? '') !== deviceId) {
+      continue;
+    }
+    const response = output.response;
+    if (!isRecord(response)) {
+      continue;
+    }
+    const modelId = extractDeviceModelIdFromResponse(response.data);
+    if (modelId) {
+      return modelId;
+    }
+  }
+  return undefined;
+}
+
+function findPriorModelCommandCandidates(ctx: RunContext, modelId: string): ModelCommandCandidates | undefined {
+  for (const output of ctx.taskOutputs.values()) {
+    if (!isRecord(output) || output.endpointKey !== 'organization.models.getModel') {
+      continue;
+    }
+    const request = output.request;
+    if (!isRecord(request) || !isRecord(request.path) || String(request.path.id ?? '') !== modelId) {
+      continue;
+    }
+    const response = output.response;
+    if (!isRecord(response)) {
+      continue;
+    }
+    return extractModelCommandCandidates(response.data);
+  }
+  return undefined;
+}
+
+function parseCommandExtraParams(ctx: RunContext): Record<string, unknown> | undefined {
+  const raw = ctx.resolvedContext.command_extra_params_json ?? ctx.resolvedContext.extra_params_json;
+  if (!raw?.trim()) {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (isRecord(parsed)) {
+      return parsed;
+    }
+  } catch {
+    // handled below
+  }
+  throw new FlowNeedsInputError('command_extra_params_json must be a valid JSON object.');
+}
+
+function buildSendCommandBodyPayload(step: FlowTaskStep, ctx: RunContext, bodyPayload: unknown): unknown {
+  if (step.call?.endpointKey !== 'organization.commands.sendCommand' || !isRecord(bodyPayload)) {
+    return bodyPayload;
+  }
+  const out: Record<string, unknown> = { ...bodyPayload };
+  const extraParams = parseCommandExtraParams(ctx);
+  if (extraParams) {
+    out.extra_params = extraParams;
+  }
+  const fileId = ctx.resolvedContext.command_file_id ?? ctx.resolvedContext.file_id;
+  if (fileId?.trim()) {
+    out.file_id = fileId.trim();
+  }
+  return out;
+}
+
+function validateCommandArguments(
+  modelId: string,
+  command: ModelCommandDefinition,
+  bodyPayload: Record<string, unknown>
+): void {
+  const extraParams = isRecord(bodyPayload.extra_params) ? bodyPayload.extra_params : {};
+  const extraKeys = Object.keys(extraParams);
+  if (extraKeys.length > 0 && command.customFields.size === 0) {
+    throw new FlowNeedsInputError(
+      `Selected command for model ${modelId} does not define custom_fields, but extra_params were provided.`
+    );
+  }
+  const unknownKeys = extraKeys.filter((key) => !command.customFields.has(key));
+  if (unknownKeys.length > 0) {
+    throw new FlowNeedsInputError(
+      `Selected command for model ${modelId} does not define extra_params field(s): ${unknownKeys.join(', ')}.`
+    );
+  }
+  const missingRequired = [...command.requiredFields].filter(
+    (key) => extraParams[key] === undefined || extraParams[key] === null || extraParams[key] === ''
+  );
+  if (missingRequired.length > 0) {
+    throw new FlowNeedsInputError(
+      `Selected command for model ${modelId} requires extra_params field(s): ${missingRequired.join(', ')}.`
+    );
+  }
+  if (command.withFile && typeof bodyPayload.file_id !== 'string') {
+    throw new FlowNeedsInputError(`Selected command for model ${modelId} requires command_file_id/file_id.`);
+  }
+}
+
+function validateSendCommandAgainstModel(
+  step: FlowTaskStep,
+  ctx: RunContext,
+  pathPayload: unknown,
+  bodyPayload: unknown
+): void {
+  if (step.call?.endpointKey !== 'organization.commands.sendCommand') {
+    return;
+  }
+  if (!isRecord(pathPayload)) {
+    throw new FlowNeedsInputError(
+      `Step ${step.id} requires path.device_id before sending organization.commands.sendCommand.`
+    );
+  }
+  if (!isRecord(bodyPayload)) {
+    throw new FlowNeedsInputError(
+      `Step ${step.id} requires body.name or body.friendly_name selected from organization.models.getModel commands[].`
+    );
+  }
+  const deviceId = String(pathPayload.device_id ?? '');
+  const legacyCommand = typeof bodyPayload.command === 'string' ? bodyPayload.command.trim() : '';
+  if (legacyCommand) {
+    throw new FlowNeedsInputError(
+      `Step ${step.id} must use body.name or body.friendly_name for organization.commands.sendCommand; body.command is not supported.`
+    );
+  }
+  const name = typeof bodyPayload.name === 'string' ? bodyPayload.name.trim() : '';
+  const friendlyName = typeof bodyPayload.friendly_name === 'string' ? bodyPayload.friendly_name.trim() : '';
+  if (!deviceId) {
+    throw new FlowNeedsInputError(`Step ${step.id} requires device_id before sending organization.commands.sendCommand.`);
+  }
+  if (!name && !friendlyName) {
+    throw new FlowNeedsInputError(
+      `Step ${step.id} requires body.name or body.friendly_name selected from organization.models.getModel commands[].`
+    );
+  }
+
+  const modelId = findPriorDeviceModelId(ctx, deviceId) ?? ctx.resolvedContext.device_model_id;
+  if (!modelId) {
+    throw new FlowNeedsInputError(
+      `Step ${step.id} requires device model evidence from organization.devices.getDevice before sending a command.`
+    );
+  }
+
+  const candidates = findPriorModelCommandCandidates(ctx, modelId);
+  if (!candidates || (candidates.names.size === 0 && candidates.friendlyNames.size === 0)) {
+    throw new FlowNeedsInputError(
+      `Step ${step.id} requires supported-command evidence from organization.models.getModel for model ${modelId}.`
+    );
+  }
+  let commandDefinition: ModelCommandDefinition | undefined;
+  if (name && !candidates.names.has(name)) {
+    throw new FlowNeedsInputError(
+      `Selected command name "${name}" was not found in organization.models.getModel commands[].name for model ${modelId}.`
+    );
+  }
+  if (name) {
+    commandDefinition = candidates.byName.get(name);
+  }
+  if (friendlyName && !candidates.friendlyNames.has(friendlyName)) {
+    throw new FlowNeedsInputError(
+      `Selected friendly_name "${friendlyName}" was not found in organization.models.getModel commands[].friendly_name for model ${modelId}.`
+    );
+  }
+  if (!commandDefinition && friendlyName) {
+    commandDefinition = candidates.byFriendlyName.get(friendlyName);
+  }
+  if (commandDefinition) {
+    validateCommandArguments(modelId, commandDefinition, bodyPayload);
+  }
 }
 
 function evaluateReadinessWithConnectivity(ctx: RunContext): ReturnType<typeof evaluateReadiness> {
@@ -563,7 +843,9 @@ async function handleCall(step: FlowTaskStep, _stepIndex: number, ctx: RunContex
   const requestId = randomUUID();
   const pathPayload = callConfig.path ? resolveTemplateValue(callConfig.path, ctx.resolvedContext) : undefined;
   const queryPayload = callConfig.query ? resolveTemplateValue(callConfig.query, ctx.resolvedContext) : undefined;
-  const bodyPayload = callConfig.body ? resolveTemplateValue(callConfig.body, ctx.resolvedContext) : undefined;
+  const resolvedBodyPayload = callConfig.body ? resolveTemplateValue(callConfig.body, ctx.resolvedContext) : undefined;
+  const bodyPayload = buildSendCommandBodyPayload(step, ctx, resolvedBodyPayload);
+  validateSendCommandAgainstModel(step, ctx, pathPayload, bodyPayload);
   const result = await ctx.args.client.callWithMeta(callConfig.endpointKey, {
     requestId,
     tenantId: ctx.args.tenantId,
@@ -580,12 +862,17 @@ async function handleCall(step: FlowTaskStep, _stepIndex: number, ctx: RunContex
     request: { path: pathPayload, query: queryPayload, body: bodyPayload },
     response: { status: result.status, durationMs: result.durationMs, retryCount: result.retryCount, data: result.data }
   });
+  const contextUpdates = {
+    ...(callConfig.outputContext
+      ? extractCallOutputContext(result.data, callConfig.outputContext, ctx.resolvedContext)
+      : undefined),
+    ...extractEndpointContext(callConfig.endpointKey, result.data, ctx.resolvedContext)
+  };
+
   return {
     ok: true,
     output: envelope,
-    contextUpdates: callConfig.outputContext
-      ? extractCallOutputContext(result.data, callConfig.outputContext)
-      : undefined
+    contextUpdates: Object.keys(contextUpdates).length > 0 ? contextUpdates : undefined
   };
 }
 
@@ -695,6 +982,8 @@ async function handleEdgeClaim(step: FlowTaskStep, _stepIndex: number, ctx: RunC
     device_model_id: context.device_model_id,
     space_id: context.space_id,
     display_name: context.display_name,
+    mac: context.mac,
+    sn: context.sn,
     skip_connectivity_check: context.skip_connectivity_check,
     custom_parameters: context.custom_parameters,
     custom_partner_name: context.custom_partner_name,
@@ -739,9 +1028,82 @@ async function handleEdgeClaimBatch(step: FlowTaskStep, _stepIndex: number, ctx:
     ? { edge_claim_apply_report_path: reportPath }
     : { edge_claim_dry_run_report_path: reportPath };
   if (!batchExitedClean(result)) {
+    const needsInput =
+      result.totals.failed === 0 &&
+      result.totals.timeout === 0 &&
+      result.totals.proxyOffline === 0 &&
+      result.totals.pingFailed === 0 &&
+      result.totals.aborted === 0 &&
+      result.totals.rejected > 0;
     return {
       ok: false,
+      needsInput,
       failureDetail: `Edge claim batch reported ${result.totals.failed} failed, ${result.totals.rejected} rejected, ${result.totals.timeout} timeout, ${result.totals.proxyOffline} proxy-offline, ${result.totals.pingFailed} ping-failed, ${result.totals.aborted} aborted row(s).`,
+      output: result,
+      primaryOutputPath: reportPath,
+      contextUpdates
+    };
+  }
+  return { ok: true, output: result, primaryOutputPath: reportPath, contextUpdates };
+}
+
+async function handleEdgeParamsUpdate(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+  const config = requireStepConfig(step.edgeParamsUpdate, step.id, 'edge params update');
+  const context = ctx.resolvedContext;
+  const deviceId = context.device_id?.trim();
+  if (!deviceId) {
+    return { ok: false, needsInput: true, failureDetail: `Step ${step.id} requires context key device_id.` };
+  }
+  let set: Record<string, unknown>;
+  try {
+    set = parseEdgeParamsSetJson(context.set_json);
+  } catch (error) {
+    throw new FlowNeedsInputError(errorMessage(error), { cause: error });
+  }
+  const result = await runEdgeParamsUpdate({
+    client: ctx.args.client,
+    tenantId: ctx.args.tenantId,
+    deviceId,
+    set,
+    expectedModelId: context.expected_model_id,
+    apply: config.apply
+  });
+  if (result.outcome.disposition !== 'planned' && result.outcome.disposition !== 'succeeded') {
+    return {
+      ok: false,
+      needsInput: result.outcome.disposition === 'rejected',
+      failureDetail: `Edge params update ${result.outcome.disposition}${result.outcome.detail ? `: ${result.outcome.detail}` : ''}.`,
+      output: result
+    };
+  }
+  return { ok: true, output: result };
+}
+
+async function handleEdgeParamsUpdateBatch(
+  step: FlowTaskStep,
+  _stepIndex: number,
+  ctx: RunContext
+): Promise<TaskExecutionResult> {
+  const config = requireStepConfig(step.edgeParamsUpdateBatch, step.id, 'edge params update batch');
+  const inputPath = path.resolve(resolveTemplateString(config.inputPath, ctx.resolvedContext));
+  const reportPath = path.join(ctx.outputsDir, path.basename(config.reportPath));
+  const resumePath = path.join(ctx.outputsDir, path.basename(config.resumePath));
+  const result = await runEdgeParamsUpdateBatch({
+    client: ctx.args.client,
+    tenantId: ctx.args.tenantId,
+    inputPath,
+    apply: config.apply,
+    reportPath,
+    resumePath
+  });
+  const contextUpdates: Record<string, string> = config.apply
+    ? { edge_params_apply_report_path: reportPath }
+    : { edge_params_dry_run_report_path: reportPath };
+  if (!edgeParamsBatchExitedClean(result)) {
+    return {
+      ok: false,
+      needsInput: result.totals.failed === 0 && result.totals.rejected > 0,
+      failureDetail: `Edge params update batch reported ${result.totals.failed} failed and ${result.totals.rejected} rejected row(s).`,
       output: result,
       primaryOutputPath: reportPath,
       contextUpdates
@@ -796,6 +1158,8 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
     case 'space.import-tree': return handleSpaceImportTree(step, stepIndex, ctx);
     case 'edge.claim':        return handleEdgeClaim(step, stepIndex, ctx);
     case 'edge.claim-batch':  return handleEdgeClaimBatch(step, stepIndex, ctx);
+    case 'edge.params-update': return handleEdgeParamsUpdate(step, stepIndex, ctx);
+    case 'edge.params-update-batch': return handleEdgeParamsUpdateBatch(step, stepIndex, ctx);
     case 'edge.ping':         return handleEdgePing(step, stepIndex, ctx);
     default: throw new Error(`Unsupported flow task type: ${(step as { task: string }).task}`);
   }
@@ -1287,7 +1651,12 @@ async function runSteps(state: RunState): Promise<ExecuteStepsResult> {
         }
 
         if (!result.ok) {
-          const problem = toProblemDetails(new Error(result.failureDetail), `/flow/${args.flowId}/${step.id}`);
+          const error = result.needsInput
+            ? new FlowNeedsInputError(result.failureDetail)
+            : new Error(result.failureDetail);
+          const problem = result.needsInput
+            ? toNeedsInputProblem(error, `/flow/${args.flowId}/${step.id}`)
+            : toProblemDetails(error, `/flow/${args.flowId}/${step.id}`);
           const classification = await recordStepFailure(stepState, problem, {
             stepId: step.id,
             startedAt: stepStartedAt,

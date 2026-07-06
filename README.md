@@ -114,7 +114,10 @@ Key params:
 ### 2) Read endpoint call (safe)
 
 ```bash
-xyte-cli api call organization.devices.getDevices --tenant <tenant-id>
+xyte-cli api call organization.devices.getDevices \
+  --tenant <tenant-id> \
+  --query-json '{"page":1,"per_page":100}' \
+  --output-mode envelope
 xyte-cli api call organization.notes.getDeviceNotes \
   --tenant <tenant-id> \
   --path-json '{"device_id":"<device-id>"}' \
@@ -125,6 +128,7 @@ Key params:
 - `--tenant <tenant-id>`
 - `--output-mode envelope` for contract output
 - `--strict-json` for machine parsing
+- For `organization.devices.getDevices`, increment `page` until the response reports `has_next_page=false`.
 
 ### 2b) Device or space notes
 
@@ -158,6 +162,7 @@ Key params:
 
 ```bash
 xyte-cli flow list --format text
+xyte-cli flow run flow.device-command --tenant <tenant-id> --plan --var device_id=<device-id> --var command=reboot
 xyte-cli flow run flow.guided-remediation --tenant <tenant-id> --var incident_id=<incident-id> --var device_id=<device-id> --var command=reboot --var updated_device_name=<device-name>
 ```
 
@@ -187,14 +192,26 @@ Key params:
 Primary read/setup/reporting workflows are shell-neutral. Advanced raw API examples like this one remain shell-specific because inline JSON quoting differs across PowerShell, CMD, Bash, and zsh.
 
 ```bash
+xyte-cli flow run flow.device-command --tenant <tenant-id> --plan --var device_id=<device-id> --var command=reboot
+
+xyte-cli api call organization.devices.getDevice \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}'
+
+xyte-cli edge models describe \
+  --tenant <tenant-id> \
+  --model-id <model-id-from-device>
+
 xyte-cli api call organization.commands.sendCommand \
   --tenant <tenant-id> \
   --path-json '{"device_id":"<device-id>"}' \
-  --body-json '{"command":"reboot"}'
+  --body-json '{"name":"reboot","extra_params":{}}'
 ```
 
 Behavior:
-- executes directly once you choose the write step
+- prefer `flow.device-command` for one-device command sends because it reads the device model, validates `commands[].name` and command `custom_fields`, and pauses before the write gate
+- use `organization.commands.getCommands` only after sending when you need command queue/history evidence
+- the raw API call executes directly once you choose the write step
 
 ### 7) Fleet insights and deep-dive data
 
@@ -294,22 +311,37 @@ xyte-cli api call organization.devices.claimDevice \
   --body-json '{"name":"<name>","space_id":<space-id>,"sn":"<sn>","mac":"<mac>","cloud_id":"<cloud-id>"}'
 
 # Single Edge claim, plan first
+xyte-cli edge models list --tenant <tenant-id> --page 1 --per-page 100
+xyte-cli edge models describe --tenant <tenant-id> --model-id <device-model-id>
 xyte-cli edge claim \
   --tenant <tenant-id> \
   --proxy-id <proxy-id> \
   --device-ip <device-ip> \
   --device-model-id <device-model-id> \
   --space-id <space-id> \
+  --custom-parameters '{"SNMP community":"public","Port":"161"}' \
   --plan
 
 # Bulk Edge claim, plan first
 xyte-cli util prepare --action organization.edge.startClaim --input ./edge-devices.xlsx --output-dir ./prepared
 xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --plan
 xyte-cli edge claim-batch --tenant <tenant-id> --input ./prepared/organization-edge-startclaim.csv --apply --report ./reports/edge-claim.apply.ndjson --resume-artifact ./reports/edge-claim.resume.ndjson
+
+# Already-claimed Edge custom parameters, plan first
+xyte-cli edge update-params \
+  --tenant <tenant-id> \
+  --device-id <device-id> \
+  --set-json '{"Port":"161"}' \
+  --plan
+xyte-cli util prepare --action edge.params.update --tenant <tenant-id> --input ./edge-params.xlsx --output-dir ./prepared
+xyte-cli edge update-params-batch --tenant <tenant-id> --input ./prepared/edge-params-update.csv --plan --report ./reports/edge-params.plan.ndjson
 ```
 
 Key params:
-- `edge claim`, `edge claim-batch`, and `edge ping` are mutating; run `--plan` first
+- `edge models list` and `edge models describe` are read-only and are the source for Edge model ids and supported parameter labels
+- `edge claim`, `edge claim-batch`, `edge update-params`, `edge update-params-batch`, and `edge ping` are mutating; run `--plan` first
+- `edge claim` and `edge claim-batch` accept optional `mac` and `sn` fields when the source data provides them
+- `edge update-params` and `edge update-params-batch` send complete replacement `custom_parameters` bodies after validation
 - blank or `skip_connectivity_check=false` batch rows run a pre-claim ping before `startClaim`
 - `skip_connectivity_check=true` rows skip that batch-owned ping
 - C2C claiming is not exposed through the public API; use the End Customer Portal
