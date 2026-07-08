@@ -462,6 +462,7 @@ describe('upgrade utilities', () => {
   });
 
   it('times out when registry response body stalls', async () => {
+    vi.useFakeTimers();
     const configDir = mkdtempSync(join(tmpdir(), 'xyte-notifier-timeout-'));
     const fetchImpl = vi.fn(
       async () =>
@@ -470,19 +471,23 @@ describe('upgrade utilities', () => {
           json: () => new Promise(() => undefined)
         }) as unknown as Response
     ) as unknown as typeof fetch;
-    const startedAt = Date.now();
 
-    const result = await maybeNotifyUpdateAvailable({
-      commandPath: 'xyte-cli status',
-      env: { XYTE_CLI_CONFIG_DIR: configDir, NODE_ENV: 'development' },
-      stderr: { write: vi.fn() },
-      isInteractive: true,
-      stdoutIsTTY: true,
-      fetchTimeoutMs: 20,
-      upgradeDependencies: { fetchImpl, getCurrentVersion: () => '0.12.0' }
-    });
+    try {
+      const resultPromise = maybeNotifyUpdateAvailable({
+        commandPath: 'xyte-cli status',
+        env: { XYTE_CLI_CONFIG_DIR: configDir, NODE_ENV: 'development' },
+        stderr: { write: vi.fn() },
+        isInteractive: true,
+        stdoutIsTTY: true,
+        fetchTimeoutMs: 20,
+        upgradeDependencies: { fetchImpl, getCurrentVersion: () => '0.12.0' }
+      });
+      await vi.advanceTimersByTimeAsync(21);
+      const result = await resultPromise;
 
-    expect(result).toMatchObject({ notified: false, checked: true, reason: 'check-failed' });
-    expect(Date.now() - startedAt).toBeLessThan(500);
+      expect(result).toMatchObject({ notified: false, checked: true, reason: 'check-failed' });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
