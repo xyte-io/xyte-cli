@@ -5,7 +5,7 @@ description: "Use for @xyteai/cli operations: first-run setup, config/tenant/key
 
 # XYTE Skill Router (One-Stop, Agent-Native)
 
-Last updated: 2026-06-10
+Last updated: 2026-07-07
 
 This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
 
@@ -14,6 +14,7 @@ This skill is the entrypoint for deterministic Xyte operations via `xyte-cli`.
 - Use `xyte-cli` commands directly.
 - Do not use source/dev entrypoints (`tsx`, `src/*`, `dist/*`, `bin/*`).
 - If `xyte-cli` is unavailable on `PATH`, run `npx -y @xyteai/cli@latest doctor environment --format json` and use the command prefix from `recommendations`; `npm exec -- @xyteai/cli@latest <command>` also works until `PATH` is fixed.
+- If `xyte-cli` prints `A new version of xyte-cli is available` on `stderr`, mention it once in the final user response. Do not run `xyte-cli upgrade` unless the user explicitly asks. JSON/headless runs suppress this notice, so do not invent update advice when no notice appears.
 - Command option correctness:
   - `xyte-cli config tenant list` has no `--output`.
   - `xyte-cli setup status`, `xyte-cli config doctor`, `xyte-cli status`, `xyte-cli ops inspect`, and `xyte-cli ops console --headless` accept `--output json|text` where relevant.

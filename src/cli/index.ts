@@ -25,6 +25,7 @@ import {
   type SkillInstallScope
 } from './install-skills';
 import { applyUpgrade, checkForUpgrade, type UpgradeDependencies } from './upgrade';
+import { maybeNotifyUpdateAvailable, type UpdateNotifier } from './update-notifier';
 import { promptValue } from './prompt-value';
 import { runTuiApp } from '../tui/app';
 import { CliUserError } from '../contracts/user-error';
@@ -93,6 +94,7 @@ interface CliRuntime {
   isTTY?: boolean;
   stdoutIsTTY?: boolean;
   upgradeDependencies?: UpgradeDependencies;
+  updateNotifier?: UpdateNotifier;
   watchDelayFn?: (ms: number) => Promise<void>;
   cwd?: string;
   env?: NodeJS.ProcessEnv;
@@ -134,6 +136,19 @@ function argvForCommand(command: Command): string[] {
 function executableArgForCommand(command: Command): string | undefined {
   const rawArgs = rawArgsForCommand(command);
   return rawArgs.length > 1 ? rawArgs[1] : undefined;
+}
+
+function commandOutputIsMachineReadable(command: Command): boolean {
+  const options = command.optsWithGlobals() as Record<string, unknown>;
+  const stringOptions = [options.format, options.output, options.render].map((value) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : undefined
+  );
+  return (
+    options.headless === true ||
+    options.strictJson === true ||
+    stringOptions.includes('json') ||
+    options.outputMode === 'envelope'
+  );
 }
 
 function inferCommandPathFromArgv(argv: string[]): string {
@@ -387,19 +402,41 @@ function formatRootLauncherText(payload: RootLauncherPayload): string {
 }
 
 export function createCli(runtime: CliRuntime = {}): Command {
-  const stdout = runtime.stdout ?? process.stdout;
+  const baseStdout = runtime.stdout ?? process.stdout;
+  // Sniff whether the current action emitted machine-readable output so the
+  // update notifier can stay silent for always-JSON commands regardless of
+  // which flags (if any) selected that output.
+  let stdoutSniffed = false;
+  let stdoutEmittedJson = false;
+  const resetStdoutJsonDetection = () => {
+    stdoutSniffed = false;
+    stdoutEmittedJson = false;
+  };
+  const stdout: OutputStream = {
+    write: (chunk) => {
+      if (!stdoutSniffed && typeof chunk === 'string') {
+        const trimmed = chunk.trimStart();
+        if (trimmed) {
+          stdoutSniffed = true;
+          stdoutEmittedJson = trimmed.startsWith('{') || trimmed.startsWith('[');
+        }
+      }
+      return baseStdout.write(chunk);
+    }
+  };
   const stderr = runtime.stderr ?? process.stderr;
   const prompt = runtime.promptValue ?? promptValue;
   const readStdin = runtime.readStdinValue ?? readStdinValue;
   const isInteractive = runtime.isTTY ?? Boolean(process.stdin.isTTY);
   const stdoutIsTTY =
     runtime.stdoutIsTTY ??
-    Boolean(('isTTY' in stdout ? (stdout as typeof process.stdout).isTTY : undefined) ?? process.stdout.isTTY);
+    Boolean(('isTTY' in baseStdout ? (baseStdout as typeof process.stdout).isTTY : undefined) ?? process.stdout.isTTY);
   const profileStore = runtime.profileStore ?? createProfileStore();
   const runTui = runtime.runTui ?? runTuiApp;
   const cwd = runtime.cwd ?? process.cwd();
   const env = runtime.env ?? process.env;
   const environmentDoctor = runtime.environmentDoctor ?? buildEnvironmentDoctorReport;
+  const updateNotifier = runtime.updateNotifier ?? maybeNotifyUpdateAvailable;
 
   let cachedSecretStore: SecretStore | undefined;
   const getSecretStore = () => {
@@ -956,6 +993,35 @@ export function createCli(runtime: CliRuntime = {}): Command {
   registerSetupCommands(program, cliContext);
   registerConfigCommands(program, cliContext);
   registerLogsCommands(program, cliContext);
+
+  program.hook('preAction', () => {
+    resetStdoutJsonDetection();
+  });
+
+  // Registered before the completion-log postAction hook: Commander runs
+  // postAction hooks in reverse registration order, so the log hook records
+  // an accurate durationMs before the notifier's network check runs.
+  program.hook('postAction', async (_thisCommand, actionCommand) => {
+    if ((process.exitCode ?? 0) !== 0) {
+      return;
+    }
+    await updateNotifier({
+      commandPath: commandPathFor(actionCommand),
+      env,
+      stderr,
+      isInteractive,
+      stdoutIsTTY,
+      commandOutputIsMachineReadable: commandOutputIsMachineReadable(actionCommand) || stdoutEmittedJson,
+      resolveOutputConfig: async () => {
+        const settings = await resolveSettings();
+        return {
+          outputMode: settings.values.output.mode,
+          strictJson: settings.values.output.strictJson
+        };
+      },
+      upgradeDependencies: runtime.upgradeDependencies
+    }).catch(() => undefined);
+  });
 
   program.hook('preAction', (_thisCommand, actionCommand) => {
     const logger = getOrCreateActionLogger(actionCommand);

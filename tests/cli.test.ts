@@ -58,6 +58,7 @@ describe('cli integration', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    process.exitCode = undefined;
   });
 
   it('rejects invalid global output before command-local defaults shadow it', async () => {
@@ -84,6 +85,103 @@ describe('cli integration', () => {
     await expect(program.parseAsync(['node', 'xyte-cli', '--error-format', 'xml', 'logs', 'list'])).rejects.toThrow(
       'Invalid error format'
     );
+  });
+
+  it('runs the update notifier after successful interactive commands', async () => {
+    const updateNotifier = vi.fn().mockResolvedValue({ notified: false, checked: false, reason: 'test' });
+    const program = createCli({
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout: { write: vi.fn() },
+      stderr: { write: vi.fn() },
+      isTTY: true,
+      stdoutIsTTY: true,
+      env: {
+        XYTE_CLI_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'xyte-cli-notifier-')),
+        NODE_ENV: 'development'
+      },
+      updateNotifier
+    });
+
+    await program.parseAsync(['node', 'xyte-cli', 'doctor', 'install', '--format', 'text']);
+
+    expect(updateNotifier).toHaveBeenCalledWith(
+      expect.objectContaining({
+        commandPath: 'xyte-cli doctor install',
+        isInteractive: true,
+        stdoutIsTTY: true
+      })
+    );
+  });
+
+  it('suppresses update checks for commands that always print JSON', async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(JSON.stringify({ version: '0.12.3' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    );
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout,
+      stderr,
+      isTTY: true,
+      stdoutIsTTY: true,
+      env: {
+        XYTE_CLI_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'xyte-cli-always-json-')),
+        NODE_ENV: 'development'
+      },
+      upgradeDependencies: {
+        fetchImpl,
+        getCurrentVersion: () => '0.12.0'
+      }
+    });
+
+    await program.parseAsync(['node', 'xyte-cli', 'config', 'tenant', 'list']);
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(stderr.write.mock.calls.map((call) => String(call[0])).join('')).not.toContain(
+      'A new version of xyte-cli is available'
+    );
+    expect(() => JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''))).not.toThrow();
+  });
+
+  it('suppresses update checks for command-local default JSON output', async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(JSON.stringify({ version: '0.12.3' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    );
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout,
+      stderr,
+      isTTY: true,
+      stdoutIsTTY: true,
+      env: {
+        XYTE_CLI_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'xyte-cli-json-notifier-')),
+        NODE_ENV: 'development'
+      },
+      upgradeDependencies: {
+        fetchImpl,
+        getCurrentVersion: () => '0.12.0'
+      }
+    });
+
+    await program.parseAsync(['node', 'xyte-cli', 'doctor', 'install']);
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(stderr.write.mock.calls.map((call) => String(call[0])).join('')).not.toContain(
+      'A new version of xyte-cli is available'
+    );
+    expect(() => JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''))).not.toThrow();
   });
 
   it('allows read-only calls without --allow-write', async () => {
