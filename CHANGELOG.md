@@ -6,6 +6,9 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+### Added
+- Every API request now sends an `X-Xyte-Client: xyte-cli/<version>` header, so the hub attributes calls in the tenant's API call log (Settings > API Keys > Call Log) to the CLI instead of to a direct integration.
+
 ## [0.12.1] - 2026-07-08
 
 ### Added
