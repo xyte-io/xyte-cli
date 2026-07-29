@@ -10,10 +10,13 @@ import type { PublicEndpointSpec } from '../types/endpoints';
 import { PROVIDER_ORG, PROVIDER_PARTNER, type SecretProvider } from '../types/profile';
 import type { XyteCallArgs, XyteCallResult, XyteClient, XyteClientOptions } from '../types/client';
 import { isRecord } from '../utils/json';
+import { getCliVersion } from '../utils/version';
 
 const DEFAULT_HUB_BASE_URL = 'https://hub.xyte.io';
 const DEFAULT_ENTRY_BASE_URL = 'https://entry.xyte.io';
 const CLI_USER_AGENT = 'CLI';
+const CLIENT_HEADER = 'X-Xyte-Client';
+const CLIENT_NAME = 'xyte-cli';
 
 function withPathParams(
   pathTemplate: string,
@@ -149,7 +152,10 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
     const headers: Record<string, string> = {
       Accept: 'application/json',
       ...(args.headers ?? {}),
-      'User-Agent': CLI_USER_AGENT
+      'User-Agent': CLI_USER_AGENT,
+      // Identifies the CLI to the hub, which records it as the originating client
+      // of every API call (Settings > API Keys > Call Log).
+      [CLIENT_HEADER]: `${CLIENT_NAME}/${getCliVersion()}`
     };
 
     if (authHeader && !headers.Authorization) {
