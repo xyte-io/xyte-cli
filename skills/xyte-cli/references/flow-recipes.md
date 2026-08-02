@@ -90,7 +90,7 @@ xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --o
 
 ## flow.device-command
 
-Fetch the device, describe its model, then pause before sending the selected model-supported command. If more than one command is available, pass the desired command with `--var command=<commands[].name>` before apply. If the command has `custom_fields`, pass `--var command_extra_params_json='<json-object>'`; if `with_file=true`, pass `--var command_file_id=<file-id>`.
+Fetch the device, describe its model, then pause before sending the selected model-supported command. If more than one command is available, pass the desired command with `--var command=<commands[].name>` before apply. If the command has `custom_fields`, pass `--var command_extra_params_json='<json-object>'`; select labels are mapped to the exact values in model metadata. If `with_file=true`, pass `--var command_file_id=<file-id>`. Optional status polling requires `--var command_poll=true --var command_poll_timeout_ms=<positive-ms>`; `command_poll_interval_ms` defaults to 5000.
 
 ```bash
 xyte-cli api call organization.devices.getDevice \
@@ -105,6 +105,11 @@ xyte-cli api call organization.commands.sendCommand \
   --tenant <tenant-id> \
   --path-json '{"device_id":"<device-id>"}' \
   --body-json '{"name":"<commands[].name>","extra_params":{}}'
+
+xyte-cli api call organization.commands.getCommands \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}' \
+  --query-json '{"page":1,"per_page":500}'
 ```
 
 ## flow.device-migration

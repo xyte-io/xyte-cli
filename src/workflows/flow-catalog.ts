@@ -30,6 +30,7 @@ export type FlowTaskType =
   | 'device.move-batch'
   | 'device.verify-batch'
   | 'space.import-tree'
+  | 'command.poll'
   | 'edge.claim'
   | 'edge.claim-batch'
   | 'edge.params-update'
@@ -100,6 +101,12 @@ export interface FlowTaskStep extends FlowStepBase {
     inputPath: string;
     apply: boolean;
     reportPath: string;
+  };
+  commandPoll?: {
+    sendStepId: string;
+    enabledKey: string;
+    intervalMsKey: string;
+    timeoutMsKey: string;
   };
   edgeClaim?: {
     pollIntervalMsKey?: string;
@@ -550,7 +557,7 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
     id: 'flow.device-command',
     title: 'Device Command',
     intent:
-      'Fetch model-supported commands for one device and send a selected command only after explicit approval.',
+      'Fetch model-supported commands for one device, send one after explicit approval, and optionally poll its status.',
     writeCapable: true,
     recipeCommands: [
       [
@@ -568,6 +575,12 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         '  --tenant <tenant-id> \\',
         `  --path-json '{"device_id":"<device-id>"}' \\`,
         `  --body-json '{"name":"<commands[].name>","extra_params":{}}'`
+      ].join('\n'),
+      [
+        'xyte-cli api call organization.commands.getCommands \\',
+        '  --tenant <tenant-id> \\',
+        `  --path-json '{"device_id":"<device-id>"}' \\`,
+        `  --query-json '{"page":1,"per_page":500}'`
       ].join('\n')
     ],
     steps: [
@@ -633,6 +646,21 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         mutating: true,
         command:
           'xyte-cli api call organization.commands.sendCommand --tenant <tenant-id> --path-json {"device_id":"<device-id>"} --body-json {"name":"<commands[].name>","extra_params":{}}'
+      },
+      {
+        kind: 'task',
+        id: 'device_command_status',
+        title: 'Poll Device Command Status',
+        task: 'command.poll',
+        commandPoll: {
+          sendStepId: 'device_command_send',
+          enabledKey: 'command_poll',
+          intervalMsKey: 'command_poll_interval_ms',
+          timeoutMsKey: 'command_poll_timeout_ms'
+        },
+        mutating: false,
+        command:
+          'xyte-cli api call organization.commands.getCommands --tenant <tenant-id> --path-json {"device_id":"<device-id>"} --query-json {"page":1,"per_page":500}'
       }
     ]
   },

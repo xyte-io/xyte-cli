@@ -106,10 +106,13 @@ xyte-cli api call organization.incidents.closeIncident \
 
 ### `organization.commands.sendCommand`
 
-Prefer `flow.device-command` for user requests like "send command X to device Y"; it first reads `organization.devices.getDevice`, describes the returned model with `organization.models.getModel`, validates the selected `commands[].name` plus any command parameters, and pauses before `organization.commands.sendCommand`.
+Prefer `flow.device-command` for user requests like "send command X to device Y"; it first reads `organization.devices.getDevice`, describes the returned model with `organization.models.getModel`, validates the selected `commands[].name` plus any command parameters, maps select labels to the exact model-defined values, and pauses before `organization.commands.sendCommand`. Send request values under `extra_params`; `params` is response/history data and is rejected in a raw send body.
 
 ```bash
 xyte-cli flow run flow.device-command --tenant <tenant-id> --plan --var device_id=<device-id> --var command=reboot
+
+# Add these vars only when command queue/history polling is wanted:
+xyte-cli flow run flow.device-command --tenant <tenant-id> --apply --var device_id=<device-id> --var command=reboot --var command_poll=true --var command_poll_timeout_ms=60000
 
 xyte-cli api call organization.devices.getDevice \
   --tenant <tenant-id> \
@@ -123,7 +126,14 @@ xyte-cli api call organization.commands.sendCommand \
   --tenant <tenant-id> \
   --path-json '{"device_id":"<device-id>"}' \
   --body-json '{"name":"reboot","extra_params":{}}'
+
+xyte-cli api call organization.commands.getCommands \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}' \
+  --query-json '{"page":1,"per_page":500}'
 ```
+
+Optional flow polling matches only the id returned by `sendCommand` and reports Xyte command queue/history status.
 
 ### `organization.devices.mergeDevice` / `organization.devices.splitDevice`
 
@@ -243,7 +253,7 @@ Model discovery:
 - `organization.models.getModels` -> `GET /core/v1/organization/models` with `edge_only=true`, `page`, `per_page`, and optional `search`.
 - `organization.models.getModel` -> `GET /core/v1/organization/models/:id`; returns `parameters[]` and model-supported `commands[]`.
 - Use `parameters[].name` as the accepted `custom_parameters` labels for Edge claim and already-claimed parameter updates.
-- Use `commands[].name` or `commands[].friendly_name` for `organization.commands.sendCommand`; use `commands[].custom_fields[].name` for `extra_params`, and provide `file_id` when `commands[].with_file` is true.
+- Use `commands[].name` or `commands[].friendly_name` for `organization.commands.sendCommand`; use `commands[].custom_fields[].name` for `extra_params`, map select labels through the field's own options, and provide `file_id` when `commands[].with_file` is true.
 
 Verified raw route mapping:
 - `organization.edge.startClaim` -> `POST /core/v1/organization/edges/devices/start_claim`

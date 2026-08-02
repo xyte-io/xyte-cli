@@ -390,10 +390,46 @@ describe('cli integration', () => {
       '--path-json',
       '{"device_id":"dev-1"}',
       '--body-json',
-      '{"name":"reboot"}'
+      '{"name":"set_input","extra_params":{"input":"33"}}'
     ]);
 
-    expect(fetchMock).toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect((fetchMock.mock.calls[0][1] as RequestInit | undefined)?.body).toBe(
+      JSON.stringify({ name: 'set_input', extra_params: { input: '33' } })
+    );
+  });
+
+  it('rejects response-only params in a raw sendCommand body before calling the API', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const program = createCli({
+      profileStore,
+      secretStore,
+      stdout: { write: vi.fn() },
+      stderr: { write: vi.fn() }
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      program.parseAsync([
+        'node',
+        'xyte-cli',
+        'api',
+        'call',
+        'organization.commands.sendCommand',
+        '--tenant',
+        'acme',
+        '--path-json',
+        '{"device_id":"dev-1"}',
+        '--body-json',
+        '{"name":"set_input","params":{"input":"33"}}'
+      ])
+    ).rejects.toThrow('use "extra_params" instead of "params"');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('allows organization update device call without the legacy write flag', async () => {

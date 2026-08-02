@@ -1694,9 +1694,10 @@ describe('flow runner', () => {
     expect(summary.steps.find((item) => item.stepId === 'device_command_model_describe')?.status).toBe('completed');
     expect(summary.steps.find((item) => item.stepId === 'gate_device_command_send')?.status).toBe('gate_pending');
     expect(summary.steps.find((item) => item.stepId === 'device_command_send')?.status).toBe('pending');
+    expect(summary.steps.find((item) => item.stepId === 'device_command_status')?.status).toBe('pending');
   });
 
-  it('runs flow.device-command apply after an explicit command is provided', async () => {
+  it('runs flow.device-command apply and polls the exact command id only when requested', async () => {
     const { profileStore, secretStore, client } = await makeClient();
     const definition = getBuiltInFlowDefinition('flow.device-command');
     builtInDefinitionOverride = definition;
@@ -1718,10 +1719,26 @@ describe('flow runner', () => {
       }
       if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'POST') {
         sentBodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
-        return new Response(JSON.stringify({ id: 'cmd-1', command: 'identify' }), {
+        return new Response(JSON.stringify({ id: 'cmd-1', command: 'identify', status: 'pending' }), {
           status: 200,
           headers: { 'content-type': 'application/json' }
         });
+      }
+      if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'GET') {
+        expect(url).toContain('page=1');
+        expect(url).toContain('per_page=500');
+        return new Response(
+          JSON.stringify({
+            items: [
+              { id: 'other-command', status: 'done' },
+              { id: 'cmd-1', status: 'done' }
+            ]
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
       }
       throw new Error(`Unexpected URL in flow.device-command apply test: ${url}`);
     });
@@ -1734,7 +1751,10 @@ describe('flow runner', () => {
       outDir,
       context: {
         device_id: 'dev-1',
-        command: 'identify'
+        command: 'identify',
+        command_poll: 'true',
+        command_poll_timeout_ms: '100',
+        command_poll_interval_ms: '1'
       },
       once: true,
       strictJson: true,
@@ -1744,17 +1764,25 @@ describe('flow runner', () => {
     });
 
     expect(summary.outcome).toBe('completed');
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
     expect(sentBodies).toEqual([{ name: 'identify' }]);
     expect(summary.steps.map((item) => item.status)).toEqual([
       'completed',
       'completed',
       'gate_approved',
+      'completed',
       'completed'
     ]);
+    const statusStep = summary.steps.find((item) => item.stepId === 'device_command_status');
+    expect(statusStep?.artifactPath).toBeDefined();
+    expect(JSON.parse(readFileSync(statusStep!.artifactPath!, 'utf8'))).toMatchObject({
+      commandId: 'cmd-1',
+      outcome: 'done',
+      attempts: 1
+    });
   });
 
-  it('passes command extra_params only after validating model custom_fields', async () => {
+  it('maps a model select label to its canonical extra_params value before sending', async () => {
     const { profileStore, secretStore, client } = await makeClient();
     const definition = getBuiltInFlowDefinition('flow.device-command');
     builtInDefinitionOverride = definition;
@@ -1772,7 +1800,24 @@ describe('flow runner', () => {
         return new Response(
           JSON.stringify({
             id: 'model-1',
-            commands: [{ name: 'identify', custom_fields: [{ name: 'delay', type: 'number', required: true }] }]
+            commands: [
+              {
+                name: 'set_input',
+                custom_fields: [
+                  {
+                    name: 'input',
+                    type: 'select',
+                    title: 'Value',
+                    required: true,
+                    typeName: 'staticListSingle',
+                    options: {
+                      '33': { label: 'HDMI 1', order: 2, value: '33' },
+                      '35': { label: 'HDMI 2', order: 4, value: '35' }
+                    }
+                  }
+                ]
+              }
+            ]
           }),
           {
             status: 200,
@@ -1782,7 +1827,7 @@ describe('flow runner', () => {
       }
       if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'POST') {
         sentBodies.push(JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>);
-        return new Response(JSON.stringify({ id: 'cmd-1', name: 'identify' }), {
+        return new Response(JSON.stringify({ id: 'cmd-1', name: 'set_input' }), {
           status: 200,
           headers: { 'content-type': 'application/json' }
         });
@@ -1798,8 +1843,8 @@ describe('flow runner', () => {
       outDir,
       context: {
         device_id: 'dev-1',
-        command: 'identify',
-        command_extra_params_json: '{"delay":5}'
+        command: 'set_input',
+        command_extra_params_json: '{"input":"HDMI 1"}'
       },
       once: true,
       strictJson: true,
@@ -1809,7 +1854,127 @@ describe('flow runner', () => {
     });
 
     expect(summary.outcome).toBe('completed');
-    expect(sentBodies).toEqual([{ name: 'identify', extra_params: { delay: 5 } }]);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(sentBodies).toEqual([{ name: 'set_input', extra_params: { input: '33' } }]);
+    expect(summary.steps.find((item) => item.stepId === 'device_command_status')?.status).toBe('completed');
+  });
+
+  it('blocks ambiguous model select mappings before sending', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition = getBuiltInFlowDefinition('flow.device-command');
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-command-ambiguous-options`);
+
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/organization/devices/dev-1') && !url.includes('/commands') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ id: 'dev-1', model: { id: 'model-1' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/models/model-1') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(
+          JSON.stringify({
+            id: 'model-1',
+            commands: [
+              {
+                name: 'set_mode',
+                custom_fields: [
+                  {
+                    name: 'mode',
+                    type: 'select',
+                    required: true,
+                    options: { foo: 'bar' }
+                  }
+                ]
+              }
+            ]
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
+      }
+      if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'POST') {
+        throw new Error('flow.device-command must not POST an ambiguous select mapping');
+      }
+      throw new Error(`Unexpected URL in flow.device-command ambiguous-options test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const summary = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      context: {
+        device_id: 'dev-1',
+        command: 'set_mode',
+        command_extra_params_json: '{"mode":"foo"}'
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('needs_input');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(summary.steps.find((item) => item.stepId === 'device_command_send')?.error?.detail ?? '')).toContain(
+      'ambiguous options metadata'
+    );
+  });
+
+  it('validates requested polling bounds before sending', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition = getBuiltInFlowDefinition('flow.device-command');
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-command-poll-bounds`);
+
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/organization/devices/dev-1') && !url.includes('/commands') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ id: 'dev-1', model: { id: 'model-1' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/models/model-1') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ id: 'model-1', commands: [{ name: 'reboot' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'POST') {
+        throw new Error('flow.device-command must not POST before validating polling bounds');
+      }
+      throw new Error(`Unexpected URL in flow.device-command poll-bounds test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const summary = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      context: {
+        device_id: 'dev-1',
+        command: 'reboot',
+        command_poll: 'true'
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(summary.outcome).toBe('needs_input');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(summary.steps.find((item) => item.stepId === 'device_command_send')?.error?.detail ?? '')).toContain(
+      'command_poll_timeout_ms is required'
+    );
   });
 
   it('passes command_file_id when the model command requires a file', async () => {

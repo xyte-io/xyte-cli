@@ -65,7 +65,7 @@ Use when the request involves any of:
 - Never auto-apply and never infer permission to create or update from context.
 - In automation, always pass `--tenant <tenant-id>`.
 - For `organization.incidents.getIncidents`, prefer explicit integer time bounds (`from=0`, `to=<unix-now>`) to avoid empty responses from null or omitted bounds in some environments.
-- When the user asks to send a command to a specific device, use `flow.device-command`: read `organization.devices.getDevice`, read `organization.models.getModel` for that device model, choose or ask for the exact `commands[].name`, validate any `command_extra_params_json` against `commands[].custom_fields`, then stop at the approval gate before `organization.commands.sendCommand`.
+- When the user asks to send a command to a specific device, use `flow.device-command`: read `organization.devices.getDevice`, read `organization.models.getModel` for that device model, choose or ask for the exact `commands[].name`, validate any `command_extra_params_json` against `commands[].custom_fields`, and map select labels to the exact values in model metadata. Send request values under `extra_params`, never response-only `params`. Polling is optional and requires `command_poll=true` plus a positive `command_poll_timeout_ms`; it matches the id returned by the send.
 
 ## Claiming Devices (Mandatory Disambiguation)
 

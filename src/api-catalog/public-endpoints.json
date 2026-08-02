@@ -50,7 +50,8 @@
       "Docs category: /branches/2.0/categories/reference/API Access",
       "Docs parent: /branches/2.0/reference/commands",
       "Docs raw path params: device_id",
-      "Docs OpenAPI requestBody repeats device_id, but the verified route uses device_id as a path parameter and this GET request must not send a body."
+      "Docs OpenAPI requestBody repeats device_id, but the verified route uses device_id as a path parameter and this GET request must not send a body.",
+      "Returns command queue/history entries that can be matched by command id; it does not describe model-supported commands."
     ]
   },
   {
@@ -69,6 +70,7 @@
     "authScope": "organization",
     "bodyType": "json",
     "hasBody": true,
+    "bodyExample": "{\n  \"name\": \"<commands[].name>\",\n  \"extra_params\": {\n    \"<custom_fields[].name>\": \"<model-defined-value>\"\n  }\n}",
     "sourceFile": "https://docs.xyte.io/reference/send-command",
     "notes": [
       "Docs page: https://docs.xyte.io/reference/send-command",
@@ -76,7 +78,8 @@
       "Docs parent: /branches/2.0/reference/commands",
       "Docs raw path params: device_id",
       "Docs page: https://docs.xyte.io/reference/send-command",
-      "Docs 422 example explicitly requires a valid command or friendly_name, which implies a request payload even when requestBody schema is absent in SSR data."
+      "Docs 422 example explicitly requires a valid command or friendly_name, which implies a request payload even when requestBody schema is absent in SSR data.",
+      "Send request parameters belong under extra_params; params is returned in command responses and history."
     ]
   },
   {

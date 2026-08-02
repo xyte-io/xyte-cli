@@ -46,6 +46,12 @@ import {
 } from './edge-params-update';
 import { runEdgePing } from './edge-ping';
 import { parsePositiveInt as parseEdgePollPositiveInt } from './edge-poll';
+import { extractSentCommandId, pollCommandStatus } from './command-poll';
+import {
+  extractModelCommandOptionSet,
+  matchModelCommandOption,
+  type ModelCommandOptionSet
+} from './model-command-options';
 import {
   buildDeepDive,
   buildFleetInspect,
@@ -447,8 +453,7 @@ function extractEndpointContext(
 interface ModelCommandDefinition {
   name?: string;
   friendlyName?: string;
-  customFields: Set<string>;
-  requiredFields: Set<string>;
+  customFields: Map<string, { required: boolean; optionSet?: ModelCommandOptionSet }>;
   withFile: boolean;
 }
 
@@ -470,8 +475,7 @@ function extractModelCommandCandidates(data: unknown): ModelCommandCandidates {
       const name = row.trim();
       const definition: ModelCommandDefinition = {
         name,
-        customFields: new Set<string>(),
-        requiredFields: new Set<string>(),
+        customFields: new Map(),
         withFile: false
       };
       names.add(name);
@@ -481,23 +485,22 @@ function extractModelCommandCandidates(data: unknown): ModelCommandCandidates {
     if (!isRecord(row)) {
       continue;
     }
-    const customFields = new Set<string>();
-    const requiredFields = new Set<string>();
+    const customFields = new Map<string, { required: boolean; optionSet?: ModelCommandOptionSet }>();
     if (Array.isArray(row.custom_fields)) {
       for (const field of row.custom_fields) {
         if (!isRecord(field) || typeof field.name !== 'string' || !field.name.trim()) {
           continue;
         }
         const fieldName = field.name.trim();
-        customFields.add(fieldName);
-        if (field.required === true) {
-          requiredFields.add(fieldName);
-        }
+        const optionSet = extractModelCommandOptionSet(field);
+        customFields.set(fieldName, {
+          required: field.required === true,
+          ...(optionSet ? { optionSet } : {})
+        });
       }
     }
     const definition: ModelCommandDefinition = {
       customFields,
-      requiredFields,
       withFile: row.with_file === true
     };
     if (typeof row.name === 'string' && row.name.trim()) {
@@ -589,7 +592,7 @@ function validateCommandArguments(
   modelId: string,
   command: ModelCommandDefinition,
   bodyPayload: Record<string, unknown>
-): void {
+): Record<string, unknown> {
   const extraParams = isRecord(bodyPayload.extra_params) ? bodyPayload.extra_params : {};
   const extraKeys = Object.keys(extraParams);
   if (extraKeys.length > 0 && command.customFields.size === 0) {
@@ -603,9 +606,10 @@ function validateCommandArguments(
       `Selected command for model ${modelId} does not define extra_params field(s): ${unknownKeys.join(', ')}.`
     );
   }
-  const missingRequired = [...command.requiredFields].filter(
-    (key) => extraParams[key] === undefined || extraParams[key] === null || extraParams[key] === ''
-  );
+  const missingRequired = [...command.customFields.entries()]
+    .filter(([, field]) => field.required)
+    .map(([name]) => name)
+    .filter((key) => extraParams[key] === undefined || extraParams[key] === null || extraParams[key] === '');
   if (missingRequired.length > 0) {
     throw new FlowNeedsInputError(
       `Selected command for model ${modelId} requires extra_params field(s): ${missingRequired.join(', ')}.`
@@ -614,6 +618,26 @@ function validateCommandArguments(
   if (command.withFile && typeof bodyPayload.file_id !== 'string') {
     throw new FlowNeedsInputError(`Selected command for model ${modelId} requires command_file_id/file_id.`);
   }
+
+  const normalizedExtraParams: Record<string, unknown> = { ...extraParams };
+  for (const key of extraKeys) {
+    const optionSet = command.customFields.get(key)?.optionSet;
+    if (!optionSet) continue;
+    if (optionSet.issues.length > 0 || optionSet.options.length === 0) {
+      throw new FlowNeedsInputError(
+        `Selected command for model ${modelId} has ambiguous options metadata for extra_params field ${key}.`
+      );
+    }
+    const match = matchModelCommandOption(optionSet.options, extraParams[key]);
+    if (match.status !== 'matched') {
+      throw new FlowNeedsInputError(
+        `Selected command for model ${modelId} has ${match.status === 'ambiguous' ? 'an ambiguous' : 'an unknown'} value for extra_params field ${key}.`
+      );
+    }
+    normalizedExtraParams[key] = match.value;
+  }
+
+  return extraKeys.length > 0 ? { ...bodyPayload, extra_params: normalizedExtraParams } : bodyPayload;
 }
 
 function validateSendCommandAgainstModel(
@@ -621,9 +645,9 @@ function validateSendCommandAgainstModel(
   ctx: RunContext,
   pathPayload: unknown,
   bodyPayload: unknown
-): void {
+): unknown {
   if (step.call?.endpointKey !== 'organization.commands.sendCommand') {
-    return;
+    return bodyPayload;
   }
   if (!isRecord(pathPayload)) {
     throw new FlowNeedsInputError(
@@ -684,8 +708,9 @@ function validateSendCommandAgainstModel(
     commandDefinition = candidates.byFriendlyName.get(friendlyName);
   }
   if (commandDefinition) {
-    validateCommandArguments(modelId, commandDefinition, bodyPayload);
+    return validateCommandArguments(modelId, commandDefinition, bodyPayload);
   }
+  return bodyPayload;
 }
 
 function evaluateReadinessWithConnectivity(ctx: RunContext): ReturnType<typeof evaluateReadiness> {
@@ -844,8 +869,13 @@ async function handleCall(step: FlowTaskStep, _stepIndex: number, ctx: RunContex
   const pathPayload = callConfig.path ? resolveTemplateValue(callConfig.path, ctx.resolvedContext) : undefined;
   const queryPayload = callConfig.query ? resolveTemplateValue(callConfig.query, ctx.resolvedContext) : undefined;
   const resolvedBodyPayload = callConfig.body ? resolveTemplateValue(callConfig.body, ctx.resolvedContext) : undefined;
-  const bodyPayload = buildSendCommandBodyPayload(step, ctx, resolvedBodyPayload);
-  validateSendCommandAgainstModel(step, ctx, pathPayload, bodyPayload);
+  const bodyPayload = validateSendCommandAgainstModel(
+    step,
+    ctx,
+    pathPayload,
+    buildSendCommandBodyPayload(step, ctx, resolvedBodyPayload)
+  );
+  validateDependentCommandPoll(step, ctx);
   const result = await ctx.args.client.callWithMeta(callConfig.endpointKey, {
     requestId,
     tenantId: ctx.args.tenantId,
@@ -972,6 +1002,98 @@ function resolvePollOptions(ctx: RunContext, intervalKey?: string, timeoutKey?: 
   if (interval !== undefined) options.intervalMs = interval;
   if (timeout !== undefined) options.timeoutMs = timeout;
   return options;
+}
+
+function parseCommandPollEnabled(raw: string | undefined, key: string): boolean {
+  if (raw === undefined || !raw.trim() || raw.trim().toLowerCase() === 'false') return false;
+  if (raw.trim().toLowerCase() === 'true') return true;
+  throw new FlowNeedsInputError(`${key} must be true or false.`);
+}
+
+function parseCommandPollPositiveInt(raw: string | undefined, key: string): number | undefined {
+  try {
+    return parseEdgePollPositiveInt(raw, key);
+  } catch {
+    throw new FlowNeedsInputError(`${key} must be a positive integer.`);
+  }
+}
+
+function resolveCommandPollConfiguration(
+  config: NonNullable<FlowTaskStep['commandPoll']>,
+  ctx: RunContext
+): { enabled: false } | { enabled: true; timeoutMs: number; intervalMs?: number } {
+  if (!parseCommandPollEnabled(ctx.resolvedContext[config.enabledKey], config.enabledKey)) {
+    return { enabled: false };
+  }
+  const timeoutMs = parseCommandPollPositiveInt(ctx.resolvedContext[config.timeoutMsKey], config.timeoutMsKey);
+  if (timeoutMs === undefined) {
+    throw new FlowNeedsInputError(`${config.timeoutMsKey} is required when ${config.enabledKey}=true.`);
+  }
+  const intervalMs = parseCommandPollPositiveInt(ctx.resolvedContext[config.intervalMsKey], config.intervalMsKey);
+  return {
+    enabled: true,
+    timeoutMs,
+    ...(intervalMs === undefined ? {} : { intervalMs })
+  };
+}
+
+function validateDependentCommandPoll(sendStep: FlowTaskStep, ctx: RunContext): void {
+  const pollStep = ctx.definition.steps.find(
+    (candidate): candidate is FlowTaskStep =>
+      candidate.kind === 'task' &&
+      candidate.task === 'command.poll' &&
+      candidate.commandPoll?.sendStepId === sendStep.id
+  );
+  if (pollStep?.commandPoll) {
+    resolveCommandPollConfiguration(pollStep.commandPoll, ctx);
+  }
+}
+
+async function handleCommandPoll(
+  step: FlowTaskStep,
+  _stepIndex: number,
+  ctx: RunContext
+): Promise<TaskExecutionResult> {
+  const config = requireStepConfig(step.commandPoll, step.id, 'command poll');
+  const options = resolveCommandPollConfiguration(config, ctx);
+  if (!options.enabled) {
+    return { ok: true, output: { outcome: 'not_requested' } };
+  }
+
+  const sendOutput = ctx.taskOutputs.get(config.sendStepId);
+  const sendResponse = isRecord(sendOutput) && isRecord(sendOutput.response) ? sendOutput.response.data : undefined;
+  const commandId = extractSentCommandId(sendResponse);
+  if (!commandId) {
+    return {
+      ok: false,
+      failureDetail: `Step ${step.id} could not read a command id from ${config.sendStepId}.`
+    };
+  }
+  const deviceId = ctx.resolvedContext.device_id?.trim();
+  if (!deviceId) {
+    throw new FlowNeedsInputError(`Step ${step.id} requires device_id.`);
+  }
+
+  const result = await pollCommandStatus({
+    client: ctx.args.client,
+    tenantId: ctx.args.tenantId,
+    deviceId,
+    commandId,
+    timeoutMs: options.timeoutMs,
+    ...(options.intervalMs === undefined ? {} : { intervalMs: options.intervalMs })
+  });
+  if (result.outcome === 'done') {
+    return { ok: true, output: result };
+  }
+  const statusDetail = result.lastStatus ? ` Last status: ${result.lastStatus}.` : '';
+  return {
+    ok: false,
+    failureDetail:
+      result.outcome === 'timeout'
+        ? `Command ${commandId} status polling timed out.${statusDetail}`
+        : `Command ${commandId} ended with status ${result.outcome}.`,
+    output: result
+  };
 }
 
 async function handleEdgeClaim(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
@@ -1156,6 +1278,7 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
     case 'device.move-batch': return handleDeviceMoveBatch(step, stepIndex, ctx);
     case 'device.verify-batch': return handleDeviceVerifyBatch(step, stepIndex, ctx);
     case 'space.import-tree': return handleSpaceImportTree(step, stepIndex, ctx);
+    case 'command.poll':      return handleCommandPoll(step, stepIndex, ctx);
     case 'edge.claim':        return handleEdgeClaim(step, stepIndex, ctx);
     case 'edge.claim-batch':  return handleEdgeClaimBatch(step, stepIndex, ctx);
     case 'edge.params-update': return handleEdgeParamsUpdate(step, stepIndex, ctx);

@@ -192,12 +192,13 @@ xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --o
 ## flow.device-command
 
 - Flow ID: `flow.device-command`
-- Intent: fetch model-supported commands for one device, choose a valid command, and send it only after explicit human approval.
+- Intent: fetch model-supported commands for one device, choose a valid command, send it only after explicit human approval, and optionally poll its command status.
 - Prerequisites:
   - `<tenant-id>` is active and authorized.
   - `<device-id>` is the exact target device id.
   - If the model returns more than one command, provide the selected command as `--var command=<commands[].name>` when running the flow.
-  - If the selected command has `custom_fields`, provide `--var command_extra_params_json='<json-object>'`; if it has `with_file=true`, provide `--var command_file_id=<file-id>`.
+  - If the selected command has `custom_fields`, provide `--var command_extra_params_json='<json-object>'`; select labels are mapped to the exact values in the model metadata. If it has `with_file=true`, provide `--var command_file_id=<file-id>`.
+  - To poll after sending, provide `--var command_poll=true --var command_poll_timeout_ms=<positive-ms>`; `command_poll_interval_ms` is optional and defaults to 5000.
 - Shell note:
   - the raw `api call ... --path-json/--body-json` examples below are Bash/zsh-shaped because inline JSON quoting still differs by shell.
   - on PowerShell or CMD, prefer `xyte-cli flow run flow.device-command --tenant <tenant-id> --plan --var device_id=<device-id>`.
@@ -216,20 +217,26 @@ xyte-cli api call organization.commands.sendCommand \
   --tenant <tenant-id> \
   --path-json '{"device_id":"<device-id>"}' \
   --body-json '{"name":"<commands[].name>","extra_params":{}}'
+
+xyte-cli api call organization.commands.getCommands \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}' \
+  --query-json '{"page":1,"per_page":500}'
 ```
 
 - Expected artifacts:
   - device read response with `model.id`.
   - model response with `commands[]`, `custom_fields`, and `with_file`.
   - command dispatch response from `organization.commands.sendCommand` when the gate is approved.
+  - when polling is requested, the matching command queue/history row and terminal status.
 - Stop/decision gates:
   - Default to `--plan`. Only advance to `--apply` after the operator approves the exact command.
   - Stop if the model has no usable `commands[]` for the target device.
   - Stop if the desired command is ambiguous or absent; ask for `--var command=<commands[].name>`.
-  - Stop if `command_extra_params_json` contains keys not declared in `commands[].custom_fields[].name` or omits a required field.
+  - Stop if `command_extra_params_json` contains keys not declared in `commands[].custom_fields[].name`, omits a required field, or cannot be mapped unambiguously from the model options.
 - Failure handling:
   - 401 aborts the flow — fix with `xyte-cli setup run` or `xyte-cli config key`.
-  - Non-2xx send response stops the flow; re-read the device and command response before retrying.
+  - Non-2xx send response stops the flow. Optional polling matches only the id returned by that send and reports Xyte command queue/history status.
 
 ## flow.device-migration
 

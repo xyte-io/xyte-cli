@@ -186,10 +186,13 @@ Frame event types:
 
 ## Write Examples
 
-These raw API examples are shell-specific because inline JSON quoting differs across shells. For one-device command sends, prefer `flow.device-command`; it reads the device model's supported commands first and pauses before `sendCommand`.
+These raw API examples are shell-specific because inline JSON quoting differs across shells. For one-device command sends, prefer `flow.device-command`; it reads the device model's supported commands first, maps select labels to the model-defined values, and pauses before `sendCommand`. Command request values belong under `extra_params`; raw `sendCommand` calls reject the response-only `params` field.
 
 ```bash
 xyte-cli flow run flow.device-command --tenant <tenant-id> --plan --var device_id=DEVICE_ID --var command=reboot
+
+# Optional after the approved send:
+xyte-cli flow run flow.device-command --tenant <tenant-id> --apply --var device_id=DEVICE_ID --var command=reboot --var command_poll=true --var command_poll_timeout_ms=60000
 
 xyte-cli api call organization.devices.getDevice \
   --tenant <tenant-id> \
@@ -207,7 +210,7 @@ xyte-cli api call organization.commands.sendCommand \
 xyte-cli api call organization.commands.getCommands \
   --tenant <tenant-id> \
   --path-json '{"device_id":"DEVICE_ID"}' \
-  --query-json '{"page":1,"per_page":20}'
+  --query-json '{"page":1,"per_page":500}'
 
 xyte-cli api call organization.commands.cancelCommand \
   --tenant <tenant-id> \
@@ -235,6 +238,8 @@ xyte-cli api call partner.organizations.createOrganization \
   --tenant <tenant-id> \
   --body-json '{"name":"Acme HQ","admin_contact_email":"admin@example.com","admin_contact_name":"Jane Doe","finance_contact_email":"finance@example.com","finance_contact_name":"Finance Team"}'
 ```
+
+Optional flow polling matches the exact id returned by `sendCommand`. It reports Xyte command queue/history status; it does not read device state.
 
 ## Utility Pipelines, Space Import, And Device Migration
 
