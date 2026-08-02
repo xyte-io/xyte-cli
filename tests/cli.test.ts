@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -4236,6 +4236,35 @@ describe('cli integration', () => {
   it('force-installs all skill bundles with skills refresh', async () => {
     const ws = mkdtempSync(join(tmpdir(), 'xyte-skills-ws-'));
     const home = mkdtempSync(join(tmpdir(), 'xyte-skills-home-'));
+    const canonical = join(__dirname, '..', 'skills', 'xyte-cli');
+    const installedBundles = [
+      join(ws, '.claude', 'skills', 'xyte-cli'),
+      join(ws, '.github', 'skills', 'xyte-cli'),
+      join(ws, '.agents', 'skills', 'xyte-cli'),
+      join(home, '.claude', 'skills', 'xyte-cli'),
+      join(home, '.copilot', 'skills', 'xyte-cli'),
+      join(home, '.agents', 'skills', 'xyte-cli')
+    ];
+    const snapshot = (root: string): Array<{ path: string; bytes: Buffer }> => {
+      const files: Array<{ path: string; bytes: Buffer }> = [];
+      const visit = (directory: string, relativeDirectory = '') => {
+        const entries = readdirSync(directory, { withFileTypes: true }).sort((left, right) =>
+          left.name.localeCompare(right.name)
+        );
+        for (const entry of entries) {
+          const relativePath = join(relativeDirectory, entry.name);
+          const absolutePath = join(directory, entry.name);
+          if (entry.isDirectory()) {
+            visit(absolutePath, relativePath);
+          } else {
+            files.push({ path: relativePath, bytes: readFileSync(absolutePath) });
+          }
+        }
+      };
+      visit(root);
+      return files;
+    };
+    const canonicalSnapshot = snapshot(canonical);
     const stdout = { write: vi.fn() };
     const program = createCli({
       profileStore: new MemoryProfileStore(),
@@ -4251,8 +4280,17 @@ describe('cli integration', () => {
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     expect(output).toContain('project/claude: installed');
     expect(output).toContain('user/codex: installed');
-    expect(existsSync(join(ws, '.claude/skills/xyte-cli/SKILL.md'))).toBe(true);
-    expect(existsSync(join(home, '.copilot/skills/xyte-cli/SKILL.md'))).toBe(true);
+    for (const installed of installedBundles) {
+      expect(snapshot(installed)).toEqual(canonicalSnapshot);
+    }
+
+    const corruptedSkill = join(installedBundles[0], 'SKILL.md');
+    writeFileSync(
+      corruptedSkill,
+      '# Stale command guidance\n\n```bash\nxyte-cli api call organization.commands.sendCommand --body-json \'{"name":"reboot"}\'\n```\n',
+      'utf8'
+    );
+    expect(readFileSync(corruptedSkill, 'utf8')).toContain('"name":"reboot"');
 
     const stdout2 = { write: vi.fn() };
     const program2 = createCli({
@@ -4267,6 +4305,9 @@ describe('cli integration', () => {
     const output2 = stdout2.write.mock.calls.map((call) => String(call[0])).join('');
     expect(output2).toContain('project/claude: overwritten');
     expect(output2).toContain('user/codex: overwritten');
+    for (const installed of installedBundles) {
+      expect(snapshot(installed)).toEqual(canonicalSnapshot);
+    }
   });
 
   it('suggests skills refresh after a successful upgrade in text mode', async () => {

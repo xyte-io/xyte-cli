@@ -82,7 +82,7 @@
       "Docs 422 example explicitly requires a valid command or friendly_name, which implies a request payload even when requestBody schema is absent in SSR data.",
       "The request selector is command or friendly_name; name is the model metadata field, not a send request field.",
       "Send request parameters belong in a JSON object under extra_params; params is returned in command responses and history.",
-      "For custom fields with model-provided options, send the exact model-defined scalar value or an array of exact values for multi-select fields."
+      "For custom fields with embedded model-provided options and unambiguous single- or multi-value cardinality, send the exact model-defined scalar value or array of values; option support is not limited to fields whose general type is select or multiselect."
     ]
   },
   {
