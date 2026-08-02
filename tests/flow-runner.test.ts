@@ -574,6 +574,16 @@ describe('flow runner', () => {
       expectedError: 'body.command to be a non-empty string'
     },
     {
+      label: 'a non-string body.friendly_name',
+      body: { friendly_name: 33 },
+      expectedError: 'body.friendly_name to be a non-empty string'
+    },
+    {
+      label: 'a blank body.friendly_name',
+      body: { friendly_name: '   ' },
+      expectedError: 'body.friendly_name to be a non-empty string'
+    },
+    {
       label: 'response-only body.params',
       body: { command: '{{command}}', params: { input: '33' } },
       expectedError: 'body.params is response-only data'
@@ -2036,7 +2046,7 @@ describe('flow runner', () => {
                 custom_fields: [
                   {
                     name: 'input',
-                    type: 'select',
+                    type: 'string',
                     title: 'Value',
                     required: true,
                     typeName: 'staticListSingle',
@@ -2047,7 +2057,7 @@ describe('flow runner', () => {
                   },
                   {
                     name: 'zones',
-                    type: 'multiselect',
+                    type: 'array',
                     title: 'Zones',
                     required: true,
                     typeName: 'staticListMulti',
@@ -2399,6 +2409,11 @@ describe('flow runner', () => {
       label: 'a non-boolean file requirement',
       modelCommands: [{ name: 'set_mode', with_file: 'true' }],
       expectedError: 'with_file must be a boolean'
+    },
+    {
+      label: 'a bare string command entry',
+      modelCommands: ['set_mode'],
+      expectedError: 'command metadata must be an object'
     }
   ])('blocks $label in model command metadata before sending', async ({ modelCommands, expectedError }) => {
     const { profileStore, secretStore, client } = await makeClient();
@@ -2550,6 +2565,22 @@ describe('flow runner', () => {
       context: { friendly_name: '  Restart device  ' },
       expectedBody: { friendly_name: 'Restart device' },
       expectedError: undefined
+    },
+    {
+      label: 'accepts matching name and friendly name selectors',
+      modelCommands: [{ name: 'reboot', friendly_name: 'Restart device' }],
+      body: { command: '{{command}}', friendly_name: '{{friendly_name}}' },
+      context: { command: 'reboot', friendly_name: 'Restart device' },
+      expectedBody: { command: 'reboot', friendly_name: 'Restart device' },
+      expectedError: undefined
+    },
+    {
+      label: 'rejects a friendly-name-only command definition',
+      modelCommands: [{ friendly_name: 'Restart device' }],
+      body: { friendly_name: '{{friendly_name}}' },
+      context: { friendly_name: 'Restart device' },
+      expectedBody: undefined,
+      expectedError: 'name must be a non-empty string'
     },
     {
       label: 'rejects a duplicate friendly name',

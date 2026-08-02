@@ -46,13 +46,13 @@ import {
 } from './edge-params-update';
 import { runEdgePing } from './edge-ping';
 import { parsePositiveInt as parseEdgePollPositiveInt } from './edge-poll';
-import { extractSentCommandId, MAX_COMMAND_POLL_DELAY_MS, pollCommandStatus } from './command-poll';
 import {
-  extractModelCommandOptionSet,
-  matchModelCommandOption,
-  MODEL_COMMAND_PATH_OPTIONS_ISSUE,
-  type ModelCommandOptionSet
-} from './model-command-options';
+  DeviceCommandNeedsInputError,
+  extractDeviceModelIdFromResponse,
+  prepareDeviceCommandBody,
+  runDeviceCommandPollStep,
+  validateDependentCommandPoll
+} from './device-command';
 import {
   buildDeepDive,
   buildFleetInspect,
@@ -438,20 +438,6 @@ function extractCallOutputContext(
   return candidates.length === 1 ? { [spec.contextKey]: candidates[0][spec.valueField] as string } : undefined;
 }
 
-function extractDeviceModelIdFromResponse(data: unknown): string | undefined {
-  if (!isRecord(data)) return undefined;
-  if (isRecord(data.model) && typeof data.model.id === 'string' && data.model.id.trim()) {
-    return data.model.id.trim();
-  }
-  if (typeof data.device_model_id === 'string' && data.device_model_id.trim()) {
-    return data.device_model_id.trim();
-  }
-  if (typeof data.model_id === 'string' && data.model_id.trim()) {
-    return data.model_id.trim();
-  }
-  return undefined;
-}
-
 function extractEndpointContext(
   endpointKey: string,
   data: unknown,
@@ -462,374 +448,6 @@ function extractEndpointContext(
     return modelId ? { device_model_id: modelId } : undefined;
   }
   return undefined;
-}
-
-interface ModelCommandDefinition {
-  name?: string;
-  friendlyName?: string;
-  customFields: Map<string, { required: boolean; optionSet?: ModelCommandOptionSet }>;
-  withFile: boolean;
-  issues: string[];
-}
-
-interface ModelCommandCandidates {
-  names: Set<string>;
-  friendlyNames: Set<string>;
-  ambiguousNames: Set<string>;
-  ambiguousFriendlyNames: Set<string>;
-  byName: Map<string, ModelCommandDefinition>;
-  byFriendlyName: Map<string, ModelCommandDefinition>;
-}
-
-function extractModelCommandCandidates(data: unknown): ModelCommandCandidates {
-  const rows = isRecord(data) && Array.isArray(data.commands) ? data.commands : [];
-  const names = new Set<string>();
-  const friendlyNames = new Set<string>();
-  const ambiguousNames = new Set<string>();
-  const ambiguousFriendlyNames = new Set<string>();
-  const byName = new Map<string, ModelCommandDefinition>();
-  const byFriendlyName = new Map<string, ModelCommandDefinition>();
-  for (const row of rows) {
-    if (typeof row === 'string' && row.trim()) {
-      const name = row.trim();
-      const definition: ModelCommandDefinition = {
-        name,
-        customFields: new Map(),
-        withFile: false,
-        issues: []
-      };
-      names.add(name);
-      if (byName.has(name)) {
-        ambiguousNames.add(name);
-        byName.delete(name);
-      } else if (!ambiguousNames.has(name)) {
-        byName.set(name, definition);
-      }
-      continue;
-    }
-    if (!isRecord(row)) {
-      continue;
-    }
-    const customFields = new Map<string, { required: boolean; optionSet?: ModelCommandOptionSet }>();
-    const issues: string[] = [];
-    if (Array.isArray(row.custom_fields)) {
-      for (const [index, field] of row.custom_fields.entries()) {
-        if (!isRecord(field) || typeof field.name !== 'string' || !field.name.trim()) {
-          issues.push(`custom_fields entry ${index + 1} is invalid`);
-          continue;
-        }
-        const fieldName = field.name.trim();
-        if (customFields.has(fieldName)) {
-          issues.push(`custom_fields contains duplicate name ${JSON.stringify(fieldName)}`);
-          continue;
-        }
-        if (field.required !== undefined && typeof field.required !== 'boolean') {
-          issues.push(`custom_fields ${JSON.stringify(fieldName)} required flag must be a boolean`);
-        }
-        const optionSet = extractModelCommandOptionSet(field);
-        customFields.set(fieldName, {
-          required: field.required === true,
-          ...(optionSet ? { optionSet } : {})
-        });
-      }
-    } else if (row.custom_fields !== undefined && row.custom_fields !== null) {
-      issues.push('custom_fields must be an array');
-    }
-    if (row.with_file !== undefined && row.with_file !== null && typeof row.with_file !== 'boolean') {
-      issues.push('with_file must be a boolean');
-    }
-    const definition: ModelCommandDefinition = {
-      customFields,
-      withFile: row.with_file === true,
-      issues
-    };
-    if (typeof row.name === 'string' && row.name.trim()) {
-      definition.name = row.name.trim();
-      names.add(definition.name);
-      if (byName.has(definition.name)) {
-        ambiguousNames.add(definition.name);
-        byName.delete(definition.name);
-      } else if (!ambiguousNames.has(definition.name)) {
-        byName.set(definition.name, definition);
-      }
-    }
-    if (typeof row.friendly_name === 'string' && row.friendly_name.trim()) {
-      definition.friendlyName = row.friendly_name.trim();
-      friendlyNames.add(definition.friendlyName);
-      if (byFriendlyName.has(definition.friendlyName)) {
-        ambiguousFriendlyNames.add(definition.friendlyName);
-        byFriendlyName.delete(definition.friendlyName);
-      } else if (!ambiguousFriendlyNames.has(definition.friendlyName)) {
-        byFriendlyName.set(definition.friendlyName, definition);
-      }
-    }
-  }
-  return { names, friendlyNames, ambiguousNames, ambiguousFriendlyNames, byName, byFriendlyName };
-}
-
-function findPriorDeviceModelId(ctx: RunContext, deviceId: string): string | undefined {
-  for (const output of ctx.taskOutputs.values()) {
-    if (!isRecord(output) || output.endpointKey !== 'organization.devices.getDevice') {
-      continue;
-    }
-    const request = output.request;
-    if (!isRecord(request) || !isRecord(request.path) || String(request.path.device_id ?? '') !== deviceId) {
-      continue;
-    }
-    const response = output.response;
-    if (!isRecord(response)) {
-      continue;
-    }
-    const modelId = extractDeviceModelIdFromResponse(response.data);
-    if (modelId) {
-      return modelId;
-    }
-  }
-  return undefined;
-}
-
-function findPriorModelCommandCandidates(ctx: RunContext, modelId: string): ModelCommandCandidates | undefined {
-  for (const output of ctx.taskOutputs.values()) {
-    if (!isRecord(output) || output.endpointKey !== 'organization.models.getModel') {
-      continue;
-    }
-    const request = output.request;
-    if (!isRecord(request) || !isRecord(request.path) || String(request.path.id ?? '') !== modelId) {
-      continue;
-    }
-    const response = output.response;
-    if (!isRecord(response)) {
-      continue;
-    }
-    return extractModelCommandCandidates(response.data);
-  }
-  return undefined;
-}
-
-function parseCommandExtraParams(ctx: RunContext): Record<string, unknown> | undefined {
-  const raw = ctx.resolvedContext.command_extra_params_json ?? ctx.resolvedContext.extra_params_json;
-  if (!raw?.trim()) {
-    return undefined;
-  }
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (isRecord(parsed)) {
-      return parsed;
-    }
-  } catch {
-    // handled below
-  }
-  throw new FlowNeedsInputError('command_extra_params_json must be a valid JSON object.');
-}
-
-function buildSendCommandBodyPayload(step: FlowTaskStep, ctx: RunContext, bodyPayload: unknown): unknown {
-  if (step.call?.endpointKey !== 'organization.commands.sendCommand' || !isRecord(bodyPayload)) {
-    return bodyPayload;
-  }
-  const out: Record<string, unknown> = { ...bodyPayload };
-  const extraParams = parseCommandExtraParams(ctx);
-  if (extraParams) {
-    out.extra_params = extraParams;
-  }
-  const fileId = ctx.resolvedContext.command_file_id ?? ctx.resolvedContext.file_id;
-  if (fileId?.trim()) {
-    out.file_id = fileId.trim();
-  }
-  return out;
-}
-
-function validateCommandArguments(
-  modelId: string,
-  command: ModelCommandDefinition,
-  bodyPayload: Record<string, unknown>
-): Record<string, unknown> {
-  if (command.issues.length > 0) {
-    throw new FlowNeedsInputError(
-      `Selected command for model ${modelId} has invalid or ambiguous custom field metadata: ${command.issues.join('; ')}.`
-    );
-  }
-  const extraParams = isRecord(bodyPayload.extra_params) ? bodyPayload.extra_params : {};
-  const extraKeys = Object.keys(extraParams);
-  if (extraKeys.length > 0 && command.customFields.size === 0) {
-    throw new FlowNeedsInputError(
-      `Selected command for model ${modelId} does not define custom_fields, but extra_params were provided.`
-    );
-  }
-  const unknownKeys = extraKeys.filter((key) => !command.customFields.has(key));
-  if (unknownKeys.length > 0) {
-    throw new FlowNeedsInputError(
-      `Selected command for model ${modelId} does not define extra_params field(s): ${unknownKeys.join(', ')}.`
-    );
-  }
-  const missingRequired = [...command.customFields.entries()]
-    .filter(([, field]) => field.required)
-    .map(([name]) => name)
-    .filter((key) => {
-      const value = extraParams[key];
-      const field = command.customFields.get(key);
-      return (
-        value === undefined ||
-        value === null ||
-        value === '' ||
-        (field?.optionSet?.cardinality === 'multiple' && Array.isArray(value) && value.length === 0)
-      );
-    });
-  if (missingRequired.length > 0) {
-    throw new FlowNeedsInputError(
-      `Selected command for model ${modelId} requires extra_params field(s): ${missingRequired.join(', ')}.`
-    );
-  }
-  if (command.withFile && (typeof bodyPayload.file_id !== 'string' || !bodyPayload.file_id.trim())) {
-    throw new FlowNeedsInputError(`Selected command for model ${modelId} requires command_file_id/file_id.`);
-  }
-
-  const normalizedExtraParams: Record<string, unknown> = { ...extraParams };
-  for (const key of extraKeys) {
-    const optionSet = command.customFields.get(key)?.optionSet;
-    if (!optionSet) continue;
-    if (optionSet.issues.length > 0 || optionSet.options.length === 0) {
-      if (optionSet.issues.includes(MODEL_COMMAND_PATH_OPTIONS_ISSUE)) {
-        throw new FlowNeedsInputError(
-          `Selected command for model ${modelId} uses path-backed options for extra_params field ${key}; this flow cannot resolve those choices from model metadata.`
-        );
-      }
-      throw new FlowNeedsInputError(
-        `Selected command for model ${modelId} has invalid or ambiguous options metadata for extra_params field ${key}.`
-      );
-    }
-    const match = matchModelCommandOption(optionSet, extraParams[key]);
-    if (match.status !== 'matched') {
-      const problem =
-        match.status === 'ambiguous'
-          ? 'an ambiguous value'
-          : match.status === 'invalid-cardinality'
-            ? 'a value with the wrong scalar/array shape'
-            : 'an unknown value';
-      throw new FlowNeedsInputError(
-        `Selected command for model ${modelId} has ${problem} for extra_params field ${key}.`
-      );
-    }
-    normalizedExtraParams[key] = match.value;
-  }
-
-  return extraKeys.length > 0 ? { ...bodyPayload, extra_params: normalizedExtraParams } : bodyPayload;
-}
-
-function validateSendCommandAgainstModel(
-  step: FlowTaskStep,
-  ctx: RunContext,
-  pathPayload: unknown,
-  bodyPayload: unknown
-): unknown {
-  if (step.call?.endpointKey !== 'organization.commands.sendCommand') {
-    return bodyPayload;
-  }
-  if (!isRecord(pathPayload)) {
-    throw new FlowNeedsInputError(
-      `Step ${step.id} requires path.device_id before sending organization.commands.sendCommand.`
-    );
-  }
-  if (!isRecord(bodyPayload)) {
-    throw new FlowNeedsInputError(
-      `Step ${step.id} requires body.command or body.friendly_name selected from organization.models.getModel commands[].`
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(bodyPayload, 'params')) {
-    throw new FlowNeedsInputError(
-      `Step ${step.id} must use body.extra_params for command request values; body.params is response-only data.`
-    );
-  }
-  if (Object.prototype.hasOwnProperty.call(bodyPayload, 'extra_params') && !isRecord(bodyPayload.extra_params)) {
-    throw new FlowNeedsInputError(`Step ${step.id} requires body.extra_params to be a JSON object.`);
-  }
-  const deviceId = String(pathPayload.device_id ?? '');
-  if (Object.prototype.hasOwnProperty.call(bodyPayload, 'name')) {
-    throw new FlowNeedsInputError(
-      `Step ${step.id} must use body.command or body.friendly_name for organization.commands.sendCommand; body.name is not supported.`
-    );
-  }
-  if (
-    Object.prototype.hasOwnProperty.call(bodyPayload, 'command') &&
-    (typeof bodyPayload.command !== 'string' || !bodyPayload.command.trim())
-  ) {
-    throw new FlowNeedsInputError(`Step ${step.id} requires body.command to be a non-empty string when provided.`);
-  }
-  if (
-    Object.prototype.hasOwnProperty.call(bodyPayload, 'friendly_name') &&
-    (typeof bodyPayload.friendly_name !== 'string' || !bodyPayload.friendly_name.trim())
-  ) {
-    throw new FlowNeedsInputError(
-      `Step ${step.id} requires body.friendly_name to be a non-empty string when provided.`
-    );
-  }
-  const commandName = typeof bodyPayload.command === 'string' ? bodyPayload.command.trim() : '';
-  const friendlyName = typeof bodyPayload.friendly_name === 'string' ? bodyPayload.friendly_name.trim() : '';
-  if (!deviceId) {
-    throw new FlowNeedsInputError(
-      `Step ${step.id} requires device_id before sending organization.commands.sendCommand.`
-    );
-  }
-  if (!commandName && !friendlyName) {
-    throw new FlowNeedsInputError(
-      `Step ${step.id} requires body.command or body.friendly_name selected from organization.models.getModel commands[].`
-    );
-  }
-
-  const modelId = findPriorDeviceModelId(ctx, deviceId) ?? ctx.resolvedContext.device_model_id;
-  if (!modelId) {
-    throw new FlowNeedsInputError(
-      `Step ${step.id} requires device model evidence from organization.devices.getDevice before sending a command.`
-    );
-  }
-
-  const candidates = findPriorModelCommandCandidates(ctx, modelId);
-  if (!candidates || (candidates.names.size === 0 && candidates.friendlyNames.size === 0)) {
-    throw new FlowNeedsInputError(
-      `Step ${step.id} requires supported-command evidence from organization.models.getModel for model ${modelId}.`
-    );
-  }
-  let commandDefinition: ModelCommandDefinition | undefined;
-  if (commandName && !candidates.names.has(commandName)) {
-    throw new FlowNeedsInputError(
-      `Selected command name "${commandName}" was not found in organization.models.getModel commands[].name for model ${modelId}.`
-    );
-  }
-  if (commandName && candidates.ambiguousNames.has(commandName)) {
-    throw new FlowNeedsInputError(
-      `Selected command name ${JSON.stringify(commandName)} is ambiguous in organization.models.getModel commands[] for model ${modelId}.`
-    );
-  }
-  if (commandName) {
-    commandDefinition = candidates.byName.get(commandName);
-  }
-  if (friendlyName && !candidates.friendlyNames.has(friendlyName)) {
-    throw new FlowNeedsInputError(
-      `Selected friendly_name "${friendlyName}" was not found in organization.models.getModel commands[].friendly_name for model ${modelId}.`
-    );
-  }
-  if (friendlyName && candidates.ambiguousFriendlyNames.has(friendlyName)) {
-    throw new FlowNeedsInputError(
-      `Selected friendly_name ${JSON.stringify(friendlyName)} is ambiguous in organization.models.getModel commands[] for model ${modelId}.`
-    );
-  }
-  const friendlyNameDefinition = friendlyName ? candidates.byFriendlyName.get(friendlyName) : undefined;
-  if (commandDefinition && friendlyNameDefinition && commandDefinition !== friendlyNameDefinition) {
-    throw new FlowNeedsInputError(
-      `Selected command name ${JSON.stringify(commandName)} and friendly_name ${JSON.stringify(friendlyName)} identify different model commands for model ${modelId}.`
-    );
-  }
-  if (!commandDefinition && friendlyNameDefinition) {
-    commandDefinition = friendlyNameDefinition;
-  }
-  const normalizedBodyPayload: Record<string, unknown> = {
-    ...bodyPayload,
-    ...(commandName ? { command: commandName } : {}),
-    ...(friendlyName ? { friendly_name: friendlyName } : {})
-  };
-  if (commandDefinition) {
-    return validateCommandArguments(modelId, commandDefinition, normalizedBodyPayload);
-  }
-  return normalizedBodyPayload;
 }
 
 function evaluateReadinessWithConnectivity(ctx: RunContext): ReturnType<typeof evaluateReadiness> {
@@ -1010,13 +628,27 @@ async function handleCall(step: FlowTaskStep, _stepIndex: number, ctx: RunContex
   const pathPayload = callConfig.path ? resolveTemplateValue(callConfig.path, ctx.resolvedContext) : undefined;
   const queryPayload = callConfig.query ? resolveTemplateValue(callConfig.query, ctx.resolvedContext) : undefined;
   const resolvedBodyPayload = callConfig.body ? resolveTemplateValue(callConfig.body, ctx.resolvedContext) : undefined;
-  const bodyPayload = validateSendCommandAgainstModel(
-    step,
-    ctx,
-    pathPayload,
-    buildSendCommandBodyPayload(step, ctx, resolvedBodyPayload)
-  );
-  validateDependentCommandPoll(step, ctx);
+  let bodyPayload: unknown;
+  try {
+    bodyPayload = prepareDeviceCommandBody({
+      endpointKey: callConfig.endpointKey,
+      stepId: step.id,
+      context: ctx.resolvedContext,
+      taskOutputs: ctx.taskOutputs,
+      pathPayload,
+      bodyPayload: resolvedBodyPayload
+    });
+    validateDependentCommandPoll({
+      steps: ctx.definition.steps,
+      sendStepId: step.id,
+      context: ctx.resolvedContext
+    });
+  } catch (error) {
+    if (error instanceof DeviceCommandNeedsInputError) {
+      throw new FlowNeedsInputError(error.message, { cause: error });
+    }
+    throw error;
+  }
   const result = await ctx.args.client.callWithMeta(callConfig.endpointKey, {
     requestId,
     tenantId: ctx.args.tenantId,
@@ -1176,101 +808,27 @@ function resolvePollOptions(
   return options;
 }
 
-function parseCommandPollEnabled(raw: string | undefined, key: string): boolean {
-  if (raw === undefined || !raw.trim() || raw.trim().toLowerCase() === 'false') return false;
-  if (raw.trim().toLowerCase() === 'true') return true;
-  throw new FlowNeedsInputError(`${key} must be true or false.`);
-}
-
-function parseCommandPollPositiveInt(raw: string | undefined, key: string): number | undefined {
-  let value: number | undefined;
-  try {
-    value = parseEdgePollPositiveInt(raw, key);
-  } catch {
-    throw new FlowNeedsInputError(`${key} must be a positive integer.`);
-  }
-  if (value !== undefined && value > MAX_COMMAND_POLL_DELAY_MS) {
-    throw new FlowNeedsInputError(`${key} must be no greater than ${MAX_COMMAND_POLL_DELAY_MS}.`);
-  }
-  return value;
-}
-
-function resolveCommandPollConfiguration(
-  config: NonNullable<FlowTaskStep['commandPoll']>,
-  ctx: RunContext
-): { enabled: false } | { enabled: true; timeoutMs: number; intervalMs?: number } {
-  if (!parseCommandPollEnabled(ctx.resolvedContext[config.enabledKey], config.enabledKey)) {
-    return { enabled: false };
-  }
-  const timeoutMs = parseCommandPollPositiveInt(ctx.resolvedContext[config.timeoutMsKey], config.timeoutMsKey);
-  if (timeoutMs === undefined) {
-    throw new FlowNeedsInputError(`${config.timeoutMsKey} is required when ${config.enabledKey}=true.`);
-  }
-  const intervalMs = parseCommandPollPositiveInt(ctx.resolvedContext[config.intervalMsKey], config.intervalMsKey);
-  return {
-    enabled: true,
-    timeoutMs,
-    ...(intervalMs === undefined ? {} : { intervalMs })
-  };
-}
-
-function validateDependentCommandPoll(sendStep: FlowTaskStep, ctx: RunContext): void {
-  const pollStep = ctx.definition.steps.find(
-    (candidate): candidate is FlowTaskStep =>
-      candidate.kind === 'task' &&
-      candidate.task === 'command.poll' &&
-      candidate.commandPoll?.sendStepId === sendStep.id
-  );
-  if (pollStep?.commandPoll) {
-    resolveCommandPollConfiguration(pollStep.commandPoll, ctx);
-  }
-}
-
 async function handleCommandPoll(
   step: FlowTaskStep,
   _stepIndex: number,
   ctx: RunContext
 ): Promise<TaskExecutionResult> {
   const config = requireStepConfig(step.commandPoll, step.id, 'command poll');
-  const options = resolveCommandPollConfiguration(config, ctx);
-  if (!options.enabled) {
-    return { ok: true, output: { outcome: 'not_requested' } };
+  try {
+    return await runDeviceCommandPollStep({
+      stepId: step.id,
+      config,
+      context: ctx.resolvedContext,
+      sendOutput: ctx.taskOutputs.get(config.sendStepId),
+      client: ctx.args.client,
+      tenantId: ctx.args.tenantId
+    });
+  } catch (error) {
+    if (error instanceof DeviceCommandNeedsInputError) {
+      throw new FlowNeedsInputError(error.message, { cause: error });
+    }
+    throw error;
   }
-
-  const sendOutput = ctx.taskOutputs.get(config.sendStepId);
-  const sendResponse = isRecord(sendOutput) && isRecord(sendOutput.response) ? sendOutput.response.data : undefined;
-  const commandId = extractSentCommandId(sendResponse);
-  if (!commandId) {
-    return {
-      ok: false,
-      failureDetail: `Step ${step.id} could not read a command id from ${config.sendStepId}.`
-    };
-  }
-  const deviceId = ctx.resolvedContext.device_id?.trim();
-  if (!deviceId) {
-    throw new FlowNeedsInputError(`Step ${step.id} requires device_id.`);
-  }
-
-  const result = await pollCommandStatus({
-    client: ctx.args.client,
-    tenantId: ctx.args.tenantId,
-    deviceId,
-    commandId,
-    timeoutMs: options.timeoutMs,
-    ...(options.intervalMs === undefined ? {} : { intervalMs: options.intervalMs })
-  });
-  if (result.outcome === 'done') {
-    return { ok: true, output: result };
-  }
-  const statusDetail = result.lastStatus ? ` Last status: ${result.lastStatus}.` : '';
-  return {
-    ok: false,
-    failureDetail:
-      result.outcome === 'timeout'
-        ? `Command ${commandId} status polling timed out.${statusDetail}`
-        : `Command ${commandId} ended with status ${result.outcome}.`,
-    output: result
-  };
 }
 
 async function handleEdgeClaim(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {

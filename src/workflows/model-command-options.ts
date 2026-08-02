@@ -145,14 +145,17 @@ function optionCardinality(field: Record<string, unknown>): {
 } {
   const type = normalizedIdentifier(field.type);
   const typeName = normalizedIdentifier(field.typeName);
+  const hasType = Object.prototype.hasOwnProperty.call(field, 'type');
   const hasTypeName = Object.prototype.hasOwnProperty.call(field, 'typeName');
   const typeCardinality = cardinalityFromType(type);
   const typeNameCardinality = cardinalityFromTypeName(typeName);
   const issues: string[] = [];
 
-  if (!type) {
+  if (hasType && !type) {
+    issues.push('field type must be a non-empty string when provided');
+  } else if (!type && !typeNameCardinality) {
     issues.push('option-backed field type is missing');
-  } else if (!typeCardinality) {
+  } else if (type && !typeCardinality && !typeNameCardinality) {
     issues.push(`field type ${JSON.stringify(field.type)} does not define option cardinality`);
   }
   if (hasTypeName && !typeName) {

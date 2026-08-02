@@ -119,6 +119,46 @@ describe('model command field options', () => {
     expect(result?.issues).not.toEqual([]);
   });
 
+  it.each([
+    {
+      label: 'a scalar enum on a string field',
+      field: {
+        name: 'mode',
+        type: 'string',
+        typeName: 'staticListSingle',
+        options: [{ label: 'Automatic', value: 'auto' }]
+      },
+      input: 'Automatic',
+      expected: 'auto'
+    },
+    {
+      label: 'a multi-value enum on an array field',
+      field: {
+        name: 'zones',
+        type: 'array',
+        typeName: 'staticListMulti',
+        options: [{ label: 'Lobby', value: 'lobby' }]
+      },
+      input: ['Lobby'],
+      expected: ['lobby']
+    },
+    {
+      label: 'an enum whose type is omitted',
+      field: {
+        name: 'mode',
+        typeName: 'staticListSingle',
+        options: [{ label: 'Automatic', value: 'auto' }]
+      },
+      input: 'Automatic',
+      expected: 'auto'
+    }
+  ])('uses typeName cardinality for $label', ({ field, input, expected }) => {
+    const result = extractModelCommandOptionSet(field);
+
+    expect(result?.issues).toEqual([]);
+    expect(matchModelCommandOption(result!, input)).toEqual({ status: 'matched', value: expected });
+  });
+
   it('fails closed when type and typeName disagree about cardinality', () => {
     const result = extractModelCommandOptionSet({
       name: 'mode',
@@ -171,26 +211,25 @@ describe('model command field options', () => {
     expect(empty).toEqual({ cardinality: 'single', options: [], issues: [] });
   });
 
-  it('fails closed when typeName is unknown or type is missing', () => {
+  it('fails closed when typeName is unknown', () => {
     const unknownTypeName = extractModelCommandOptionSet({
       name: 'mode',
       type: 'select',
       typeName: 'surpriseList',
       options: [{ label: 'Automatic', value: 'auto' }]
     });
-    const missingType = extractModelCommandOptionSet({
-      name: 'mode',
-      typeName: 'staticListSingle',
-      options: [{ label: 'Automatic', value: 'auto' }]
-    });
 
     expect(unknownTypeName?.cardinality).toBe('unknown');
     expect(unknownTypeName?.issues).not.toEqual([]);
-    expect(missingType?.cardinality).toBe('unknown');
-    expect(missingType?.issues).not.toEqual([]);
   });
 
-  it('fails closed when typeName or path metadata has the wrong shape', () => {
+  it('fails closed when type, typeName, or path metadata has the wrong shape', () => {
+    const malformedType = extractModelCommandOptionSet({
+      name: 'mode',
+      type: 123,
+      typeName: 'staticListSingle',
+      options: [{ label: 'Automatic', value: 'auto' }]
+    });
     const malformedTypeName = extractModelCommandOptionSet({
       name: 'mode',
       type: 'select',
@@ -205,6 +244,7 @@ describe('model command field options', () => {
       options: [{ label: 'Automatic', value: 'auto' }]
     });
 
+    expect(malformedType?.issues).toContain('field type must be a non-empty string when provided');
     expect(malformedTypeName?.issues).toContain('field typeName must be a non-empty string when provided');
     expect(malformedPath?.issues).toContain('field path must be a non-empty string when provided');
   });

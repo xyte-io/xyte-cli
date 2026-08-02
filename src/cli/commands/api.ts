@@ -7,7 +7,8 @@ import { buildCallEnvelope } from '../../contracts/call-envelope';
 import { toProblemDetails } from '../../client/errors';
 import { CliUserError } from '../../contracts/user-error';
 import { isMutatingMethod } from '../../client/catalog';
-import { isRecord, parseJsonObject } from '../../utils/json';
+import { parseJsonObject } from '../../utils/json';
+import { inspectSendCommandRequestBody } from '../../workflows/send-command-request';
 import { parseQueryJson, parseQueryString } from '../parse-options';
 import {
   type CliContext,
@@ -87,20 +88,22 @@ function collectQueryEntries(value: string, previous: string[] = []): string[] {
 }
 
 function validateSendCommandRequestBody(key: string, body: unknown): void {
-  if (key !== 'organization.commands.sendCommand' || !isRecord(body)) return;
-  if (Object.prototype.hasOwnProperty.call(body, 'name')) {
+  if (key !== 'organization.commands.sendCommand') return;
+  const inspection = inspectSendCommandRequestBody(body);
+  if (!inspection) return;
+  if (inspection.hasName) {
     throw new CliUserError({
       summary: 'Invalid sendCommand body: use "command" instead of "name".',
       detail: 'The model exposes commands[].name, but the send request field is "command".'
     });
   }
-  if (Object.prototype.hasOwnProperty.call(body, 'params')) {
+  if (inspection.hasParams) {
     throw new CliUserError({
       summary: 'Invalid sendCommand body: use "extra_params" instead of "params".',
       detail: '"params" is returned in command responses; command request values belong under "extra_params".'
     });
   }
-  if (Object.prototype.hasOwnProperty.call(body, 'extra_params') && !isRecord(body.extra_params)) {
+  if (inspection.hasInvalidExtraParams) {
     throw new CliUserError({
       summary: 'Invalid sendCommand body: "extra_params" must be a JSON object.'
     });
