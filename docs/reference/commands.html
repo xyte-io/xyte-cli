@@ -147,7 +147,7 @@ xyte-cli api endpoints describe organization.devices.getDevices
 xyte-cli api call organization.devices.getDevices \
   --tenant &lt;tenant-id&gt; \
   --query-json '{"space_id":"&lt;space-id&gt;"}'</code></pre></div>
-          <p class="section-copy">For write-capable endpoints, prefer a guide or flow first. For one-device command sends, use <code>flow.device-command</code> so the device model&rsquo;s supported commands, <code>custom_fields</code>, and <code>with_file</code> requirements are captured before the approval gate. Select labels are mapped to the exact values in model metadata. Send request values under <code>extra_params</code>; raw sends reject response-only <code>params</code>.</p>
+          <p class="section-copy">For write-capable endpoints, prefer a guide or flow first. For one-device command sends, use <code>flow.device-command</code> so the device model&rsquo;s supported commands, <code>custom_fields</code>, and <code>with_file</code> requirements are captured before the approval gate. Send the selected <code>commands[].name</code> under request field <code>command</code>, or use <code>friendly_name</code>; request field <code>name</code> is invalid. Labels and label arrays are mapped through static <code>options</code> embedded in model metadata. Path-backed dynamic choices stop before the send because their values are not embedded there. Send request values as an object under <code>extra_params</code>; raw sends reject response-only <code>params</code> and non-object <code>extra_params</code>.</p>
           <div class="command"><pre><code>xyte-cli api endpoints describe organization.commands.sendCommand
 xyte-cli api call organization.devices.getDevice \
   --tenant &lt;tenant-id&gt; \

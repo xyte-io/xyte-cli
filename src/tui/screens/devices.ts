@@ -18,7 +18,13 @@ import type { CommandTemplate } from '../data-loaders';
 import { loadCommandTemplates, loadDevicesData } from '../data-loaders';
 import { sceneFromDevicesState } from '../scene';
 import { payloadSummary, safeSearchText } from '../serialize';
-import { confirmWriteWithToken, openActionPalette, parseJsonObjectInput, promptChoice, runGuardedAction } from '../actions';
+import {
+  confirmWriteWithToken,
+  openActionPalette,
+  parseJsonObjectInput,
+  promptChoice,
+  runGuardedAction
+} from '../actions';
 import { errorMessage } from '../../utils/error-format';
 import { asRecord, asRecordOrUndefined } from '../../utils/json';
 
@@ -76,7 +82,7 @@ export async function sendCommandWithGuard(args: SendCommandWithGuardArgs): Prom
   }
 
   const body: Record<string, unknown> =
-    args.template.mode === 'command' ? { name: args.template.value } : { friendly_name: args.template.value };
+    args.template.mode === 'command' ? { command: args.template.value } : { friendly_name: args.template.value };
   if (args.params && Object.keys(args.params).length > 0) {
     body.extra_params = args.params;
   }
@@ -200,9 +206,7 @@ export function createDevicesScreen(): NavigableScreen {
       const needle = searchText.toLowerCase();
       filtered = devices.filter((device) => safeSearchText(device).includes(needle));
     }
-    const restoreIndex = restoreDeviceId
-      ? filtered.findIndex((device) => deviceIdOf(device) === restoreDeviceId)
-      : -1;
+    const restoreIndex = restoreDeviceId ? filtered.findIndex((device) => deviceIdOf(device) === restoreDeviceId) : -1;
     selectedIndex = restoreIndex >= 0 ? restoreIndex : clampIndex(selectedIndex, filtered.length);
 
     const actionsHint = 'actions: a send-command, f endpoint filter';
@@ -286,7 +290,10 @@ export function createDevicesScreen(): NavigableScreen {
     });
     if (loaded.error) {
       context.setStatus(`Devices ${loaded.connectionState}: ${loaded.error.message}`);
-      logScreenDataFetch(context.debugLog, 'devices', 'error', { message: loaded.error.message, state: loaded.connectionState });
+      logScreenDataFetch(context.debugLog, 'devices', 'error', {
+        message: loaded.error.message,
+        state: loaded.connectionState
+      });
     }
     applyFilter(restoreDeviceId);
   };
@@ -441,12 +448,13 @@ export function createDevicesScreen(): NavigableScreen {
           actions: [
             {
               label: 'Send command',
-              run: () => runSendCommandWizard({
-                context,
-                getIsMounted: () => isMounted,
-                selectedDevice,
-                refreshDevices
-              })
+              run: () =>
+                runSendCommandWizard({
+                  context,
+                  getIsMounted: () => isMounted,
+                  selectedDevice,
+                  refreshDevices
+                })
             }
           ]
         });

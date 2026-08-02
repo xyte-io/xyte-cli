@@ -86,15 +86,23 @@ function collectQueryEntries(value: string, previous: string[] = []): string[] {
   return [...previous, value];
 }
 
-function rejectResponseOnlyCommandParams(key: string, body: unknown): void {
-  if (
-    key === 'organization.commands.sendCommand' &&
-    isRecord(body) &&
-    Object.prototype.hasOwnProperty.call(body, 'params')
-  ) {
+function validateSendCommandRequestBody(key: string, body: unknown): void {
+  if (key !== 'organization.commands.sendCommand' || !isRecord(body)) return;
+  if (Object.prototype.hasOwnProperty.call(body, 'name')) {
+    throw new CliUserError({
+      summary: 'Invalid sendCommand body: use "command" instead of "name".',
+      detail: 'The model exposes commands[].name, but the send request field is "command".'
+    });
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'params')) {
     throw new CliUserError({
       summary: 'Invalid sendCommand body: use "extra_params" instead of "params".',
       detail: '"params" is returned in command responses; command request values belong under "extra_params".'
+    });
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'extra_params') && !isRecord(body.extra_params)) {
+    throw new CliUserError({
+      summary: 'Invalid sendCommand body: "extra_params" must be a JSON object.'
     });
   }
 }
@@ -134,7 +142,7 @@ async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptio
       throw new CliUserError({ summary: `Invalid --body-json${detail}` });
     }
   }
-  rejectResponseOnlyCommandParams(key, body);
+  validateSendCommandRequestBody(key, body);
   const strictJson = resolveStrictJson({ strictJson: options.strictJson, settings });
   const mutating = isMutatingMethod(method);
   const note = options.note?.trim() || undefined;

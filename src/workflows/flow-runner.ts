@@ -46,10 +46,11 @@ import {
 } from './edge-params-update';
 import { runEdgePing } from './edge-ping';
 import { parsePositiveInt as parseEdgePollPositiveInt } from './edge-poll';
-import { extractSentCommandId, pollCommandStatus } from './command-poll';
+import { extractSentCommandId, MAX_COMMAND_POLL_DELAY_MS, pollCommandStatus } from './command-poll';
 import {
   extractModelCommandOptionSet,
   matchModelCommandOption,
+  MODEL_COMMAND_PATH_OPTIONS_ISSUE,
   type ModelCommandOptionSet
 } from './model-command-options';
 import {
@@ -75,7 +76,9 @@ class FlowNeedsInputError extends Error {
   }
 }
 
-type RunContextArgs = Omit<RunDeterministicFlowArgs, 'inspectProviderScope'> & { inspectProviderScope: InspectProviderScope };
+type RunContextArgs = Omit<RunDeterministicFlowArgs, 'inspectProviderScope'> & {
+  inspectProviderScope: InspectProviderScope;
+};
 
 interface RunContext {
   args: RunContextArgs;
@@ -94,8 +97,23 @@ interface RunContext {
 }
 
 type TaskExecutionResult =
-  | { ok: true; output?: unknown; artifactPath?: string; primaryOutputPath?: string; watchFrames?: WatchFrameV1[]; contextUpdates?: Record<string, string> }
-  | { ok: false; failureDetail: string; needsInput?: boolean; output?: unknown; artifactPath?: string; primaryOutputPath?: string; contextUpdates?: Record<string, string> };
+  | {
+      ok: true;
+      output?: unknown;
+      artifactPath?: string;
+      primaryOutputPath?: string;
+      watchFrames?: WatchFrameV1[];
+      contextUpdates?: Record<string, string>;
+    }
+  | {
+      ok: false;
+      failureDetail: string;
+      needsInput?: boolean;
+      output?: unknown;
+      artifactPath?: string;
+      primaryOutputPath?: string;
+      contextUpdates?: Record<string, string>;
+    };
 
 interface FlowRunInputsPayload {
   flowId?: string;
@@ -323,10 +341,7 @@ function classifyFailure(problem: ReturnType<typeof toProblemDetails>): FlowRunC
   return 'bug';
 }
 
-function toNeedsInputProblem(
-  error: FlowNeedsInputError,
-  instance: string
-): ProblemDetails {
+function toNeedsInputProblem(error: FlowNeedsInputError, instance: string): ProblemDetails {
   return {
     type: 'https://xyte.dev/problems/flow-needs-input',
     title: 'Flow requires additional input',
@@ -408,7 +423,6 @@ function buildReportInputNeedsDataMessage(stepId: string, inputStepId: string, c
   return `${base} ${cause.message}`;
 }
 
-
 function extractCallOutputContext(
   data: unknown,
   spec: { contextKey: string; arrayPath: string; valueField: string },
@@ -455,11 +469,14 @@ interface ModelCommandDefinition {
   friendlyName?: string;
   customFields: Map<string, { required: boolean; optionSet?: ModelCommandOptionSet }>;
   withFile: boolean;
+  issues: string[];
 }
 
 interface ModelCommandCandidates {
   names: Set<string>;
   friendlyNames: Set<string>;
+  ambiguousNames: Set<string>;
+  ambiguousFriendlyNames: Set<string>;
   byName: Map<string, ModelCommandDefinition>;
   byFriendlyName: Map<string, ModelCommandDefinition>;
 }
@@ -468,6 +485,8 @@ function extractModelCommandCandidates(data: unknown): ModelCommandCandidates {
   const rows = isRecord(data) && Array.isArray(data.commands) ? data.commands : [];
   const names = new Set<string>();
   const friendlyNames = new Set<string>();
+  const ambiguousNames = new Set<string>();
+  const ambiguousFriendlyNames = new Set<string>();
   const byName = new Map<string, ModelCommandDefinition>();
   const byFriendlyName = new Map<string, ModelCommandDefinition>();
   for (const row of rows) {
@@ -476,45 +495,76 @@ function extractModelCommandCandidates(data: unknown): ModelCommandCandidates {
       const definition: ModelCommandDefinition = {
         name,
         customFields: new Map(),
-        withFile: false
+        withFile: false,
+        issues: []
       };
       names.add(name);
-      byName.set(name, definition);
+      if (byName.has(name)) {
+        ambiguousNames.add(name);
+        byName.delete(name);
+      } else if (!ambiguousNames.has(name)) {
+        byName.set(name, definition);
+      }
       continue;
     }
     if (!isRecord(row)) {
       continue;
     }
     const customFields = new Map<string, { required: boolean; optionSet?: ModelCommandOptionSet }>();
+    const issues: string[] = [];
     if (Array.isArray(row.custom_fields)) {
-      for (const field of row.custom_fields) {
+      for (const [index, field] of row.custom_fields.entries()) {
         if (!isRecord(field) || typeof field.name !== 'string' || !field.name.trim()) {
+          issues.push(`custom_fields entry ${index + 1} is invalid`);
           continue;
         }
         const fieldName = field.name.trim();
+        if (customFields.has(fieldName)) {
+          issues.push(`custom_fields contains duplicate name ${JSON.stringify(fieldName)}`);
+          continue;
+        }
+        if (field.required !== undefined && typeof field.required !== 'boolean') {
+          issues.push(`custom_fields ${JSON.stringify(fieldName)} required flag must be a boolean`);
+        }
         const optionSet = extractModelCommandOptionSet(field);
         customFields.set(fieldName, {
           required: field.required === true,
           ...(optionSet ? { optionSet } : {})
         });
       }
+    } else if (row.custom_fields !== undefined && row.custom_fields !== null) {
+      issues.push('custom_fields must be an array');
+    }
+    if (row.with_file !== undefined && row.with_file !== null && typeof row.with_file !== 'boolean') {
+      issues.push('with_file must be a boolean');
     }
     const definition: ModelCommandDefinition = {
       customFields,
-      withFile: row.with_file === true
+      withFile: row.with_file === true,
+      issues
     };
     if (typeof row.name === 'string' && row.name.trim()) {
       definition.name = row.name.trim();
       names.add(definition.name);
-      byName.set(definition.name, definition);
+      if (byName.has(definition.name)) {
+        ambiguousNames.add(definition.name);
+        byName.delete(definition.name);
+      } else if (!ambiguousNames.has(definition.name)) {
+        byName.set(definition.name, definition);
+      }
     }
     if (typeof row.friendly_name === 'string' && row.friendly_name.trim()) {
       definition.friendlyName = row.friendly_name.trim();
       friendlyNames.add(definition.friendlyName);
-      byFriendlyName.set(definition.friendlyName, definition);
+      if (byFriendlyName.has(definition.friendlyName)) {
+        ambiguousFriendlyNames.add(definition.friendlyName);
+        byFriendlyName.delete(definition.friendlyName);
+      } else if (!ambiguousFriendlyNames.has(definition.friendlyName)) {
+        byFriendlyName.set(definition.friendlyName, definition);
+      }
     }
   }
-  return { names, friendlyNames, byName, byFriendlyName };
+  return { names, friendlyNames, ambiguousNames, ambiguousFriendlyNames, byName, byFriendlyName };
 }
 
 function findPriorDeviceModelId(ctx: RunContext, deviceId: string): string | undefined {
@@ -593,6 +643,11 @@ function validateCommandArguments(
   command: ModelCommandDefinition,
   bodyPayload: Record<string, unknown>
 ): Record<string, unknown> {
+  if (command.issues.length > 0) {
+    throw new FlowNeedsInputError(
+      `Selected command for model ${modelId} has invalid or ambiguous custom field metadata: ${command.issues.join('; ')}.`
+    );
+  }
   const extraParams = isRecord(bodyPayload.extra_params) ? bodyPayload.extra_params : {};
   const extraKeys = Object.keys(extraParams);
   if (extraKeys.length > 0 && command.customFields.size === 0) {
@@ -609,13 +664,22 @@ function validateCommandArguments(
   const missingRequired = [...command.customFields.entries()]
     .filter(([, field]) => field.required)
     .map(([name]) => name)
-    .filter((key) => extraParams[key] === undefined || extraParams[key] === null || extraParams[key] === '');
+    .filter((key) => {
+      const value = extraParams[key];
+      const field = command.customFields.get(key);
+      return (
+        value === undefined ||
+        value === null ||
+        value === '' ||
+        (field?.optionSet?.cardinality === 'multiple' && Array.isArray(value) && value.length === 0)
+      );
+    });
   if (missingRequired.length > 0) {
     throw new FlowNeedsInputError(
       `Selected command for model ${modelId} requires extra_params field(s): ${missingRequired.join(', ')}.`
     );
   }
-  if (command.withFile && typeof bodyPayload.file_id !== 'string') {
+  if (command.withFile && (typeof bodyPayload.file_id !== 'string' || !bodyPayload.file_id.trim())) {
     throw new FlowNeedsInputError(`Selected command for model ${modelId} requires command_file_id/file_id.`);
   }
 
@@ -624,14 +688,25 @@ function validateCommandArguments(
     const optionSet = command.customFields.get(key)?.optionSet;
     if (!optionSet) continue;
     if (optionSet.issues.length > 0 || optionSet.options.length === 0) {
+      if (optionSet.issues.includes(MODEL_COMMAND_PATH_OPTIONS_ISSUE)) {
+        throw new FlowNeedsInputError(
+          `Selected command for model ${modelId} uses path-backed options for extra_params field ${key}; this flow cannot resolve those choices from model metadata.`
+        );
+      }
       throw new FlowNeedsInputError(
-        `Selected command for model ${modelId} has ambiguous options metadata for extra_params field ${key}.`
+        `Selected command for model ${modelId} has invalid or ambiguous options metadata for extra_params field ${key}.`
       );
     }
-    const match = matchModelCommandOption(optionSet.options, extraParams[key]);
+    const match = matchModelCommandOption(optionSet, extraParams[key]);
     if (match.status !== 'matched') {
+      const problem =
+        match.status === 'ambiguous'
+          ? 'an ambiguous value'
+          : match.status === 'invalid-cardinality'
+            ? 'a value with the wrong scalar/array shape'
+            : 'an unknown value';
       throw new FlowNeedsInputError(
-        `Selected command for model ${modelId} has ${match.status === 'ambiguous' ? 'an ambiguous' : 'an unknown'} value for extra_params field ${key}.`
+        `Selected command for model ${modelId} has ${problem} for extra_params field ${key}.`
       );
     }
     normalizedExtraParams[key] = match.value;
@@ -656,24 +731,47 @@ function validateSendCommandAgainstModel(
   }
   if (!isRecord(bodyPayload)) {
     throw new FlowNeedsInputError(
-      `Step ${step.id} requires body.name or body.friendly_name selected from organization.models.getModel commands[].`
+      `Step ${step.id} requires body.command or body.friendly_name selected from organization.models.getModel commands[].`
     );
+  }
+  if (Object.prototype.hasOwnProperty.call(bodyPayload, 'params')) {
+    throw new FlowNeedsInputError(
+      `Step ${step.id} must use body.extra_params for command request values; body.params is response-only data.`
+    );
+  }
+  if (Object.prototype.hasOwnProperty.call(bodyPayload, 'extra_params') && !isRecord(bodyPayload.extra_params)) {
+    throw new FlowNeedsInputError(`Step ${step.id} requires body.extra_params to be a JSON object.`);
   }
   const deviceId = String(pathPayload.device_id ?? '');
-  const legacyCommand = typeof bodyPayload.command === 'string' ? bodyPayload.command.trim() : '';
-  if (legacyCommand) {
+  if (Object.prototype.hasOwnProperty.call(bodyPayload, 'name')) {
     throw new FlowNeedsInputError(
-      `Step ${step.id} must use body.name or body.friendly_name for organization.commands.sendCommand; body.command is not supported.`
+      `Step ${step.id} must use body.command or body.friendly_name for organization.commands.sendCommand; body.name is not supported.`
     );
   }
-  const name = typeof bodyPayload.name === 'string' ? bodyPayload.name.trim() : '';
+  if (
+    Object.prototype.hasOwnProperty.call(bodyPayload, 'command') &&
+    (typeof bodyPayload.command !== 'string' || !bodyPayload.command.trim())
+  ) {
+    throw new FlowNeedsInputError(`Step ${step.id} requires body.command to be a non-empty string when provided.`);
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(bodyPayload, 'friendly_name') &&
+    (typeof bodyPayload.friendly_name !== 'string' || !bodyPayload.friendly_name.trim())
+  ) {
+    throw new FlowNeedsInputError(
+      `Step ${step.id} requires body.friendly_name to be a non-empty string when provided.`
+    );
+  }
+  const commandName = typeof bodyPayload.command === 'string' ? bodyPayload.command.trim() : '';
   const friendlyName = typeof bodyPayload.friendly_name === 'string' ? bodyPayload.friendly_name.trim() : '';
   if (!deviceId) {
-    throw new FlowNeedsInputError(`Step ${step.id} requires device_id before sending organization.commands.sendCommand.`);
-  }
-  if (!name && !friendlyName) {
     throw new FlowNeedsInputError(
-      `Step ${step.id} requires body.name or body.friendly_name selected from organization.models.getModel commands[].`
+      `Step ${step.id} requires device_id before sending organization.commands.sendCommand.`
+    );
+  }
+  if (!commandName && !friendlyName) {
+    throw new FlowNeedsInputError(
+      `Step ${step.id} requires body.command or body.friendly_name selected from organization.models.getModel commands[].`
     );
   }
 
@@ -691,30 +789,57 @@ function validateSendCommandAgainstModel(
     );
   }
   let commandDefinition: ModelCommandDefinition | undefined;
-  if (name && !candidates.names.has(name)) {
+  if (commandName && !candidates.names.has(commandName)) {
     throw new FlowNeedsInputError(
-      `Selected command name "${name}" was not found in organization.models.getModel commands[].name for model ${modelId}.`
+      `Selected command name "${commandName}" was not found in organization.models.getModel commands[].name for model ${modelId}.`
     );
   }
-  if (name) {
-    commandDefinition = candidates.byName.get(name);
+  if (commandName && candidates.ambiguousNames.has(commandName)) {
+    throw new FlowNeedsInputError(
+      `Selected command name ${JSON.stringify(commandName)} is ambiguous in organization.models.getModel commands[] for model ${modelId}.`
+    );
+  }
+  if (commandName) {
+    commandDefinition = candidates.byName.get(commandName);
   }
   if (friendlyName && !candidates.friendlyNames.has(friendlyName)) {
     throw new FlowNeedsInputError(
       `Selected friendly_name "${friendlyName}" was not found in organization.models.getModel commands[].friendly_name for model ${modelId}.`
     );
   }
-  if (!commandDefinition && friendlyName) {
-    commandDefinition = candidates.byFriendlyName.get(friendlyName);
+  if (friendlyName && candidates.ambiguousFriendlyNames.has(friendlyName)) {
+    throw new FlowNeedsInputError(
+      `Selected friendly_name ${JSON.stringify(friendlyName)} is ambiguous in organization.models.getModel commands[] for model ${modelId}.`
+    );
   }
+  const friendlyNameDefinition = friendlyName ? candidates.byFriendlyName.get(friendlyName) : undefined;
+  if (commandDefinition && friendlyNameDefinition && commandDefinition !== friendlyNameDefinition) {
+    throw new FlowNeedsInputError(
+      `Selected command name ${JSON.stringify(commandName)} and friendly_name ${JSON.stringify(friendlyName)} identify different model commands for model ${modelId}.`
+    );
+  }
+  if (!commandDefinition && friendlyNameDefinition) {
+    commandDefinition = friendlyNameDefinition;
+  }
+  const normalizedBodyPayload: Record<string, unknown> = {
+    ...bodyPayload,
+    ...(commandName ? { command: commandName } : {}),
+    ...(friendlyName ? { friendly_name: friendlyName } : {})
+  };
   if (commandDefinition) {
-    return validateCommandArguments(modelId, commandDefinition, bodyPayload);
+    return validateCommandArguments(modelId, commandDefinition, normalizedBodyPayload);
   }
-  return bodyPayload;
+  return normalizedBodyPayload;
 }
 
 function evaluateReadinessWithConnectivity(ctx: RunContext): ReturnType<typeof evaluateReadiness> {
-  return evaluateReadiness({ profileStore: ctx.args.profileStore, secretStore: ctx.args.secretStore, tenantId: ctx.args.tenantId, client: ctx.args.client, checkConnectivity: true });
+  return evaluateReadiness({
+    profileStore: ctx.args.profileStore,
+    secretStore: ctx.args.secretStore,
+    tenantId: ctx.args.tenantId,
+    client: ctx.args.client,
+    checkConnectivity: true
+  });
 }
 
 async function handleSetupStatusStep(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
@@ -736,7 +861,12 @@ async function handleConfigDoctor(_step: FlowTaskStep, ctx: RunContext): Promise
 }
 
 async function handleStatusFast(_step: FlowTaskStep, ctx: RunContext): Promise<TaskExecutionResult> {
-  const readiness = await evaluateReadiness({ profileStore: ctx.args.profileStore, secretStore: ctx.args.secretStore, tenantId: ctx.args.tenantId, checkConnectivity: false });
+  const readiness = await evaluateReadiness({
+    profileStore: ctx.args.profileStore,
+    secretStore: ctx.args.secretStore,
+    tenantId: ctx.args.tenantId,
+    checkConnectivity: false
+  });
   return { ok: true, output: buildStatusContract({ mode: 'fast', checkConnectivity: false, readiness }) };
 }
 
@@ -761,7 +891,16 @@ function handleMigrationReport(args: {
   tenantId: string;
   outPath: string;
 }): TaskExecutionResult {
-  const { stepId, inputFromStepId, fleetFromStepId, verificationFromStepId, reportInput, taskOutputs, tenantId, outPath } = args;
+  const {
+    stepId,
+    inputFromStepId,
+    fleetFromStepId,
+    verificationFromStepId,
+    reportInput,
+    taskOutputs,
+    tenantId,
+    outPath
+  } = args;
   if (reportInput.schemaVersion !== UTILITY_BATCH_SCHEMA_VERSION || reportInput.command !== 'device.move') {
     throw new FlowNeedsInputError(`Step ${stepId} requires device.move batch output from ${inputFromStepId}.`);
   }
@@ -802,7 +941,9 @@ async function handleReportGenerate(step: FlowTaskStep, ctx: RunContext): Promis
   try {
     reportInput = parseReportInput(input, ctx.args.tenantId);
   } catch (error) {
-    throw new FlowNeedsInputError(buildReportInputNeedsDataMessage(step.id, report.inputFromStepId, error), { cause: error });
+    throw new FlowNeedsInputError(buildReportInputNeedsDataMessage(step.id, report.inputFromStepId, error), {
+      cause: error
+    });
   }
   const outPath = path.join(ctx.outputsDir, report.outFileName);
   const { fleetFromStepId, verificationFromStepId } = report;
@@ -923,7 +1064,11 @@ function handleUtilityPrepare(step: FlowTaskStep, _stepIndex: number, ctx: RunCo
   return { ok: true, output: result, primaryOutputPath: result.artifacts.primary, contextUpdates };
 }
 
-async function handleDeviceMatch(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+async function handleDeviceMatch(
+  step: FlowTaskStep,
+  _stepIndex: number,
+  ctx: RunContext
+): Promise<TaskExecutionResult> {
   const deviceMatch = requireStepConfig(step.deviceMatch, step.id, 'device match');
   const sourcePath = path.resolve(resolveTemplateString(deviceMatch.sourcePath, ctx.resolvedContext));
   const targetPath = path.resolve(resolveTemplateString(deviceMatch.targetPath, ctx.resolvedContext));
@@ -939,7 +1084,11 @@ async function handleDeviceMatch(step: FlowTaskStep, _stepIndex: number, ctx: Ru
   return { ok: true, output: result, primaryOutputPath: outputPath };
 }
 
-async function handleDeviceMoveBatch(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+async function handleDeviceMoveBatch(
+  step: FlowTaskStep,
+  _stepIndex: number,
+  ctx: RunContext
+): Promise<TaskExecutionResult> {
   const deviceMoveBatch = requireStepConfig(step.deviceMoveBatch, step.id, 'device move batch');
   const inputPath = path.resolve(resolveTemplateString(deviceMoveBatch.inputPath, ctx.resolvedContext));
   const reportPath = path.join(ctx.outputsDir, path.basename(deviceMoveBatch.reportPath));
@@ -955,12 +1104,22 @@ async function handleDeviceMoveBatch(step: FlowTaskStep, _stepIndex: number, ctx
     ? { execute_moves_report_path: reportPath }
     : { dry_run_moves_report_path: reportPath };
   if (result.totals.failed > 0 || result.stoppedEarly) {
-    return { ok: false, failureDetail: `Step ${step.id} failed because the move batch reported ${result.totals.failed} failed row(s).`, output: result, primaryOutputPath: reportPath, contextUpdates };
+    return {
+      ok: false,
+      failureDetail: `Step ${step.id} failed because the move batch reported ${result.totals.failed} failed row(s).`,
+      output: result,
+      primaryOutputPath: reportPath,
+      contextUpdates
+    };
   }
   return { ok: true, output: result, primaryOutputPath: reportPath, contextUpdates };
 }
 
-async function handleDeviceVerifyBatch(step: FlowTaskStep, stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+async function handleDeviceVerifyBatch(
+  step: FlowTaskStep,
+  stepIndex: number,
+  ctx: RunContext
+): Promise<TaskExecutionResult> {
   const deviceVerifyBatch = requireStepConfig(step.deviceVerifyBatch, step.id, 'device verification');
   const inputPath = path.resolve(resolveTemplateString(deviceVerifyBatch.inputPath, ctx.resolvedContext));
   const artifactPath = buildStepArtifactPath(ctx, stepIndex, step.id, 'json');
@@ -971,12 +1130,21 @@ async function handleDeviceVerifyBatch(step: FlowTaskStep, stepIndex: number, ct
     outputPath: artifactPath
   });
   if (result.totals.mismatched > 0 || result.totals.missing > 0) {
-    return { ok: false, failureDetail: `Step ${step.id} found ${result.totals.mismatched} mismatched and ${result.totals.missing} missing planned device(s).`, output: result, artifactPath };
+    return {
+      ok: false,
+      failureDetail: `Step ${step.id} found ${result.totals.mismatched} mismatched and ${result.totals.missing} missing planned device(s).`,
+      output: result,
+      artifactPath
+    };
   }
   return { ok: true, output: result, artifactPath };
 }
 
-async function handleSpaceImportTree(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+async function handleSpaceImportTree(
+  step: FlowTaskStep,
+  _stepIndex: number,
+  ctx: RunContext
+): Promise<TaskExecutionResult> {
   const spaceImportTree = requireStepConfig(step.spaceImportTree, step.id, 'space import');
   const inputPath = path.resolve(resolveTemplateString(spaceImportTree.inputPath, ctx.resolvedContext));
   const reportPath = path.join(ctx.outputsDir, path.basename(spaceImportTree.reportPath));
@@ -991,7 +1159,11 @@ async function handleSpaceImportTree(step: FlowTaskStep, _stepIndex: number, ctx
   return { ok: true, output: result, artifactPath: reportPath, primaryOutputPath: reportPath };
 }
 
-function resolvePollOptions(ctx: RunContext, intervalKey?: string, timeoutKey?: string): { intervalMs?: number; timeoutMs?: number } {
+function resolvePollOptions(
+  ctx: RunContext,
+  intervalKey?: string,
+  timeoutKey?: string
+): { intervalMs?: number; timeoutMs?: number } {
   const options: { intervalMs?: number; timeoutMs?: number } = {};
   const resolvedIntervalKey = intervalKey ?? 'edge_poll_interval_ms';
   const resolvedTimeoutKey = timeoutKey ?? 'edge_poll_timeout_ms';
@@ -1011,11 +1183,16 @@ function parseCommandPollEnabled(raw: string | undefined, key: string): boolean 
 }
 
 function parseCommandPollPositiveInt(raw: string | undefined, key: string): number | undefined {
+  let value: number | undefined;
   try {
-    return parseEdgePollPositiveInt(raw, key);
+    value = parseEdgePollPositiveInt(raw, key);
   } catch {
     throw new FlowNeedsInputError(`${key} must be a positive integer.`);
   }
+  if (value !== undefined && value > MAX_COMMAND_POLL_DELAY_MS) {
+    throw new FlowNeedsInputError(`${key} must be no greater than ${MAX_COMMAND_POLL_DELAY_MS}.`);
+  }
+  return value;
 }
 
 function resolveCommandPollConfiguration(
@@ -1132,7 +1309,11 @@ async function handleEdgeClaim(step: FlowTaskStep, _stepIndex: number, ctx: RunC
   return { ok: true, output: outcome };
 }
 
-async function handleEdgeClaimBatch(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+async function handleEdgeClaimBatch(
+  step: FlowTaskStep,
+  _stepIndex: number,
+  ctx: RunContext
+): Promise<TaskExecutionResult> {
   const config = requireStepConfig(step.edgeClaimBatch, step.id, 'edge claim batch');
   const inputPath = path.resolve(resolveTemplateString(config.inputPath, ctx.resolvedContext));
   const reportPath = path.join(ctx.outputsDir, path.basename(config.reportPath));
@@ -1169,7 +1350,11 @@ async function handleEdgeClaimBatch(step: FlowTaskStep, _stepIndex: number, ctx:
   return { ok: true, output: result, primaryOutputPath: reportPath, contextUpdates };
 }
 
-async function handleEdgeParamsUpdate(step: FlowTaskStep, _stepIndex: number, ctx: RunContext): Promise<TaskExecutionResult> {
+async function handleEdgeParamsUpdate(
+  step: FlowTaskStep,
+  _stepIndex: number,
+  ctx: RunContext
+): Promise<TaskExecutionResult> {
   const config = requireStepConfig(step.edgeParamsUpdate, step.id, 'edge params update');
   const context = ctx.resolvedContext;
   const deviceId = context.device_id?.trim();
@@ -1264,27 +1449,48 @@ async function runTaskStep(step: FlowTaskStep, stepIndex: number, ctx: RunContex
   ensureContextKeys(step, ctx.resolvedContext);
 
   switch (step.task) {
-    case 'doctor.install':    return { ok: true, output: buildInstallDoctorReport(path.resolve(__dirname, '../../dist/bin/xyte-cli.js')) };
-    case 'setup.status':      return handleSetupStatusStep(step, ctx);
-    case 'config.doctor':     return handleConfigDoctor(step, ctx);
-    case 'status.fast':       return handleStatusFast(step, ctx);
-    case 'inspect.fleet':     return handleFleetInspect(step, ctx);
-    case 'inspect.deep-dive': return handleDeepDive(step, ctx);
-    case 'report.generate':   return handleReportGenerate(step, ctx);
-    case 'watch':             return handleWatch(step, stepIndex, ctx);
-    case 'call':              return handleCall(step, stepIndex, ctx);
-    case 'utility.prepare':   return handleUtilityPrepare(step, stepIndex, ctx);
-    case 'device.match':      return handleDeviceMatch(step, stepIndex, ctx);
-    case 'device.move-batch': return handleDeviceMoveBatch(step, stepIndex, ctx);
-    case 'device.verify-batch': return handleDeviceVerifyBatch(step, stepIndex, ctx);
-    case 'space.import-tree': return handleSpaceImportTree(step, stepIndex, ctx);
-    case 'command.poll':      return handleCommandPoll(step, stepIndex, ctx);
-    case 'edge.claim':        return handleEdgeClaim(step, stepIndex, ctx);
-    case 'edge.claim-batch':  return handleEdgeClaimBatch(step, stepIndex, ctx);
-    case 'edge.params-update': return handleEdgeParamsUpdate(step, stepIndex, ctx);
-    case 'edge.params-update-batch': return handleEdgeParamsUpdateBatch(step, stepIndex, ctx);
-    case 'edge.ping':         return handleEdgePing(step, stepIndex, ctx);
-    default: throw new Error(`Unsupported flow task type: ${(step as { task: string }).task}`);
+    case 'doctor.install':
+      return { ok: true, output: buildInstallDoctorReport(path.resolve(__dirname, '../../dist/bin/xyte-cli.js')) };
+    case 'setup.status':
+      return handleSetupStatusStep(step, ctx);
+    case 'config.doctor':
+      return handleConfigDoctor(step, ctx);
+    case 'status.fast':
+      return handleStatusFast(step, ctx);
+    case 'inspect.fleet':
+      return handleFleetInspect(step, ctx);
+    case 'inspect.deep-dive':
+      return handleDeepDive(step, ctx);
+    case 'report.generate':
+      return handleReportGenerate(step, ctx);
+    case 'watch':
+      return handleWatch(step, stepIndex, ctx);
+    case 'call':
+      return handleCall(step, stepIndex, ctx);
+    case 'utility.prepare':
+      return handleUtilityPrepare(step, stepIndex, ctx);
+    case 'device.match':
+      return handleDeviceMatch(step, stepIndex, ctx);
+    case 'device.move-batch':
+      return handleDeviceMoveBatch(step, stepIndex, ctx);
+    case 'device.verify-batch':
+      return handleDeviceVerifyBatch(step, stepIndex, ctx);
+    case 'space.import-tree':
+      return handleSpaceImportTree(step, stepIndex, ctx);
+    case 'command.poll':
+      return handleCommandPoll(step, stepIndex, ctx);
+    case 'edge.claim':
+      return handleEdgeClaim(step, stepIndex, ctx);
+    case 'edge.claim-batch':
+      return handleEdgeClaimBatch(step, stepIndex, ctx);
+    case 'edge.params-update':
+      return handleEdgeParamsUpdate(step, stepIndex, ctx);
+    case 'edge.params-update-batch':
+      return handleEdgeParamsUpdateBatch(step, stepIndex, ctx);
+    case 'edge.ping':
+      return handleEdgePing(step, stepIndex, ctx);
+    default:
+      throw new Error(`Unsupported flow task type: ${(step as { task: string }).task}`);
   }
 }
 
@@ -1343,7 +1549,10 @@ async function findRunBundle(outDir: string, resumeRef: string): Promise<string>
           return candidate;
         }
       } catch (error) {
-        getLogger().debug({ manifestPath, error: errorMessage(error) }, 'Skipping malformed manifest during resume search');
+        getLogger().debug(
+          { manifestPath, error: errorMessage(error) },
+          'Skipping malformed manifest during resume search'
+        );
       }
     }
   }
@@ -1465,7 +1674,10 @@ async function restoreTaskOutputsFromSteps(steps: FlowRunStep[]): Promise<Map<st
       const parsed = JSON.parse(await readFile(step.artifactPath, 'utf8')) as unknown;
       taskOutputs.set(step.stepId, parsed);
     } catch (error) {
-      getLogger().warn({ stepId: step.stepId, error: errorMessage(error) }, 'Failed to restore task artifact from step during resume hydration');
+      getLogger().warn(
+        { stepId: step.stepId, error: errorMessage(error) },
+        'Failed to restore task artifact from step during resume hydration'
+      );
     }
   }
   return taskOutputs;
@@ -1499,7 +1711,9 @@ async function loadResumeState(resumeBundle: string): Promise<ResumeState> {
   try {
     existingSummary = FlowRunSummarySchema.parse(JSON.parse(raw));
   } catch {
-    throw new CliUserError({ summary: `Resume bundle manifest is invalid JSON or has unexpected shape: ${manifestPath}` });
+    throw new CliUserError({
+      summary: `Resume bundle manifest is invalid JSON or has unexpected shape: ${manifestPath}`
+    });
   }
   const storedInputs = await readStoredInputs(resumeBundle);
   return {
@@ -1510,9 +1724,10 @@ async function loadResumeState(resumeBundle: string): Promise<ResumeState> {
     cursorIndex: existingSummary.cursor.nextStepIndex,
     priorDecisions: await readLinesAsJson(path.join(resumeBundle, 'decisions.ndjson'), FlowRunDecisionSchema),
     priorErrors: await readLinesAsJson(path.join(resumeBundle, 'errors.ndjson'), FlowRunErrorEntrySchema),
-    resumedInspectProviderScope: storedInputs && isInspectProviderScopeValue(storedInputs.inspectProviderScope)
-      ? storedInputs.inspectProviderScope
-      : undefined,
+    resumedInspectProviderScope:
+      storedInputs && isInspectProviderScopeValue(storedInputs.inspectProviderScope)
+        ? storedInputs.inspectProviderScope
+        : undefined,
     resumedContext: toStringRecord(storedInputs?.context)
   };
 }

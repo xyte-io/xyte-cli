@@ -36,6 +36,8 @@ describe('public endpoint catalog', () => {
   it('documents the sendCommand request field separately from response params', () => {
     const sendCommand = endpoints.find((endpoint) => endpoint.key === 'organization.commands.sendCommand');
 
+    expect(sendCommand?.bodyExample).toContain('"command"');
+    expect(sendCommand?.bodyExample).not.toContain('"name"');
     expect(sendCommand?.bodyExample).toContain('"extra_params"');
     expect(sendCommand?.bodyExample).not.toContain('"params"');
     expect(sendCommand?.notes?.join(' ')).toContain('params is returned in command responses');

@@ -20,6 +20,7 @@ export interface XyteClientOptions {
 
 export interface XyteCallArgs {
   requestId?: string;
+  signal?: AbortSignal;
   path?: Record<string, string | number>;
   query?: Record<string, string | number | boolean | null | undefined>;
   body?: unknown;

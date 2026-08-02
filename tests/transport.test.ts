@@ -52,6 +52,58 @@ describe('http transport', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('aborts an idempotent request on the caller signal without retrying', async () => {
+    const fetchMock = vi.fn(
+      (_url: string, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          if (init?.signal?.aborted) {
+            reject(new DOMException('The operation was aborted', 'AbortError'));
+            return;
+          }
+          init?.signal?.addEventListener(
+            'abort',
+            () => reject(new DOMException('The operation was aborted', 'AbortError')),
+            { once: true }
+          );
+        })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+    const transport = new HttpTransport({ timeoutMs: 1_000, retryAttempts: 2, retryBackoffMs: 1 });
+
+    const request = transport.request({
+      method: 'GET',
+      url: 'https://example.test/v1/devices',
+      idempotent: true,
+      signal: controller.signal
+    });
+    controller.abort();
+
+    await expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels retry backoff when the caller aborts', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('network down'));
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+    const transport = new HttpTransport({ retryAttempts: 2, retryBackoffMs: 1_000 });
+    const startedAt = Date.now();
+
+    const request = transport.request({
+      method: 'GET',
+      url: 'https://example.test/v1/devices',
+      idempotent: true,
+      signal: controller.signal
+    });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    controller.abort();
+
+    await expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(Date.now() - startedAt).toBeLessThan(500);
+  });
+
   it('parses structured error responses', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ message: 'unauthorized' }), {

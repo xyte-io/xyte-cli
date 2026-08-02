@@ -86,7 +86,9 @@ describe('client auth behavior', () => {
       hubBaseUrl: 'https://hub.example.test',
       transport
     });
+    const controller = new AbortController();
     await client.organization.getCommands({
+      signal: controller.signal,
       path: { device_id: 'dev-1' },
       query: { status: 'pending' },
       body: { device_id: 'dev-1' }
@@ -98,6 +100,7 @@ describe('client auth behavior', () => {
     expect(sent.url).toBe('https://hub.example.test/core/v1/organization/devices/dev-1/commands?status=pending');
     expect(sent.body).toBeUndefined();
     expect(sent.headers['Content-Type']).toBeUndefined();
+    expect(sent.signal).toBe(controller.signal);
   });
 
   it('uses the callable partner ticket path without the docs copy suffix', async () => {

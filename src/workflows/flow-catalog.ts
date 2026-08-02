@@ -328,16 +328,14 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         '  --tenant <tenant-id> \\',
         `  --path-json '{"device_id":"<device-id>"}'`
       ].join('\n'),
-      [
-        'xyte-cli edge models describe \\',
-        '  --tenant <tenant-id> \\',
-        '  --model-id <model-id-from-device>'
-      ].join('\n'),
+      ['xyte-cli edge models describe \\', '  --tenant <tenant-id> \\', '  --model-id <model-id-from-device>'].join(
+        '\n'
+      ),
       [
         'xyte-cli api call organization.commands.sendCommand \\',
         '  --tenant <tenant-id> \\',
         `  --path-json '{"device_id":"<device-id>"}' \\`,
-        `  --body-json '{"name":"<commands[].name>","extra_params":{}}'`
+        `  --body-json '{"command":"<commands[].name>","extra_params":{}}'`
       ].join('\n'),
       [
         'xyte-cli api call organization.devices.updateDevice \\',
@@ -431,14 +429,14 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
             device_id: '{{device_id}}'
           },
           body: {
-            name: '{{command}}'
+            command: '{{command}}'
           },
           outputMode: 'envelope'
         },
         requiresContext: ['device_id', 'command'],
         mutating: true,
         command:
-          'xyte-cli api call organization.commands.sendCommand --tenant <tenant-id> --path-json {"device_id":"<device-id>"} --body-json {"name":"<commands[].name>","extra_params":{}}'
+          'xyte-cli api call organization.commands.sendCommand --tenant <tenant-id> --path-json {"device_id":"<device-id>"} --body-json {"command":"<commands[].name>","extra_params":{}}'
       },
       {
         kind: 'gate',
@@ -565,16 +563,14 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         '  --tenant <tenant-id> \\',
         `  --path-json '{"device_id":"<device-id>"}'`
       ].join('\n'),
-      [
-        'xyte-cli edge models describe \\',
-        '  --tenant <tenant-id> \\',
-        '  --model-id <model-id-from-device>'
-      ].join('\n'),
+      ['xyte-cli edge models describe \\', '  --tenant <tenant-id> \\', '  --model-id <model-id-from-device>'].join(
+        '\n'
+      ),
       [
         'xyte-cli api call organization.commands.sendCommand \\',
         '  --tenant <tenant-id> \\',
         `  --path-json '{"device_id":"<device-id>"}' \\`,
-        `  --body-json '{"name":"<commands[].name>","extra_params":{}}'`
+        `  --body-json '{"command":"<commands[].name>","extra_params":{}}'`
       ].join('\n'),
       [
         'xyte-cli api call organization.commands.getCommands \\',
@@ -638,14 +634,14 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
             device_id: '{{device_id}}'
           },
           body: {
-            name: '{{command}}'
+            command: '{{command}}'
           },
           outputMode: 'envelope'
         },
         requiresContext: ['device_id', 'command'],
         mutating: true,
         command:
-          'xyte-cli api call organization.commands.sendCommand --tenant <tenant-id> --path-json {"device_id":"<device-id>"} --body-json {"name":"<commands[].name>","extra_params":{}}'
+          'xyte-cli api call organization.commands.sendCommand --tenant <tenant-id> --path-json {"device_id":"<device-id>"} --body-json {"command":"<commands[].name>","extra_params":{}}'
       },
       {
         kind: 'task',
@@ -697,8 +693,7 @@ const FLOWS: Record<BuiltInFlowId, BuiltInFlowDefinition> = {
         },
         requiresContext: ['source_space_id'],
         mutating: false,
-        command:
-          `xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query-json '{"space_id":"<source-space-id>","page":1,"per_page":100}' --output-mode envelope --output json > ./artifacts/source-devices.page-1.json`
+        command: `xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query-json '{"space_id":"<source-space-id>","page":1,"per_page":100}' --output-mode envelope --output json > ./artifacts/source-devices.page-1.json`
       },
       {
         kind: 'task',

@@ -115,11 +115,12 @@ describe('cli integration', () => {
   });
 
   it('suppresses update checks for commands that always print JSON', async () => {
-    const fetchImpl = vi.fn(async () =>
-      new Response(JSON.stringify({ version: '0.12.3' }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' }
-      })
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ version: '0.12.3' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
     );
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
@@ -150,11 +151,12 @@ describe('cli integration', () => {
   });
 
   it('suppresses update checks for command-local default JSON output', async () => {
-    const fetchImpl = vi.fn(async () =>
-      new Response(JSON.stringify({ version: '0.12.3' }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' }
-      })
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ version: '0.12.3' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
     );
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
@@ -390,16 +392,32 @@ describe('cli integration', () => {
       '--path-json',
       '{"device_id":"dev-1"}',
       '--body-json',
-      '{"name":"set_input","extra_params":{"input":"33"}}'
+      '{"command":"set_input","extra_params":{"input":"33"}}'
     ]);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect((fetchMock.mock.calls[0][1] as RequestInit | undefined)?.body).toBe(
-      JSON.stringify({ name: 'set_input', extra_params: { input: '33' } })
+      JSON.stringify({ command: 'set_input', extra_params: { input: '33' } })
     );
   });
 
-  it('rejects response-only params in a raw sendCommand body before calling the API', async () => {
+  it.each([
+    {
+      label: 'model metadata name used as the request key',
+      bodyJson: '{"name":"set_input"}',
+      expectedError: 'use "command" instead of "name"'
+    },
+    {
+      label: 'response-only params',
+      bodyJson: '{"command":"set_input","params":{"input":"33"}}',
+      expectedError: 'use "extra_params" instead of "params"'
+    },
+    {
+      label: 'non-object extra_params',
+      bodyJson: '{"command":"set_input","extra_params":["33"]}',
+      expectedError: '"extra_params" must be a JSON object'
+    }
+  ])('rejects $label in a raw sendCommand body before calling the API', async ({ bodyJson, expectedError }) => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
@@ -426,9 +444,9 @@ describe('cli integration', () => {
         '--path-json',
         '{"device_id":"dev-1"}',
         '--body-json',
-        '{"name":"set_input","params":{"input":"33"}}'
+        bodyJson
       ])
-    ).rejects.toThrow('use "extra_params" instead of "params"');
+    ).rejects.toThrow(expectedError);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -4895,7 +4913,11 @@ describe('cli integration', () => {
             }
           );
         }
-        if (url.includes('/organization/devices/dev-1') && !url.includes('/commands') && (init?.method ?? 'GET') === 'GET') {
+        if (
+          url.includes('/organization/devices/dev-1') &&
+          !url.includes('/commands') &&
+          (init?.method ?? 'GET') === 'GET'
+        ) {
           return new Response(JSON.stringify({ id: 'dev-1', model: { id: 'model-1', name: 'Model 1' } }), {
             status: 200,
             headers: { 'content-type': 'application/json' }

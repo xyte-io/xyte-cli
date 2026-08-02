@@ -57,6 +57,11 @@
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "type": { "type": "string" },
+        "typeName": { "type": "string" },
+        "options": {
+          "oneOf": [{ "type": "array" }, { "type": "object" }]
+        },
+        "path": { "type": "string" },
         "required": { "type": "boolean" }
       },
       "additionalProperties": true
@@ -69,10 +74,10 @@
         "name": { "type": "string", "minLength": 1 },
         "friendly_name": { "type": "string" },
         "custom_fields": {
-          "type": "array",
+          "type": ["array", "null"],
           "items": { "$ref": "#/$defs/commandCustomField" }
         },
-        "with_file": { "type": "boolean" }
+        "with_file": { "type": ["boolean", "null"] }
       },
       "additionalProperties": true
     }
