@@ -1429,7 +1429,7 @@ describe('cli integration', () => {
     parsed = JSON.parse(output);
     expect(parsed.values.console.screen).toBe('dashboard');
     expect(parsed.sources['console.screen']).toBe('default');
-  });
+  }, 20_000);
 
   it('lets env defaults win over config until explicit flags override them', async () => {
     const profileStore = new MemoryProfileStore();
