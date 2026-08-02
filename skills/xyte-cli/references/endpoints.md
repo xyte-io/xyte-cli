@@ -106,7 +106,7 @@ xyte-cli api call organization.incidents.closeIncident \
 
 ### `organization.commands.sendCommand`
 
-Prefer `flow.device-command` for user requests like "send command X to device Y"; it first reads `organization.devices.getDevice`, describes the returned model with `organization.models.getModel`, validates the selected command plus its parameters, maps labels or label arrays through embedded static `options` to exact scalar or array values, and pauses before `organization.commands.sendCommand`. The selected `commands[].name` is sent under request field `command`; `friendly_name` is the alternate selector and request field `name` is invalid. Malformed, duplicated, and unresolved path-backed choices stop before the send. Send request values as an object under `extra_params`; raw sends reject response/history `params` and non-object `extra_params`.
+Prefer `flow.device-command` for user requests like "send command X to device Y"; it first reads `organization.devices.getDevice`, describes the returned model with `organization.models.getModel`, validates required fields and declared parameter types, maps labels or label arrays through embedded static `options` to exact scalar or array values, and pauses before `organization.commands.sendCommand`. The built-in flow sends the selected `commands[].name` under request field `command`; raw or custom sends may use `friendly_name`, while request field `name` is invalid. Malformed or unresolved choices stop before the send. Send request values as an object under `extra_params`; raw sends reject response/history `params` and non-object `extra_params`. Optional polling needs one command id from the send response. If the send result is interrupted or unknown, resume stops instead of sending it again.
 
 ```bash
 xyte-cli flow run flow.device-command --tenant <tenant-id> --plan --var device_id=<device-id> --var command=reboot
@@ -253,7 +253,7 @@ Model discovery:
 - `organization.models.getModels` -> `GET /core/v1/organization/models` with `edge_only=true`, `page`, `per_page`, and optional `search`.
 - `organization.models.getModel` -> `GET /core/v1/organization/models/:id`; returns `parameters[]` and model-supported `commands[]`.
 - Use `parameters[].name` as the accepted `custom_parameters` labels for Edge claim and already-claimed parameter updates.
-- Send `commands[].name` under request field `command`, or send `commands[].friendly_name` under `friendly_name`; use `commands[].custom_fields[].name` for `extra_params`, map labels or label arrays through embedded static `options`, stop on unresolved path-backed dynamic choices, and provide `file_id` when `commands[].with_file` is true.
+- For raw or custom calls, send `commands[].name` under request field `command`, or send `commands[].friendly_name` under `friendly_name`; use `commands[].custom_fields[].name` for `extra_params`, map labels or label arrays through embedded static `options`, stop on malformed or unresolved choices, and provide `file_id` when `commands[].with_file` is true. The built-in `flow.device-command` selects by `commands[].name`.
 
 Verified raw route mapping:
 - `organization.edge.startClaim` -> `POST /core/v1/organization/edges/devices/start_claim`

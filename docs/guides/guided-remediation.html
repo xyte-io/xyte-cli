@@ -81,7 +81,7 @@ xyte-cli ops inspect fleet \
   --var incident_id=&lt;incident-id&gt; \
   --once \
   --strict-json</code></pre></div></li>
-          <li class="step"><h3>List commands the device actually supports</h3><p>Read the device model, then choose from <code>commands[].name</code> or <code>commands[].friendly_name</code>. Use <code>custom_fields</code> for command arguments and provide <code>command_file_id</code> when <code>with_file</code> is true. Do not guess a command name from another model.</p><div class="command"><pre><code>xyte-cli api call organization.devices.getDevice \
+          <li class="step"><h3>List commands the device actually supports</h3><p>Read the device model, then choose its exact <code>commands[].name</code>. Pass command arguments as <code>command_extra_params_json</code> and provide <code>command_file_id</code> when <code>with_file</code> is true. Labels are mapped to the model&rsquo;s values; malformed, unknown, or ambiguous choices stop before sending. Do not guess a command name from another model.</p><div class="command"><pre><code>xyte-cli api call organization.devices.getDevice \
   --tenant &lt;tenant-id&gt; \
   --path-json '{"device_id":"&lt;device-id&gt;"}'
 

@@ -50,6 +50,7 @@ Write safety requirements:
 2. `xyte-cli util import-tree` is dry-run by default unless `--apply` is provided.
 3. Human decision gates are mandatory before any write or apply loop.
 4. The raw `api call ... --path-json/--body-json` examples below are Bash/zsh-shaped because inline JSON quoting still differs by shell. On PowerShell or CMD, prefer `xyte-cli flow run flow.guided-remediation --tenant <tenant-id> --plan` and adapt copied write commands to your shell.
+5. Its command step selects an exact `commands[].name`; pass model-defined command arguments with `command_extra_params_json` and use `command_file_id` when `with_file` is true.
 
 ```bash
 xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --once --output json --strict-json --out ./artifacts/xyte-watch.before.ndjson
@@ -90,7 +91,7 @@ xyte-cli ops watch incidents --tenant <tenant-id> --profile incidents-active --o
 
 ## flow.device-command
 
-Fetch the device, describe its model, then pause before sending the selected model-supported command. If more than one command is available, pass the desired command with `--var command=<commands[].name>` before apply; the send request places that value under `command`, not `name`. If the command has `custom_fields`, pass an object with `--var command_extra_params_json='<json-object>'`; labels or label arrays are mapped through embedded static `options` to exact scalar or array values. Malformed, duplicated, and unresolved path-backed choices stop before the send. If `with_file=true`, pass `--var command_file_id=<file-id>`. Optional status polling requires `--var command_poll=true --var command_poll_timeout_ms=<positive-ms>`; it follows history pages for the exact returned id and stops at the timeout.
+Fetch the device, describe its model, then pause before sending the selected model-supported command. If more than one command is available, pass the desired command with `--var command=<commands[].name>` before apply; the built-in flow places that value under `command`, not `name`, and does not select by `friendly_name`. If the command has `custom_fields`, pass an object with `--var command_extra_params_json='<json-object>'`; required fields and declared value types are checked, and labels or label arrays are mapped through embedded static `options` to exact scalar or array values. Malformed command/option metadata, duplicate command/custom-field definitions, unsupported declared types, ambiguous values, and unresolved path-backed choices stop before the send. If `with_file=true`, pass `--var command_file_id=<file-id>`. Optional status polling requires `--var command_poll=true --var command_poll_timeout_ms=<positive-ms>`; it follows history pages for the one returned id and stops at the timeout. If the send result is interrupted or unknown, resume stops rather than sending the command again.
 
 ```bash
 xyte-cli api call organization.devices.getDevice \

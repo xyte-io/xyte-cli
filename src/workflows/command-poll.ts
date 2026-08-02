@@ -62,10 +62,11 @@ function validatePollDelay(value: number, label: string): void {
 }
 
 export function extractSentCommandId(payload: unknown): string | undefined {
-  if (!isRecord(payload) || typeof payload.id !== 'string' || !payload.id || payload.id.trim() !== payload.id) {
+  const command = Array.isArray(payload) ? (payload.length === 1 ? payload[0] : undefined) : payload;
+  if (!isRecord(command) || typeof command.id !== 'string' || !command.id || command.id.trim() !== command.id) {
     return undefined;
   }
-  return payload.id;
+  return command.id;
 }
 
 export async function pollCommandStatus(args: {

@@ -12,6 +12,7 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ### Fixed
 - Device command sends now use the API's `command` or `friendly_name` selector, keep request values under `extra_params`, and map model-provided static option labels or canonical values for both single- and multi-value fields. Unknown, ambiguous, malformed, and unresolved dynamic choices stop before sending.
+- The CLI's model-guided command paths now share declared value-type and attached-file checks, and resume will not automatically repeat a command whose send result is unknown.
 
 ### Upgrade notes
 - Existing workspaces that already installed the shipped skill bundle should run `xyte-cli skills refresh` after upgrading so agents receive the corrected device-command guidance.

@@ -27,6 +27,7 @@ import {
 } from '../actions';
 import { errorMessage } from '../../utils/error-format';
 import { asRecord, asRecordOrUndefined } from '../../utils/json';
+import { prepareModelBackedDeviceCommandBody } from '../../workflows/device-command';
 
 function deviceIdOf(device: unknown): string {
   const rec = asRecordOrUndefined(device);
@@ -61,6 +62,7 @@ interface SendCommandWithGuardArgs {
   device: unknown;
   template: CommandTemplate;
   params: Record<string, unknown> | undefined;
+  fileId?: string;
   context: Pick<TuiContext, 'confirmWrite' | 'setStatus' | 'showError' | 'getActiveTenantId' | 'client'>;
 }
 
@@ -68,6 +70,26 @@ export async function sendCommandWithGuard(args: SendCommandWithGuardArgs): Prom
   const deviceId = deviceIdOf(args.device);
   if (!deviceId) {
     args.context.setStatus('Selected device has no id.');
+    return false;
+  }
+
+  const body: Record<string, unknown> =
+    args.template.mode === 'command' ? { command: args.template.value } : { friendly_name: args.template.value };
+  if (args.params && Object.keys(args.params).length > 0) {
+    body.extra_params = args.params;
+  }
+  if (args.fileId?.trim()) {
+    body.file_id = args.fileId.trim();
+  }
+  let validatedBody: Record<string, unknown>;
+  try {
+    validatedBody = prepareModelBackedDeviceCommandBody({
+      evidence: args.template.modelEvidence,
+      bodyPayload: body,
+      sourceLabel: 'Command send'
+    });
+  } catch (error) {
+    args.context.showError(error);
     return false;
   }
 
@@ -81,17 +103,11 @@ export async function sendCommandWithGuard(args: SendCommandWithGuardArgs): Prom
     return false;
   }
 
-  const body: Record<string, unknown> =
-    args.template.mode === 'command' ? { command: args.template.value } : { friendly_name: args.template.value };
-  if (args.params && Object.keys(args.params).length > 0) {
-    body.extra_params = args.params;
-  }
-
   return runGuardedAction(args.context, 'Sending command...', async (tenantId) => {
     await args.context.client.organization.sendCommand({
       tenantId,
       path: { device_id: deviceId },
-      body
+      body: validatedBody
     });
     args.context.setStatus(`Command sent to device ${deviceId}.`);
   });
@@ -144,7 +160,7 @@ async function runSendCommandWizard(args: {
     return;
   }
 
-  const paramsInput = await context.prompt('Optional params JSON object (empty skips):', '');
+  const paramsInput = await context.prompt('Command params JSON object (empty only when model permits):', '');
   if (paramsInput === undefined || !getIsMounted()) {
     context.setStatus('Send command canceled.');
     return;
@@ -159,7 +175,21 @@ async function runSendCommandWizard(args: {
     params = parsed.value;
   }
 
-  const sent = await sendCommandWithGuard({ device, template: selectedTemplate, params, context });
+  let fileId: string | undefined;
+  if (selectedTemplate.withFile) {
+    const fileInput = await context.prompt('File ID required by this command:', '');
+    if (fileInput === undefined || !getIsMounted()) {
+      context.setStatus('Send command canceled.');
+      return;
+    }
+    fileId = fileInput.trim();
+    if (!fileId) {
+      context.setStatus('File ID is required for this command.');
+      return;
+    }
+  }
+
+  const sent = await sendCommandWithGuard({ device, template: selectedTemplate, params, fileId, context });
   if (sent && getIsMounted()) {
     await refreshDevices(deviceId);
   }

@@ -186,7 +186,7 @@ Frame event types:
 
 ## Write Examples
 
-These raw API examples are shell-specific because inline JSON quoting differs across shells. For one-device command sends, prefer `flow.device-command`; it reads the device model's supported commands first and maps labels or label arrays through static `options` embedded in the model metadata before pausing at `sendCommand`. Send the selected `commands[].name` under request field `command`, or use `friendly_name`; request field `name` is invalid. Path-backed dynamic choices stop before the send because their values are not embedded in that response. Command request values belong in a JSON object under `extra_params`; raw calls reject response-only `params` and non-object `extra_params`.
+These raw API examples are shell-specific because inline JSON quoting differs across shells. For one-device command sends, prefer `flow.device-command`; it reads the device model's supported commands first, checks required fields and declared value types, and maps labels or label arrays through static `options` embedded in the model metadata before pausing at `sendCommand`. The built-in flow sends the selected `commands[].name` under request field `command`; raw or custom sends may instead use `friendly_name`, while request field `name` is invalid. Malformed or unresolved choices stop before the send. Command request values belong in a JSON object under `extra_params`; raw calls reject response-only `params` and non-object `extra_params`.
 
 ```bash
 xyte-cli flow run flow.device-command --tenant <tenant-id> --plan --var device_id=DEVICE_ID --var command=reboot
@@ -239,7 +239,7 @@ xyte-cli api call partner.organizations.createOrganization \
   --body-json '{"name":"Acme HQ","admin_contact_email":"admin@example.com","admin_contact_name":"Jane Doe","finance_contact_email":"finance@example.com","finance_contact_name":"Finance Team"}'
 ```
 
-Optional flow polling follows command-history pages for the exact id returned by `sendCommand` and stops at the requested timeout. It reports Xyte command queue/history status; it does not read device state.
+Optional flow polling follows command-history pages for the one command id returned by `sendCommand` and stops at the requested timeout. It reports Xyte command queue/history status; it does not read device state. If the send is interrupted before its result is recorded, resume stops rather than risking a second send.
 
 ## Utility Pipelines, Space Import, And Device Migration
 

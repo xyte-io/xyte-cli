@@ -209,11 +209,12 @@ xyte-cli api call organization.commands.sendCommand \
 ```
 
 Behavior:
-- prefer `flow.device-command` for one-device command sends because it reads the device model, validates `commands[].name` and command `custom_fields`, and maps labels or label arrays through static `options` embedded in the model metadata; path-backed dynamic choices stop before the send because their values are not embedded there
-- send the selected `commands[].name` under request field `command` (or use `friendly_name`); `name` is model metadata, not a send request field
+- prefer `flow.device-command` for one-device command sends because it reads the device model, validates required fields and declared value types in `custom_fields`, and maps labels or label arrays through static `options` embedded in the model metadata; malformed or unresolved choices stop before the send
+- the built-in flow sends the selected `commands[].name` under request field `command`; raw or custom sends may use `friendly_name`, while `name` remains model metadata rather than a send request field
 - send command parameters as a JSON object under `extra_params`; raw `sendCommand` calls reject response-only `params` and non-object `extra_params`
 - optional status polling requires `--var command_poll=true --var command_poll_timeout_ms=<positive-ms>`; add `--var command_poll_interval_ms=<positive-ms>` to override the 5-second interval
 - polling follows command-history pages for the exact id returned by the send response, stops at the requested timeout, and reports queue/history status only
+- if a send is interrupted before its result is recorded, resume stops instead of sending the command a second time
 - the raw API call executes directly once you choose the write step
 
 ### 7) Fleet insights and deep-dive data

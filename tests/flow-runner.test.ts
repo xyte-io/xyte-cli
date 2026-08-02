@@ -1,10 +1,11 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createXyteClient } from '../src/client/create-client';
+import { FlowRunSummarySchema } from '../src/contracts/flow-run';
 import {
   getBuiltInFlowDefinition,
   type BuiltInFlowDefinition,
@@ -1833,6 +1834,387 @@ describe('flow runner', () => {
     });
   });
 
+  it('persists a fresh command run before POST and rejects artifact-less resume request changes', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition = getBuiltInFlowDefinition('flow.device-command');
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-command-uncertain-send`);
+    let postCalls = 0;
+    let provisionalRunId = '';
+
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (
+        url.includes('/organization/devices/dev-1') &&
+        !url.includes('/commands') &&
+        (init?.method ?? 'GET') === 'GET'
+      ) {
+        return new Response(JSON.stringify({ id: 'dev-1', model: { id: 'model-1' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/models/model-1') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(JSON.stringify({ id: 'model-1', commands: [{ name: 'reboot' }, { name: 'identify' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'POST') {
+        postCalls += 1;
+        const runDirectories = readdirSync(join(outDir, definition.id));
+        expect(runDirectories).toHaveLength(1);
+        const provisional = FlowRunSummarySchema.parse(
+          JSON.parse(readFileSync(join(outDir, definition.id, runDirectories[0], 'manifest.json'), 'utf8'))
+        );
+        provisionalRunId = provisional.runId;
+        expect(provisional.cursor).toEqual({
+          nextStepIndex: definition.steps.findIndex((step) => step.id === 'device_command_send'),
+          nextStepId: 'device_command_send'
+        });
+        expect(provisional.steps.find((step) => step.stepId === 'device_command_send')?.status).toBe('pending');
+        expect(
+          JSON.parse(readFileSync(join(provisional.bundleDir, 'steps', 'device_command_send.dispatch.json'), 'utf8'))
+        ).toMatchObject({
+          stepId: 'device_command_send',
+          stepIdentity: expect.stringMatching(/^sha256:/),
+          request: {
+            tenantId: 'acme',
+            path: { device_id: 'dev-1' },
+            query: {},
+            body: { command: 'reboot' }
+          }
+        });
+        throw new Error('connection closed after command may have been accepted');
+      }
+      throw new Error(`Unexpected URL in uncertain command send test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const first = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      context: { device_id: 'dev-1', command: 'reboot' },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(first.outcome).toBe('failed');
+    expect(postCalls).toBe(1);
+    expect(provisionalRunId).toBe(first.runId);
+    const checkpointPath = join(first.bundleDir, 'steps', 'device_command_send.dispatch.json');
+    expect(existsSync(checkpointPath)).toBe(true);
+    expect(existsSync(join(first.bundleDir, 'steps', '04-device_command_send.json'))).toBe(false);
+
+    const changedRequest = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: provisionalRunId,
+      context: { command: 'identify' },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(changedRequest.outcome).toBe('needs_input');
+    expect(postCalls).toBe(1);
+    expect(
+      String(changedRequest.steps.find((item) => item.stepId === 'device_command_send')?.error?.detail ?? '')
+    ).toContain('checkpoint request does not match current request');
+
+    const resumed = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: provisionalRunId,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(resumed.outcome).toBe('needs_input');
+    expect(postCalls).toBe(1);
+    expect(String(resumed.steps.find((item) => item.stepId === 'device_command_send')?.error?.detail ?? '')).toContain(
+      '--resume will not send it again'
+    );
+
+    writeFileSync(checkpointPath, '{');
+    const malformedResume = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: first.runId,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(malformedResume.outcome).toBe('needs_input');
+    expect(postCalls).toBe(1);
+    expect(
+      String(malformedResume.steps.find((item) => item.stepId === 'device_command_send')?.error?.detail ?? '')
+    ).toContain('checkpoint malformed');
+  });
+
+  it('rejects resume identity changes while allowing presentation-only flow edits', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition = getBuiltInFlowDefinition('flow.device-command');
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-resume-identity`);
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/organization/devices/dev-1') && !url.includes('/commands')) {
+        return new Response(JSON.stringify({ id: 'dev-1', model: { id: 'model-1' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', commands: [{ name: 'reboot' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in resume identity test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const first = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: { device_id: 'dev-1' },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    const resumeArgs = {
+      mode: 'apply' as const,
+      outDir,
+      resume: first.runId,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    };
+    await expect(runDeterministicFlow({ ...resumeArgs, flowId: 'flow.edge-ping', tenantId: 'acme' })).rejects.toThrow(
+      'Resume flowId mismatch'
+    );
+    await expect(
+      runDeterministicFlow({ ...resumeArgs, flowId: definition.id, tenantId: 'different-tenant' })
+    ).rejects.toThrow('Resume tenant mismatch');
+
+    builtInDefinitionOverride = {
+      ...definition,
+      steps: definition.steps.map((step) => {
+        if (step.id === 'device_command_send') {
+          return { ...step, title: 'Renamed command dispatch', command: 'Updated display recipe' };
+        }
+        if (step.kind === 'gate') {
+          return { ...step, title: 'Renamed approval', command: 'Updated gate display', detail: 'Updated guidance' };
+        }
+        return step;
+      })
+    };
+    const presentationOnlyResume = await runDeterministicFlow({
+      ...resumeArgs,
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'plan'
+    });
+    expect(presentationOnlyResume.outcome).toBe('pending_gate');
+
+    const reorderedSteps = [...definition.steps];
+    [reorderedSteps[3], reorderedSteps[4]] = [reorderedSteps[4], reorderedSteps[3]];
+    builtInDefinitionOverride = { ...definition, steps: reorderedSteps };
+    await expect(runDeterministicFlow({ ...resumeArgs, flowId: definition.id, tenantId: 'acme' })).rejects.toThrow(
+      'Resume flow definition mismatch'
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('binds a confirmed response to the original command request before resuming into polling', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition = getBuiltInFlowDefinition('flow.device-command');
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-device-command-confirmed-send`);
+    let postCalls = 0;
+    let pollCalls = 0;
+
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (
+        url.includes('/organization/devices/dev-1') &&
+        !url.includes('/commands') &&
+        (init?.method ?? 'GET') === 'GET'
+      ) {
+        return new Response(JSON.stringify({ id: 'dev-1', model: { id: 'model-1' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/models/model-1') && (init?.method ?? 'GET') === 'GET') {
+        return new Response(
+          JSON.stringify({
+            id: 'model-1',
+            commands: [{ name: 'reboot', custom_fields: [{ name: 'mode' }] }, { name: 'identify' }]
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'POST') {
+        postCalls += 1;
+        return new Response(JSON.stringify({ id: 'cmd-confirmed', command: 'reboot', status: 'pending' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'GET') {
+        pollCalls += 1;
+        return new Response(
+          JSON.stringify({ items: [{ id: 'cmd-confirmed', status: 'done' }], has_next_page: false }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      throw new Error(`Unexpected URL in confirmed command send test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const first = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      context: { device_id: 'dev-1', command: 'reboot', command_poll: 'false' },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(first.outcome).toBe('completed');
+    expect(postCalls).toBe(1);
+    expect(pollCalls).toBe(0);
+    const sendIndex = definition.steps.findIndex((step) => step.id === 'device_command_send');
+    const manifest = JSON.parse(readFileSync(first.manifestPath, 'utf8')) as {
+      outcome: string;
+      nextResumeStepId?: string;
+      steps: Array<Record<string, unknown>>;
+      cursor: { nextStepIndex: number; nextStepId?: string };
+    };
+    for (let index = sendIndex; index < manifest.steps.length; index += 1) {
+      manifest.steps[index].status = 'pending';
+      delete manifest.steps[index].startedAtUtc;
+      delete manifest.steps[index].endedAtUtc;
+      delete manifest.steps[index].durationMs;
+      delete manifest.steps[index].artifactPath;
+      delete manifest.steps[index].error;
+      delete manifest.steps[index].classification;
+    }
+    manifest.outcome = 'failed';
+    manifest.nextResumeStepId = 'device_command_send';
+    manifest.cursor = { nextStepIndex: sendIndex, nextStepId: 'device_command_send' };
+    writeFileSync(first.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+    const changedCommand = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: first.runId,
+      context: { command: 'identify' },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(changedCommand.outcome).toBe('needs_input');
+    expect(postCalls).toBe(1);
+    expect(pollCalls).toBe(0);
+    expect(
+      String(changedCommand.steps.find((item) => item.stepId === 'device_command_send')?.error?.detail ?? '')
+    ).toContain('confirmed response does not match current request');
+
+    const changedParams = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: first.runId,
+      context: { command: 'reboot', command_extra_params_json: '{"mode":"soft"}' },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(changedParams.outcome).toBe('needs_input');
+    expect(postCalls).toBe(1);
+    expect(pollCalls).toBe(0);
+    expect(
+      String(changedParams.steps.find((item) => item.stepId === 'device_command_send')?.error?.detail ?? '')
+    ).toContain('confirmed response does not match current request');
+
+    const resumed = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: first.runId,
+      context: {
+        command: 'reboot',
+        command_extra_params_json: '',
+        command_poll: 'true',
+        command_poll_timeout_ms: '100',
+        command_poll_interval_ms: '1'
+      },
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(resumed.outcome).toBe('completed');
+    expect(postCalls).toBe(1);
+    expect(pollCalls).toBe(1);
+    const sendStep = resumed.steps.find((item) => item.stepId === 'device_command_send');
+    const statusStep = resumed.steps.find((item) => item.stepId === 'device_command_status');
+    expect(JSON.parse(readFileSync(sendStep!.artifactPath!, 'utf8'))).toMatchObject({
+      requestId: expect.any(String),
+      endpointKey: 'organization.commands.sendCommand',
+      response: { data: { id: 'cmd-confirmed' } }
+    });
+    expect(JSON.parse(readFileSync(statusStep!.artifactPath!, 'utf8'))).toMatchObject({
+      commandId: 'cmd-confirmed',
+      outcome: 'done'
+    });
+  });
+
   it('skips status checking when disabled, even if unused polling values are invalid', async () => {
     const { profileStore, secretStore, client } = await makeClient();
     const definition = getBuiltInFlowDefinition('flow.device-command');
@@ -2953,7 +3335,7 @@ describe('flow runner', () => {
 
     expect(summary.outcome).toBe('needs_input');
     expect(String(summary.steps.find((item) => item.stepId === 'device_command_send')?.error?.detail ?? '')).toContain(
-      'requires command_file_id/file_id'
+      'requires command_file_id'
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
@@ -3862,6 +4244,61 @@ describe('flow runner', () => {
     } finally {
       Object.defineProperty(process, 'platform', platformDescriptor);
     }
+  });
+
+  it('resumes a legacy non-command flow without stored definition identity', async () => {
+    const { profileStore, secretStore, client } = await makeClient();
+    const definition: BuiltInFlowDefinition = {
+      id: 'flow.setup-readiness-10m',
+      title: 'Legacy Resume Compatibility',
+      intent: 'resume a legacy unrelated flow',
+      writeCapable: false,
+      recipeCommands: [],
+      steps: [
+        {
+          kind: 'gate',
+          id: 'legacy_gate',
+          title: 'Legacy Gate',
+          command: 'Human gate',
+          mutating: false,
+          detail: 'approve legacy resume'
+        }
+      ]
+    };
+    builtInDefinitionOverride = definition;
+    const outDir = join(tmpdir(), `xyte-flow-runner-${Date.now()}-legacy-resume-identity`);
+
+    const first = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'plan',
+      outDir,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+    const legacyInputs = JSON.parse(readFileSync(first.inputsPath, 'utf8')) as Record<string, unknown>;
+    expect(legacyInputs).not.toHaveProperty('definitionIdentity');
+
+    const resumed = await runDeterministicFlow({
+      flowId: definition.id,
+      tenantId: 'acme',
+      mode: 'apply',
+      outDir,
+      resume: first.runId,
+      context: {},
+      once: true,
+      strictJson: true,
+      profileStore,
+      secretStore,
+      client
+    });
+
+    expect(resumed.outcome).toBe('completed');
+    expect(resumed.steps.find((step) => step.stepId === 'legacy_gate')?.status).toBe('gate_approved');
   });
 
   it('fails closed when resume inputs metadata is malformed', async () => {

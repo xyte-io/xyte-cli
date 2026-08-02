@@ -25,10 +25,23 @@ export class DeviceCommandNeedsInputError extends Error {
   }
 }
 
+type ModelCommandValueKind = 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object' | 'unsupported';
+
+interface DeclaredModelCommandValueType {
+  raw: string;
+  kind: ModelCommandValueKind;
+}
+
+interface ModelCommandCustomFieldDefinition {
+  required: boolean;
+  optionSet?: ModelCommandOptionSet;
+  declaredType?: DeclaredModelCommandValueType;
+}
+
 interface ModelCommandDefinition {
   name?: string;
   friendlyName?: string;
-  customFields: Map<string, { required: boolean; optionSet?: ModelCommandOptionSet }>;
+  customFields: Map<string, ModelCommandCustomFieldDefinition>;
   withFile: boolean;
   issues: string[];
 }
@@ -38,6 +51,11 @@ type CommandSelectorEntry = { status: 'unique'; command: ModelCommandDefinition 
 interface ModelCommandCandidates {
   byName: Map<string, CommandSelectorEntry>;
   byFriendlyName: Map<string, CommandSelectorEntry>;
+}
+
+export interface DeviceCommandModelEvidence {
+  modelId: string;
+  modelData: unknown;
 }
 
 export type DeviceCommandPollStepResult =
@@ -61,6 +79,122 @@ function createMalformedStringCommand(name: string): ModelCommandDefinition {
   };
 }
 
+function hasOwn(record: Record<string, unknown>, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(record, key);
+}
+
+function readOptionalMetadataString(
+  record: Record<string, unknown>,
+  key: 'type' | 'typeName' | 'path',
+  fieldName: string,
+  issues: string[]
+): string | undefined {
+  if (!hasOwn(record, key)) {
+    return undefined;
+  }
+  const raw = record[key];
+  if (typeof raw !== 'string' || !raw.trim()) {
+    issues.push(`custom_fields ${JSON.stringify(fieldName)} ${key} must be a non-empty string when provided`);
+    return undefined;
+  }
+  return raw.trim();
+}
+
+function modelCommandValueKind(rawType: string): ModelCommandValueKind {
+  switch (rawType.trim().toLowerCase()) {
+    case 'string':
+    case 'text':
+    case 'password':
+    case 'date':
+    case 'datetime':
+    case 'date-time':
+      return 'string';
+    case 'number':
+      return 'number';
+    case 'integer':
+      return 'integer';
+    case 'boolean':
+      return 'boolean';
+    case 'array':
+      return 'array';
+    case 'object':
+    case 'json':
+      return 'object';
+    default:
+      return 'unsupported';
+  }
+}
+
+function isOptionCardinalityMetadata(key: 'type' | 'typeName', rawType: string): boolean {
+  const normalized = rawType.trim().toLowerCase();
+  return key === 'type'
+    ? normalized === 'select' || normalized === 'multiselect'
+    : normalized === 'staticlistsingle' ||
+        normalized === 'staticlistmulti' ||
+        normalized === 'dynamiclistsingle' ||
+        normalized === 'dynamiclistmulti';
+}
+
+function declaredValueTypeFromMetadata(args: {
+  fieldName: string;
+  key: 'type' | 'typeName';
+  rawType: string | undefined;
+  issues: string[];
+}): DeclaredModelCommandValueType | undefined {
+  if (!args.rawType || isOptionCardinalityMetadata(args.key, args.rawType)) {
+    return undefined;
+  }
+  const kind = modelCommandValueKind(args.rawType);
+  if (kind === 'unsupported') {
+    args.issues.push(
+      `custom_fields ${JSON.stringify(args.fieldName)} declares unsupported ${args.key} ${JSON.stringify(args.rawType)}`
+    );
+    return undefined;
+  }
+  return { raw: args.rawType, kind };
+}
+
+function extractDeclaredValueType(args: {
+  fieldName: string;
+  fieldType?: string;
+  fieldTypeName?: string;
+  optionSet?: ModelCommandOptionSet;
+  issues: string[];
+}): DeclaredModelCommandValueType | undefined {
+  const fieldType = declaredValueTypeFromMetadata({
+    fieldName: args.fieldName,
+    key: 'type',
+    rawType: args.fieldType,
+    issues: args.issues
+  });
+  const fieldTypeName = declaredValueTypeFromMetadata({
+    fieldName: args.fieldName,
+    key: 'typeName',
+    rawType: args.fieldTypeName,
+    issues: args.issues
+  });
+  if (fieldType && fieldTypeName && fieldType.kind !== fieldTypeName.kind) {
+    args.issues.push(
+      `custom_fields ${JSON.stringify(args.fieldName)} type and typeName declare conflicting value types`
+    );
+  }
+
+  const declaredType = fieldType ?? fieldTypeName;
+  if (!declaredType || !args.optionSet || args.optionSet.cardinality === 'unknown') {
+    return declaredType;
+  }
+  const compatible =
+    args.optionSet.cardinality === 'multiple'
+      ? declaredType.kind === 'array'
+      : declaredType.kind !== 'array' && declaredType.kind !== 'object';
+  if (!compatible) {
+    args.issues.push(
+      `custom_fields ${JSON.stringify(args.fieldName)} declared type ${JSON.stringify(declaredType.raw)} is incompatible with ${args.optionSet.cardinality}-value options`
+    );
+  }
+  return declaredType;
+}
+
 function extractModelCommandCandidates(data: unknown): ModelCommandCandidates {
   const rows = isRecord(data) && Array.isArray(data.commands) ? data.commands : [];
   const byName = new Map<string, CommandSelectorEntry>();
@@ -76,7 +210,7 @@ function extractModelCommandCandidates(data: unknown): ModelCommandCandidates {
       continue;
     }
 
-    const customFields = new Map<string, { required: boolean; optionSet?: ModelCommandOptionSet }>();
+    const customFields = new Map<string, ModelCommandCustomFieldDefinition>();
     const issues: string[] = [];
     if (Array.isArray(row.custom_fields)) {
       for (const [index, field] of row.custom_fields.entries()) {
@@ -92,10 +226,21 @@ function extractModelCommandCandidates(data: unknown): ModelCommandCandidates {
         if (field.required !== undefined && typeof field.required !== 'boolean') {
           issues.push(`custom_fields ${JSON.stringify(fieldName)} required flag must be a boolean`);
         }
+        const fieldType = readOptionalMetadataString(field, 'type', fieldName, issues);
+        const fieldTypeName = readOptionalMetadataString(field, 'typeName', fieldName, issues);
+        readOptionalMetadataString(field, 'path', fieldName, issues);
         const optionSet = extractModelCommandOptionSet(field);
+        const declaredType = extractDeclaredValueType({
+          fieldName,
+          fieldType,
+          fieldTypeName,
+          ...(optionSet ? { optionSet } : {}),
+          issues
+        });
         customFields.set(fieldName, {
           required: field.required === true,
-          ...(optionSet ? { optionSet } : {})
+          ...(optionSet ? { optionSet } : {}),
+          ...(declaredType ? { declaredType } : {})
         });
       }
     } else if (row.custom_fields !== undefined && row.custom_fields !== null) {
@@ -116,9 +261,13 @@ function extractModelCommandCandidates(data: unknown): ModelCommandCandidates {
     } else {
       issues.push('name must be a non-empty string');
     }
-    if (typeof row.friendly_name === 'string' && row.friendly_name.trim()) {
-      definition.friendlyName = row.friendly_name.trim();
-      addCommandSelector(byFriendlyName, definition.friendlyName, definition);
+    if (hasOwn(row, 'friendly_name')) {
+      if (typeof row.friendly_name === 'string' && row.friendly_name.trim()) {
+        definition.friendlyName = row.friendly_name.trim();
+        addCommandSelector(byFriendlyName, definition.friendlyName, definition);
+      } else {
+        issues.push('friendly_name must be a non-empty string when provided');
+      }
     }
   }
 
@@ -160,10 +309,10 @@ function findPriorDeviceModelId(taskOutputs: ReadonlyMap<string, unknown>, devic
   return undefined;
 }
 
-function findPriorModelCommandCandidates(
+function findPriorModelCommandEvidence(
   taskOutputs: ReadonlyMap<string, unknown>,
   modelId: string
-): ModelCommandCandidates | undefined {
+): DeviceCommandModelEvidence | undefined {
   for (const output of taskOutputs.values()) {
     if (!isRecord(output) || output.endpointKey !== 'organization.models.getModel') {
       continue;
@@ -176,13 +325,13 @@ function findPriorModelCommandCandidates(
     if (!isRecord(response)) {
       continue;
     }
-    return extractModelCommandCandidates(response.data);
+    return { modelId, modelData: response.data };
   }
   return undefined;
 }
 
 function parseCommandExtraParams(context: Record<string, string>): Record<string, unknown> | undefined {
-  const raw = context.command_extra_params_json ?? context.extra_params_json;
+  const raw = context.command_extra_params_json;
   if (!raw?.trim()) {
     return undefined;
   }
@@ -206,11 +355,58 @@ function addCommandContextToBody(bodyPayload: unknown, context: Record<string, s
   if (extraParams) {
     out.extra_params = extraParams;
   }
-  const fileId = context.command_file_id ?? context.file_id;
+  const fileId = context.command_file_id;
   if (fileId?.trim()) {
     out.file_id = fileId.trim();
   }
   return out;
+}
+
+function validateCommandOptionMetadata(modelId: string, command: ModelCommandDefinition): void {
+  for (const [fieldName, field] of command.customFields) {
+    const optionSet = field.optionSet;
+    if (!optionSet || (optionSet.issues.length === 0 && optionSet.options.length > 0)) {
+      continue;
+    }
+    if (optionSet.issues.includes(MODEL_COMMAND_PATH_OPTIONS_ISSUE)) {
+      throw new DeviceCommandNeedsInputError(
+        `Selected command for model ${modelId} uses path-backed options for extra_params field ${fieldName}; those choices cannot be resolved from model metadata.`
+      );
+    }
+    throw new DeviceCommandNeedsInputError(
+      `Selected command for model ${modelId} has invalid or ambiguous options metadata for extra_params field ${fieldName}.`
+    );
+  }
+}
+
+function validateDeclaredCommandValue(
+  modelId: string,
+  fieldName: string,
+  declaredType: DeclaredModelCommandValueType,
+  value: unknown
+): void {
+  if (declaredType.kind === 'unsupported') {
+    throw new DeviceCommandNeedsInputError(
+      `Selected command for model ${modelId} declares unsupported type ${JSON.stringify(declaredType.raw)} for extra_params field ${fieldName}.`
+    );
+  }
+  const valid =
+    declaredType.kind === 'string'
+      ? typeof value === 'string'
+      : declaredType.kind === 'number'
+        ? typeof value === 'number' && Number.isFinite(value)
+        : declaredType.kind === 'integer'
+          ? typeof value === 'number' && Number.isInteger(value)
+          : declaredType.kind === 'boolean'
+            ? typeof value === 'boolean'
+            : declaredType.kind === 'array'
+              ? Array.isArray(value)
+              : isRecord(value);
+  if (!valid) {
+    throw new DeviceCommandNeedsInputError(
+      `Selected command for model ${modelId} requires extra_params field ${fieldName} to match declared type ${JSON.stringify(declaredType.raw)}.`
+    );
+  }
 }
 
 function validateCommandArguments(
@@ -223,6 +419,7 @@ function validateCommandArguments(
       `Selected command for model ${modelId} has invalid or ambiguous metadata: ${command.issues.join('; ')}.`
     );
   }
+  validateCommandOptionMetadata(modelId, command);
   const extraParams = isRecord(bodyPayload.extra_params) ? bodyPayload.extra_params : {};
   const extraKeys = Object.keys(extraParams);
   if (extraKeys.length > 0 && command.customFields.size === 0) {
@@ -255,22 +452,18 @@ function validateCommandArguments(
     );
   }
   if (command.withFile && (typeof bodyPayload.file_id !== 'string' || !bodyPayload.file_id.trim())) {
-    throw new DeviceCommandNeedsInputError(`Selected command for model ${modelId} requires command_file_id/file_id.`);
+    throw new DeviceCommandNeedsInputError(`Selected command for model ${modelId} requires command_file_id.`);
   }
 
   const normalizedExtraParams: Record<string, unknown> = { ...extraParams };
   for (const key of extraKeys) {
-    const optionSet = command.customFields.get(key)?.optionSet;
-    if (!optionSet) continue;
-    if (optionSet.issues.length > 0 || optionSet.options.length === 0) {
-      if (optionSet.issues.includes(MODEL_COMMAND_PATH_OPTIONS_ISSUE)) {
-        throw new DeviceCommandNeedsInputError(
-          `Selected command for model ${modelId} uses path-backed options for extra_params field ${key}; this flow cannot resolve those choices from model metadata.`
-        );
+    const field = command.customFields.get(key);
+    const optionSet = field?.optionSet;
+    if (!optionSet) {
+      if (field?.declaredType) {
+        validateDeclaredCommandValue(modelId, key, field.declaredType, extraParams[key]);
       }
-      throw new DeviceCommandNeedsInputError(
-        `Selected command for model ${modelId} has invalid or ambiguous options metadata for extra_params field ${key}.`
-      );
+      continue;
     }
     const match = matchModelCommandOption(optionSet, extraParams[key]);
     if (match.status !== 'matched') {
@@ -284,10 +477,111 @@ function validateCommandArguments(
         `Selected command for model ${modelId} has ${problem} for extra_params field ${key}.`
       );
     }
+    if (field?.declaredType) {
+      validateDeclaredCommandValue(modelId, key, field.declaredType, match.value);
+    }
     normalizedExtraParams[key] = match.value;
   }
 
   return extraKeys.length > 0 ? { ...bodyPayload, extra_params: normalizedExtraParams } : bodyPayload;
+}
+
+function assertValidSendCommandRequestBody(
+  bodyPayload: unknown,
+  sourceLabel: string
+): asserts bodyPayload is Record<string, unknown> {
+  if (!isRecord(bodyPayload)) {
+    throw new DeviceCommandNeedsInputError(
+      `${sourceLabel} requires body.command or body.friendly_name selected from organization.models.getModel commands[].`
+    );
+  }
+  const bodyInspection = inspectSendCommandRequestBody(bodyPayload);
+  if (bodyInspection?.hasParams) {
+    throw new DeviceCommandNeedsInputError(
+      `${sourceLabel} must use body.extra_params for command request values; body.params is response-only data.`
+    );
+  }
+  if (bodyInspection?.hasInvalidExtraParams) {
+    throw new DeviceCommandNeedsInputError(`${sourceLabel} requires body.extra_params to be a JSON object.`);
+  }
+  if (bodyInspection?.hasName) {
+    throw new DeviceCommandNeedsInputError(
+      `${sourceLabel} must use body.command or body.friendly_name for ${SEND_COMMAND_ENDPOINT}; body.name is not supported.`
+    );
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(bodyPayload, 'command') &&
+    (typeof bodyPayload.command !== 'string' || !bodyPayload.command.trim())
+  ) {
+    throw new DeviceCommandNeedsInputError(
+      `${sourceLabel} requires body.command to be a non-empty string when provided.`
+    );
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(bodyPayload, 'friendly_name') &&
+    (typeof bodyPayload.friendly_name !== 'string' || !bodyPayload.friendly_name.trim())
+  ) {
+    throw new DeviceCommandNeedsInputError(
+      `${sourceLabel} requires body.friendly_name to be a non-empty string when provided.`
+    );
+  }
+  const commandName = typeof bodyPayload.command === 'string' ? bodyPayload.command.trim() : '';
+  const friendlyName = typeof bodyPayload.friendly_name === 'string' ? bodyPayload.friendly_name.trim() : '';
+  if (!commandName && !friendlyName) {
+    throw new DeviceCommandNeedsInputError(
+      `${sourceLabel} requires body.command or body.friendly_name selected from organization.models.getModel commands[].`
+    );
+  }
+}
+
+export function prepareModelBackedDeviceCommandBody(args: {
+  evidence: DeviceCommandModelEvidence;
+  bodyPayload: unknown;
+  sourceLabel?: string;
+}): Record<string, unknown> {
+  const sourceLabel = args.sourceLabel ?? 'Command send';
+  const { bodyPayload } = args;
+  assertValidSendCommandRequestBody(bodyPayload, sourceLabel);
+
+  const modelId = args.evidence?.modelId?.trim();
+  if (!modelId) {
+    throw new DeviceCommandNeedsInputError(`${sourceLabel} requires device model evidence before sending a command.`);
+  }
+  const commandName = typeof bodyPayload.command === 'string' ? bodyPayload.command.trim() : '';
+  const friendlyName = typeof bodyPayload.friendly_name === 'string' ? bodyPayload.friendly_name.trim() : '';
+
+  const candidates = extractModelCommandCandidates(args.evidence.modelData);
+  if (candidates.byName.size === 0 && candidates.byFriendlyName.size === 0) {
+    throw new DeviceCommandNeedsInputError(
+      `${sourceLabel} requires supported-command evidence from organization.models.getModel for model ${modelId}.`
+    );
+  }
+
+  const commandDefinition = commandName
+    ? resolveCommandSelector(candidates.byName, commandName, 'command name', modelId)
+    : undefined;
+  const friendlyNameDefinition = friendlyName
+    ? resolveCommandSelector(candidates.byFriendlyName, friendlyName, 'friendly_name', modelId)
+    : undefined;
+  if (commandDefinition && friendlyNameDefinition && commandDefinition !== friendlyNameDefinition) {
+    throw new DeviceCommandNeedsInputError(
+      `Selected command name ${JSON.stringify(commandName)} and friendly_name ${JSON.stringify(friendlyName)} identify different model commands for model ${modelId}.`
+    );
+  }
+
+  const selectedDefinition = commandDefinition ?? friendlyNameDefinition;
+  if (!selectedDefinition) {
+    throw new DeviceCommandNeedsInputError(
+      `${sourceLabel} requires body.command or body.friendly_name selected from organization.models.getModel commands[].`
+    );
+  }
+
+  const normalizedBodyPayload: Record<string, unknown> = {
+    ...bodyPayload,
+    ...(commandName ? { command: commandName } : {}),
+    ...(friendlyName ? { friendly_name: friendlyName } : {})
+  };
+  return validateCommandArguments(modelId, selectedDefinition, normalizedBodyPayload);
 }
 
 function resolveCommandSelector(
@@ -324,53 +618,11 @@ function validateSendCommandAgainstModel(args: {
       `Step ${stepId} requires path.device_id before sending ${SEND_COMMAND_ENDPOINT}.`
     );
   }
-  if (!isRecord(bodyPayload)) {
-    throw new DeviceCommandNeedsInputError(
-      `Step ${stepId} requires body.command or body.friendly_name selected from organization.models.getModel commands[].`
-    );
-  }
-  const bodyInspection = inspectSendCommandRequestBody(bodyPayload);
-  if (bodyInspection?.hasParams) {
-    throw new DeviceCommandNeedsInputError(
-      `Step ${stepId} must use body.extra_params for command request values; body.params is response-only data.`
-    );
-  }
-  if (bodyInspection?.hasInvalidExtraParams) {
-    throw new DeviceCommandNeedsInputError(`Step ${stepId} requires body.extra_params to be a JSON object.`);
-  }
-  if (bodyInspection?.hasName) {
-    throw new DeviceCommandNeedsInputError(
-      `Step ${stepId} must use body.command or body.friendly_name for ${SEND_COMMAND_ENDPOINT}; body.name is not supported.`
-    );
-  }
-  if (
-    Object.prototype.hasOwnProperty.call(bodyPayload, 'command') &&
-    (typeof bodyPayload.command !== 'string' || !bodyPayload.command.trim())
-  ) {
-    throw new DeviceCommandNeedsInputError(
-      `Step ${stepId} requires body.command to be a non-empty string when provided.`
-    );
-  }
-  if (
-    Object.prototype.hasOwnProperty.call(bodyPayload, 'friendly_name') &&
-    (typeof bodyPayload.friendly_name !== 'string' || !bodyPayload.friendly_name.trim())
-  ) {
-    throw new DeviceCommandNeedsInputError(
-      `Step ${stepId} requires body.friendly_name to be a non-empty string when provided.`
-    );
-  }
-
+  assertValidSendCommandRequestBody(bodyPayload, `Step ${stepId}`);
   const deviceId = String(pathPayload.device_id ?? '');
-  const commandName = typeof bodyPayload.command === 'string' ? bodyPayload.command.trim() : '';
-  const friendlyName = typeof bodyPayload.friendly_name === 'string' ? bodyPayload.friendly_name.trim() : '';
   if (!deviceId) {
     throw new DeviceCommandNeedsInputError(
       `Step ${stepId} requires device_id before sending ${SEND_COMMAND_ENDPOINT}.`
-    );
-  }
-  if (!commandName && !friendlyName) {
-    throw new DeviceCommandNeedsInputError(
-      `Step ${stepId} requires body.command or body.friendly_name selected from organization.models.getModel commands[].`
     );
   }
 
@@ -381,38 +633,17 @@ function validateSendCommandAgainstModel(args: {
     );
   }
 
-  const candidates = findPriorModelCommandCandidates(taskOutputs, modelId);
-  if (!candidates || (candidates.byName.size === 0 && candidates.byFriendlyName.size === 0)) {
+  const evidence = findPriorModelCommandEvidence(taskOutputs, modelId);
+  if (!evidence) {
     throw new DeviceCommandNeedsInputError(
       `Step ${stepId} requires supported-command evidence from organization.models.getModel for model ${modelId}.`
     );
   }
-
-  const commandDefinition = commandName
-    ? resolveCommandSelector(candidates.byName, commandName, 'command name', modelId)
-    : undefined;
-  const friendlyNameDefinition = friendlyName
-    ? resolveCommandSelector(candidates.byFriendlyName, friendlyName, 'friendly_name', modelId)
-    : undefined;
-  if (commandDefinition && friendlyNameDefinition && commandDefinition !== friendlyNameDefinition) {
-    throw new DeviceCommandNeedsInputError(
-      `Selected command name ${JSON.stringify(commandName)} and friendly_name ${JSON.stringify(friendlyName)} identify different model commands for model ${modelId}.`
-    );
-  }
-
-  const selectedDefinition = commandDefinition ?? friendlyNameDefinition;
-  if (!selectedDefinition) {
-    throw new DeviceCommandNeedsInputError(
-      `Step ${stepId} requires body.command or body.friendly_name selected from organization.models.getModel commands[].`
-    );
-  }
-
-  const normalizedBodyPayload: Record<string, unknown> = {
-    ...bodyPayload,
-    ...(commandName ? { command: commandName } : {}),
-    ...(friendlyName ? { friendly_name: friendlyName } : {})
-  };
-  return validateCommandArguments(modelId, selectedDefinition, normalizedBodyPayload);
+  return prepareModelBackedDeviceCommandBody({
+    evidence,
+    bodyPayload,
+    sourceLabel: `Step ${stepId}`
+  });
 }
 
 export function prepareDeviceCommandBody(args: {
@@ -499,6 +730,21 @@ export async function runDeviceCommandPollStep(args: {
     return { ok: true, output: { outcome: 'not_requested' } };
   }
 
+  const sendRequest =
+    isRecord(args.sendOutput) && isRecord(args.sendOutput.request) ? args.sendOutput.request : undefined;
+  const sendPath = sendRequest && isRecord(sendRequest.path) ? sendRequest.path : undefined;
+  const deviceId = sendPath?.device_id;
+  if (typeof deviceId !== 'string' || !deviceId.trim()) {
+    throw new DeviceCommandNeedsInputError(
+      `Step ${args.stepId} requires an exact non-empty device_id in ${args.config.sendStepId} request.path.`
+    );
+  }
+  if (args.context.device_id !== deviceId) {
+    throw new DeviceCommandNeedsInputError(
+      `Step ${args.stepId} requires context device_id to exactly match ${args.config.sendStepId} request.path.device_id.`
+    );
+  }
+
   const sendResponse =
     isRecord(args.sendOutput) && isRecord(args.sendOutput.response) ? args.sendOutput.response.data : undefined;
   const commandId = extractSentCommandId(sendResponse);
@@ -507,10 +753,6 @@ export async function runDeviceCommandPollStep(args: {
       ok: false,
       failureDetail: `Step ${args.stepId} could not read a command id from ${args.config.sendStepId}.`
     };
-  }
-  const deviceId = args.context.device_id?.trim();
-  if (!deviceId) {
-    throw new DeviceCommandNeedsInputError(`Step ${args.stepId} requires device_id.`);
   }
 
   const result = await pollCommandStatus({

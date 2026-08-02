@@ -21,15 +21,26 @@ function makeClient(responses: unknown[]): { client: XyteClient; callWithMeta: R
 }
 
 describe('command polling', () => {
-  it('extracts only a concrete id from the send response', () => {
+  it('extracts a concrete id from each documented send response shape', () => {
     expect(extractSentCommandId({ id: 'cmd-1', status: 'pending' })).toBe('cmd-1');
-    expect(extractSentCommandId({ id: '  cmd-3  ' })).toBeUndefined();
-    expect(extractSentCommandId([{ id: 'cmd-2' }])).toBeUndefined();
-    expect(extractSentCommandId([{ id: 'cmd-1' }, { id: 'cmd-2' }])).toBeUndefined();
-    expect(extractSentCommandId({ status: 'pending' })).toBeUndefined();
-    expect(extractSentCommandId({ id: '   ' })).toBeUndefined();
-    expect(extractSentCommandId({ id: 33 })).toBeUndefined();
-    expect(extractSentCommandId([null])).toBeUndefined();
+    expect(extractSentCommandId([{ id: 'cmd-2', status: 'pending' }])).toBe('cmd-2');
+  });
+
+  it.each([
+    { label: 'an empty array', payload: [] },
+    { label: 'multiple command records', payload: [{ id: 'cmd-1' }, { id: 'cmd-2' }] },
+    { label: 'a top-level record without an id', payload: { status: 'pending' } },
+    { label: 'an array item without an id', payload: [{ status: 'pending' }] },
+    { label: 'an empty id', payload: { id: '' } },
+    { label: 'a whitespace-only id', payload: { id: '   ' } },
+    { label: 'an id with surrounding whitespace', payload: [{ id: '  cmd-3  ' }] },
+    { label: 'a non-string id', payload: { id: 33 } },
+    { label: 'a null array item', payload: [null] },
+    { label: 'a nested record', payload: { data: { id: 'cmd-1' } } },
+    { label: 'a nested array item', payload: [{ data: { id: 'cmd-1' } }] },
+    { label: 'a nested array', payload: [[{ id: 'cmd-1' }]] }
+  ])('rejects $label as an ambiguous or invalid send response', ({ payload }) => {
+    expect(extractSentCommandId(payload)).toBeUndefined();
   });
 
   it.each([
