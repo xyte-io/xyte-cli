@@ -2041,8 +2041,8 @@ describe('flow runner', () => {
                     required: true,
                     typeName: 'staticListSingle',
                     options: {
-                      '33': { label: 'HDMI 1', order: 2, value: '33' },
-                      '35': { label: 'HDMI 2', order: 4, value: '35' }
+                      '33': 'HDMI 1',
+                      '35': 'HDMI 2'
                     }
                   },
                   {
@@ -2668,7 +2668,10 @@ describe('flow runner', () => {
                     name: 'mode',
                     type: 'select',
                     required: true,
-                    options: { foo: 'bar' }
+                    options: {
+                      foo: { label: 'Primary', value: 'foo' },
+                      bar: { label: 'foo', value: 'bar' }
+                    }
                   }
                 ]
               }
@@ -2707,7 +2710,7 @@ describe('flow runner', () => {
     expect(summary.outcome).toBe('needs_input');
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(String(summary.steps.find((item) => item.stepId === 'device_command_send')?.error?.detail ?? '')).toContain(
-      'ambiguous options metadata'
+      'an ambiguous value'
     );
   });
 

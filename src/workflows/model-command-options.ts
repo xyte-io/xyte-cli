@@ -48,8 +48,8 @@ function scalarText(value: unknown): string | undefined {
   return undefined;
 }
 
-function isNumericCode(value: string): boolean {
-  return /^-?\d+(?:\.\d+)?$/.test(value.trim());
+function optionValuesEqual(left: ModelCommandOptionValue, right: ModelCommandOptionValue): boolean {
+  return typeof left === typeof right && Object.is(left, right);
 }
 
 function optionFromRecord(
@@ -58,6 +58,11 @@ function optionFromRecord(
 ): ModelCommandOption | undefined {
   const hasValue = Object.prototype.hasOwnProperty.call(record, 'value');
   const hasId = Object.prototype.hasOwnProperty.call(record, 'id');
+  if (hasValue && hasId) {
+    if (!isOptionValue(record.value) || !isOptionValue(record.id) || !optionValuesEqual(record.value, record.id)) {
+      return undefined;
+    }
+  }
   let value = fallbackValue;
   if (hasValue) {
     if (!isOptionValue(record.value)) return undefined;
@@ -67,6 +72,7 @@ function optionFromRecord(
     value = record.id;
   }
   if (!isOptionValue(value)) return undefined;
+  if (fallbackValue !== undefined && !optionValuesEqual(value, fallbackValue)) return undefined;
   const label =
     scalarText(record.label) ?? scalarText(record.title) ?? scalarText(record.name) ?? scalarText(fallbackValue);
   return label ? { label, value } : undefined;
@@ -93,16 +99,8 @@ function normalizeArrayOptions(raw: unknown[]): NormalizedModelCommandOptions {
 }
 
 function normalizePrimitiveMapOption(key: string, raw: ModelCommandOptionValue): ModelCommandOption | undefined {
-  if (typeof raw !== 'string') {
-    return { label: key, value: raw };
-  }
-
-  const keyIsCode = isNumericCode(key);
-  const valueIsCode = isNumericCode(raw);
-  if (keyIsCode === valueIsCode) {
-    return undefined;
-  }
-  return keyIsCode ? { label: raw, value: key } : { label: key, value: raw };
+  const label = scalarText(raw);
+  return isOptionValue(key) && label ? { label, value: key } : undefined;
 }
 
 function normalizeMappedOptions(raw: Record<string, unknown>): NormalizedModelCommandOptions {
@@ -226,10 +224,6 @@ export function extractModelCommandOptionSet(field: Record<string, unknown>): Mo
   };
 }
 
-function valuesEqual(left: ModelCommandOptionValue, right: ModelCommandOptionValue): boolean {
-  return typeof left === typeof right && Object.is(left, right);
-}
-
 function normalizedText(value: ModelCommandOptionValue): string {
   return String(value).trim().replace(/\s+/g, ' ').toLowerCase();
 }
@@ -237,7 +231,7 @@ function normalizedText(value: ModelCommandOptionValue): string {
 function distinctValues(options: ModelCommandOption[]): ModelCommandOptionValue[] {
   const values: ModelCommandOptionValue[] = [];
   for (const option of options) {
-    if (!values.some((value) => valuesEqual(value, option.value))) {
+    if (!values.some((value) => optionValuesEqual(value, option.value))) {
       values.push(option.value);
     }
   }
@@ -249,14 +243,14 @@ function matchScalarModelCommandOption(options: ModelCommandOption[], input: unk
     return { status: 'unmatched' };
   }
 
-  const exactValues = distinctValues(options.filter((option) => valuesEqual(option.value, input)));
-  if (exactValues.length === 1) {
-    return { status: 'matched', value: exactValues[0] };
-  }
-
   const inputText = normalizedText(input);
   const matchedValues = distinctValues(
-    options.filter((option) => normalizedText(option.value) === inputText || normalizedText(option.label) === inputText)
+    options.filter(
+      (option) =>
+        optionValuesEqual(option.value, input) ||
+        normalizedText(option.value) === inputText ||
+        normalizedText(option.label) === inputText
+    )
   );
   if (matchedValues.length === 1) {
     return { status: 'matched', value: matchedValues[0] };

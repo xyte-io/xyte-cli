@@ -32,20 +32,22 @@ describe('model command field options', () => {
     expect(matchModelCommandOption(result, 33)).toEqual({ status: 'matched', value: '33' });
   });
 
-  it('supports either safely inferable primitive-map orientation', () => {
-    const canonicalKey = optionSet({ '33': 'HDMI 1' });
-    const labelKey = optionSet({ 'HDMI 1': '33' });
+  it('uses primitive map keys as canonical values without guessing from numeric text', () => {
+    const numericKey = optionSet({ '33': 'HDMI 1' });
+    const textKey = optionSet({ 'power-on': '1' });
 
-    expect(canonicalKey.issues).toEqual([]);
-    expect(labelKey.issues).toEqual([]);
-    expect(matchModelCommandOption(canonicalKey, 'HDMI 1')).toEqual({
+    expect(numericKey.issues).toEqual([]);
+    expect(textKey.issues).toEqual([]);
+    expect(matchModelCommandOption(numericKey, 'HDMI 1')).toEqual({
       status: 'matched',
       value: '33'
     });
-    expect(matchModelCommandOption(labelKey, 'HDMI 1')).toEqual({
+    expect(matchModelCommandOption(numericKey, '33')).toEqual({ status: 'matched', value: '33' });
+    expect(matchModelCommandOption(textKey, '1')).toEqual({
       status: 'matched',
-      value: '33'
+      value: 'power-on'
     });
+    expect(matchModelCommandOption(textKey, 'power-on')).toEqual({ status: 'matched', value: 'power-on' });
   });
 
   it('extracts options from multi-select command fields', () => {
@@ -66,19 +68,22 @@ describe('model command field options', () => {
   });
 
   it('maps every array entry and preserves exact model-defined value types', () => {
-    const result = optionSet(
-      {
-        enabled: { label: 'Enabled', value: true },
-        disabled: { label: 'Disabled', value: false }
-      },
-      'multiselect'
-    );
+    const result = extractModelCommandOptionSet({
+      name: 'flags',
+      type: 'multiselect',
+      typeName: 'staticListMulti',
+      options: [
+        { label: 'Enabled', value: true },
+        { label: 'Disabled', value: false }
+      ]
+    });
 
-    expect(matchModelCommandOption(result, ['Enabled', false])).toEqual({
+    expect(result?.issues).toEqual([]);
+    expect(matchModelCommandOption(result!, ['Enabled', false])).toEqual({
       status: 'matched',
       value: [true, false]
     });
-    expect(matchModelCommandOption(result, [])).toEqual({ status: 'matched', value: [] });
+    expect(matchModelCommandOption(result!, [])).toEqual({ status: 'matched', value: [] });
   });
 
   it('rejects an array when any option is unknown or ambiguous', () => {
@@ -261,18 +266,26 @@ describe('model command field options', () => {
     expect(extractModelCommandOptionSet({ name: 'delay', type: 'number' })).toBeUndefined();
   });
 
-  it('preserves a numeric model-defined value without loose numeric coercion', () => {
-    const result = optionSet({ 'HDMI 1': 33 });
+  it('preserves a numeric model-defined value from an explicit option array', () => {
+    const result = extractModelCommandOptionSet({
+      name: 'input',
+      type: 'select',
+      typeName: 'staticListSingle',
+      options: [{ label: 'HDMI 1', value: 33 }]
+    });
 
-    expect(result.issues).toEqual([]);
-    expect(matchModelCommandOption(result, 'HDMI 1')).toEqual({ status: 'matched', value: 33 });
-    expect(matchModelCommandOption(result, '33')).toEqual({ status: 'matched', value: 33 });
-    expect(matchModelCommandOption(result, '033')).toEqual({ status: 'unmatched' });
+    expect(result?.issues).toEqual([]);
+    expect(matchModelCommandOption(result!, 'HDMI 1')).toEqual({ status: 'matched', value: 33 });
+    expect(matchModelCommandOption(result!, '33')).toEqual({ status: 'matched', value: 33 });
+    expect(matchModelCommandOption(result!, '033')).toEqual({ status: 'unmatched' });
   });
 
-  it('rejects primitive maps whose direction cannot be inferred safely', () => {
-    expect(optionSet({ foo: 'bar' }).issues).not.toEqual([]);
-    expect(optionSet({ '33': '35' }).issues).not.toEqual([]);
+  it('supports non-numeric primitive option maps using the server key-as-value contract', () => {
+    const result = optionSet({ foo: 'bar' });
+
+    expect(result.issues).toEqual([]);
+    expect(matchModelCommandOption(result, 'bar')).toEqual({ status: 'matched', value: 'foo' });
+    expect(matchModelCommandOption(result, 'foo')).toEqual({ status: 'matched', value: 'foo' });
   });
 
   it('reports duplicate labels as ambiguous while exact canonical values still match', () => {
@@ -283,6 +296,28 @@ describe('model command field options', () => {
 
     expect(matchModelCommandOption(result, 'Input')).toEqual({ status: 'ambiguous' });
     expect(matchModelCommandOption(result, '33')).toEqual({ status: 'matched', value: '33' });
+  });
+
+  it('reports an input as ambiguous when it is one option value and another option label', () => {
+    const result = optionSet({
+      '33': { label: 'HDMI 1', value: '33' },
+      '35': { label: '33', value: '35' }
+    });
+
+    expect(matchModelCommandOption(result, '33')).toEqual({ status: 'ambiguous' });
+    expect(matchModelCommandOption(result, 33)).toEqual({ status: 'ambiguous' });
+  });
+
+  it.each([
+    { label: 'a different string value', value: '35' },
+    { label: 'a differently typed numeric value', value: 33 }
+  ])('rejects mapped option records whose explicit value conflicts with the canonical key: $label', ({ value }) => {
+    const result = optionSet({
+      '33': { label: 'HDMI 1', value }
+    });
+
+    expect(result.options).toEqual([]);
+    expect(result.issues).not.toEqual([]);
   });
 
   it('rejects malformed explicit option values instead of falling back to the map key', () => {
