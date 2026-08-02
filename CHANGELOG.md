@@ -6,6 +6,21 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+### Added
+- Every API request now sends an `X-Xyte-Client: xyte-cli/<version>` header, so the hub attributes calls in the tenant's API call log (Settings > API Keys > Call Log) to the CLI instead of to a direct integration.
+
+## [0.12.1] - 2026-07-08
+
+### Added
+- Added a passive once-per-day update notice for eligible interactive CLI runs, with suppression for CI, non-interactive sessions, upgrade/help/version commands, and JSON/headless/machine-readable output.
+- Added shipped agent guidance so AI agents relay update notices once without running `xyte-cli upgrade` unless explicitly asked.
+
+### Changed
+- Bumped package metadata and lockfile to `0.12.1`.
+
+### Upgrade notes
+- Existing workspaces that already installed the shipped skill bundle should run `xyte-cli skills refresh` after upgrading so agents receive the update-notice guidance.
+
 ## [0.12.0] - 2026-07-06
 
 ### Added

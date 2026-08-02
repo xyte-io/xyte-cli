@@ -33,6 +33,8 @@ describe('client auth behavior', () => {
     expect(transport.request).toHaveBeenCalledTimes(1);
     expect(transport.request.mock.calls[0][0].headers.Authorization).toBe('org-key-123');
     expect(transport.request.mock.calls[0][0].headers['User-Agent']).toBe('CLI');
+    // The hub reads this header to record the call's originating client
+    expect(transport.request.mock.calls[0][0].headers['X-Xyte-Client']).toMatch(/^xyte-cli\/\d+\.\d+\.\d+/);
   });
 
   it('throws auth error when scoped key is missing', async () => {
