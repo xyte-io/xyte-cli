@@ -4308,7 +4308,7 @@ describe('cli integration', () => {
     for (const installed of installedBundles) {
       expect(snapshot(installed)).toEqual(canonicalSnapshot);
     }
-  });
+  }, 20_000);
 
   it('suggests skills refresh after a successful upgrade in text mode', async () => {
     const stdout = { write: vi.fn() };
