@@ -232,6 +232,7 @@ describe('tui data loaders', () => {
   });
 
   it('loads command templates from the selected device model', async () => {
+    const commands = [{ name: 'reboot', with_file: true }, { friendly_name: 'power_cycle' }];
     const client: any = {
       organization: {
         getDevice: async () => ({
@@ -240,7 +241,7 @@ describe('tui data loaders', () => {
         }),
         getModel: async () => ({
           id: 'model-1',
-          commands: [{ name: 'reboot' }, { friendly_name: 'power_cycle' }]
+          commands
         })
       }
     };
@@ -248,8 +249,79 @@ describe('tui data loaders', () => {
     const templates = await loadCommandTemplates(client, 'acme', { deviceId: 'dev-1' });
     expect(templates.connectionState).toBe('connected');
     expect(templates.data).toEqual([
-      { mode: 'command', value: 'reboot', label: 'name: reboot' },
-      { mode: 'friendly_name', value: 'power_cycle', label: 'friendly_name: power_cycle' }
+      {
+        mode: 'command',
+        value: 'reboot',
+        label: 'name: reboot',
+        withFile: true,
+        modelEvidence: { modelId: 'model-1', modelData: { commands } }
+      },
+      {
+        mode: 'friendly_name',
+        value: 'power_cycle',
+        label: 'friendly_name: power_cycle',
+        withFile: false,
+        modelEvidence: { modelId: 'model-1', modelData: { commands } }
+      }
     ]);
+  });
+
+  it('retains duplicate command definitions as validation evidence', async () => {
+    const commands = [
+      { name: 'reboot', custom_fields: [{ name: 'delay', required: true }] },
+      { name: 'reboot', custom_fields: [{ name: 'delay', required: false }] }
+    ];
+    const client: any = {
+      organization: {
+        getDevice: async () => ({ id: 'dev-1', model: { id: 'model-1' } }),
+        getModel: async () => ({ id: 'model-1', commands })
+      }
+    };
+
+    const templates = await loadCommandTemplates(client, 'acme', { deviceId: 'dev-1' });
+
+    expect(templates.data).toHaveLength(1);
+    expect(templates.data[0]?.modelEvidence).toEqual({
+      modelId: 'model-1',
+      modelData: { commands }
+    });
+  });
+
+  it('loads exact data.commands entries without accepting a command alias', async () => {
+    const client: any = {
+      organization: {
+        getDevice: async () => ({ id: 'dev-1', model: { id: 'model-1' } }),
+        getModel: async () => ({
+          data: {
+            commands: [{ name: 'reboot' }, { command: 'legacy_alias' }]
+          }
+        })
+      }
+    };
+
+    const templates = await loadCommandTemplates(client, 'acme', { deviceId: 'dev-1' });
+
+    expect(templates.data.map(({ mode, value }) => ({ mode, value }))).toEqual([{ mode: 'command', value: 'reboot' }]);
+    expect(templates.data[0]?.modelEvidence.modelData).toEqual({
+      commands: [{ name: 'reboot' }, { command: 'legacy_alias' }]
+    });
+  });
+
+  it('does not infer commands from unrelated model arrays', async () => {
+    const client: any = {
+      organization: {
+        getDevice: async () => ({ id: 'dev-1', model: { id: 'model-1' } }),
+        getModel: async () => ({
+          aliases: [{ name: 'alias_entry' }],
+          parameters: [{ name: 'parameter_entry' }],
+          items: [{ name: 'item_entry' }]
+        })
+      }
+    };
+
+    const templates = await loadCommandTemplates(client, 'acme', { deviceId: 'dev-1' });
+
+    expect(templates.connectionState).toBe('connected');
+    expect(templates.data).toEqual([]);
   });
 });

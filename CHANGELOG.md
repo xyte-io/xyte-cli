@@ -6,6 +6,23 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-08-03
+
+### Added
+- `flow.device-command` can optionally poll command history for the exact command ID returned by the send request, with an explicit timeout.
+
+### Changed
+- Bumped package metadata and lockfile to `0.14.0`.
+
+### Fixed
+- Device command sends now use the API's `command` or `friendly_name` selector, keep request values under `extra_params`, and map model-provided static option labels or canonical values for both single- and multi-value fields. Unknown, ambiguous, malformed, and unresolved dynamic choices stop before sending.
+- The CLI's model-guided command paths now share declared value-type and attached-file checks, and resume will not automatically repeat a command whose send result is unknown.
+
+### Upgrade notes
+- Existing workspaces that already installed the shipped skill bundle should run `xyte-cli skills refresh` after upgrading so agents receive the corrected device-command guidance.
+
+## [0.13.0] - 2026-07-29
+
 ### Added
 - Every API request now sends an `X-Xyte-Client: xyte-cli/<version>` header, so the hub attributes calls in the tenant's API call log (Settings > API Keys > Call Log) to the CLI instead of to a direct integration.
 

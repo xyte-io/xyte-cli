@@ -106,7 +106,7 @@ function buildSuggestedCommands(
         'Choose command names only from model commands[].name or friendly names only from commands[].friendly_name.',
         'Fill extra_params only from commands[].custom_fields[].name and provide file_id when commands[].with_file is true.'
       ].join(' '),
-      apply: `xyte-cli api call organization.commands.sendCommand --tenant ${tenant} --path-json '{"device_id":"<device_id>"}' --body-json '{"name":"<commands[].name>","extra_params":{}}'`,
+      apply: `xyte-cli api call organization.commands.sendCommand --tenant ${tenant} --path-json '{"device_id":"<device_id>"}' --body-json '{"command":"<commands[].name>","extra_params":{}}'`,
       verify: `xyte-cli api call organization.commands.getCommands --tenant ${tenant} --path-json '{"device_id":"<device_id>"}' --query-json '{"page":1,"per_page":20}'`
     };
   }
@@ -273,10 +273,7 @@ function rejectTaxonomy(profile: UtilityActionProfile, requiredHeaders: string[]
   const reasons = requiredHeaders.map((header) => `missing_${header}`);
   const jsonHeaders = profile.headers.filter(
     (header) =>
-      header.endsWith('_json') ||
-      header === 'config' ||
-      header === 'custom_parameters' ||
-      header === 'set_json'
+      header.endsWith('_json') || header === 'config' || header === 'custom_parameters' || header === 'set_json'
   );
   reasons.push(...jsonHeaders.map((header) => `invalid_${header}`));
   if (profile.actionKey === 'organization.edge.startClaim') {

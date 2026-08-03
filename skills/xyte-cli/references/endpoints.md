@@ -106,10 +106,13 @@ xyte-cli api call organization.incidents.closeIncident \
 
 ### `organization.commands.sendCommand`
 
-Prefer `flow.device-command` for user requests like "send command X to device Y"; it first reads `organization.devices.getDevice`, describes the returned model with `organization.models.getModel`, validates the selected `commands[].name` plus any command parameters, and pauses before `organization.commands.sendCommand`.
+Prefer `flow.device-command` for user requests like "send command X to device Y"; it first reads `organization.devices.getDevice`, describes the returned model with `organization.models.getModel`, validates required fields and declared parameter types, maps labels or label arrays through embedded static `options` to exact scalar or array values, and pauses before `organization.commands.sendCommand`. The built-in flow sends the selected `commands[].name` under request field `command`; raw or custom sends may use `friendly_name`, while request field `name` is invalid. Malformed or unresolved choices stop before the send. Send request values as an object under `extra_params`; raw sends reject response/history `params` and non-object `extra_params`. Optional polling needs one command id from the send response. If the send result is interrupted or unknown, resume stops instead of sending it again.
 
 ```bash
 xyte-cli flow run flow.device-command --tenant <tenant-id> --plan --var device_id=<device-id> --var command=reboot
+
+# Add these vars only when command queue/history polling is wanted:
+xyte-cli flow run flow.device-command --tenant <tenant-id> --apply --var device_id=<device-id> --var command=reboot --var command_poll=true --var command_poll_timeout_ms=60000
 
 xyte-cli api call organization.devices.getDevice \
   --tenant <tenant-id> \
@@ -122,8 +125,15 @@ xyte-cli edge models describe \
 xyte-cli api call organization.commands.sendCommand \
   --tenant <tenant-id> \
   --path-json '{"device_id":"<device-id>"}' \
-  --body-json '{"name":"reboot","extra_params":{}}'
+  --body-json '{"command":"reboot","extra_params":{}}'
+
+xyte-cli api call organization.commands.getCommands \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}' \
+  --query-json '{"page":1,"per_page":500}'
 ```
+
+Optional flow polling matches only the id returned by `sendCommand`, follows `has_next_page` when needed, and stops at the requested timeout. It reports Xyte command queue/history status. The verified page size limit is 500.
 
 ### `organization.devices.mergeDevice` / `organization.devices.splitDevice`
 
@@ -243,7 +253,7 @@ Model discovery:
 - `organization.models.getModels` -> `GET /core/v1/organization/models` with `edge_only=true`, `page`, `per_page`, and optional `search`.
 - `organization.models.getModel` -> `GET /core/v1/organization/models/:id`; returns `parameters[]` and model-supported `commands[]`.
 - Use `parameters[].name` as the accepted `custom_parameters` labels for Edge claim and already-claimed parameter updates.
-- Use `commands[].name` or `commands[].friendly_name` for `organization.commands.sendCommand`; use `commands[].custom_fields[].name` for `extra_params`, and provide `file_id` when `commands[].with_file` is true.
+- For raw or custom calls, send `commands[].name` under request field `command`, or send `commands[].friendly_name` under `friendly_name`; use `commands[].custom_fields[].name` for `extra_params`, map labels or label arrays through embedded static `options`, stop on malformed or unresolved choices, and provide `file_id` when `commands[].with_file` is true. The built-in `flow.device-command` selects by `commands[].name`.
 
 Verified raw route mapping:
 - `organization.edge.startClaim` -> `POST /core/v1/organization/edges/devices/start_claim`

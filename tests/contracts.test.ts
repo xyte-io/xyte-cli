@@ -174,8 +174,23 @@ describe('schema contracts', () => {
             id: 'cmd-1',
             name: 'reboot',
             friendly_name: 'Reboot device',
-            custom_fields: [{ name: 'delay', type: 'number' }],
+            custom_fields: [
+              {
+                name: 'zones',
+                type: 'multiselect',
+                typeName: 'staticListMulti',
+                options: {
+                  lobby: { label: 'Lobby', value: 'lobby', order: 0 }
+                }
+              }
+            ],
             with_file: false
+          },
+          {
+            id: 'cmd-2',
+            name: 'identify',
+            custom_fields: null,
+            with_file: null
           }
         ]
       }
@@ -395,7 +410,6 @@ describe('schema contracts', () => {
     await profileStore.upsertTenant({ id: 'acme' });
     await profileStore.setActiveTenant('acme');
     const slot = await profileStore.addKeySlot('acme', 'xyte-org', {
-      
       name: 'primary',
       fingerprint: 'sha256:test'
     });

@@ -184,6 +184,7 @@ export function createXyteClient(options: XyteClientOptions = {}): XyteClient {
 
     const response = await transport.request<T>({
       requestId: args.requestId,
+      signal: args.signal,
       endpointKey: endpoint.key,
       method: endpoint.method,
       url: url.toString(),

@@ -50,7 +50,9 @@
       "Docs category: /branches/2.0/categories/reference/API Access",
       "Docs parent: /branches/2.0/reference/commands",
       "Docs raw path params: device_id",
-      "Docs OpenAPI requestBody repeats device_id, but the verified route uses device_id as a path parameter and this GET request must not send a body."
+      "Docs OpenAPI requestBody repeats device_id, but the verified route uses device_id as a path parameter and this GET request must not send a body.",
+      "Returns command queue/history entries that can be matched by command id; it does not describe model-supported commands.",
+      "The verified response uses items plus has_next_page, and per_page accepts at most 500 entries."
     ]
   },
   {
@@ -69,6 +71,7 @@
     "authScope": "organization",
     "bodyType": "json",
     "hasBody": true,
+    "bodyExample": "{\n  \"command\": \"<commands[].name>\",\n  \"extra_params\": {\n    \"<custom_fields[].name>\": \"<model-defined-value>\"\n  }\n}",
     "sourceFile": "https://docs.xyte.io/reference/send-command",
     "notes": [
       "Docs page: https://docs.xyte.io/reference/send-command",
@@ -76,7 +79,11 @@
       "Docs parent: /branches/2.0/reference/commands",
       "Docs raw path params: device_id",
       "Docs page: https://docs.xyte.io/reference/send-command",
-      "Docs 422 example explicitly requires a valid command or friendly_name, which implies a request payload even when requestBody schema is absent in SSR data."
+      "Docs 422 example explicitly requires a valid command or friendly_name, which implies a request payload even when requestBody schema is absent in SSR data.",
+      "The request selector is command or friendly_name; name is the model metadata field, not a send request field.",
+      "Send request parameters belong in a JSON object under extra_params; params is returned in command responses and history.",
+      "For custom fields with embedded model-provided options and unambiguous single- or multi-value cardinality, send the exact model-defined scalar value or array of values; option support is not limited to fields whose general type is select or multiselect.",
+      "The documented send response is an array; command polling accepts a command object or an exactly one-item array only when it contains one unambiguous command id."
     ]
   },
   {

@@ -284,7 +284,8 @@ describe('utility prepare workflow', () => {
     expect(result.suggestedCommands.next).toContain('organization.models.getModel');
     expect(result.suggestedCommands.next).toContain('extra_params');
     expect(result.suggestedCommands.apply).toContain('organization.commands.sendCommand');
-    expect(result.suggestedCommands.apply).toContain('"name"');
+    expect(result.suggestedCommands.apply).toContain('"command"');
+    expect(result.suggestedCommands.apply).not.toContain('"name"');
     expect(result.suggestedCommands.verify).toContain('organization.commands.getCommands');
   });
 
@@ -428,9 +429,9 @@ describe('utility prepare workflow', () => {
     expect(listUtilityPrepareActions({ executionSupport: 'edge.claim-batch' }).map((item) => item.actionKey)).toEqual([
       'organization.edge.startClaim'
     ]);
-    expect(listUtilityPrepareActions({ executionSupport: 'edge.params-update-batch' }).map((item) => item.actionKey)).toEqual([
-      'edge.params.update'
-    ]);
+    expect(
+      listUtilityPrepareActions({ executionSupport: 'edge.params-update-batch' }).map((item) => item.actionKey)
+    ).toEqual(['edge.params.update']);
     expect(listUtilityPrepareActions({ executionSupport: 'prepare-only' }).map((item) => item.actionKey)).toEqual([
       'organization.connectors.prepareSetup',
       'organization.teamAccess.groups',

@@ -186,10 +186,13 @@ Frame event types:
 
 ## Write Examples
 
-These raw API examples are shell-specific because inline JSON quoting differs across shells. For one-device command sends, prefer `flow.device-command`; it reads the device model's supported commands first and pauses before `sendCommand`.
+These raw API examples are shell-specific because inline JSON quoting differs across shells. For one-device command sends, prefer `flow.device-command`; it reads the device model's supported commands first, checks required fields and declared value types, and maps labels or label arrays through static `options` embedded in the model metadata before pausing at `sendCommand`. The built-in flow sends the selected `commands[].name` under request field `command`; raw or custom sends may instead use `friendly_name`, while request field `name` is invalid. Malformed or unresolved choices stop before the send. Command request values belong in a JSON object under `extra_params`; raw calls reject response-only `params` and non-object `extra_params`.
 
 ```bash
 xyte-cli flow run flow.device-command --tenant <tenant-id> --plan --var device_id=DEVICE_ID --var command=reboot
+
+# Optional after the approved send:
+xyte-cli flow run flow.device-command --tenant <tenant-id> --apply --var device_id=DEVICE_ID --var command=reboot --var command_poll=true --var command_poll_timeout_ms=60000
 
 xyte-cli api call organization.devices.getDevice \
   --tenant <tenant-id> \
@@ -202,12 +205,12 @@ xyte-cli edge models describe \
 xyte-cli api call organization.commands.sendCommand \
   --tenant <tenant-id> \
   --path-json '{"device_id":"DEVICE_ID"}' \
-  --body-json '{"name":"reboot","extra_params":{}}'
+  --body-json '{"command":"reboot","extra_params":{}}'
 
 xyte-cli api call organization.commands.getCommands \
   --tenant <tenant-id> \
   --path-json '{"device_id":"DEVICE_ID"}' \
-  --query-json '{"page":1,"per_page":20}'
+  --query-json '{"page":1,"per_page":500}'
 
 xyte-cli api call organization.commands.cancelCommand \
   --tenant <tenant-id> \
@@ -235,6 +238,8 @@ xyte-cli api call partner.organizations.createOrganization \
   --tenant <tenant-id> \
   --body-json '{"name":"Acme HQ","admin_contact_email":"admin@example.com","admin_contact_name":"Jane Doe","finance_contact_email":"finance@example.com","finance_contact_name":"Finance Team"}'
 ```
+
+Optional flow polling follows command-history pages for the one command id returned by `sendCommand` and stops at the requested timeout. It reports Xyte command queue/history status; it does not read device state. If the send is interrupted before its result is recorded, resume stops rather than risking a second send.
 
 ## Utility Pipelines, Space Import, And Device Migration
 

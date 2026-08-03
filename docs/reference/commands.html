@@ -147,7 +147,7 @@ xyte-cli api endpoints describe organization.devices.getDevices
 xyte-cli api call organization.devices.getDevices \
   --tenant &lt;tenant-id&gt; \
   --query-json '{"space_id":"&lt;space-id&gt;"}'</code></pre></div>
-          <p class="section-copy">For write-capable endpoints, prefer a guide or flow first. For one-device command sends, use <code>flow.device-command</code> so the device model&rsquo;s supported commands, <code>custom_fields</code>, and <code>with_file</code> requirements are captured before the approval gate. If you use <code>xyte-cli api call &lt;endpoint-key&gt;</code> directly, choose the target from endpoint output and read the state back afterward.</p>
+          <p class="section-copy">For write-capable endpoints, prefer a guide or flow first. For one-device command sends, use <code>flow.device-command</code> so the device model&rsquo;s supported commands, required fields, declared value types, and <code>with_file</code> requirements are captured before the approval gate. The built-in flow sends the selected <code>commands[].name</code> under request field <code>command</code>; raw or custom sends may instead use <code>friendly_name</code>, while request field <code>name</code> is invalid. Labels and label arrays are mapped through static <code>options</code> embedded in model metadata. Malformed or unresolved choices stop before the send. Send request values as an object under <code>extra_params</code>; raw sends reject response-only <code>params</code> and non-object <code>extra_params</code>.</p>
           <div class="command"><pre><code>xyte-cli api endpoints describe organization.commands.sendCommand
 xyte-cli api call organization.devices.getDevice \
   --tenant &lt;tenant-id&gt; \
@@ -163,7 +163,17 @@ xyte-cli flow run flow.device-command \
   --var device_id=&lt;device-id&gt; \
   --var command=&lt;command&gt; \
   --var command_extra_params_json='{"delay":5}' \
-  --var command_file_id=&lt;file-id-if-with_file&gt;</code></pre></div>
+  --var command_file_id=&lt;file-id-if-with_file&gt;
+
+# Optional command queue/history polling:
+xyte-cli flow run flow.device-command \
+  --tenant &lt;tenant-id&gt; \
+  --apply \
+  --var device_id=&lt;device-id&gt; \
+  --var command=&lt;command&gt; \
+  --var command_poll=true \
+  --var command_poll_timeout_ms=60000</code></pre></div>
+          <p class="section-copy">Optional polling matches the one id returned by the send and reports Xyte command queue/history status only. If the send is interrupted before its result is recorded, resume stops instead of sending it again.</p>
 
           <h2 id="flows-utilities">Flows and utilities</h2>
           <p class="section-copy">Flows run repeatable operator work. Utilities prepare messy input files as structured rows for later commands.</p>

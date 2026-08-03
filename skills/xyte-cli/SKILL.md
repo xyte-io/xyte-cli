@@ -65,7 +65,7 @@ Use when the request involves any of:
 - Never auto-apply and never infer permission to create or update from context.
 - In automation, always pass `--tenant <tenant-id>`.
 - For `organization.incidents.getIncidents`, prefer explicit integer time bounds (`from=0`, `to=<unix-now>`) to avoid empty responses from null or omitted bounds in some environments.
-- When the user asks to send a command to a specific device, use `flow.device-command`: read `organization.devices.getDevice`, read `organization.models.getModel` for that device model, choose or ask for the exact `commands[].name`, validate any `command_extra_params_json` against `commands[].custom_fields`, then stop at the approval gate before `organization.commands.sendCommand`.
+- When the user asks to send a command to a specific device, use `flow.device-command`: read `organization.devices.getDevice`, read `organization.models.getModel` for that device model, choose or ask for the exact `commands[].name`, and send it under request field `command` (raw or custom sends may use `friendly_name`; never request field `name`). Validate only `command_extra_params_json` against required fields and declared value types in `commands[].custom_fields`, map labels or label arrays through embedded static `options` to exact scalar or array values, and use `command_file_id` when `with_file` is true. Stop on malformed command/option metadata, duplicate command/custom-field definitions, unsupported declared types, ambiguous values, and unresolved path-backed choices. Send request values under `extra_params`, never response-only `params`. Optional polling requires `command_poll=true` plus a positive `command_poll_timeout_ms`; it follows history pages for the one returned id until a final status or timeout. If the send result is interrupted or unknown, resume must stop rather than sending the command again.
 
 ## Claiming Devices (Mandatory Disambiguation)
 
@@ -304,7 +304,7 @@ xyte-cli edge models describe \
 xyte-cli api call organization.commands.sendCommand \
   --tenant <tenant-id> \
   --path-json '{"device_id":"<device-id>"}' \
-  --body-json '{"name":"<commands[].name>","extra_params":{}}'
+  --body-json '{"command":"<commands[].name>","extra_params":{}}'
 ```
 
 Delete call:

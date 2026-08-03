@@ -33,6 +33,16 @@ describe('public endpoint catalog', () => {
     expect(partnerTicket?.pathParams).toEqual(['ticket_id']);
   });
 
+  it('documents the sendCommand request field separately from response params', () => {
+    const sendCommand = endpoints.find((endpoint) => endpoint.key === 'organization.commands.sendCommand');
+
+    expect(sendCommand?.bodyExample).toContain('"command"');
+    expect(sendCommand?.bodyExample).not.toContain('"name"');
+    expect(sendCommand?.bodyExample).toContain('"extra_params"');
+    expect(sendCommand?.bodyExample).not.toContain('"params"');
+    expect(sendCommand?.notes?.join(' ')).toContain('params is returned in command responses');
+  });
+
   it('contains no device namespace or device auth scope endpoints', () => {
     const deviceNamespace = endpoints.filter((endpoint) => (endpoint as { namespace: string }).namespace === 'device');
     const deviceScope = endpoints.filter((endpoint) => (endpoint as { authScope: string }).authScope === 'device');
