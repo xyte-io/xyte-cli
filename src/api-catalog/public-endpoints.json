@@ -342,7 +342,9 @@
       "to",
       "device_id",
       "space_id",
-      "name"
+      "name",
+      "page",
+      "per_page"
     ],
     "authScope": "organization",
     "bodyType": "none",
@@ -351,7 +353,10 @@
     "notes": [
       "Docs page: https://docs.xyte.io/reference/get-histories",
       "Docs category: /branches/2.0/categories/reference/API Access",
-      "Docs parent: /branches/2.0/reference/devices-2"
+      "Docs parent: /branches/2.0/reference/devices-2",
+      "from/to are Unix epoch seconds; the window between them must not exceed 31 days and to must be >= from (422 otherwise). from defaults to 1 week ago, to defaults to now.",
+      "Paginate with page (starts at 1) and per_page (default 100, max 1000). Response includes has_next_page; no total count is returned.",
+      "status filters by the device's CURRENT status (online, offline, unavailable, error), not the status recorded in each history row."
     ]
   },
   {

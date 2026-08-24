@@ -43,7 +43,7 @@ Derived from the bundled public endpoint spec.
 | --- | --- | --- | --- |
 | `organization.spaces.getSpaces` | `id`, `name`, `parent_id`, `space_type`, `created_before`, `created_after`, `path_includes` | none | Main listing endpoint with server-side filtering |
 | `organization.devices.getDevices` | `page`, `per_page`, `space_id` | `page`, `per_page` | Filter devices by one space; shared docs mention `has_next_page`, live Verve/Playground responses returned `next_page`; handle either continuation field |
-| `organization.devices.getHistories` | `status`, `from`, `to`, `device_id`, `space_id`, `name` | none | Filtered history lookup; can be time-windowed |
+| `organization.devices.getHistories` | `status`, `from`, `to`, `device_id`, `space_id`, `name`, `page`, `per_page` | `page`, `per_page` | Filtered history lookup. `from`/`to` window must not exceed 31 days (422 otherwise); defaults are last week. `status` filters the device's *current* status. |
 | `organization.commands.getCommands` | `status`, `page`, `per_page` | `page`, `per_page` | Command history pagination and status filter |
 | `organization.incidents.getIncidents` | `from`, `to`, `status`, `priority`, `title`, `description`, `issue`, `device_model`, `partner_name`, `sub_model`, `space_id`, `page`, `per_page` | `page`, `per_page` | Incident filtering matrix. Use integer `from` and `to`; for reliable active-incident fetches use both (`from=0`, `to=<now>`). |
 | `organization.notes.getAllDeviceNotes` | `page`, `per_page` | `page`, `per_page` | Paginated notes across all devices |
@@ -78,11 +78,15 @@ xyte-cli api call organization.devices.getHistories \
   --tenant <tenant-id> \
   --query-json '{
     "status": "online",
-    "from": 0,
-    "to": 2000000000,
-    "space_id": "<space-id>"
+    "from": <now-epoch minus up to 31 days>,
+    "to": <now-epoch>,
+    "space_id": "<space-id>",
+    "page": 1,
+    "per_page": 100
   }'
 ```
+
+The `from`/`to` window may not exceed 31 days (the API returns 422 for wider or reversed windows). Walk further back by sliding the window; walk within a window with `page` until `has_next_page` is false.
 
 ### `organization.incidents.getIncidents`
 
