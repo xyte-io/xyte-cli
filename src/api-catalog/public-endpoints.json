@@ -342,7 +342,9 @@
       "to",
       "device_id",
       "space_id",
-      "name"
+      "name",
+      "page",
+      "per_page"
     ],
     "authScope": "organization",
     "bodyType": "none",
@@ -351,7 +353,11 @@
     "notes": [
       "Docs page: https://docs.xyte.io/reference/get-histories",
       "Docs category: /branches/2.0/categories/reference/API Access",
-      "Docs parent: /branches/2.0/reference/devices-2"
+      "Docs parent: /branches/2.0/reference/devices-2",
+      "from/to are Unix epoch seconds and both bounds are INCLUSIVE; the window between them must not exceed 31 days and to must be >= from (422 otherwise). Defaults (from: 1 week ago, to: now) apply independently, so send both bounds - a lone to older than a week 422s against the default from.",
+      "Paginate with page (starts at 1) and per_page (default 100). Values outside 1..1000 for per_page, or page < 1, are rejected with 422 - not clamped. Response includes has_next_page; no total count is returned.",
+      "Rows are ordered newest-first (created_at desc, id desc - stable). Slide the window back with to = previous_from - 1 (bounds are inclusive) to avoid duplicate boundary rows. Prefer a narrower window or a device_id/space_id filter over deep page walks - each page costs a full OFFSET scan, so high page numbers can time out even inside a legal window.",
+      "status filters by the device's CURRENT status (online, offline, unavailable, error), not the status recorded in each history row."
     ]
   },
   {

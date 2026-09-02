@@ -29,6 +29,14 @@ describe('notes endpoint docs and skill guidance', () => {
     expect(content).toContain('created_by: null');
   });
 
+  it('pins getHistories window and pagination guidance in the shipped endpoint reference', () => {
+    const content = read('skills/xyte-cli/references/endpoints.md');
+
+    expect(content).toContain('31 days');
+    expect(content).toContain('has_next_page');
+    expect(content).toContain('to = previous from - 1');
+  });
+
   it('documents generic utility behavior for note write endpoints', () => {
     const docs = read('docs/ai-utility-preprocessing.md');
     const skill = read('skills/xyte-cli/references/ai-utility-preprocessing.md');
