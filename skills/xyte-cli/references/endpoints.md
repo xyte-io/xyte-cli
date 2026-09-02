@@ -78,15 +78,15 @@ xyte-cli api call organization.devices.getHistories \
   --tenant <tenant-id> \
   --query-json '{
     "status": "online",
-    "from": <now-epoch minus up to 31 days>,
-    "to": <now-epoch>,
+    "from": 1707400000,
+    "to": 1710000000,
     "space_id": "<space-id>",
     "page": 1,
     "per_page": 100
   }'
 ```
 
-The `from`/`to` window may not exceed 31 days (the API returns 422 for wider or reversed windows). Walk further back by sliding the window; walk within a window with `page` until `has_next_page` is false.
+Replace `1710000000` with the current Unix timestamp and `1707400000` with a value at most 31 days earlier; the `from`/`to` window may not exceed 31 days (the API returns 422 for wider or reversed windows). Both bounds are inclusive: walk further back by sliding the window with `to = previous from - 1`, and walk within a window with `page` until `has_next_page` is false. Prefer a shorter window or a `device_id`/`space_id` filter over deep page walks — each page costs a full OFFSET scan, so high page numbers can time out even inside a legal window.
 
 ### `organization.incidents.getIncidents`
 
