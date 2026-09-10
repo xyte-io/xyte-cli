@@ -34,7 +34,8 @@ describe('notes endpoint docs and skill guidance', () => {
 
     expect(content).toContain('31 days');
     expect(content).toContain('has_next_page');
-    expect(content).toContain('to = previous from - 1');
+    expect(content).toContain("set the next window's `to` to the current window's `from`");
+    expect(content).toContain('(uuid, create_at)');
   });
 
   it('documents generic utility behavior for note write endpoints', () => {

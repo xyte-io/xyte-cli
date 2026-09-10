@@ -43,7 +43,7 @@ Derived from the bundled public endpoint spec.
 | --- | --- | --- | --- |
 | `organization.spaces.getSpaces` | `id`, `name`, `parent_id`, `space_type`, `created_before`, `created_after`, `path_includes` | none | Main listing endpoint with server-side filtering |
 | `organization.devices.getDevices` | `page`, `per_page`, `space_id` | `page`, `per_page` | Filter devices by one space; shared docs mention `has_next_page`, live Verve/Playground responses returned `next_page`; handle either continuation field |
-| `organization.devices.getHistories` | `status`, `from`, `to`, `device_id`, `space_id`, `name`, `page`, `per_page` | `page`, `per_page` | Filtered history lookup. `from`/`to` window must not exceed 31 days (422 otherwise); defaults are last week. `status` filters the device's *current* status. |
+| `organization.devices.getHistories` | `status`, `from`, `to`, `device_id`, `space_id`, `name`, `page`, `per_page` | `page`, `per_page` | Filtered history lookup. `from`/`to` window must not exceed 31 days (422 otherwise); defaults: `from` = 1 week ago, `to` = now, applied independently — send both. `status` filters the device's *current* status. |
 | `organization.commands.getCommands` | `status`, `page`, `per_page` | `page`, `per_page` | Command history pagination and status filter |
 | `organization.incidents.getIncidents` | `from`, `to`, `status`, `priority`, `title`, `description`, `issue`, `device_model`, `partner_name`, `sub_model`, `space_id`, `page`, `per_page` | `page`, `per_page` | Incident filtering matrix. Use integer `from` and `to`; for reliable active-incident fetches use both (`from=0`, `to=<now>`). |
 | `organization.notes.getAllDeviceNotes` | `page`, `per_page` | `page`, `per_page` | Paginated notes across all devices |
@@ -86,7 +86,7 @@ xyte-cli api call organization.devices.getHistories \
   }'
 ```
 
-Replace `1710000000` with the current Unix timestamp and `1707400000` with a value at most 31 days earlier; the `from`/`to` window may not exceed 31 days (the API returns 422 for wider or reversed windows). Both bounds are inclusive: walk further back by sliding the window with `to = previous from - 1`, and walk within a window with `page` until `has_next_page` is false. Prefer a shorter window or a `device_id`/`space_id` filter over deep page walks — each page costs a full OFFSET scan, so high page numbers can time out even inside a legal window.
+Replace `1710000000` with the current Unix timestamp and `1707400000` with a value at most 31 days earlier; the `from`/`to` window may not exceed 31 days (the API returns 422 for wider or reversed windows). Walk within a window with `page` (starts at 1) and `per_page` (default 100, 1..1000 — values outside that range are rejected with 422, not clamped) until `has_next_page` is false. To read further back, set the next window's `to` to the current window's `from` — not `from - 1`. Both bounds are inclusive, so a row landing exactly on the boundary is returned in both windows; drop rows whose `(uuid, create_at)` you have already seen. Rows are under `items`, newest-first; each has `uuid` (the device id) and `create_at` (sic — an ISO8601 string, not epoch seconds), and no row `id`. Prefer a shorter window or a `device_id`/`space_id` filter over deep page walks — each page costs a full OFFSET scan, so high page numbers can time out even inside a legal window.
 
 ### `organization.incidents.getIncidents`
 
