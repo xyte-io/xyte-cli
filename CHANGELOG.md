@@ -6,6 +6,20 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-09-24
+
+### Added
+- `organization.devices.getDevices` now lists the hub's device filters: `name` (case-insensitive substring), `status`, `effective_status`, `model_id`, `connection_method` (`native`/`c2c`/`edge`) and `connector_id`. Pass several statuses as a comma-separated string, e.g. `--query-json '{"status":"online,error"}'`.
+- Device responses from `getDevices`, `getDevice` and `claimDevice` document the new `connector: { type, id, name }` block.
+
+### Changed
+- The hub now rejects any other `getDevices` query parameter, and invalid filter values, with `422`.
+- Device pagination guidance now names `next_page` only; the API docs were corrected from `has_next_page`.
+- Bumped package metadata and lockfile to `0.15.0`.
+
+### Upgrade notes
+- Run `xyte-cli skills refresh` after upgrading so installed skill bundles pick up the new filters.
+
 ## [0.14.0] - 2026-08-03
 
 ### Added

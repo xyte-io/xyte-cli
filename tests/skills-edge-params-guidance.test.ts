@@ -46,7 +46,9 @@ describe('edge custom params docs and skill guidance', () => {
     for (const content of [readme, commands]) {
       expect(content).toContain('organization.devices.getDevices');
       expect(content).toContain('"page":1,"per_page":100');
-      expect(content).toContain('has_next_page=false');
+      expect(content).toContain('`next_page` is null/absent');
+      expect(content).not.toContain('has_next_page');
+      expect(content).toContain('connector_id');
     }
   });
 

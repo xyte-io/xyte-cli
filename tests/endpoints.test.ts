@@ -143,9 +143,22 @@ describe('public endpoint catalog', () => {
 
   it('includes documented filter params for key read endpoints', () => {
     const getDevices = endpoints.find((item) => item.key === 'organization.devices.getDevices');
-    expect(getDevices?.queryParams).toEqual(['page', 'per_page', 'space_id']);
-    expect(getDevices?.notes?.join(' ')).toContain('has_next_page');
+    expect(getDevices?.queryParams).toEqual([
+      'page',
+      'per_page',
+      'space_id',
+      'name',
+      'status',
+      'effective_status',
+      'model_id',
+      'connection_method',
+      'connector_id'
+    ]);
     expect(getDevices?.notes?.join(' ')).toContain('next_page');
+    expect(getDevices?.notes?.join(' ')).toContain('Unsupported query parameter');
+    for (const key of ['organization.devices.getDevices', 'organization.devices.getDevice', 'organization.devices.claimDevice']) {
+      expect(endpoints.find((item) => item.key === key)?.notes?.join(' ')).toContain('connector: { type: native|c2c|edge');
+    }
 
     const getHistories = endpoints.find((item) => item.key === 'organization.devices.getHistories');
     expect(getHistories?.queryParams).toEqual(['status', 'from', 'to', 'device_id', 'space_id', 'name']);
