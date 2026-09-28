@@ -6,6 +6,12 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+### Changed
+- `organization.devices.getHistories` catalog notes and skill docs now document `page`/`per_page` pagination (422 outside 1..1000, not clamped), the 31-day inclusive `from`/`to` window (422 when exceeded or reversed), the stable newest-first ordering, and guidance to prefer narrow windows and filters over deep page walks.
+
+### Upgrade notes
+- Existing workspaces that already installed the shipped skill bundle should run `xyte-cli skills refresh` after upgrading — the previous `getHistories` example used a wide `from=0` window that now returns 422 against production.
+
 ## [0.14.0] - 2026-08-03
 
 ### Added

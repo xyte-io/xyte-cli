@@ -148,7 +148,18 @@ describe('public endpoint catalog', () => {
     expect(getDevices?.notes?.join(' ')).toContain('next_page');
 
     const getHistories = endpoints.find((item) => item.key === 'organization.devices.getHistories');
-    expect(getHistories?.queryParams).toEqual(['status', 'from', 'to', 'device_id', 'space_id', 'name']);
+    expect(getHistories?.queryParams).toEqual([
+      'status',
+      'from',
+      'to',
+      'device_id',
+      'space_id',
+      'name',
+      'page',
+      'per_page'
+    ]);
+    expect(getHistories?.notes?.join(' ')).toContain('31 days');
+    expect(getHistories?.notes?.join(' ')).toContain('has_next_page');
 
     const getIncidents = endpoints.find((item) => item.key === 'organization.incidents.getIncidents');
     expect(getIncidents?.queryParams).toEqual([
