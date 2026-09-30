@@ -483,6 +483,7 @@ describe('schema contracts', () => {
 
     const upgradeCheck = buildUpgradeCheck({
       packageName: '@xyteai/cli',
+      recommendedCommand: 'npm install --global @xyteai/cli@latest',
       currentVersion: '0.4.0',
       latestVersion: '0.4.1'
     });

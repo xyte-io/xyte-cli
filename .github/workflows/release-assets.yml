@@ -163,11 +163,25 @@ jobs:
           TAG: ${{ needs.meta.outputs.tag }}
           MSI_NAME: XyteCLI-${{ needs.meta.outputs.version }}-win-x64.msi
         run: |
-          set -eu
+          set -euo pipefail
           skip=false
-          if [[ "${FORCE}" != "true" ]] && gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" --json assets --jq '.assets[].name' | grep -Fxq "${MSI_NAME}"; then
-            echo "::notice::${MSI_NAME} is already attached to ${TAG}; skipping. Re-run with force_windows_msi to replace it."
-            skip=true
+          err="$(mktemp)"
+          if [[ "${FORCE}" != "true" ]]; then
+            # Only "release not found" counts as absent; any other gh failure must not
+            # read as "no MSI yet" and trigger a rebuild/re-sign.
+            if ! assets="$(gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" --json assets --jq '.assets[].name' 2>"${err}")"; then
+              if grep -qi 'release not found' "${err}"; then
+                assets=""
+              else
+                cat "${err}" >&2
+                echo "::error::Could not list the assets of release ${TAG}."
+                exit 1
+              fi
+            fi
+            if grep -Fxq "${MSI_NAME}" <<<"${assets}"; then
+              echo "::notice::${MSI_NAME} is already attached to ${TAG}; skipping. Re-run with force_windows_msi to replace it."
+              skip=true
+            fi
           fi
           echo "skip=${skip}" >> "${GITHUB_OUTPUT}"
 
@@ -250,17 +264,67 @@ jobs:
     env:
       MSI_PATH: artifacts/windows-installer/XyteCLI-${{ needs.meta.outputs.version }}-win-x64.msi
     steps:
+      # Same guard as windows-msi, repeated before azure/login so re-running only this
+      # job cannot re-sign and replace an MSI that is already published.
+      - name: Check for an existing Windows MSI asset
+        id: existing
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ github.event.inputs.force_windows_msi || 'false' }}
+          TAG: ${{ needs.meta.outputs.tag }}
+          MSI_NAME: XyteCLI-${{ needs.meta.outputs.version }}-win-x64.msi
+        run: |
+          set -euo pipefail
+          skip=false
+          err="$(mktemp)"
+          if [[ "${FORCE}" != "true" ]]; then
+            # Only "release not found" counts as absent; any other gh failure must not
+            # read as "no MSI yet" and trigger a rebuild/re-sign.
+            if ! assets="$(gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" --json assets --jq '.assets[].name' 2>"${err}")"; then
+              if grep -qi 'release not found' "${err}"; then
+                assets=""
+              else
+                cat "${err}" >&2
+                echo "::error::Could not list the assets of release ${TAG}."
+                exit 1
+              fi
+            fi
+            if grep -Fxq "${MSI_NAME}" <<<"${assets}"; then
+              echo "::notice::${MSI_NAME} is already attached to ${TAG}; skipping. Re-run with force_windows_msi to replace it."
+              skip=true
+            fi
+          fi
+          echo "skip=${skip}" >> "${GITHUB_OUTPUT}"
+
+      # Signing stays off until AZURE_SIGNING_CERT_PROFILE is set on the release
+      # environment, which needs Microsoft's identity validation to complete first.
+      # An unsigned MSI is never published: until then the release gets no Windows
+      # assets and the unsigned build stays in the windows-msi-unsigned artifact.
+      - name: Decide whether to sign and publish
+        id: gate
+        if: steps.existing.outputs.skip != 'true'
+        shell: bash
+        env:
+          SIGNING_CERT_PROFILE: ${{ vars.AZURE_SIGNING_CERT_PROFILE }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SIGNING_CERT_PROFILE}" ]]; then
+            echo "::warning::Windows MSI was not published: signing is not configured (AZURE_SIGNING_CERT_PROFILE is unset on the release environment). The unsigned build is available as the windows-msi-unsigned workflow artifact."
+            echo "publish=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "publish=true" >> "${GITHUB_OUTPUT}"
+          fi
+
       - name: Download unsigned Windows MSI
+        if: steps.gate.outputs.publish == 'true'
         uses: actions/download-artifact@v4
         with:
           name: windows-msi-unsigned
           path: artifacts/windows-installer
 
-      # Signing stays off until AZURE_SIGNING_CERT_PROFILE is set on the release
-      # environment, which needs Microsoft's identity validation to complete first.
-      # Until then this job publishes the unsigned MSI.
       - name: Azure login
-        if: vars.AZURE_SIGNING_CERT_PROFILE != ''
+        if: steps.gate.outputs.publish == 'true'
         uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
@@ -268,7 +332,7 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Sign Windows MSI
-        if: vars.AZURE_SIGNING_CERT_PROFILE != ''
+        if: steps.gate.outputs.publish == 'true'
         uses: azure/artifact-signing-action@v2
         with:
           endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
@@ -278,7 +342,7 @@ jobs:
           description: Xyte CLI
 
       - name: Verify MSI signature
-        if: vars.AZURE_SIGNING_CERT_PROFILE != ''
+        if: steps.gate.outputs.publish == 'true'
         shell: pwsh
         run: |
           $sig = Get-AuthenticodeSignature $env:MSI_PATH
@@ -286,7 +350,7 @@ jobs:
           if ($sig.Status -ne 'Valid') { throw "MSI signature is $($sig.Status)" }
 
       - name: Point the WinGet manifest at the signed MSI
-        if: vars.AZURE_SIGNING_CERT_PROFILE != ''
+        if: steps.gate.outputs.publish == 'true'
         shell: pwsh
         run: |
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $env:MSI_PATH).Hash
@@ -298,6 +362,7 @@ jobs:
           "InstallerSha256: $hash"
 
       - name: Generate Windows checksums
+        if: steps.gate.outputs.publish == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -305,6 +370,7 @@ jobs:
           sha256sum *.msi windows-installer-manifest.json winget/*.yaml > windows-checksums.txt
 
       - name: Upload Windows MSI artifact
+        if: steps.gate.outputs.publish == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: windows-msi
@@ -315,6 +381,7 @@ jobs:
             artifacts/windows-installer/windows-checksums.txt
 
       - name: Publish Windows release assets
+        if: steps.gate.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.meta.outputs.tag }}
@@ -325,6 +392,7 @@ jobs:
             artifacts/windows-installer/windows-checksums.txt
 
       - name: Verify Windows release assets attached
+        if: steps.gate.outputs.publish == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}

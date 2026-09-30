@@ -7,7 +7,6 @@ export const WINDOWS_MSI_PACKAGE_ID = 'Xyte.XyteCLI';
 
 export interface InstallChannel {
   kind: InstallChannelKind;
-  packageId?: string;
 }
 
 const DEFAULT_INSTALL_CHANNEL: InstallChannel = {
@@ -24,12 +23,9 @@ function parseInstallChannel(payload: unknown): InstallChannel | undefined {
     return undefined;
   }
 
-  // The marker only flips the channel; the winget id is fixed so a planted file
-  // cannot point `xyte-cli upgrade` at another package.
-  return {
-    kind: 'windows-msi',
-    packageId: WINDOWS_MSI_PACKAGE_ID
-  };
+  // The marker only flips the channel; the winget id is the fixed WINDOWS_MSI_PACKAGE_ID
+  // so a planted file cannot point `xyte-cli upgrade` at another package.
+  return { kind: 'windows-msi' };
 }
 
 function readInstallChannelFile(filePath: string): InstallChannel | undefined {
@@ -41,19 +37,8 @@ function readInstallChannelFile(filePath: string): InstallChannel | undefined {
 }
 
 export function detectInstallChannel(installRoot: string = path.resolve(__dirname, '..', '..')): InstallChannel {
-  const overrideFile = process.env.XYTE_CLI_INSTALL_CHANNEL_FILE?.trim();
-  if (overrideFile) {
-    const channel = readInstallChannelFile(path.resolve(overrideFile));
-    if (channel) {
-      return channel;
-    }
-  }
-
   if (process.env.XYTE_CLI_INSTALL_CHANNEL?.trim() === 'windows-msi') {
-    return {
-      kind: 'windows-msi',
-      packageId: WINDOWS_MSI_PACKAGE_ID
-    };
+    return { kind: 'windows-msi' };
   }
   if (process.env.XYTE_CLI_INSTALL_CHANNEL?.trim() === 'npm') {
     return DEFAULT_INSTALL_CHANNEL;

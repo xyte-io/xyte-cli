@@ -25,6 +25,7 @@ import {
   type SkillInstallScope
 } from './install-skills';
 import { applyUpgrade, checkForUpgrade, type UpgradeDependencies } from './upgrade';
+import { detectInstallChannel } from '../utils/install-channel';
 import { maybeNotifyUpdateAvailable, type UpdateNotifier } from './update-notifier';
 import { promptValue } from './prompt-value';
 import { runTuiApp } from '../tui/app';
@@ -912,6 +913,10 @@ export function createCli(runtime: CliRuntime = {}): Command {
         stdoutIsTTY,
         settings
       });
+      const formatSource = command.getOptionValueSource('format');
+      const explicitJson =
+        output === 'json' &&
+        ((formatSource !== undefined && formatSource !== 'default') || getExplicitGlobalOutput(command) === 'json');
       const latestVersionOverride = process.env.XYTE_CLI_UPGRADE_TARGET_VERSION?.trim() || undefined;
       const installSpec = process.env.XYTE_CLI_UPGRADE_SPEC?.trim() || undefined;
       const loadCheck = () =>
@@ -942,7 +947,10 @@ export function createCli(runtime: CliRuntime = {}): Command {
         }
         const answer = (
           await prompt({
-            question: 'Proceed with global CLI update and user-scope skills refresh? (y/N)',
+            question:
+              (runtime.upgradeDependencies?.getInstallChannel ?? detectInstallChannel)().kind === 'windows-msi'
+                ? 'Proceed to hand off the upgrade to winget? (y/N)'
+                : 'Proceed with global CLI update and user-scope skills refresh? (y/N)',
             initial: 'N',
             stdout
           })
@@ -965,9 +973,10 @@ export function createCli(runtime: CliRuntime = {}): Command {
           skillSourceDir: resolveSkillSourceDir(),
           installSpec,
           latestVersionOverride,
-          // windows-msi: only open a winget window for a human at a terminal; agents
-          // and --json callers get the command back instead.
-          launchInteractive: output === 'text' && stdoutIsTTY
+          // windows-msi: open a winget window for a human at a terminal, even under the
+          // default JSON format; non-TTY callers and an explicit JSON request
+          // (--format json / --output json) get the command back instead.
+          launchInteractive: stdoutIsTTY && !explicitJson
         },
         runtime.upgradeDependencies
       );

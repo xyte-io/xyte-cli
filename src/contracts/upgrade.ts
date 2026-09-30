@@ -69,17 +69,12 @@ export type UpgradeResultV1 = z.infer<typeof UpgradeResultSchema>;
 export function buildUpgradeCheck(args: {
   packageName: string;
   installChannel?: 'npm' | 'windows-msi';
-  recommendedCommand?: string;
+  recommendedCommand: string;
   currentVersion: string;
   latestVersion: string;
 }): UpgradeCheckV1 {
   const upToDate = compareSemver(args.currentVersion, args.latestVersion) >= 0;
   const installChannel = args.installChannel ?? 'npm';
-  const recommendedCommand =
-    args.recommendedCommand ??
-    (installChannel === 'windows-msi'
-      ? 'winget upgrade --id Xyte.XyteCLI --exact --source winget --accept-source-agreements --accept-package-agreements --silent'
-      : `npm install --global ${args.packageName}@latest`);
   return {
     schemaVersion: UPGRADE_CHECK_SCHEMA_VERSION,
     generatedAtUtc: new Date().toISOString(),
@@ -88,6 +83,6 @@ export function buildUpgradeCheck(args: {
     currentVersion: args.currentVersion,
     latestVersion: args.latestVersion,
     upToDate,
-    recommendedCommand: upToDate ? null : recommendedCommand
+    recommendedCommand: upToDate ? null : args.recommendedCommand
   };
 }

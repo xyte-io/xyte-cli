@@ -100,7 +100,7 @@ Environment doctor notes:
 - Chat-only assistants cannot install the CLI; use a shell-capable terminal or agent (Terminal, PowerShell, Codex, Claude Code/Desktop, GitHub Copilot CLI, VS Code Copilot Agent).
 
 Upgrade notes:
-- `xyte-cli upgrade --check --format json` reports `installChannel`. Npm installs use `npm install --global @xyteai/cli@latest`; Windows MSI installs use `winget upgrade --id Xyte.XyteCLI --exact` or a newer MSI.
+- `xyte-cli upgrade --check --format json` reports `installChannel`. Npm installs use `npm install --global @xyteai/cli@latest`; Windows MSI installs use `winget upgrade --id Xyte.XyteCLI --exact` or a newer MSI; `xyte-cli upgrade --yes` from an interactive terminal opens winget in a new console window, while non-TTY callers and an explicit `--format json`/`--output json` get the command back instead (`handoff.status: "manual"`).
 
 Skill bundle notes:
 - `xyte-cli skills refresh` force-installs all agent skill bundles (project and user scope).

@@ -37,7 +37,7 @@ describe('upgrade utilities', () => {
     expect(result.upToDate).toBe(false);
   });
 
-  it('recommends winget updates for Windows MSI installs, defaulting the package id', async () => {
+  it('recommends winget updates for Windows MSI installs, using the fixed package id', async () => {
     const result = await checkForUpgrade(
       {
         packageName: '@xyteai/cli',
@@ -50,26 +50,6 @@ describe('upgrade utilities', () => {
     );
 
     expect(result.installChannel).toBe('windows-msi');
-    expect(result.recommendedCommand).toBe(
-      'winget upgrade --id Xyte.XyteCLI --exact --source winget --accept-source-agreements --accept-package-agreements --silent'
-    );
-  });
-
-  it('ignores a custom package id and always recommends Xyte.XyteCLI', async () => {
-    const result = await checkForUpgrade(
-      {
-        packageName: '@xyteai/cli',
-        latestVersionOverride: '0.5.0'
-      },
-      {
-        getCurrentVersion: () => '0.4.0',
-        getInstallChannel: () => ({
-          kind: 'windows-msi',
-          packageId: 'Xyte.CustomCLI'
-        })
-      }
-    );
-
     expect(result.recommendedCommand).toBe(
       'winget upgrade --id Xyte.XyteCLI --exact --source winget --accept-source-agreements --accept-package-agreements --silent'
     );
@@ -232,7 +212,7 @@ describe('upgrade utilities', () => {
     expect(result.updateCommand?.args).toEqual(['install', '--global', '@xyteai/cli@0.6.0']);
   });
 
-  const msiChannel = () => ({ kind: 'windows-msi' as const, packageId: 'Xyte.XyteCLI' });
+  const msiChannel = () => ({ kind: 'windows-msi' as const });
   const wingetFlags = ['--source', 'winget', '--accept-source-agreements', '--accept-package-agreements', '--silent'];
 
   it('hands Windows MSI upgrades off to a winget console window without verifying or refreshing skills', async () => {
@@ -362,6 +342,18 @@ describe('upgrade utilities', () => {
         { fetchImpl: vi.fn() as any, detachedLauncher, getCurrentVersion: () => '0.6.0', getInstallChannel: msiChannel }
       )
     ).rejects.toThrow(/is not a valid version/);
+    expect(detachedLauncher).not.toHaveBeenCalled();
+  });
+
+  it('rejects a prerelease target version on the windows-msi channel', async () => {
+    const detachedLauncher = vi.fn();
+
+    await expect(
+      applyUpgrade(
+        { packageName: '@xyteai/cli', skillSourceDir: '/repo/skills/xyte-cli', latestVersionOverride: '1.0.0-rc.1', launchInteractive: true },
+        { fetchImpl: vi.fn() as any, detachedLauncher, getCurrentVersion: () => '0.6.0', getInstallChannel: msiChannel }
+      )
+    ).rejects.toThrow(/prereleases have no MSI/);
     expect(detachedLauncher).not.toHaveBeenCalled();
   });
 

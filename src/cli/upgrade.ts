@@ -54,11 +54,13 @@ function parseVersionFromOutput(output: string): string | undefined {
   return match ? match[0] : undefined;
 }
 
-const STRICT_SEMVER = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/;
+// MSIs are only built for release versions (WiX needs numeric versions), so a
+// prerelease target can never exist on winget.
+const MSI_RELEASE_VERSION = /^\d+\.\d+\.\d+$/;
 
 // winget must not run as a child of the node.exe it replaces (locked files, restart
 // prompts), so it gets the full non-interactive flag set and runs after this process
-// exits. The id and flags are constants and the version is strict semver, which is
+// exits. The id and flags are constants and the version is a plain X.Y.Z release version, which is
 // what makes these args safe to pass through cmd.exe.
 function buildWingetUpgradeArgs(targetVersion?: string): string[] {
   return [
@@ -204,9 +206,9 @@ export async function applyUpgrade(
     });
   }
   const requestedVersion = settings.latestVersionOverride?.trim();
-  if (installChannel.kind === 'windows-msi' && requestedVersion && !STRICT_SEMVER.test(requestedVersion)) {
+  if (installChannel.kind === 'windows-msi' && requestedVersion && !MSI_RELEASE_VERSION.test(requestedVersion)) {
     throw new CliUserError({
-      summary: `XYTE_CLI_UPGRADE_TARGET_VERSION "${requestedVersion}" is not a valid version (expected e.g. 1.2.3 or 1.2.3-rc.1).`
+      summary: `XYTE_CLI_UPGRADE_TARGET_VERSION "${requestedVersion}" is not a valid version (expected a release version such as 1.2.3; prereleases have no MSI).`
     });
   }
   const npmCommand = deps.npmCommand ?? (process.platform === 'win32' ? 'npm.cmd' : 'npm');

@@ -121,7 +121,7 @@ Apply through WinGet:
 winget upgrade --id Xyte.XyteCLI --exact --source winget --accept-source-agreements --accept-package-agreements --silent
 ```
 
-`xyte-cli upgrade --yes` on an MSI install, run from an interactive terminal with text output, opens a new console window that runs that same command (winget is resolved to an absolute path, never from the current directory) and stays open after winget exits so its result and any errors stay readable; it returns immediately (`handoff.status: "started"`) and does not wait for winget or refresh skills. Without a terminal, or with `--format json`, it launches nothing and returns the command for you to run (`handoff.status: "manual"`, command in `updateCommand`). An MSI install that is already up to date returns `updated: false` without a hand-off. `XYTE_CLI_UPGRADE_TARGET_VERSION` must be a plain version such as `1.2.3`. After winget finishes, open a new terminal and run `xyte-cli skills refresh`. The winget package can lag the npm release, so winget may report no newer version for a while after a release.
+`xyte-cli upgrade --yes` on an MSI install, run from an interactive terminal, opens a new console window that runs that same command (winget is resolved to an absolute path, never from the current directory) and stays open after winget exits so its result and any errors stay readable; it returns immediately (`handoff.status: "started"`) and does not wait for winget or refresh skills. This holds under the default JSON output too. Without a terminal, or when JSON is explicitly requested (`--format json` or `--output json`), it launches nothing and returns the command for you to run (`handoff.status: "manual"`, command in `updateCommand`). An MSI install that is already up to date returns `updated: false` without a hand-off. `XYTE_CLI_UPGRADE_TARGET_VERSION` must be a plain version such as `1.2.3`. After winget finishes, open a new terminal and run `xyte-cli skills refresh`. The winget package can lag the npm release, so winget may report no newer version for a while after a release.
 
 When WinGet is not available, download the newer MSI and run:
 
@@ -131,7 +131,7 @@ msiexec /i XyteCLI-<new-version>-win-x64.msi /qn /norestart
 
 The MSI uses a stable `UpgradeCode`, so newer MSI versions replace older MSI versions.
 
-Release packaging generates WinGet manifest YAML under `artifacts/windows-installer/winget`. After the signed MSI is published to the GitHub release, submit those manifests to the WinGet package repository for `Xyte.XyteCLI`.
+Submit the `Xyte.XyteCLI*.yaml` manifests attached to the GitHub release to the WinGet package repository for `Xyte.XyteCLI`. The `windows-msi-sign` release job produces them after signing, with `InstallerSha256` set to the signed MSI. Do not submit the YAML that a local build writes to `artifacts/windows-installer/winget`: it carries the unsigned MSI's hash. A release only carries the MSI and manifests once signing is configured (see `docs/release.md`).
 
 ## Build from this repo
 

@@ -158,6 +158,13 @@ jobs:
           xyte-cli --version
           xyte-cli doctor environment --format text
 
+          # The installed layout must be detected as the MSI channel. The target-version
+          # override skips the npm registry lookup, so --check stays offline.
+          $env:XYTE_CLI_UPGRADE_TARGET_VERSION = "0.0.0"
+          $r = xyte-cli upgrade --check --format json | ConvertFrom-Json
+          Remove-Item Env:XYTE_CLI_UPGRADE_TARGET_VERSION
+          if ($r.installChannel -ne 'windows-msi') { throw "installChannel=$($r.installChannel)" }
+
           Add-Content -Path $env:GITHUB_PATH -Value $installDir
 
       - name: Smoke setup assistant and record terminal transcript
