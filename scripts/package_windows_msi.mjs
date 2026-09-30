@@ -16,8 +16,7 @@ function parseArgs(argv) {
     skipBuild: false,
     skipMsi: false,
     skipNode: false,
-    skipNpmInstall: false,
-    manifestsOnly: false
+    skipNpmInstall: false
   };
   const readValue = (index, flag) => {
     const value = argv[index];
@@ -38,7 +37,6 @@ function parseArgs(argv) {
     else if (arg === '--skip-msi') args.skipMsi = true;
     else if (arg === '--skip-node') args.skipNode = true;
     else if (arg === '--skip-npm-install') args.skipNpmInstall = true;
-    else if (arg === '--manifests-only') args.manifestsOnly = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
   return args;
@@ -390,22 +388,12 @@ function generateWingetManifests(args, msiPath) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   validateArgs(args);
-  if (!args.skipMsi && !args.manifestsOnly) {
+  if (!args.skipMsi) {
     ensureMsiBuildSupported();
   }
   const payloadDir = join(args.outDir, 'payload');
   const wxsPath = join(args.outDir, 'Product.generated.wxs');
   const msiPath = join(args.outDir, `XyteCLI-${packageJson.version}-win-x64.msi`);
-
-  // Release signing changes the MSI bytes after the build, so the workflow re-runs
-  // only this step to point the WinGet manifests at the signed file's SHA-256.
-  if (args.manifestsOnly) {
-    if (!existsSync(msiPath)) {
-      throw new Error(`--manifests-only needs an existing MSI: ${msiPath}`);
-    }
-    generateWingetManifests(args, msiPath);
-    return;
-  }
 
   rmSync(payloadDir, { recursive: true, force: true });
   mkdirSync(payloadDir, { recursive: true });

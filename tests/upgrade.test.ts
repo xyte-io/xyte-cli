@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { applyUpgrade, checkForUpgrade } from '../src/cli/upgrade';
+import { applyUpgrade, buildWingetConsoleArgs, checkForUpgrade, resolveWingetPath } from '../src/cli/upgrade';
 import { maybeNotifyUpdateAvailable } from '../src/cli/update-notifier';
 import { compareSemver } from '../src/contracts/semver';
 
@@ -55,7 +55,7 @@ describe('upgrade utilities', () => {
     );
   });
 
-  it('derives winget recommendations from a custom package id', async () => {
+  it('ignores a custom package id and always recommends Xyte.XyteCLI', async () => {
     const result = await checkForUpgrade(
       {
         packageName: '@xyteai/cli',
@@ -71,7 +71,7 @@ describe('upgrade utilities', () => {
     );
 
     expect(result.recommendedCommand).toBe(
-      'winget upgrade --id Xyte.CustomCLI --exact --source winget --accept-source-agreements --accept-package-agreements --silent'
+      'winget upgrade --id Xyte.XyteCLI --exact --source winget --accept-source-agreements --accept-package-agreements --silent'
     );
   });
 
@@ -235,13 +235,13 @@ describe('upgrade utilities', () => {
   const msiChannel = () => ({ kind: 'windows-msi' as const, packageId: 'Xyte.XyteCLI' });
   const wingetFlags = ['--source', 'winget', '--accept-source-agreements', '--accept-package-agreements', '--silent'];
 
-  it('hands Windows MSI upgrades off to a detached winget without verifying or refreshing skills', async () => {
+  it('hands Windows MSI upgrades off to a winget console window without verifying or refreshing skills', async () => {
     const commandRunner = vi.fn();
     const detachedLauncher = vi.fn().mockResolvedValue(undefined);
     const installSkillsImpl = vi.fn();
 
     const result = await applyUpgrade(
-      { packageName: '@xyteai/cli', skillSourceDir: '/repo/skills/xyte-cli' },
+      { packageName: '@xyteai/cli', skillSourceDir: '/repo/skills/xyte-cli', launchInteractive: true },
       {
         fetchImpl: vi.fn().mockResolvedValue({ ok: true, json: async () => ({ version: '0.7.0' }) }) as any,
         commandRunner,
@@ -268,7 +268,7 @@ describe('upgrade utilities', () => {
     const detachedLauncher = vi.fn().mockResolvedValue(undefined);
 
     await applyUpgrade(
-      { packageName: '@xyteai/cli', skillSourceDir: '/repo/skills/xyte-cli', latestVersionOverride: '0.7.0' },
+      { packageName: '@xyteai/cli', skillSourceDir: '/repo/skills/xyte-cli', latestVersionOverride: '0.7.0', launchInteractive: true },
       {
         fetchImpl: vi.fn() as any,
         commandRunner: vi.fn(),
@@ -305,7 +305,7 @@ describe('upgrade utilities', () => {
   it('reports a clear error when winget cannot be started', async () => {
     await expect(
       applyUpgrade(
-        { packageName: '@xyteai/cli', skillSourceDir: '/repo/skills/xyte-cli', latestVersionOverride: '0.7.0' },
+        { packageName: '@xyteai/cli', skillSourceDir: '/repo/skills/xyte-cli', latestVersionOverride: '0.7.0', launchInteractive: true },
         {
           fetchImpl: vi.fn() as any,
           detachedLauncher: vi.fn().mockRejectedValue(new Error('spawn winget ENOENT')),
@@ -314,6 +314,83 @@ describe('upgrade utilities', () => {
         }
       )
     ).rejects.toThrow(/Could not start "winget": spawn winget ENOENT/);
+  });
+
+  it('returns the winget command without launching when there is no interactive terminal', async () => {
+    const detachedLauncher = vi.fn();
+    const commandRunner = vi.fn();
+
+    const result = await applyUpgrade(
+      { packageName: '@xyteai/cli', skillSourceDir: '/repo/skills/xyte-cli', latestVersionOverride: '0.7.0' },
+      { fetchImpl: vi.fn() as any, commandRunner, detachedLauncher, getCurrentVersion: () => '0.6.0', getInstallChannel: msiChannel }
+    );
+
+    expect(detachedLauncher).not.toHaveBeenCalled();
+    expect(commandRunner).not.toHaveBeenCalled();
+    expect(result.handoff).toEqual({ tool: 'winget', status: 'manual' });
+    expect(result.updateCommand?.args).toContain('0.7.0');
+    expect(result.updated).toBe(false);
+  });
+
+  it('returns early without verify or skills refresh when an MSI install is already current', async () => {
+    const detachedLauncher = vi.fn();
+    const commandRunner = vi.fn();
+    const installSkillsImpl = vi.fn();
+
+    const result = await applyUpgrade(
+      { packageName: '@xyteai/cli', skillSourceDir: '/repo/skills/xyte-cli', latestVersionOverride: '0.6.0', launchInteractive: true },
+      { fetchImpl: vi.fn() as any, commandRunner, detachedLauncher, installSkillsImpl, getCurrentVersion: () => '0.6.0', getInstallChannel: msiChannel }
+    );
+
+    expect(detachedLauncher).not.toHaveBeenCalled();
+    expect(commandRunner).not.toHaveBeenCalled();
+    expect(installSkillsImpl).not.toHaveBeenCalled();
+    expect(result.updated).toBe(false);
+    expect(result.upToDateBefore).toBe(true);
+    expect(result.handoff).toBeUndefined();
+    expect(result.updateCommand).toBeUndefined();
+    expect(result.verify).toBeUndefined();
+    expect(result.skills).toBeUndefined();
+  });
+
+  it('rejects a non-semver target version on the windows-msi channel', async () => {
+    const detachedLauncher = vi.fn();
+
+    await expect(
+      applyUpgrade(
+        { packageName: '@xyteai/cli', skillSourceDir: '/repo/skills/xyte-cli', latestVersionOverride: '1.0.0 & calc', launchInteractive: true },
+        { fetchImpl: vi.fn() as any, detachedLauncher, getCurrentVersion: () => '0.6.0', getInstallChannel: msiChannel }
+      )
+    ).rejects.toThrow(/is not a valid version/);
+    expect(detachedLauncher).not.toHaveBeenCalled();
+  });
+
+  it('resolves winget from WindowsApps first, never from the current directory or relative PATH entries', () => {
+    const localApp = 'C:\\Users\\u\\AppData\\Local';
+    const alias = 'C:\\Users\\u\\AppData\\Local\\Microsoft\\WindowsApps\\winget.exe';
+    expect(resolveWingetPath({ LOCALAPPDATA: localApp, PATH: 'C:\\Tools' }, (p) => p === alias || p === 'C:\\Tools\\winget.exe', 'C:\\repo')).toBe(alias);
+
+    const exists = (p: string) => ['C:\\repo\\winget.exe', 'bin\\winget.exe', 'C:\\Tools\\winget.exe'].includes(p);
+    expect(resolveWingetPath({ PATH: 'C:\\repo;bin;.;C:\\Tools' }, exists, 'C:\\repo')).toBe('C:\\Tools\\winget.exe');
+
+    expect(() => resolveWingetPath({ PATH: 'C:\\repo;.' }, () => true, 'C:\\repo')).toThrow(/winget.exe was not found/);
+    expect(() => resolveWingetPath({ PATH: 'C:\\a&b' }, () => true, 'C:\\repo')).toThrow(/cannot be passed safely/);
+  });
+
+  it('builds a cmd.exe launch that opens a console window and keeps it open', () => {
+    expect(buildWingetConsoleArgs('C:\\W\\winget.exe', ['upgrade', '--id', 'Xyte.XyteCLI'])).toEqual([
+      '/d',
+      '/c',
+      'start',
+      '"Xyte CLI upgrade"',
+      'cmd.exe',
+      '/d',
+      '/k',
+      '"C:\\W\\winget.exe"',
+      'upgrade',
+      '--id',
+      'Xyte.XyteCLI'
+    ]);
   });
 
   it('prints a passive update notice at most once per check interval', async () => {

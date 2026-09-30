@@ -14,14 +14,6 @@ const DEFAULT_INSTALL_CHANNEL: InstallChannel = {
   kind: 'npm'
 };
 
-function nonBlankString(value: unknown): string | undefined {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-  const trimmed = value.trim();
-  return trimmed ? trimmed : undefined;
-}
-
 function parseInstallChannel(payload: unknown): InstallChannel | undefined {
   if (!payload || typeof payload !== 'object') {
     return undefined;
@@ -32,9 +24,11 @@ function parseInstallChannel(payload: unknown): InstallChannel | undefined {
     return undefined;
   }
 
+  // The marker only flips the channel; the winget id is fixed so a planted file
+  // cannot point `xyte-cli upgrade` at another package.
   return {
     kind: 'windows-msi',
-    packageId: nonBlankString(record.packageId)
+    packageId: WINDOWS_MSI_PACKAGE_ID
   };
 }
 
@@ -46,7 +40,7 @@ function readInstallChannelFile(filePath: string): InstallChannel | undefined {
   }
 }
 
-export function detectInstallChannel(startDir: string = __dirname): InstallChannel {
+export function detectInstallChannel(installRoot: string = path.resolve(__dirname, '..', '..')): InstallChannel {
   const overrideFile = process.env.XYTE_CLI_INSTALL_CHANNEL_FILE?.trim();
   if (overrideFile) {
     const channel = readInstallChannelFile(path.resolve(overrideFile));
@@ -65,21 +59,15 @@ export function detectInstallChannel(startDir: string = __dirname): InstallChann
     return DEFAULT_INSTALL_CHANNEL;
   }
 
-  let current = path.resolve(startDir);
-  for (let depth = 0; depth < 8; depth += 1) {
-    const candidate = path.join(current, 'install-channel.json');
-    if (existsSync(candidate)) {
-      const channel = readInstallChannelFile(candidate);
-      if (channel) {
-        return channel;
-      }
+  // Only the MSI layout location counts: the MSI writes install-channel.json to the
+  // install root, next to dist/ (this file compiles to <root>/dist/utils/). Walking up
+  // further would let any repo the CLI runs from plant a marker.
+  const candidate = path.join(path.resolve(installRoot), 'install-channel.json');
+  if (existsSync(candidate)) {
+    const channel = readInstallChannelFile(candidate);
+    if (channel) {
+      return channel;
     }
-
-    const parent = path.dirname(current);
-    if (parent === current) {
-      break;
-    }
-    current = parent;
   }
 
   return DEFAULT_INSTALL_CHANNEL;

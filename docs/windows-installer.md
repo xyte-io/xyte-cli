@@ -121,7 +121,7 @@ Apply through WinGet:
 winget upgrade --id Xyte.XyteCLI --exact --source winget --accept-source-agreements --accept-package-agreements --silent
 ```
 
-`xyte-cli upgrade --yes` on an MSI install starts that same command in its own window and returns immediately (`handoff.status: "started"` in JSON output); it does not wait for winget or refresh skills. After winget finishes, open a new terminal and run `xyte-cli skills refresh`. The winget package can lag the npm release, so winget may report no newer version for a while after a release.
+`xyte-cli upgrade --yes` on an MSI install, run from an interactive terminal with text output, opens a new console window that runs that same command (winget is resolved to an absolute path, never from the current directory) and stays open after winget exits so its result and any errors stay readable; it returns immediately (`handoff.status: "started"`) and does not wait for winget or refresh skills. Without a terminal, or with `--format json`, it launches nothing and returns the command for you to run (`handoff.status: "manual"`, command in `updateCommand`). An MSI install that is already up to date returns `updated: false` without a hand-off. `XYTE_CLI_UPGRADE_TARGET_VERSION` must be a plain version such as `1.2.3`. After winget finishes, open a new terminal and run `xyte-cli skills refresh`. The winget package can lag the npm release, so winget may report no newer version for a while after a release.
 
 When WinGet is not available, download the newer MSI and run:
 

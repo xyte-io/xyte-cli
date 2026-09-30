@@ -964,7 +964,10 @@ export function createCli(runtime: CliRuntime = {}): Command {
           packageName: '@xyteai/cli',
           skillSourceDir: resolveSkillSourceDir(),
           installSpec,
-          latestVersionOverride
+          latestVersionOverride,
+          // windows-msi: only open a winget window for a human at a terminal; agents
+          // and --json callers get the command back instead.
+          launchInteractive: output === 'text' && stdoutIsTTY
         },
         runtime.upgradeDependencies
       );
@@ -975,9 +978,18 @@ export function createCli(runtime: CliRuntime = {}): Command {
         stdout.write(`Current: ${result.currentVersion}\n`);
         stdout.write(`Latest: ${result.latestVersion}\n`);
         if (result.handoff && result.updateCommand) {
-          stdout.write(`Upgrade handed off to winget in a new window: winget ${result.updateCommand.args.join(' ')}\n`);
+          const wingetCommand = `winget ${result.updateCommand.args.join(' ')}`;
+          if (result.handoff.status === 'started') {
+            stdout.write(`Upgrade started in a new winget console window (it stays open when winget finishes): ${wingetCommand}\n`);
+          } else {
+            stdout.write(`To upgrade, run: ${wingetCommand}\n`);
+          }
           stdout.write('Note: the winget package can lag the npm release; winget reports if the version is not available yet.\n');
           stdout.write('After winget finishes, open a new terminal and run: xyte-cli skills refresh\n');
+          return;
+        }
+        if (result.installChannel === 'windows-msi') {
+          stdout.write('Already up to date.\n');
           return;
         }
         stdout.write(`Updated: ${result.updated}\n`);

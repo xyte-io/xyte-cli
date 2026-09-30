@@ -85,9 +85,15 @@ Prerequisites:
 
 The MSI embeds a bundled Windows Node.js runtime, adds `C:\Program Files\Xyte CLI` to machine `PATH`, ships the post-install setup assistant, and marks the install channel as `windows-msi`. Users update MSI installs with `winget upgrade --id Xyte.XyteCLI --exact` or a newer MSI, not `npm install -g`.
 
-The Windows MSI release asset job publishes MSI-specific assets independently from the npm package release job. A Windows runner, WiX, signing, or Node runtime download failure should not block the npm tarball, SBOM, and npm checksums from being attached to the release.
+The Windows MSI jobs publish MSI-specific assets independently from the npm package release job. A Windows runner, WiX, signing, or Node runtime download failure should not block the npm tarball, SBOM, and npm checksums from being attached to the release.
 
-When `AZURE_SIGNING_CERT_PROFILE` is set, the workflow signs the MSI with `azure/artifact-signing-action`, fails the job unless `Get-AuthenticodeSignature` reports `Valid`, and regenerates the WinGet manifests (`--manifests-only`) so their SHA-256 matches the signed file before checksums and upload. When it is unset, the workflow still builds and uploads the MSI, but the asset is unsigned and should not be submitted to WinGet.
+The Windows path is two jobs. `windows-msi` runs `npm ci`, builds and packages the unsigned MSI with read-only permissions and no environment, and uploads it as a workflow artifact. `windows-msi-sign` runs in the `release` environment with `id-token: write`, but never checks out the repo or installs npm dependencies: it downloads that artifact, signs it, and publishes. Dependency install scripts therefore never run next to the signing credential.
+
+When `AZURE_SIGNING_CERT_PROFILE` is set, `windows-msi-sign` signs the MSI with `azure/artifact-signing-action`, fails unless `Get-AuthenticodeSignature` reports `Valid`, and rewrites `InstallerSha256` in the WinGet installer manifest to the signed file's SHA-256 before checksums and upload. When it is unset, the job still publishes the MSI, but the asset is unsigned and should not be submitted to WinGet.
+
+Prerelease tags (for example `1.2.3-rc.1`) get no MSI: WiX only accepts numeric versions, so both Windows jobs are skipped for any version containing `-`.
+
+If the release already has `XyteCLI-<version>-win-x64.msi` attached (a re-run for a published tag), the Windows jobs skip, because re-signing changes the MSI's SHA-256 and breaks any WinGet manifest already submitted for it. To replace it deliberately, run the workflow manually with `force_windows_msi` checked.
 
 CI currently pins the WiX .NET tool to `7.0.0` and the MSI build command passes WiX's `-acceptEula wix7` flag.
 

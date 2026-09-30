@@ -15,11 +15,6 @@ describe('windows packaging argument parsing', () => {
     expect(args.skipMsi).toBe(false);
   });
 
-  it('parses --manifests-only', () => {
-    expect(parseArgs([]).manifestsOnly).toBe(false);
-    expect(parseArgs(['--manifests-only']).manifestsOnly).toBe(true);
-  });
-
   it('rejects a value flag with no value', () => {
     expect(() => parseArgs(['--out-dir'])).toThrow('--out-dir requires a value.');
     expect(() => parseArgs(['--node-version', '--skip-msi'])).toThrow('--node-version requires a value.');

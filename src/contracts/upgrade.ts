@@ -54,9 +54,10 @@ export const UpgradeResultSchema = z.object({
   upToDateBefore: z.boolean(),
   updated: z.boolean(),
   updateCommand: UpgradeCommandSchema.optional(),
-  // Present when the upgrade was handed off to an external installer (windows-msi → winget);
-  // verify and skills are then absent because the upgrade finishes after this process exits.
-  handoff: z.object({ tool: z.literal('winget'), status: z.literal('started') }).optional(),
+  // Present when the upgrade is handed to an external installer (windows-msi → winget):
+  // `started` = launched in its own console window; `manual` = not launched (no TTY or
+  // JSON output), run updateCommand yourself. verify and skills are then absent.
+  handoff: z.object({ tool: z.literal('winget'), status: z.enum(['started', 'manual']) }).optional(),
   verify: UpgradeVerifySchema.optional(),
   skills: UpgradeSkillsSchema.optional(),
   warnings: z.array(z.string())

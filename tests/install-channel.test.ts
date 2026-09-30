@@ -32,25 +32,29 @@ describe('install channel detection', () => {
     });
   });
 
-  it('detects Windows MSI channel from install-channel.json', () => {
+  it('detects Windows MSI channel from install-channel.json at the install root', () => {
     delete process.env.XYTE_CLI_INSTALL_CHANNEL;
     delete process.env.XYTE_CLI_INSTALL_CHANNEL_FILE;
 
     const root = mkdtempSync(join(tmpdir(), 'xyte-install-channel-'));
-    const nested = join(root, 'dist', 'utils');
-    mkdirSync(nested, { recursive: true });
-    writeFileSync(
-      join(root, 'install-channel.json'),
-      JSON.stringify({
-        kind: 'windows-msi',
-        packageId: 'Xyte.XyteCLI'
-      })
-    );
+    writeFileSync(join(root, 'install-channel.json'), JSON.stringify({ kind: 'windows-msi', packageId: 'Xyte.XyteCLI' }));
 
-    expect(detectInstallChannel(nested)).toEqual({
+    expect(detectInstallChannel(root)).toEqual({
       kind: 'windows-msi',
       packageId: 'Xyte.XyteCLI'
     });
+  });
+
+  it('ignores install-channel.json markers above the install root', () => {
+    delete process.env.XYTE_CLI_INSTALL_CHANNEL;
+    delete process.env.XYTE_CLI_INSTALL_CHANNEL_FILE;
+
+    const root = mkdtempSync(join(tmpdir(), 'xyte-install-channel-'));
+    const nested = join(root, 'node_modules', '@xyteai', 'cli');
+    mkdirSync(nested, { recursive: true });
+    writeFileSync(join(root, 'install-channel.json'), JSON.stringify({ kind: 'windows-msi', packageId: 'Xyte.XyteCLI' }));
+
+    expect(detectInstallChannel(nested)).toEqual({ kind: 'npm' });
   });
 
   it('lets XYTE_CLI_INSTALL_CHANNEL=npm override an install-channel.json marker', () => {
@@ -63,24 +67,16 @@ describe('install channel detection', () => {
     expect(detectInstallChannel(root)).toEqual({ kind: 'npm' });
   });
 
-  it('treats a blank packageId as absent', () => {
+  it('always uses the fixed winget package id, whatever the marker says', () => {
     delete process.env.XYTE_CLI_INSTALL_CHANNEL;
     delete process.env.XYTE_CLI_INSTALL_CHANNEL_FILE;
 
     const root = mkdtempSync(join(tmpdir(), 'xyte-install-channel-'));
-    const nested = join(root, 'dist', 'utils');
-    mkdirSync(nested, { recursive: true });
-    writeFileSync(
-      join(root, 'install-channel.json'),
-      JSON.stringify({
-        kind: 'windows-msi',
-        packageId: '   '
-      })
-    );
+    writeFileSync(join(root, 'install-channel.json'), JSON.stringify({ kind: 'windows-msi', packageId: 'Evil.Package' }));
 
-    expect(detectInstallChannel(nested)).toEqual({
+    expect(detectInstallChannel(root)).toEqual({
       kind: 'windows-msi',
-      packageId: undefined
+      packageId: 'Xyte.XyteCLI'
     });
   });
 });

@@ -5,7 +5,6 @@ export interface WindowsPackagingArgs {
   skipMsi: boolean;
   skipNode: boolean;
   skipNpmInstall: boolean;
-  manifestsOnly: boolean;
 }
 
 export declare function parseArgs(argv: string[]): WindowsPackagingArgs;

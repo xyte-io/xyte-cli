@@ -1,4 +1,6 @@
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 
 import type { SkillAgent, SkillInstallOutcome } from './install-skills';
 import { installSkills } from './install-skills';
@@ -37,6 +39,8 @@ interface UpgradeSettings {
   skillSourceDir: string;
   installSpec?: string;
   latestVersionOverride?: string;
+  /** windows-msi only: launch winget in a console window (a human is at a TTY with text output). Otherwise the command is returned for the caller to run. */
+  launchInteractive?: boolean;
 }
 
 import { compareSemver } from '../contracts/semver';
@@ -50,14 +54,17 @@ function parseVersionFromOutput(output: string): string | undefined {
   return match ? match[0] : undefined;
 }
 
+const STRICT_SEMVER = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/;
+
 // winget must not run as a child of the node.exe it replaces (locked files, restart
-// prompts), and it cannot answer agreement prompts without a console, so it is handed
-// the full non-interactive flag set and launched detached in its own window.
-function buildWingetUpgradeArgs(installChannel: InstallChannel, targetVersion?: string): string[] {
+// prompts), so it gets the full non-interactive flag set and runs after this process
+// exits. The id and flags are constants and the version is strict semver, which is
+// what makes these args safe to pass through cmd.exe.
+function buildWingetUpgradeArgs(targetVersion?: string): string[] {
   return [
     'upgrade',
     '--id',
-    installChannel.packageId ?? WINDOWS_MSI_PACKAGE_ID,
+    WINDOWS_MSI_PACKAGE_ID,
     '--exact',
     ...(targetVersion ? ['--version', targetVersion] : []),
     '--source',
@@ -70,15 +77,68 @@ function buildWingetUpgradeArgs(installChannel: InstallChannel, targetVersion?: 
 
 function buildRecommendedUpdateCommand(packageName: string, installChannel: InstallChannel): string {
   if (installChannel.kind === 'windows-msi') {
-    return `winget ${buildWingetUpgradeArgs(installChannel).join(' ')}`;
+    return `winget ${buildWingetUpgradeArgs().join(' ')}`;
   }
   return `npm install --global ${packageName}@latest`;
 }
 
+/**
+ * Absolute path to winget.exe. Never resolved by bare name: Windows searches the
+ * current directory first, so a winget.exe planted in a repo would run instead.
+ */
+export function resolveWingetPath(
+  env: NodeJS.ProcessEnv = process.env,
+  exists: (filePath: string) => boolean = existsSync,
+  cwd: string = process.cwd()
+): string {
+  const win = path.win32;
+  const candidates: string[] = [];
+  if (env.LOCALAPPDATA && win.isAbsolute(env.LOCALAPPDATA)) {
+    candidates.push(win.join(env.LOCALAPPDATA, 'Microsoft', 'WindowsApps', 'winget.exe'));
+  }
+  const pathValue = env.Path ?? env.PATH ?? '';
+  for (const rawEntry of pathValue.split(';')) {
+    const entry = rawEntry.trim().replace(/^"(.*)"$/, '$1');
+    if (!entry || !win.isAbsolute(entry) || win.resolve(entry).toLowerCase() === win.resolve(cwd).toLowerCase()) {
+      continue;
+    }
+    candidates.push(win.join(entry, 'winget.exe'));
+  }
+  const found = candidates.find((candidate) => exists(candidate));
+  if (!found) {
+    throw new CliUserError({ summary: 'winget.exe was not found in %LOCALAPPDATA%\\Microsoft\\WindowsApps or on PATH.' });
+  }
+  // The path is quoted for cmd.exe below; these characters would break out of that quoting.
+  if (/["%&<>()@^|!]/.test(found)) {
+    throw new CliUserError({ summary: `winget path "${found}" contains characters that cannot be passed safely through cmd.exe.` });
+  }
+  return found;
+}
+
+/**
+ * cmd.exe argv that opens a new console window running winget and keeps it open
+ * (`cmd /k`) after winget exits, so its output and errors stay readable.
+ */
+export function buildWingetConsoleArgs(wingetPath: string, args: string[]): string[] {
+  return ['/d', '/c', 'start', '"Xyte CLI upgrade"', 'cmd.exe', '/d', '/k', `"${wingetPath}"`, ...args];
+}
+
 function defaultDetachedLauncher(command: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    // detached on Windows gives the child its own console window.
-    const child = spawn(command, args, { detached: true, stdio: 'ignore', windowsHide: false });
+    let wingetPath: string;
+    try {
+      wingetPath = command === 'winget' ? resolveWingetPath() : command;
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    // `start` gives winget its own console window; detached + stdio ignore lets the
+    // short-lived outer cmd.exe (and this process) exit without waiting for it.
+    const child = spawn('cmd.exe', buildWingetConsoleArgs(wingetPath, args), {
+      detached: true,
+      stdio: 'ignore',
+      windowsVerbatimArguments: true
+    });
     child.once('error', reject);
     child.once('spawn', () => {
       child.unref();
@@ -143,6 +203,12 @@ export async function applyUpgrade(
         'XYTE_CLI_UPGRADE_SPEC is not supported on the windows-msi install channel. Unset it, or use XYTE_CLI_UPGRADE_TARGET_VERSION to pick a winget version.'
     });
   }
+  const requestedVersion = settings.latestVersionOverride?.trim();
+  if (installChannel.kind === 'windows-msi' && requestedVersion && !STRICT_SEMVER.test(requestedVersion)) {
+    throw new CliUserError({
+      summary: `XYTE_CLI_UPGRADE_TARGET_VERSION "${requestedVersion}" is not a valid version (expected e.g. 1.2.3 or 1.2.3-rc.1).`
+    });
+  }
   const npmCommand = deps.npmCommand ?? (process.platform === 'win32' ? 'npm.cmd' : 'npm');
   const check = await checkForUpgrade(
     {
@@ -159,29 +225,34 @@ export async function applyUpgrade(
   const targetVersion = settings.latestVersionOverride?.trim() || undefined;
 
   if (installChannel.kind === 'windows-msi') {
-    if (compareSemver(check.currentVersion, check.latestVersion) < 0) {
-      const updateCommand = { command: 'winget', args: buildWingetUpgradeArgs(installChannel, targetVersion) };
-      try {
-        await launchDetached(updateCommand.command, updateCommand.args);
-      } catch (error) {
-        throw new CliUserError({
-          summary: `Could not start "winget": ${error instanceof Error ? error.message : String(error)}. Install App Installer (winget) or download the newer MSI.`
-        });
-      }
-      return {
-        schemaVersion: UPGRADE_RESULT_SCHEMA_VERSION,
-        generatedAtUtc: new Date().toISOString(),
-        packageName,
-        installChannel: installChannel.kind,
-        currentVersion: check.currentVersion,
-        latestVersion: check.latestVersion,
-        upToDateBefore: check.upToDate,
-        updated: false,
-        updateCommand,
-        handoff: { tool: 'winget', status: 'started' },
-        warnings
-      };
+    const baseResult = {
+      schemaVersion: UPGRADE_RESULT_SCHEMA_VERSION,
+      generatedAtUtc: new Date().toISOString(),
+      packageName,
+      installChannel: installChannel.kind,
+      currentVersion: check.currentVersion,
+      latestVersion: check.latestVersion,
+      upToDateBefore: check.upToDate,
+      updated: false,
+      warnings
+    };
+    // Already current: nothing to hand off, and the npm verify / skills refresh below
+    // does not apply to an MSI install.
+    if (compareSemver(check.currentVersion, check.latestVersion) >= 0) {
+      return baseResult;
     }
+    const updateCommand = { command: 'winget', args: buildWingetUpgradeArgs(targetVersion) };
+    if (!settings.launchInteractive) {
+      return { ...baseResult, updateCommand, handoff: { tool: 'winget' as const, status: 'manual' as const } };
+    }
+    try {
+      await launchDetached(updateCommand.command, updateCommand.args);
+    } catch (error) {
+      throw new CliUserError({
+        summary: `Could not start "winget": ${error instanceof Error ? error.message : String(error)}. Install App Installer (winget) or download the newer MSI.`
+      });
+    }
+    return { ...baseResult, updateCommand, handoff: { tool: 'winget' as const, status: 'started' as const } };
   }
 
   const installSpec = settings.installSpec?.trim()

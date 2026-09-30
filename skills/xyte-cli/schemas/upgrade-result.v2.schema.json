@@ -63,7 +63,7 @@
       }
     },
     "handoff": {
-      "description": "Present when the upgrade was handed off to an external installer (windows-msi channel: winget). verify and skills are then absent.",
+      "description": "Present when the upgrade is handed to an external installer (windows-msi channel: winget). started = launched in its own console window; manual = not launched (no TTY or JSON output), run updateCommand yourself. verify and skills are then absent.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -75,7 +75,10 @@
           "const": "winget"
         },
         "status": {
-          "const": "started"
+          "enum": [
+            "started",
+            "manual"
+          ]
         }
       }
     },
