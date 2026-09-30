@@ -61,6 +61,9 @@ export function detectInstallChannel(startDir: string = __dirname): InstallChann
       packageId: WINDOWS_MSI_PACKAGE_ID
     };
   }
+  if (process.env.XYTE_CLI_INSTALL_CHANNEL?.trim() === 'npm') {
+    return DEFAULT_INSTALL_CHANNEL;
+  }
 
   let current = path.resolve(startDir);
   for (let depth = 0; depth < 8; depth += 1) {

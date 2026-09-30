@@ -1,6 +1,10 @@
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
-import { findExpectedSha256, parseArgs, validateArgs } from '../scripts/package_windows_msi.mjs';
+import { findExpectedSha256, generateWingetManifests, parseArgs, validateArgs } from '../scripts/package_windows_msi.mjs';
 
 describe('windows packaging argument parsing', () => {
   it('parses flags and values', () => {
@@ -52,5 +56,15 @@ describe('windows packaging checksum parsing', () => {
 
   it('returns undefined when the file is missing', () => {
     expect(findExpectedSha256(shasums, 'node-v99.0.0-win-x64.zip')).toBeUndefined();
+  });
+});
+
+describe('winget manifests', () => {
+  it('declares the MSI UpgradeCode so winget matches MSIs installed outside winget', () => {
+    const outDir = mkdtempSync(join(tmpdir(), 'xyte-winget-'));
+    const wingetDir = generateWingetManifests({ outDir }, join(outDir, 'missing.msi'));
+    const installer = readFileSync(join(wingetDir, 'Xyte.XyteCLI.installer.yaml'), 'utf8');
+
+    expect(installer).toContain("AppsAndFeaturesEntries:\n- UpgradeCode: '{51D2C16F-65D2-4C39-9C6D-49D1D513AF2A}'\n");
   });
 });

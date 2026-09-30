@@ -53,6 +53,16 @@ describe('install channel detection', () => {
     });
   });
 
+  it('lets XYTE_CLI_INSTALL_CHANNEL=npm override an install-channel.json marker', () => {
+    delete process.env.XYTE_CLI_INSTALL_CHANNEL_FILE;
+    process.env.XYTE_CLI_INSTALL_CHANNEL = 'npm';
+
+    const root = mkdtempSync(join(tmpdir(), 'xyte-install-channel-'));
+    writeFileSync(join(root, 'install-channel.json'), JSON.stringify({ kind: 'windows-msi', packageId: 'Xyte.XyteCLI' }));
+
+    expect(detectInstallChannel(root)).toEqual({ kind: 'npm' });
+  });
+
   it('treats a blank packageId as absent', () => {
     delete process.env.XYTE_CLI_INSTALL_CHANNEL;
     delete process.env.XYTE_CLI_INSTALL_CHANNEL_FILE;

@@ -25,7 +25,7 @@ import { buildCallEnvelope } from '../src/contracts/call-envelope';
 import { buildFlowRunSummary } from '../src/contracts/flow-run';
 import { buildStatusContract } from '../src/contracts/status';
 import { buildWatchFrame } from '../src/contracts/watch-frame';
-import { buildUpgradeCheck } from '../src/contracts/upgrade';
+import { buildUpgradeCheck, UpgradeResultSchema } from '../src/contracts/upgrade';
 import { buildDeepDive, buildFleetInspect, generateFleetReport } from '../src/workflows/fleet-insights';
 import { buildEnvironmentDoctorReport, type EnvironmentDoctorOptions } from '../src/workflows/environment-doctor';
 import { generateOpsReport } from '../src/workflows/ops-report';
@@ -531,6 +531,20 @@ describe('schema contracts', () => {
     expect(validateStatus(status)).toBe(true);
     expect(validateUpgradeCheck(upgradeCheck)).toBe(true);
     expect(validateUpgradeResult(upgradeResult)).toBe(true);
+
+    const { verify: _verify, skills: _skills, ...handoffBase } = upgradeResult;
+    const handoffResult = {
+      ...handoffBase,
+      installChannel: 'windows-msi',
+      updated: false,
+      updateCommand: {
+        command: 'winget',
+        args: ['upgrade', '--id', 'Xyte.XyteCLI', '--exact', '--source', 'winget', '--accept-source-agreements', '--accept-package-agreements', '--silent']
+      },
+      handoff: { tool: 'winget', status: 'started' }
+    };
+    expect(validateUpgradeResult(handoffResult)).toBe(true);
+    expect(UpgradeResultSchema.safeParse(handoffResult).success).toBe(true);
 
     const legacyUpgradeCheck: Record<string, unknown> = { ...upgradeCheck, schemaVersion: 'xyte.upgrade.check.v1' };
     delete legacyUpgradeCheck.installChannel;

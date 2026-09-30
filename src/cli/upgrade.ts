@@ -1,3 +1,5 @@
+import { spawn } from 'node:child_process';
+
 import type { SkillAgent, SkillInstallOutcome } from './install-skills';
 import { installSkills } from './install-skills';
 import { CliUserError } from '../contracts/user-error';
@@ -17,10 +19,13 @@ interface CommandResult {
 }
 
 export type CommandRunner = (command: string, args: string[]) => Promise<CommandResult>;
+/** Starts a command that outlives this process and resolves once it has spawned. */
+export type DetachedLauncher = (command: string, args: string[]) => Promise<void>;
 
 export interface UpgradeDependencies {
   fetchImpl?: typeof fetch;
   commandRunner?: CommandRunner;
+  detachedLauncher?: DetachedLauncher;
   installSkillsImpl?: typeof installSkills;
   getCurrentVersion?: () => string;
   getInstallChannel?: () => InstallChannel;
@@ -45,29 +50,41 @@ function parseVersionFromOutput(output: string): string | undefined {
   return match ? match[0] : undefined;
 }
 
+// winget must not run as a child of the node.exe it replaces (locked files, restart
+// prompts), and it cannot answer agreement prompts without a console, so it is handed
+// the full non-interactive flag set and launched detached in its own window.
+function buildWingetUpgradeArgs(installChannel: InstallChannel, targetVersion?: string): string[] {
+  return [
+    'upgrade',
+    '--id',
+    installChannel.packageId ?? WINDOWS_MSI_PACKAGE_ID,
+    '--exact',
+    ...(targetVersion ? ['--version', targetVersion] : []),
+    '--source',
+    'winget',
+    '--accept-source-agreements',
+    '--accept-package-agreements',
+    '--silent'
+  ];
+}
+
 function buildRecommendedUpdateCommand(packageName: string, installChannel: InstallChannel): string {
   if (installChannel.kind === 'windows-msi') {
-    return `winget upgrade --id ${installChannel.packageId ?? WINDOWS_MSI_PACKAGE_ID} --exact`;
+    return `winget ${buildWingetUpgradeArgs(installChannel).join(' ')}`;
   }
   return `npm install --global ${packageName}@latest`;
 }
 
-function buildExecutableUpdateCommand(args: {
-  installChannel: InstallChannel;
-  installSpec: string;
-  npmCommand: string;
-}): { command: string; args: string[] } {
-  if (args.installChannel.kind === 'windows-msi') {
-    return {
-      command: 'winget',
-      args: ['upgrade', '--id', args.installChannel.packageId ?? WINDOWS_MSI_PACKAGE_ID, '--exact']
-    };
-  }
-
-  return {
-    command: args.npmCommand,
-    args: ['install', '--global', args.installSpec]
-  };
+function defaultDetachedLauncher(command: string, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // detached on Windows gives the child its own console window.
+    const child = spawn(command, args, { detached: true, stdio: 'ignore', windowsHide: false });
+    child.once('error', reject);
+    child.once('spawn', () => {
+      child.unref();
+      resolve();
+    });
+  });
 }
 
 async function fetchLatestVersion(packageName: string, fetchImpl: typeof fetch): Promise<string> {
@@ -118,7 +135,14 @@ export async function applyUpgrade(
   const packageName = settings.packageName ?? DEFAULT_CLI_PACKAGE;
   const runner = deps.commandRunner ?? defaultRunner;
   const installSkillsImpl = deps.installSkillsImpl ?? installSkills;
+  const launchDetached = deps.detachedLauncher ?? defaultDetachedLauncher;
   const installChannel = (deps.getInstallChannel ?? detectInstallChannel)();
+  if (installChannel.kind === 'windows-msi' && settings.installSpec?.trim()) {
+    throw new CliUserError({
+      summary:
+        'XYTE_CLI_UPGRADE_SPEC is not supported on the windows-msi install channel. Unset it, or use XYTE_CLI_UPGRADE_TARGET_VERSION to pick a winget version.'
+    });
+  }
   const npmCommand = deps.npmCommand ?? (process.platform === 'win32' ? 'npm.cmd' : 'npm');
   const check = await checkForUpgrade(
     {
@@ -132,19 +156,46 @@ export async function applyUpgrade(
   );
 
   const warnings: string[] = [];
+  const targetVersion = settings.latestVersionOverride?.trim() || undefined;
+
+  if (installChannel.kind === 'windows-msi') {
+    if (compareSemver(check.currentVersion, check.latestVersion) < 0) {
+      const updateCommand = { command: 'winget', args: buildWingetUpgradeArgs(installChannel, targetVersion) };
+      try {
+        await launchDetached(updateCommand.command, updateCommand.args);
+      } catch (error) {
+        throw new CliUserError({
+          summary: `Could not start "winget": ${error instanceof Error ? error.message : String(error)}. Install App Installer (winget) or download the newer MSI.`
+        });
+      }
+      return {
+        schemaVersion: UPGRADE_RESULT_SCHEMA_VERSION,
+        generatedAtUtc: new Date().toISOString(),
+        packageName,
+        installChannel: installChannel.kind,
+        currentVersion: check.currentVersion,
+        latestVersion: check.latestVersion,
+        upToDateBefore: check.upToDate,
+        updated: false,
+        updateCommand,
+        handoff: { tool: 'winget', status: 'started' },
+        warnings
+      };
+    }
+  }
+
   const installSpec = settings.installSpec?.trim()
     ? settings.installSpec.trim()
-    : typeof settings.latestVersionOverride === 'string' && settings.latestVersionOverride.trim()
-      ? `${packageName}@${settings.latestVersionOverride.trim()}`
+    : targetVersion
+      ? `${packageName}@${targetVersion}`
       : `${packageName}@latest`;
   let updateCommand: { command: string; args: string[] } | undefined;
 
   if (compareSemver(check.currentVersion, check.latestVersion) < 0) {
-    updateCommand = buildExecutableUpdateCommand({
-      installChannel,
-      installSpec,
-      npmCommand
-    });
+    updateCommand = {
+      command: npmCommand,
+      args: ['install', '--global', installSpec]
+    };
     const installResult = await runner(updateCommand.command, updateCommand.args);
     if (installResult.code !== 0) {
       throw new CliUserError({

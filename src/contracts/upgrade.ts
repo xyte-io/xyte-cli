@@ -54,8 +54,11 @@ export const UpgradeResultSchema = z.object({
   upToDateBefore: z.boolean(),
   updated: z.boolean(),
   updateCommand: UpgradeCommandSchema.optional(),
-  verify: UpgradeVerifySchema,
-  skills: UpgradeSkillsSchema,
+  // Present when the upgrade was handed off to an external installer (windows-msi → winget);
+  // verify and skills are then absent because the upgrade finishes after this process exits.
+  handoff: z.object({ tool: z.literal('winget'), status: z.literal('started') }).optional(),
+  verify: UpgradeVerifySchema.optional(),
+  skills: UpgradeSkillsSchema.optional(),
   warnings: z.array(z.string())
 });
 
@@ -74,7 +77,7 @@ export function buildUpgradeCheck(args: {
   const recommendedCommand =
     args.recommendedCommand ??
     (installChannel === 'windows-msi'
-      ? 'winget upgrade --id Xyte.XyteCLI --exact'
+      ? 'winget upgrade --id Xyte.XyteCLI --exact --source winget --accept-source-agreements --accept-package-agreements --silent'
       : `npm install --global ${args.packageName}@latest`);
   return {
     schemaVersion: UPGRADE_CHECK_SCHEMA_VERSION,

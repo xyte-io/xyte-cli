@@ -13,8 +13,6 @@
     "latestVersion",
     "upToDateBefore",
     "updated",
-    "verify",
-    "skills",
     "warnings"
   ],
   "properties": {
@@ -61,6 +59,23 @@
           "items": {
             "type": "string"
           }
+        }
+      }
+    },
+    "handoff": {
+      "description": "Present when the upgrade was handed off to an external installer (windows-msi channel: winget). verify and skills are then absent.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool",
+        "status"
+      ],
+      "properties": {
+        "tool": {
+          "const": "winget"
+        },
+        "status": {
+          "const": "started"
         }
       }
     },

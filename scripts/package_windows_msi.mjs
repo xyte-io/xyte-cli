@@ -351,6 +351,9 @@ function generateWingetManifests(args, msiPath) {
       'UpgradeBehavior: install',
       'Commands:',
       '- xyte-cli',
+      // Lets winget match an MSI installed from the GitHub release, not only via winget.
+      'AppsAndFeaturesEntries:',
+      `- UpgradeCode: '{${upgradeCode}}'`,
       'Installers:',
       '- Architecture: x64',
       `  InstallerUrl: ${installerUrl}`,
@@ -443,4 +446,4 @@ if (invokedDirectly) {
   });
 }
 
-export { parseArgs, validateArgs, findExpectedSha256 };
+export { parseArgs, validateArgs, findExpectedSha256, generateWingetManifests };

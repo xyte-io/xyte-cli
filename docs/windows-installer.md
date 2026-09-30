@@ -69,7 +69,7 @@ The upgrade check should report:
 ```json
 {
   "installChannel": "windows-msi",
-  "recommendedCommand": "winget upgrade --id Xyte.XyteCLI --exact"
+  "recommendedCommand": "winget upgrade --id Xyte.XyteCLI --exact --source winget --accept-source-agreements --accept-package-agreements --silent"
 }
 ```
 
@@ -118,8 +118,10 @@ xyte-cli upgrade --check --format text
 Apply through WinGet:
 
 ```powershell
-winget upgrade --id Xyte.XyteCLI --exact
+winget upgrade --id Xyte.XyteCLI --exact --source winget --accept-source-agreements --accept-package-agreements --silent
 ```
+
+`xyte-cli upgrade --yes` on an MSI install starts that same command in its own window and returns immediately (`handoff.status: "started"` in JSON output); it does not wait for winget or refresh skills. After winget finishes, open a new terminal and run `xyte-cli skills refresh`. The winget package can lag the npm release, so winget may report no newer version for a while after a release.
 
 When WinGet is not available, download the newer MSI and run:
 

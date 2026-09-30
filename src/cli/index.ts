@@ -926,6 +926,9 @@ export function createCli(runtime: CliRuntime = {}): Command {
           stdout.write(`Up to date: ${check.upToDate}\n`);
           if (check.recommendedCommand) {
             stdout.write(`Recommended: ${check.recommendedCommand}\n`);
+            if (check.installChannel === 'windows-msi') {
+              stdout.write('Note: the winget package can lag the npm release; winget reports if the version is not available yet.\n');
+            }
           }
           return;
         }
@@ -971,10 +974,18 @@ export function createCli(runtime: CliRuntime = {}): Command {
         stdout.write(`Install channel: ${result.installChannel}\n`);
         stdout.write(`Current: ${result.currentVersion}\n`);
         stdout.write(`Latest: ${result.latestVersion}\n`);
+        if (result.handoff && result.updateCommand) {
+          stdout.write(`Upgrade handed off to winget in a new window: winget ${result.updateCommand.args.join(' ')}\n`);
+          stdout.write('Note: the winget package can lag the npm release; winget reports if the version is not available yet.\n');
+          stdout.write('After winget finishes, open a new terminal and run: xyte-cli skills refresh\n');
+          return;
+        }
         stdout.write(`Updated: ${result.updated}\n`);
-        stdout.write(`Verified version: ${result.verify.detectedVersion}\n`);
+        if (result.verify) {
+          stdout.write(`Verified version: ${result.verify.detectedVersion}\n`);
+        }
         stdout.write('Skill refresh summary:\n');
-        result.skills.outcomes.forEach((outcome) => stdout.write(`${formatInstallOutcome(outcome)}\n`));
+        result.skills?.outcomes.forEach((outcome) => stdout.write(`${formatInstallOutcome(outcome)}\n`));
         if (result.warnings.length > 0) {
           stdout.write('Warnings:\n');
           result.warnings.forEach((warning) => stdout.write(`- ${warning}\n`));
