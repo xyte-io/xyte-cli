@@ -12,6 +12,8 @@ List built-in flow IDs:
 xyte-cli flow list --format text
 ```
 
+Common write-capable built-ins include `flow.device-command`, `flow.guided-remediation`, and `flow.device-migration`. Edge-specific built-ins include `flow.edge-model-discovery`, `flow.edge-claim`, `flow.edge-claim-batch`, `flow.edge-params-update`, `flow.edge-params-update-batch`, and `flow.edge-ping`.
+
 Create a custom flow:
 
 ```bash
@@ -50,6 +52,13 @@ xyte-cli flow create flow.ops-guided-remediation \
   --var device_id=<device-id> \
   --var incident_id=<incident-id> \
   --var ticket_id=<ticket-id>
+```
+
+```bash
+xyte-cli flow create flow.ops-device-command \
+  --based-on flow.device-command \
+  --title "Ops Device Command" \
+  --var device_id=<device-id>
 ```
 
 ## Edit Defaults And Metadata
@@ -184,17 +193,32 @@ xyte-cli flow run flow.local3000-guided-remediation --tenant local3000 --plan
 
 ## Edge-Claim Aliases
 
-Pin poll timeouts for your team's edge-claim rollouts:
+Pin poll timeouts and the already-discovered model id for your team's edge-claim rollouts. `flow.edge-claim` and `flow.edge-claim-batch` fetch Edge model data before their claim gates, so keep `device_model_id` current when a customer adds new models.
 
 ```bash
 xyte-cli flow create flow.noc-edge-claim-batch \
   --based-on flow.edge-claim-batch \
   --title "NOC Edge Claim Batch" \
+  --var device_model_id=<model-id> \
   --var edge_poll_interval_ms=5000 \
   --var edge_poll_timeout_ms=900000
 ```
 
 Full native-vs-edge disambiguation and C2C-unsupported guidance: [`../claim-devices.md`](../claim-devices.md).
+
+## Edge Params Aliases
+
+Pin a recurring already-claimed Edge parameter update for one device:
+
+```bash
+xyte-cli flow create flow.noc-edge-params-room101 \
+  --based-on flow.edge-params-update \
+  --title "NOC Room 101 Edge Params" \
+  --var device_id=<device-id> \
+  --var set_json='{"Port":"161"}'
+```
+
+For a spreadsheet-driven rollout, alias `flow.edge-params-update-batch` and pin `edge_params_input_path=<file>`.
 
 ## References
 

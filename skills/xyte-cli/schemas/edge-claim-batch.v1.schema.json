@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xyte-io.github.io/xyte-cli/schemas/edge-claim-batch.v1.schema.json",
+  "title": "Xyte CLI Edge Claim Batch Result",
+  "type": "object",
+  "required": ["schemaVersion", "generatedAtUtc", "tenantId", "mode", "runId", "totals", "stoppedEarly", "rows"],
+  "properties": {
+    "schemaVersion": {
+      "const": "xyte.edge.claim-batch.v1"
+    },
+    "generatedAtUtc": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mode": {
+      "enum": ["plan", "apply"]
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reportPath": {
+      "type": "string"
+    },
+    "resumePath": {
+      "type": "string"
+    },
+    "totals": {
+      "type": "object",
+      "required": [
+        "rows",
+        "succeeded",
+        "failed",
+        "rejected",
+        "timeout",
+        "alreadyClaimed",
+        "proxyOffline",
+        "pingFailed",
+        "skipped",
+        "aborted"
+      ],
+      "properties": {
+        "rows": { "type": "integer", "minimum": 0 },
+        "succeeded": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "rejected": { "type": "integer", "minimum": 0 },
+        "timeout": { "type": "integer", "minimum": 0 },
+        "alreadyClaimed": { "type": "integer", "minimum": 0 },
+        "proxyOffline": { "type": "integer", "minimum": 0 },
+        "pingFailed": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 },
+        "aborted": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "stoppedEarly": {
+      "type": "boolean"
+    },
+    "abortDetail": {
+      "type": "string"
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/row"
+      }
+    }
+  },
+  "$defs": {
+    "row": {
+      "type": "object",
+      "required": ["rowIndex", "proxy_id", "device_ip", "disposition", "attempts", "elapsedMs"],
+      "properties": {
+        "rowIndex": { "type": "integer", "minimum": 1 },
+        "proxy_id": { "type": "string" },
+        "device_ip": { "type": "string" },
+        "disposition": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "rejected",
+            "timeout",
+            "already-claimed",
+            "proxy-offline",
+            "ping-failed",
+            "skipped",
+            "aborted"
+          ]
+        },
+        "attempts": { "type": "integer", "minimum": 0 },
+        "elapsedMs": { "type": "integer", "minimum": 0 },
+        "lastState": { "type": "string" },
+        "detail": { "type": "string" },
+        "rejectReason": { "type": "string" },
+        "response": true,
+        "preClaimPing": true,
+        "planned": {
+          "type": "object",
+          "required": ["preClaimPing", "claimBody"],
+          "properties": {
+            "preClaimPing": {
+              "enum": ["required", "skipped"]
+            },
+            "claimBody": {
+              "type": "object"
+            },
+            "supportedParameters": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/modelParameter"
+              }
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "modelParameter": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "type": "string" },
+        "required": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

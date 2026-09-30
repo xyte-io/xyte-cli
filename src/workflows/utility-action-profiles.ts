@@ -6,6 +6,7 @@ export type UtilityExecutionSupport =
   | 'space.import-tree'
   | 'device.move'
   | 'edge.claim-batch'
+  | 'edge.params-update-batch'
   | 'prepare-only'
   | 'call-loop-only';
 
@@ -264,6 +265,8 @@ export function buildFriendlyEdgeClaimProfile(endpoint: PublicEndpointSpec): Uti
       'device_model_id',
       'space_id',
       'display_name',
+      'mac',
+      'sn',
       'custom_parameters',
       'custom_partner_name',
       'custom_model_name',
@@ -275,24 +278,64 @@ export function buildFriendlyEdgeClaimProfile(endpoint: PublicEndpointSpec): Uti
       device_model_id: 'model-uuid',
       space_id: 10000,
       display_name: 'Conference Room Display',
+      mac: 'aa:bb:cc:dd:ee:ff',
+      sn: 'SN-12345',
       custom_parameters: {},
       custom_partner_name: '',
       custom_model_name: '',
       skip_connectivity_check: false
     },
     decodeRules: [
-      'Map source rows into proxy_id,device_ip,device_model_id,space_id,display_name,custom_parameters,custom_partner_name,custom_model_name,skip_connectivity_check columns.',
+      'Map source rows into proxy_id,device_ip,device_model_id,space_id,display_name,mac,sn,custom_parameters,custom_partner_name,custom_model_name,skip_connectivity_check columns.',
       'proxy_id, device_ip, device_model_id, and space_id are required and must be non-empty.',
       'space_id must stay numeric so the claim endpoint receives an integer space_id.',
+      'Use edge model discovery to choose device_model_id and the supported custom_parameters keys; do not guess model ids.',
+      'mac and sn are optional; when present, copy the explicit source values without inventing them.',
       'device_ip must parse as an IPv4/IPv6 address or a resolvable hostname; reject rows that do not.',
       'skip_connectivity_check, when present, must be the literal "true" or "false" (case-insensitive); blank means the batch runner performs a pre-claim ping before startClaim.',
-      'custom_parameters, when present, must be a valid JSON object string or empty.',
+      'custom_parameters, when present, must be a valid JSON object string or empty; keys must come from organization.models.getModel parameters[].name.',
+      'Required model parameters must be present before claim; do not use masked password placeholders such as "*****".',
       'Do not guess proxy_id or device_model_id from context; reject ambiguous rows.',
       'Write unresolved rows to rejected output with reject_reason.'
     ],
     promptTemplatePath: GENERIC_PROMPT_TEMPLATE_PATH,
     skillNodePath: UTILITIES_SKILL_NODE_PATH,
     executionSupport: 'edge.claim-batch'
+  };
+}
+
+export function buildFriendlyEdgeParamsUpdateProfile(endpoint: PublicEndpointSpec): UtilityActionProfile {
+  return {
+    actionKey: 'edge.params.update',
+    title: 'Edge Custom Parameters Update',
+    entity: 'edge',
+    mode: 'friendly',
+    endpointKey: endpoint.key,
+    method: endpoint.method,
+    pathTemplate: endpoint.pathTemplate,
+    primaryFormat: 'csv',
+    headers: ['device_id', 'set_json', 'expected_model_id'],
+    jsonShape: {
+      device_id: 'device-uuid',
+      set_json: {
+        Port: '161',
+        'SNMP community': 'public'
+      },
+      expected_model_id: 'model-uuid'
+    },
+    decodeRules: [
+      'Map source rows into device_id,set_json,expected_model_id columns.',
+      'device_id is required and must be the already-claimed Edge device id.',
+      'set_json is required and must be a JSON object string containing only custom parameter labels the user explicitly wants to set or change.',
+      'expected_model_id is optional but recommended when the source includes the intended model id; the batch runner rejects rows whose current device model differs.',
+      'Do not include masked password placeholders such as "*****"; require an explicit replacement value for password parameters.',
+      'The batch runner reads current device state, reads the model schema, validates keys against parameters[].name, merges set_json into current custom_parameters, sends the full replacement object, and verifies with getDevice.',
+      'Do not use generic organization.devices.updateDevice loops for Edge custom parameters; use xyte-cli edge update-params-batch so the safety checks run.',
+      'Write unresolved rows to rejected output with reject_reason.'
+    ],
+    promptTemplatePath: GENERIC_PROMPT_TEMPLATE_PATH,
+    skillNodePath: UTILITIES_SKILL_NODE_PATH,
+    executionSupport: 'edge.params-update-batch'
   };
 }
 

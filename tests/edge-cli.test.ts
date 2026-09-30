@@ -27,11 +27,19 @@ describe('edge command group', () => {
     vi.restoreAllMocks();
   });
 
-  it('edge claim --plan prints plan payload without calling the API', async () => {
+  it('edge claim --plan prints plan payload after validating the model', async () => {
     const { profileStore, secretStore } = await bootstrapTenant();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', parameters: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in edge claim plan test: ${url}`);
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     const program = createCli({ profileStore, secretStore, stdout, stderr });
@@ -51,24 +59,40 @@ describe('edge command group', () => {
       'model-1',
       '--space-id',
       '99',
+      '--mac',
+      'aa:bb:cc:dd:ee:ff',
+      '--sn',
+      'SN-12345',
       '--plan'
     ]);
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/core/v1/organization/models/model-1');
     const printed = stdout.write.mock.calls.map(([chunk]) => chunk).join('');
     expect(printed).toContain('xyte.edge.claim.plan.v1');
     expect(printed).toContain('proxy-1');
     expect(printed).toContain('192.168.1.10');
     expect(printed).toContain('"space_id": 99');
-    const parsed = JSON.parse(printed) as { planned: Record<string, unknown> };
+    expect(printed).toContain('aa:bb:cc:dd:ee:ff');
+    expect(printed).toContain('SN-12345');
+    const parsed = JSON.parse(printed) as { planned: Record<string, unknown>; supportedParameters: unknown[] };
     expect(parsed.planned).not.toHaveProperty('skip_connectivity_check');
+    expect(parsed.supportedParameters).toEqual([]);
   });
 
   it('edge claim --plan includes skip_connectivity_check only when requested', async () => {
     const { profileStore, secretStore } = await bootstrapTenant();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', parameters: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in edge claim skip plan test: ${url}`);
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     const program = createCli({ profileStore, secretStore, stdout, stderr });
@@ -92,17 +116,72 @@ describe('edge command group', () => {
       '--plan'
     ]);
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     const printed = stdout.write.mock.calls.map(([chunk]) => chunk).join('');
     const parsed = JSON.parse(printed) as { planned: Record<string, unknown> };
     expect(parsed.planned.skip_connectivity_check).toBe(true);
+  });
+
+  it('edge claim --plan rejects custom_parameters missing required model params', async () => {
+    const { profileStore, secretStore } = await bootstrapTenant();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(
+          JSON.stringify({
+            id: 'model-1',
+            parameters: [{ name: 'SNMP community', type: 'text', required: true }]
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
+      }
+      throw new Error(`Unexpected URL in edge claim required params test: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await expect(
+      program.parseAsync([
+        'node',
+        'xyte-cli',
+        'edge',
+        'claim',
+        '--tenant',
+        'acme',
+        '--proxy-id',
+        'proxy-1',
+        '--device-ip',
+        '192.168.1.10',
+        '--device-model-id',
+        'model-1',
+        '--space-id',
+        '99',
+        '--custom-parameters',
+        '{}',
+        '--plan'
+      ])
+    ).rejects.toThrow(/Required custom parameter/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('edge claim rejects malformed input before calling the API', async () => {
     const { profileStore, secretStore } = await bootstrapTenant();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', parameters: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in edge claim-batch input-format test: ${url}`);
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     const program = createCli({ profileStore, secretStore, stdout, stderr });
@@ -163,7 +242,15 @@ describe('edge command group', () => {
     const { profileStore, secretStore } = await bootstrapTenant();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', parameters: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in edge claim-batch skip plan test: ${url}`);
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     const program = createCli({ profileStore, secretStore, stdout, stderr });
@@ -220,7 +307,15 @@ describe('edge command group', () => {
     const { profileStore, secretStore } = await bootstrapTenant();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', parameters: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in edge claim-batch input-format test: ${url}`);
+    });
     vi.stubGlobal('fetch', fetchMock);
     const tempDir = mkdtempSync(join(tmpdir(), 'xyte-edge-cli-'));
     const inputPath = join(tempDir, 'claims.csv');
@@ -246,7 +341,9 @@ describe('edge command group', () => {
       '--plan'
     ]);
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/core/v1/organization/models/model-1');
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/start_claim'))).toBe(false);
     const printed = stdout.write.mock.calls.map(([chunk]) => chunk).join('');
     const parsed = JSON.parse(printed) as { totals: { rows: number }; rows: Array<{ disposition: string }> };
     expect(parsed.totals.rows).toBe(1);
@@ -257,7 +354,15 @@ describe('edge command group', () => {
     const { profileStore, secretStore } = await bootstrapTenant();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', parameters: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in edge claim-batch skip-connectivity plan test: ${url}`);
+    });
     vi.stubGlobal('fetch', fetchMock);
     const tempDir = mkdtempSync(join(tmpdir(), 'xyte-edge-cli-'));
     const inputPath = join(tempDir, 'claims.csv');
@@ -287,7 +392,9 @@ describe('edge command group', () => {
       '--plan'
     ]);
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/core/v1/organization/models/model-1');
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/start_claim'))).toBe(false);
     const printed = stdout.write.mock.calls.map(([chunk]) => chunk).join('');
     const parsed = JSON.parse(printed) as {
       rows: Array<{
@@ -308,7 +415,15 @@ describe('edge command group', () => {
     const { profileStore, secretStore } = await bootstrapTenant();
     const stdout = { write: vi.fn() };
     const stderr = { write: vi.fn() };
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', parameters: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in edge claim-batch skip-connectivity apply conflict test: ${url}`);
+    });
     vi.stubGlobal('fetch', fetchMock);
     const tempDir = mkdtempSync(join(tmpdir(), 'xyte-edge-cli-'));
     const inputPath = join(tempDir, 'claims.csv');
@@ -333,7 +448,9 @@ describe('edge command group', () => {
       '--apply'
     ]);
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/core/v1/organization/models/model-1');
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/start_claim'))).toBe(false);
     expect(process.exitCode).toBe(1);
     const printed = stdout.write.mock.calls.map(([chunk]) => chunk).join('');
     const parsed = JSON.parse(printed) as { totals: { rejected: number }; rows: Array<{ disposition: string }> };
@@ -349,6 +466,12 @@ describe('edge command group', () => {
     const inputPath = join(tempDir, 'claims.csv');
     writeFileSync(inputPath, 'proxy_id,device_ip,device_model_id,space_id\nproxy-1,192.168.1.10,model-1,99\n', 'utf8');
     const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', parameters: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
       if (url.includes('/core/v1/organization/edges/devices/start_ping')) {
         return new Response(null, { status: 204 });
       }
@@ -395,12 +518,21 @@ describe('edge command group', () => {
     const tempDir = mkdtempSync(join(tmpdir(), 'xyte-edge-cli-'));
     const inputPath = join(tempDir, 'claims.csv');
     writeFileSync(inputPath, 'proxy_id,device_ip,device_model_id,space_id\nproxy-1,192.168.1.10,model-1,99\n', 'utf8');
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ detail: 'Edge offline — proxy unreachable.' }), {
-        status: 422,
-        headers: { 'content-type': 'application/json' }
-      })
-    );
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/core/v1/organization/models/model-1')) {
+        return new Response(JSON.stringify({ id: 'model-1', parameters: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      if (url.includes('/core/v1/organization/edges/devices/start_claim')) {
+        return new Response(JSON.stringify({ detail: 'Edge offline — proxy unreachable.' }), {
+          status: 422,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      throw new Error(`Unexpected URL in proxy-offline CLI test: ${url}`);
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     const program = createCli({ profileStore, secretStore, stdout, stderr });
@@ -479,6 +611,141 @@ describe('edge command group', () => {
         '10s'
       ])
     ).rejects.toThrow(/positive integer/);
+  });
+
+  it('edge models list calls getModels with edge_only and explicit pagination', async () => {
+    const { profileStore, secretStore } = await bootstrapTenant();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ items: [{ id: 'model-1', model: 'Sensor' }], next_page: null }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'edge',
+      'models',
+      'list',
+      '--tenant',
+      'acme',
+      '--search',
+      'sensor',
+      '--page',
+      '2',
+      '--per-page',
+      '50'
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = fetchMock.mock.calls[0]?.[0] as string;
+    expect(url).toContain('/core/v1/organization/models');
+    expect(url).toContain('edge_only=true');
+    expect(url).toContain('search=sensor');
+    expect(url).toContain('page=2');
+    expect(url).toContain('per_page=50');
+    const printed = stdout.write.mock.calls.map(([chunk]) => chunk).join('');
+    expect(printed).toContain('xyte.edge.models.list.v1');
+    expect(printed).toContain('model-1');
+    const parsed = JSON.parse(printed) as { query: Record<string, unknown>; response: Record<string, unknown> };
+    expect(parsed.query).toMatchObject({ edge_only: true, search: 'sensor', page: 2, per_page: 50 });
+    expect(parsed.response.next_page).toBeNull();
+  });
+
+  it('edge models describe calls getModel with model id path', async () => {
+    const { profileStore, secretStore } = await bootstrapTenant();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ id: 'model-1', parameters: [{ name: 'Port', type: 'number' }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'edge',
+      'models',
+      'describe',
+      '--tenant',
+      'acme',
+      '--model-id',
+      'model-1'
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url = fetchMock.mock.calls[0]?.[0] as string;
+    expect(url).toContain('/core/v1/organization/models/model-1');
+    const printed = stdout.write.mock.calls.map(([chunk]) => chunk).join('');
+    expect(printed).toContain('xyte.edge.models.describe.v1');
+    expect(printed).toContain('Port');
+  });
+
+  it('edge update-params --plan reads device/model and does not call updateDevice', async () => {
+    const { profileStore, secretStore } = await bootstrapTenant();
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/devices/dev-1')) {
+        expect(init?.method).toBe('GET');
+        return new Response(
+          JSON.stringify({
+            id: 'dev-1',
+            model: { id: 'model-1' },
+            custom_parameters: { 'SNMP community': 'public', Port: '162' }
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      if (url.includes('/models/model-1')) {
+        expect(init?.method).toBe('GET');
+        return new Response(
+          JSON.stringify({
+            id: 'model-1',
+            parameters: [
+              { name: 'SNMP community', type: 'text' },
+              { name: 'Port', type: 'number' }
+            ]
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'edge',
+      'update-params',
+      '--tenant',
+      'acme',
+      '--device-id',
+      'dev-1',
+      '--set-json',
+      '{"Port":"161"}',
+      '--plan'
+    ]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const printed = stdout.write.mock.calls.map(([chunk]) => chunk).join('');
+    expect(printed).toContain('xyte.edge.params-update.v1');
+    expect(printed).toContain('"Port": "161"');
+    expect(printed).toContain('"SNMP community": "public"');
   });
 
   it('edge claim-status calls organization.edge.getClaimStatus with query params', async () => {

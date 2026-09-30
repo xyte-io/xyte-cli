@@ -12,6 +12,76 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ### Changed
 - **Breaking (JSON contracts):** upgrade payloads moved to `xyte.upgrade.check.v2` and `xyte.upgrade.result.v2`, which add the required `installChannel` field. The v1 schemas remain published unchanged for legacy payloads; consumers validating upgrade JSON should adopt the v2 schemas in `docs/schemas/`.
+- `organization.devices.getHistories` catalog notes and skill docs now document `page`/`per_page` pagination (422 outside 1..1000, not clamped), the 31-day inclusive `from`/`to` window (422 when exceeded or reversed), the stable newest-first ordering, and guidance to prefer narrow windows and filters over deep page walks.
+
+### Upgrade notes
+- Existing workspaces that already installed the shipped skill bundle should run `xyte-cli skills refresh` after upgrading — the previous `getHistories` example used a wide `from=0` window that now returns 422 against production.
+
+## [0.14.0] - 2026-08-03
+
+### Added
+- `flow.device-command` can optionally poll command history for the exact command ID returned by the send request, with an explicit timeout.
+
+### Changed
+- Bumped package metadata and lockfile to `0.14.0`.
+
+### Fixed
+- Device command sends now use the API's `command` or `friendly_name` selector, keep request values under `extra_params`, and map model-provided static option labels or canonical values for both single- and multi-value fields. Unknown, ambiguous, malformed, and unresolved dynamic choices stop before sending.
+- The CLI's model-guided command paths now share declared value-type and attached-file checks, and resume will not automatically repeat a command whose send result is unknown.
+
+### Upgrade notes
+- Existing workspaces that already installed the shipped skill bundle should run `xyte-cli skills refresh` after upgrading so agents receive the corrected device-command guidance.
+
+## [0.13.0] - 2026-07-29
+
+### Added
+- Every API request now sends an `X-Xyte-Client: xyte-cli/<version>` header, so the hub attributes calls in the tenant's API call log (Settings > API Keys > Call Log) to the CLI instead of to a direct integration.
+
+## [0.12.1] - 2026-07-08
+
+### Added
+- Added a passive once-per-day update notice for eligible interactive CLI runs, with suppression for CI, non-interactive sessions, upgrade/help/version commands, and JSON/headless/machine-readable output.
+- Added shipped agent guidance so AI agents relay update notices once without running `xyte-cli upgrade` unless explicitly asked.
+
+### Changed
+- Bumped package metadata and lockfile to `0.12.1`.
+
+### Upgrade notes
+- Existing workspaces that already installed the shipped skill bundle should run `xyte-cli skills refresh` after upgrading so agents receive the update-notice guidance.
+
+## [0.12.0] - 2026-07-06
+
+### Added
+- Added organization Edge model discovery to the endpoint catalog and typed client:
+  - `organization.models.getModels`
+  - `organization.models.getModel`
+- Added `xyte-cli edge models list|describe` for read-only Edge model discovery. Model listing sends `edge_only=true` and supports explicit `page`, `per_page`, and `search` filters.
+- Added safe already-claimed Edge custom-parameter update commands:
+  - `xyte-cli edge update-params`
+  - `xyte-cli edge update-params-batch`
+- Added built-in flows for the new Edge workflows:
+  - `flow.edge-model-discovery`
+  - `flow.edge-params-update`
+  - `flow.edge-params-update-batch`
+- Added `flow.device-command` so agents fetch a device, read model command metadata, validate command params, and pause for approval before sending a command.
+- Added utility preparation support for Edge parameter updates via `edge.params.update`.
+- Added JSON schemas for Edge model discovery, Edge claim batch, and Edge params update outputs in both docs and the shipped `xyte-cli` skill bundle.
+- Added GH Pages/user-facing guides for already-claimed Edge custom-parameter updates and refreshed Edge claim/model discovery guidance.
+
+### Changed
+- Updated `organization.devices.getDevices` metadata for `page`/`per_page` pagination and documented both `next_page` and `has_next_page` response shapes.
+- Extended `edge claim` and `edge claim-batch` with optional `mac`, `sn`, and model-backed custom-parameter validation.
+- Updated Edge claim workflows to discover Edge models before claim writes so operators can choose real model IDs and supported `custom_parameters` labels.
+- Documented Edge `custom_parameters` updates as complete-replacement writes and routed operators through the safe Edge params commands instead of raw `updateDevice` loops.
+- Updated command-send guidance, CLI/TUI preflight behavior, docs, and shipped skills to derive supported device commands from `organization.models.getModel.commands[]` instead of command history.
+- Updated Markdown docs, GH Pages reference pages, and shipped skill guidance for Edge model discovery, Edge claim preparation, already-claimed Edge params updates, device command workflows, reports, resume artifacts, and approval gates.
+
+### Fixed
+- Edge claim batch model discovery now retries later rows after a transient model lookup failure instead of caching the failed lookup for the whole run.
+- Edge params batch reports blank or missing `set_json` as `missing_set_json` while preserving `invalid_set_json` for malformed or non-object JSON.
+
+### Upgrade notes
+- Existing workspaces that already installed the shipped skill bundle should run `xyte-cli skills refresh` after upgrading so agents receive the new Edge model, params, claim, and device-command guidance.
 
 ## [0.11.0] - 2026-06-24
 

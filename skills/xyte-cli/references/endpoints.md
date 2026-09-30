@@ -42,8 +42,8 @@ Derived from the bundled public endpoint spec.
 | Endpoint Key | Query Fields | Pagination Fields | Notes |
 | --- | --- | --- | --- |
 | `organization.spaces.getSpaces` | `id`, `name`, `parent_id`, `space_type`, `created_before`, `created_after`, `path_includes` | none | Main listing endpoint with server-side filtering |
-| `organization.devices.getDevices` | `space_id` | none | Filter devices by one space |
-| `organization.devices.getHistories` | `status`, `from`, `to`, `device_id`, `space_id`, `name` | none | Filtered history lookup; can be time-windowed |
+| `organization.devices.getDevices` | `page`, `per_page`, `space_id` | `page`, `per_page` | Filter devices by one space; shared docs mention `has_next_page`, live Verve/Playground responses returned `next_page`; handle either continuation field |
+| `organization.devices.getHistories` | `status`, `from`, `to`, `device_id`, `space_id`, `name`, `page`, `per_page` | `page`, `per_page` | Filtered history lookup. `from`/`to` window must not exceed 31 days (422 otherwise); defaults: `from` = 1 week ago, `to` = now, applied independently — send both. `status` filters the device's *current* status. |
 | `organization.commands.getCommands` | `status`, `page`, `per_page` | `page`, `per_page` | Command history pagination and status filter |
 | `organization.incidents.getIncidents` | `from`, `to`, `status`, `priority`, `title`, `description`, `issue`, `device_model`, `partner_name`, `sub_model`, `space_id`, `page`, `per_page` | `page`, `per_page` | Incident filtering matrix. Use integer `from` and `to`; for reliable active-incident fetches use both (`from=0`, `to=<now>`). |
 | `organization.notes.getAllDeviceNotes` | `page`, `per_page` | `page`, `per_page` | Paginated notes across all devices |
@@ -53,6 +53,7 @@ Derived from the bundled public endpoint spec.
 | `organization.edges.getEdges` | `page`, `per_page` | `page`, `per_page` | Paginated Edge records |
 | `organization.groups.getGroups` | `page`, `per_page` | `page`, `per_page` | Paginated team access groups |
 | `organization.users.getUsers` | `page`, `per_page` | `page`, `per_page` | Paginated active users |
+| `organization.models.getModels` | `page`, `per_page`, `search`, `edge_only` | `page`, `per_page` | Use `edge_only=true` for Edge model discovery and custom parameter labels |
 
 For the complete current query-param set, run `xyte-cli api endpoints describe <endpoint-key>` before calling.
 
@@ -77,11 +78,15 @@ xyte-cli api call organization.devices.getHistories \
   --tenant <tenant-id> \
   --query-json '{
     "status": "online",
-    "from": 0,
-    "to": 2000000000,
-    "space_id": "<space-id>"
+    "from": 1707400000,
+    "to": 1710000000,
+    "space_id": "<space-id>",
+    "page": 1,
+    "per_page": 100
   }'
 ```
+
+Replace `1710000000` with the current Unix timestamp and `1707400000` with a value at most 31 days earlier; the `from`/`to` window may not exceed 31 days (the API returns 422 for wider or reversed windows). Walk within a window with `page` (starts at 1) and `per_page` (default 100, 1..1000 — values outside that range are rejected with 422, not clamped) until `has_next_page` is false. To read further back, set the next window's `to` to the current window's `from` — not `from - 1`. Both bounds are inclusive, so a row landing exactly on the boundary is returned in both windows; drop rows whose `(uuid, create_at)` you have already seen. Rows are under `items`, newest-first; each has `uuid` (the device id) and `create_at` (sic — an ISO8601 string, not epoch seconds), and no row `id`. Prefer a shorter window or a `device_id`/`space_id` filter over deep page walks — each page costs a full OFFSET scan, so high page numbers can time out even inside a legal window.
 
 ### `organization.incidents.getIncidents`
 
@@ -105,12 +110,34 @@ xyte-cli api call organization.incidents.closeIncident \
 
 ### `organization.commands.sendCommand`
 
+Prefer `flow.device-command` for user requests like "send command X to device Y"; it first reads `organization.devices.getDevice`, describes the returned model with `organization.models.getModel`, validates required fields and declared parameter types, maps labels or label arrays through embedded static `options` to exact scalar or array values, and pauses before `organization.commands.sendCommand`. The built-in flow sends the selected `commands[].name` under request field `command`; raw or custom sends may use `friendly_name`, while request field `name` is invalid. Malformed or unresolved choices stop before the send. Send request values as an object under `extra_params`; raw sends reject response/history `params` and non-object `extra_params`. Optional polling needs one command id from the send response. If the send result is interrupted or unknown, resume stops instead of sending it again.
+
 ```bash
+xyte-cli flow run flow.device-command --tenant <tenant-id> --plan --var device_id=<device-id> --var command=reboot
+
+# Add these vars only when command queue/history polling is wanted:
+xyte-cli flow run flow.device-command --tenant <tenant-id> --apply --var device_id=<device-id> --var command=reboot --var command_poll=true --var command_poll_timeout_ms=60000
+
+xyte-cli api call organization.devices.getDevice \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}'
+
+xyte-cli edge models describe \
+  --tenant <tenant-id> \
+  --model-id <model-id-from-device>
+
 xyte-cli api call organization.commands.sendCommand \
   --tenant <tenant-id> \
   --path-json '{"device_id":"<device-id>"}' \
-  --body-json '{"command":"reboot"}'
+  --body-json '{"command":"reboot","extra_params":{}}'
+
+xyte-cli api call organization.commands.getCommands \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}' \
+  --query-json '{"page":1,"per_page":500}'
 ```
+
+Optional flow polling matches only the id returned by `sendCommand`, follows `has_next_page` when needed, and stops at the requested timeout. It reports Xyte command queue/history status. The verified page size limit is 500.
 
 ### `organization.devices.mergeDevice` / `organization.devices.splitDevice`
 
@@ -226,6 +253,12 @@ Partner:
 
 Edge devices sit behind an Xyte Edge proxy. Claim/ping are **asynchronous**: the start endpoint returns 204, then you poll the matching status endpoint until terminal (`success` or `failed`). Prefer the `xyte-cli edge` command group or `flow.edge-claim*` flows over raw `api call` — they handle polling, backoff, and resume.
 
+Model discovery:
+- `organization.models.getModels` -> `GET /core/v1/organization/models` with `edge_only=true`, `page`, `per_page`, and optional `search`.
+- `organization.models.getModel` -> `GET /core/v1/organization/models/:id`; returns `parameters[]` and model-supported `commands[]`.
+- Use `parameters[].name` as the accepted `custom_parameters` labels for Edge claim and already-claimed parameter updates.
+- For raw or custom calls, send `commands[].name` under request field `command`, or send `commands[].friendly_name` under `friendly_name`; use `commands[].custom_fields[].name` for `extra_params`, map labels or label arrays through embedded static `options`, stop on malformed or unresolved choices, and provide `file_id` when `commands[].with_file` is true. The built-in `flow.device-command` selects by `commands[].name`.
+
 Verified raw route mapping:
 - `organization.edge.startClaim` -> `POST /core/v1/organization/edges/devices/start_claim`
 - `organization.edge.getClaimStatus` -> `GET /core/v1/organization/edges/devices/get_claim_status`
@@ -243,6 +276,8 @@ xyte-cli api call organization.edge.startClaim \
     "device_model_id":"<device-model-id>",
     "space_id":<space-id>,
     "display_name":"Conference Room Display",
+    "mac":"aa:bb:cc:dd:ee:ff",
+    "sn":"SN-12345",
     "skip_connectivity_check":false
   }'
 
@@ -264,10 +299,25 @@ xyte-cli api call organization.edge.getPingStatus \
 ```
 
 Ergonomic wrappers (recommended):
+- Model discovery: `xyte-cli edge models list --tenant <tenant-id> --page 1 --per-page 100` and `xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>`.
 - Single claim: `xyte-cli edge claim --plan`, then `--apply` after explicit approval.
 - Bulk claim: `xyte-cli edge claim-batch --input <primary-csv> --plan [--skip-connectivity-check]`, then `--apply --resume-artifact <path>` after explicit approval.
 - In bulk claim, blank or `skip_connectivity_check=false` rows run an internal pre-claim ping; standalone `edge ping` is diagnostic.
 - Batch resume skips completed rows from `--resume-artifact`; it does not store in-flight claim IDs.
+
+### Already-Claimed Edge `custom_parameters`
+
+Use `organization.devices.updateDevice` for already-claimed Edge custom parameters only through the dedicated CLI wrappers unless the user explicitly requests raw calls:
+
+```bash
+xyte-cli edge update-params --tenant <tenant-id> --device-id <device-id> --set-json '{"Port":"161"}' --plan
+xyte-cli edge update-params-batch --tenant <tenant-id> --input ./prepared/edge-params-update.csv --plan --report ./artifacts/edge-params.plan.ndjson
+```
+
+Safety rules:
+- `custom_parameters` is a complete replacement write. The request body must include every value to preserve.
+- The wrapper reads `organization.devices.getDevice`, reads `organization.models.getModel`, validates keys against `parameters[].name`, merges requested changes into current values, sends `{"custom_parameters": ...}` to `organization.devices.updateDevice`, and verifies with `getDevice`.
+- Block unknown requested labels, unsupported existing labels, missing required model parameters, duplicate `device_id` batch rows, model mismatch, read-back mismatch, and masked password placeholders (`"*****"`) unless a real replacement value is supplied.
 - Status peek: `xyte-cli edge claim-status`, `xyte-cli edge ping-status`
 - Connectivity probe: `xyte-cli edge ping --plan`, then `--apply` after explicit approval.
 

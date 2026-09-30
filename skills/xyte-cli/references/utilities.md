@@ -50,11 +50,11 @@ xyte-cli util prepare \
 ```
 
 Expected files:
-1. `./prepared/organization-edge-startclaim.csv` — rows ready for `edge claim-batch`; blank `skip_connectivity_check` means the batch will ping before claim.
+1. `./prepared/organization-edge-startclaim.csv` — rows ready for `edge claim-batch`; optional `mac` and `sn` columns are supported; blank `skip_connectivity_check` means the batch will ping before claim.
 2. `./prepared/organization-edge-startclaim.rejected.csv` — rows with `reject_reason` (missing `proxy_id`, malformed `device_ip`, non-numeric `space_id`, etc.).
 3. `./prepared/organization-edge-startclaim.notes.md` — column glossary + action taxonomy.
 
-Dry-run (`--plan`) — zero API calls, per-row intended action:
+Dry-run (`--plan`) — model reads only; no claim writes; per-row intended action:
 
 ```bash
 xyte-cli edge claim-batch \
@@ -88,20 +88,68 @@ xyte-cli edge claim-batch \
 
 Resume uses completed row dispositions from `--resume-artifact`; it does not checkpoint in-flight claim IDs. If the process dies after `startClaim` but before a row result is written, inspect `edge claim-status` / logs before rerunning that row.
 
+## SOP A3: Bulk Edge Custom Parameter Updates (`edge.params.update`)
+
+Scope check first: this is for **already-claimed Edge devices**. It updates `custom_parameters` through `organization.devices.updateDevice`, but only through the dedicated Edge command so model validation and read-back verification run.
+
+Prepare:
+
+```bash
+xyte-cli util prepare \
+  --action edge.params.update \
+  --input /path/to/edge-params.xlsx \
+  --tenant <tenant-id> \
+  --output-dir ./prepared
+```
+
+Expected files:
+1. `./prepared/edge-params-update.csv` — `device_id,set_json,expected_model_id` rows ready for `edge update-params-batch`.
+2. `./prepared/edge-params-update.rejected.csv` — rows with `reject_reason`.
+3. `./prepared/edge-params-update.notes.md` — column glossary, reject taxonomy, and command checklist.
+
+Dry-run (`--plan`) — reads current device/model state, no writes:
+
+```bash
+xyte-cli edge update-params-batch \
+  --tenant <tenant-id> \
+  --input ./prepared/edge-params-update.csv \
+  --report ./artifacts/edge-params.plan.ndjson \
+  --plan
+```
+
+Apply — only after explicit user approval:
+
+```bash
+xyte-cli edge update-params-batch \
+  --tenant <tenant-id> \
+  --input ./prepared/edge-params-update.csv \
+  --report ./artifacts/edge-params.apply.ndjson \
+  --resume-artifact ./artifacts/edge-params.resume.ndjson \
+  --apply
+```
+
+Safety rules:
+- `set_json` keys must match the model's `parameters[].name`.
+- The runner merges `set_json` into current `custom_parameters` and sends the complete replacement object.
+- Unsupported existing labels (`unsupported_current_parameter`) and missing required model parameters (`missing_required_parameter`) fail closed before any write.
+- Masked password values (`"*****"`) are blocked with `masked_password_requires_value` unless the user supplies a real replacement.
+- Duplicate `device_id` rows are rejected with `duplicate_device_id` so one batch cannot apply multiple full replacements to the same claimed Edge device.
+- Resume skips rows previously recorded as `succeeded`.
+
 Decision gate:
-1. Populate `organization-edge-startclaim.csv` from the source material before running `--plan`.
-2. Review `organization-edge-startclaim.rejected.csv` before running `--plan`.
-3. Review `edge-claim-report.ndjson` after `--plan`; confirm zero unexpected rejections.
+1. Populate `edge-params-update.csv` from the source material before running `--plan`.
+2. Review `edge-params-update.rejected.csv` before running `--plan`.
+3. Review `edge-params.plan.ndjson` after `--plan`; confirm zero unexpected rejections and no unsafe replacement bodies.
 4. Ask the user before running `--apply`.
-5. On partial batch failure (exit 1), re-run with `--resume-artifact`.
-6. Use row `skip_connectivity_check=true` or command `--skip-connectivity-check` only when the batch should skip its internal pre-claim ping.
+5. On partial batch failure (exit 1), re-run with the same `--resume-artifact`.
+6. For duplicate `device_id` rows, fix the source so each claimed Edge device appears once.
 
 Artifact split:
-1. stdout carries the `xyte.edge.claim-batch.v1` summary.
+1. stdout carries the `xyte.edge.params-update-batch.v1` summary.
 2. `--report` writes per-row audit NDJSON for review/debugging.
 3. `--resume-artifact` writes completed row resume state for partial-run continuation.
 
-Full edge-case matrix and terminal-state handling: `references/claim-playbook.md`.
+Single-device command behavior and Edge claim guidance: `references/claim-playbook.md`.
 
 ## SOP B: Space Import Preprocessing + Execution (`space.import-tree`)
 

@@ -44,6 +44,13 @@ describe('claim-guidance surfaces', () => {
         expect(content).toContain('ping-failed');
       });
 
+      it('documents Edge model discovery, optional mac/sn, and claimed-device params updates', () => {
+        expect(content).toContain('edge models');
+        expect(content).toContain('mac');
+        expect(content).toContain('sn');
+        expect(content).toContain('edge update-params');
+      });
+
       it('documents true, false, blank, conflict, and resume retry semantics', () => {
         expect(content).toContain('skip_connectivity_check=true');
         expect(content).toContain('skip_connectivity_check=false');
@@ -75,6 +82,7 @@ describe('claim-guidance surfaces', () => {
 
     for (const content of [docs, playbook]) {
       expect(content).toContain('xyte.edge.claim-batch.v1');
+      expect(content).toContain('edge-claim-batch.v1.schema.json');
       expect(content).toContain('--report');
       expect(content).toContain('per-row audit NDJSON');
       expect(content).toContain('--resume-artifact');
@@ -100,5 +108,23 @@ describe('claim-guidance surfaces', () => {
 
     expect(skill).toContain('edge_claim_input_path');
     expect(skill).not.toContain('edge_claim_prepare_input');
+  });
+
+  it('documents Edge claim batch schema on GH Pages and installed skill index', () => {
+    const commandReference = read('docs/reference/commands.html');
+    const schemaReference = read('docs/reference/schema-contracts.html');
+    const guide = read('docs/guides/edge-claim.html');
+    const skill = read('skills/xyte-cli/SKILL.md');
+
+    expect(commandReference).toContain('xyte.edge.claim-batch.v1');
+    expect(commandReference).not.toContain('edge claim-batch</td><td>Plans or runs an Edge claim batch from prepared rows.</td><td>NDJSON report and summary.</td><td>Writes report and resume artifact.</td><td>Use plan in scheduled jobs; run apply only from an approved job.</td><td><code>xyte.utility.batch.v1</code>');
+    expect(schemaReference).toContain('edge-claim-batch.v1.schema.json');
+    expect(schemaReference).toContain('xyte.edge.claim-batch.v1');
+    expect(guide).toContain('MAC and serial are optional');
+    expect(skill).toContain('edge claim batch: `xyte.edge.claim-batch.v1`');
+    expect(skill).toContain('schemas/edge-claim-batch.v1.schema.json');
+    expect(read('skills/xyte-cli/schemas/edge-claim-batch.v1.schema.json')).toEqual(
+      read('docs/schemas/edge-claim-batch.v1.schema.json')
+    );
   });
 });

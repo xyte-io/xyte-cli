@@ -72,7 +72,7 @@ xyte-cli status --mode fast --format json</code></pre></div>
             <div class="failure"><strong>A flow paused at a gate</strong><p>That is expected for write-capable flows. Read <code>nextAction</code>, then resume the same run with <code>--apply --resume &lt;run-id-or-path&gt;</code> after approval. Do not retype an apply command from memory.</p></div>
             <div class="failure"><strong>Resume fails</strong><p>Use the original run id or bundle path from the plan output. If tenant state changed, run <code>--plan</code> again first.</p></div>
             <div class="failure"><strong>A batch was interrupted</strong><p>Rerun with the matching <code>--resume-artifact &lt;path&gt;</code> instead of starting over, so completed rows are not claimed twice.</p></div>
-            <div class="failure"><strong>No command is available to remediate</strong><p>Stop. List the device's real commands with <code>xyte-cli api call organization.commands.getCommands</code> and escalate if none fit. Do not guess a command from another device model.</p></div>
+            <div class="failure"><strong>No command is available to remediate</strong><p>Stop. Read the device with <code>organization.devices.getDevice</code>, describe its model with <code>xyte-cli edge models describe</code>, and choose only from <code>commands[].name</code> or <code>commands[].friendly_name</code>. Use <code>custom_fields</code> for command parameters and pass <code>command_file_id</code> when <code>with_file</code> is true. Do not guess a command from another device model.</p></div>
           </div>
 
           <h2 id="reset">Remove or reset</h2>

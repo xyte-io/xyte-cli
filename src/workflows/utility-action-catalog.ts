@@ -5,6 +5,7 @@ import {
   buildFriendlyClaimDeviceProfile,
   buildFriendlyConnectorSetupProfile,
   buildFriendlyEdgeClaimProfile,
+  buildFriendlyEdgeParamsUpdateProfile,
   buildFriendlyMoveDeviceProfile,
   buildFriendlySpaceImportProfile,
   buildFriendlyTeamAccessGroupsProfile,
@@ -42,6 +43,9 @@ function buildProfiles(): UtilityActionProfile[] {
     if (endpoint.key === 'organization.edge.startClaim') {
       profiles.set(endpoint.key, buildFriendlyEdgeClaimProfile(endpoint));
       continue;
+    }
+    if (endpoint.key === 'organization.devices.updateDevice') {
+      profiles.set('edge.params.update', buildFriendlyEdgeParamsUpdateProfile(endpoint));
     }
     if (endpoint.key === 'organization.devices.moveDevice') {
       profiles.set('device.move', buildFriendlyMoveDeviceProfile(endpoint));

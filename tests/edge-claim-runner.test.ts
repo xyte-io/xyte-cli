@@ -10,14 +10,21 @@ import {
   runEdgeClaim,
   runEdgeClaimBatch,
   validateEdgeClaimRow,
+  type EdgeClaimModelParameter,
   type EdgeClaimRow
 } from '../src/workflows/edge-claim';
 import { EdgeProbeAbortError } from '../src/workflows/edge-poll';
 import type { XyteCallArgs, XyteCallResult, XyteClient } from '../src/types/client';
 
+type ScriptedResponseBase = {
+  assertArgs?: (args: XyteCallArgs | undefined) => void;
+};
+
 type ScriptedResponse =
-  | { ok: true; data: unknown }
-  | { ok: false; status: number; detail: string; headers?: Record<string, string> };
+  | ({ ok: true; data: unknown } & ScriptedResponseBase)
+  | ({ ok: false; status: number; detail: string; headers?: Record<string, string> } & ScriptedResponseBase);
+
+type OkScriptedResponse = Extract<ScriptedResponse, { ok: true }>;
 
 interface CallRecord {
   endpointKey: string;
@@ -39,6 +46,7 @@ function buildClientFromScript(scriptByKey: Record<string, ScriptedResponse[]>):
     const index = cursors[endpointKey] ?? 0;
     const next = queue[Math.min(index, queue.length - 1)];
     cursors[endpointKey] = index + 1;
+    next.assertArgs?.(args);
     if (next.ok) {
       return {
         status: 200,
@@ -71,6 +79,33 @@ function buildClientFromScript(scriptByKey: Record<string, ScriptedResponse[]>):
     listTenantEndpoints: async () => []
   };
   return { client: stub as unknown as XyteClient, calls };
+}
+
+function modelResponse(modelId = 'model-1', parameters: EdgeClaimModelParameter[] = []): OkScriptedResponse {
+  return {
+    ok: true,
+    data: { id: modelId, parameters },
+    assertArgs: (args) => {
+      expect(args?.path?.id).toBe(modelId);
+    }
+  };
+}
+
+function withEmptyModelScript(scriptByKey: Record<string, ScriptedResponse[]>): Record<string, ScriptedResponse[]> {
+  if (scriptByKey['organization.models.getModel']) {
+    return scriptByKey;
+  }
+  return {
+    ...scriptByKey,
+    'organization.models.getModel': [modelResponse()]
+  };
+}
+
+function buildEdgeClaimClientFromScript(scriptByKey: Record<string, ScriptedResponse[]>): {
+  client: XyteClient;
+  calls: CallRecord[];
+} {
+  return buildClientFromScript(withEmptyModelScript(scriptByKey));
 }
 
 function makeRow(overrides: Partial<EdgeClaimRow> = {}): EdgeClaimRow {
@@ -117,7 +152,7 @@ function claimBodies(calls: CallRecord[]): Array<Record<string, unknown>> {
 describe('runEdgeClaim edge-case matrix', () => {
   it('happy path: pending → success returns succeeded outcome', async () => {
     const clock = controlledClock();
-    const { client } = buildClientFromScript({
+    const { client } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: true, data: null }],
       'organization.edge.getClaimStatus': [
         { ok: true, data: { result: 'pending' } },
@@ -141,9 +176,29 @@ describe('runEdgeClaim edge-case matrix', () => {
     expect(outcome.lastState).toBe('success');
   });
 
+  it('forwards optional mac and sn in the startClaim body', async () => {
+    const { client, calls } = buildEdgeClaimClientFromScript({
+      'organization.edge.startClaim': [{ ok: true, data: null }],
+      'organization.edge.getClaimStatus': [{ ok: true, data: { result: 'success' } }]
+    });
+
+    await runEdgeClaim({
+      client,
+      tenantId: 'acme',
+      row: makeRow({ mac: 'aa:bb:cc:dd:ee:ff', sn: 'SN-12345' }),
+      pollOptions: { intervalMs: 1, timeoutMs: 10 },
+      sleeper: async () => undefined
+    });
+
+    expect(claimBodies(calls)[0]).toMatchObject({
+      mac: 'aa:bb:cc:dd:ee:ff',
+      sn: 'SN-12345'
+    });
+  });
+
   it('case 1: stays pending past timeoutMs → timeout with last payload preserved', async () => {
     const clock = controlledClock();
-    const { client } = buildClientFromScript({
+    const { client } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: true, data: null }],
       'organization.edge.getClaimStatus': [{ ok: true, data: { result: 'pending' } }]
     });
@@ -164,7 +219,7 @@ describe('runEdgeClaim edge-case matrix', () => {
 
   it('case 2: terminal failed state returns failed disposition', async () => {
     const clock = controlledClock();
-    const { client } = buildClientFromScript({
+    const { client } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: true, data: null }],
       'organization.edge.getClaimStatus': [{ ok: true, data: { result: 'failed' } }]
     });
@@ -183,7 +238,7 @@ describe('runEdgeClaim edge-case matrix', () => {
   });
 
   it('case 3: startClaim 422 → rejected, no poll performed', async () => {
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: false, status: 422, detail: 'unknown device_model_id' }]
     });
 
@@ -201,7 +256,7 @@ describe('runEdgeClaim edge-case matrix', () => {
   });
 
   it('classifies transient startClaim failures as failed instead of rejected', async () => {
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: false, status: 429, detail: 'rate limited' }]
     });
 
@@ -219,7 +274,7 @@ describe('runEdgeClaim edge-case matrix', () => {
   });
 
   it('case 4: startClaim 401 → EdgeProbeAbortError bubbles up', async () => {
-    const { client } = buildClientFromScript({
+    const { client } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: false, status: 401, detail: 'bad org key' }]
     });
 
@@ -235,7 +290,7 @@ describe('runEdgeClaim edge-case matrix', () => {
   });
 
   it('case 6: proxy-offline detail → proxy-offline disposition', async () => {
-    const { client } = buildClientFromScript({
+    const { client } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: false, status: 422, detail: 'Edge offline — proxy unreachable.' }]
     });
 
@@ -251,7 +306,7 @@ describe('runEdgeClaim edge-case matrix', () => {
   });
 
   it('case 5: duplicate claim detail → already-claimed disposition', async () => {
-    const { client } = buildClientFromScript({
+    const { client } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: false, status: 409, detail: 'Device already claimed on this edge.' }]
     });
 
@@ -267,7 +322,7 @@ describe('runEdgeClaim edge-case matrix', () => {
   });
 
   it('forwards skip_connectivity_check only when the row defines it', async () => {
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [
         { ok: true, data: null },
         { ok: true, data: null },
@@ -315,7 +370,7 @@ describe('runEdgeClaim edge-case matrix', () => {
 
   it('case 12: poll tolerates 422 "not initiated" within bounded count, then succeeds', async () => {
     const clock = controlledClock();
-    const { client } = buildClientFromScript({
+    const { client } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: true, data: null }],
       'organization.edge.getClaimStatus': [
         { ok: false, status: 422, detail: 'claim not initiated for this device_ip' },
@@ -339,7 +394,7 @@ describe('runEdgeClaim edge-case matrix', () => {
   });
 
   it('case 12b: poll 422 "not initiated" beyond tolerance → failed row error', async () => {
-    const { client } = buildClientFromScript({
+    const { client } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: true, data: null }],
       'organization.edge.getClaimStatus': [{ ok: false, status: 422, detail: 'claim not initiated for this device_ip' }]
     });
@@ -364,7 +419,7 @@ describe('runEdgeClaim edge-case matrix', () => {
       sleepCalls.push(ms);
       clock.advance(ms);
     };
-    const { client } = buildClientFromScript({
+    const { client } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: true, data: null }],
       'organization.edge.getClaimStatus': [
         { ok: false, status: 429, detail: 'Too Many Requests', headers: { 'retry-after': '2' } },
@@ -388,7 +443,7 @@ describe('runEdgeClaim edge-case matrix', () => {
   it('case 11b: 429 beyond retry ceiling → failed', async () => {
     const clock = controlledClock();
     const sleeper = async (ms: number) => clock.advance(ms);
-    const { client } = buildClientFromScript({
+    const { client } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: true, data: null }],
       'organization.edge.getClaimStatus': [
         { ok: false, status: 429, detail: 'rate limited' },
@@ -427,13 +482,19 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
     return file;
   }
 
-  it('case 16: plan mode issues zero API calls and marks every row skipped', async () => {
+  function writeJson(tmp: string, rows: Array<Record<string, unknown>>): string {
+    const file = join(tmp, 'edge-claim-primary.json');
+    writeFileSync(file, JSON.stringify(rows), 'utf8');
+    return file;
+  }
+
+  it('case 16: plan mode validates model parameters and marks every row skipped', async () => {
     const tmp = makeTempDir();
     const inputPath = writeCsv(
       tmp,
       [CSV_HEADER, 'proxy-1,192.168.1.10,model-1,99', 'proxy-1,192.168.1.11,model-1,99'].join('\n')
     );
-    const { client, calls } = buildClientFromScript({});
+    const { client, calls } = buildEdgeClaimClientFromScript({});
 
     const result = await runEdgeClaimBatch({
       client,
@@ -445,7 +506,8 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       now: () => 0
     });
 
-    expect(calls).toHaveLength(0);
+    expect(endpointCalls(calls, 'organization.models.getModel')).toHaveLength(1);
+    expect(endpointCalls(calls, 'organization.edge.startClaim')).toHaveLength(0);
     expect(result.mode).toBe('plan');
     expect(result.totals).toMatchObject({ rows: 2, skipped: 2, succeeded: 0 });
     expect(result.rows.every((row) => row.disposition === 'skipped')).toBe(true);
@@ -464,7 +526,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       ].join('\n')
     );
     const reportPath = join(tmp, 'plan.ndjson');
-    const { client, calls } = buildClientFromScript({});
+    const { client, calls } = buildEdgeClaimClientFromScript({});
 
     const result = await runEdgeClaimBatch({
       client,
@@ -477,7 +539,8 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       now: () => 0
     });
 
-    expect(calls).toHaveLength(0);
+    expect(endpointCalls(calls, 'organization.models.getModel')).toHaveLength(1);
+    expect(endpointCalls(calls, 'organization.edge.startClaim')).toHaveLength(0);
     expect(result.rows.map((row) => row.planned?.preClaimPing)).toEqual(['skipped', 'required', 'required']);
     expect(result.rows[0]?.planned?.claimBody.skip_connectivity_check).toBe(true);
     expect(result.rows[1]?.planned?.claimBody.skip_connectivity_check).toBe(false);
@@ -499,7 +562,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
     );
     const reportPath = join(tmp, 'plan-force-skip.ndjson');
     const resumePath = join(tmp, 'plan-force-skip.resume.ndjson');
-    const { client, calls } = buildClientFromScript({});
+    const { client, calls } = buildEdgeClaimClientFromScript({});
 
     const result = await runEdgeClaimBatch({
       client,
@@ -514,7 +577,8 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       now: () => 0
     });
 
-    expect(calls).toHaveLength(0);
+    expect(endpointCalls(calls, 'organization.models.getModel')).toHaveLength(1);
+    expect(endpointCalls(calls, 'organization.edge.startClaim')).toHaveLength(0);
     expect(result.rows[0]?.planned?.preClaimPing).toBe('skipped');
     expect(result.rows[0]?.planned?.claimBody.skip_connectivity_check).toBe(true);
     expect(result.rows[1]?.planned?.preClaimPing).toBe('skipped');
@@ -523,6 +587,60 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
     expect(result.rows[2]?.rejectReason).toContain('conflicts with --skip-connectivity-check');
     expect(readNdjson(reportPath)).toHaveLength(3);
     expect(existsSync(resumePath)).toBe(false);
+  });
+
+  it('rejects edge claim custom_parameters that do not match model parameters', async () => {
+    const tmp = makeTempDir();
+    const inputPath = writeJson(tmp, [
+      {
+        proxy_id: 'proxy-1',
+        device_ip: '192.168.1.10',
+        device_model_id: 'model-1',
+        space_id: 99,
+        custom_parameters: { Port: '161', Wrong: 'x' }
+      },
+      {
+        proxy_id: 'proxy-1',
+        device_ip: '192.168.1.11',
+        device_model_id: 'model-1',
+        space_id: 99,
+        custom_parameters: { Port: '161' }
+      },
+      {
+        proxy_id: 'proxy-1',
+        device_ip: '192.168.1.12',
+        device_model_id: 'model-1',
+        space_id: 99,
+        custom_parameters: { Port: '161', 'SNMP community': 'public', Secret: '*****' }
+      }
+    ]);
+    const { client } = buildEdgeClaimClientFromScript({
+      'organization.models.getModel': [
+        modelResponse('model-1', [
+          { name: 'Port', type: 'number', required: true },
+          { name: 'SNMP community', type: 'text', required: true },
+          { name: 'Secret', type: 'password' }
+        ])
+      ]
+    });
+
+    const result = await runEdgeClaimBatch({
+      client,
+      tenantId: 'acme',
+      inputPath,
+      inputFormat: 'json',
+      apply: false,
+      runId: 'run-claim-params-validation',
+      sleeper: async () => undefined,
+      now: () => 0
+    });
+
+    expect(result.rows.map((row) => row.rejectReason)).toEqual([
+      'unknown_custom_parameter',
+      'missing_required_custom_parameter',
+      'masked_password_requires_value'
+    ]);
+    expect(result.totals.rejected).toBe(3);
   });
 
   it('runs pre-claim ping for non-skip rows and forwards effective claim bodies', async () => {
@@ -536,7 +654,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
         'proxy-1,192.168.1.12,model-1,99,'
       ].join('\n')
     );
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startPing': [
         { ok: true, data: null },
         { ok: true, data: null }
@@ -592,7 +710,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
         'proxy-1,192.168.1.12,model-1,99,false'
       ].join('\n')
     );
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [
         { ok: true, data: null },
         { ok: true, data: null }
@@ -623,10 +741,47 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
     expect(claimBodies(calls).map((body) => body.skip_connectivity_check)).toEqual([true, true]);
   });
 
+  it('retries model discovery after a transient lookup failure for a later row', async () => {
+    const tmp = makeTempDir();
+    const inputPath = writeCsv(
+      tmp,
+      [
+        `${CSV_HEADER},skip_connectivity_check`,
+        'proxy-1,192.168.1.10,model-1,99,true',
+        'proxy-1,192.168.1.11,model-1,99,true'
+      ].join('\n')
+    );
+    const { client, calls } = buildEdgeClaimClientFromScript({
+      'organization.models.getModel': [
+        { ok: false, status: 503, detail: 'model lookup temporarily unavailable' },
+        modelResponse()
+      ],
+      'organization.edge.startClaim': [{ ok: true, data: null }],
+      'organization.edge.getClaimStatus': [{ ok: true, data: { result: 'success' } }]
+    });
+
+    const result = await runEdgeClaimBatch({
+      client,
+      tenantId: 'acme',
+      inputPath,
+      apply: true,
+      runId: 'run-model-lookup-retry',
+      pollOptions: { intervalMs: 1, timeoutMs: 1_000 },
+      sleeper: async () => undefined,
+      now: () => 0
+    });
+
+    expect(result.rows.map((row) => row.disposition)).toEqual(['failed', 'succeeded']);
+    expect(result.rows[0]?.detail).toContain('model lookup temporarily unavailable');
+    expect(result.totals).toMatchObject({ failed: 1, succeeded: 1 });
+    expect(endpointCalls(calls, 'organization.models.getModel')).toHaveLength(2);
+    expect(endpointCalls(calls, 'organization.edge.startClaim')).toHaveLength(1);
+  });
+
   it('reports ping-failed and does not claim when pre-claim ping fails', async () => {
     const tmp = makeTempDir();
     const inputPath = writeCsv(tmp, [CSV_HEADER, 'proxy-1,192.168.1.10,model-1,99'].join('\n'));
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startPing': [{ ok: true, data: null }],
       'organization.edge.getPingStatus': [{ ok: true, data: { status: 'failed' } }]
     });
@@ -652,7 +807,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
   it('reports ping-failed and does not claim when startPing is rejected', async () => {
     const tmp = makeTempDir();
     const inputPath = writeCsv(tmp, [CSV_HEADER, 'proxy-1,192.168.1.10,model-1,99'].join('\n'));
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startPing': [{ ok: false, status: 400, detail: 'bad ping request' }]
     });
 
@@ -679,7 +834,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       tmp,
       [CSV_HEADER, 'proxy-1,192.168.1.10,model-1,99', 'proxy-1,192.168.1.11,model-1,99'].join('\n')
     );
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startPing': [{ ok: false, status: 401, detail: 'bad org key' }]
     });
 
@@ -704,7 +859,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
     const tmp = makeTempDir();
     const clock = controlledClock();
     const inputPath = writeCsv(tmp, [CSV_HEADER, 'proxy-1,192.168.1.10,model-1,99'].join('\n'));
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startPing': [{ ok: true, data: null }],
       'organization.edge.getPingStatus': [{ ok: true, data: { status: 'pending' } }]
     });
@@ -731,7 +886,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       tmp,
       [CSV_HEADER, 'proxy-1,192.168.1.10,model-1,99', 'proxy-1,192.168.1.11,model-1,99'].join('\n')
     );
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startPing': [{ ok: true, data: null }],
       'organization.edge.getPingStatus': [{ ok: false, status: 401, detail: 'bad org key' }]
     });
@@ -757,7 +912,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
   it('reports ping-failed when ping status is rate-limited beyond retry ceiling', async () => {
     const tmp = makeTempDir();
     const inputPath = writeCsv(tmp, [CSV_HEADER, 'proxy-1,192.168.1.10,model-1,99'].join('\n'));
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startPing': [{ ok: true, data: null }],
       'organization.edge.getPingStatus': [
         { ok: false, status: 429, detail: 'rate limited' },
@@ -792,7 +947,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
   it('preserves successful pre-claim ping when startClaim rejects connectivity verification', async () => {
     const tmp = makeTempDir();
     const inputPath = writeCsv(tmp, [CSV_HEADER, 'proxy-1,192.168.1.10,model-1,99'].join('\n'));
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startPing': [{ ok: true, data: null }],
       'organization.edge.getPingStatus': [{ ok: true, data: { status: 'success' } }],
       'organization.edge.startClaim': [
@@ -828,7 +983,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
         'proxy-1,192.168.1.11,model-1,99,true'
       ].join('\n')
     );
-    const { client } = buildClientFromScript({
+    const { client } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [
         { ok: true, data: null },
         { ok: true, data: null }
@@ -866,7 +1021,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
         'proxy-1,192.168.1.11,model-1,99,true'
       ].join('\n')
     );
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [
         { ok: false, status: 409, detail: 'Device already claimed on this edge.' },
         { ok: false, status: 429, detail: 'rate limited' }
@@ -900,7 +1055,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
         'proxy-1,192.168.1.11,model-1,99,true'
       ].join('\n')
     );
-    const { client } = buildClientFromScript({
+    const { client } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: true, data: null }],
       'organization.edge.getClaimStatus': [{ ok: false, status: 401, detail: 'bad org key' }]
     });
@@ -932,7 +1087,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
         'proxy-1,192.168.1.11,model-1,99,true'
       ].join('\n')
     );
-    const { client } = buildClientFromScript({
+    const { client } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [
         { ok: true, data: null },
         { ok: true, data: null }
@@ -970,7 +1125,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
         'proxy-1,192.168.1.12,model-1,99'
       ].join('\n')
     );
-    const { client } = buildClientFromScript({
+    const { client } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [
         { ok: true, data: null },
         { ok: true, data: null }
@@ -1007,7 +1162,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       tmp,
       [CSV_HEADER, 'proxy-1,192.168.1.10,model-1,99', 'proxy-1,192.168.1.11,model-1,99'].join('\n')
     );
-    const { client } = buildClientFromScript({
+    const { client } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: false, status: 401, detail: 'bad org key' }]
     });
 
@@ -1045,7 +1200,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       })}\n`,
       'utf8'
     );
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: true, data: null }],
       'organization.edge.getClaimStatus': [{ ok: true, data: { result: 'success' } }]
     });
@@ -1065,8 +1220,9 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
 
     expect(result.rows[0]?.disposition).toBe('skipped');
     expect(result.rows[1]?.disposition).toBe('succeeded');
-    expect(calls.filter((call) => call.endpointKey === 'organization.edge.startClaim')).toHaveLength(1);
-    expect(calls[0]?.args?.body && (calls[0].args.body as Record<string, unknown>).device_ip).toBe('192.168.1.11');
+    const startCalls = endpointCalls(calls, 'organization.edge.startClaim');
+    expect(startCalls).toHaveLength(1);
+    expect((startCalls[0]?.args?.body as Record<string, unknown>).device_ip).toBe('192.168.1.11');
   });
 
   it('resume terminal-success skip happens before batch skip-connectivity conflict checks', async () => {
@@ -1090,7 +1246,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       })}\n`,
       'utf8'
     );
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: true, data: null }],
       'organization.edge.getClaimStatus': [{ ok: true, data: { result: 'success' } }]
     });
@@ -1135,7 +1291,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       })}\n`,
       'utf8'
     );
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: true, data: null }],
       'organization.edge.getClaimStatus': [{ ok: true, data: { result: 'success' } }]
     });
@@ -1174,7 +1330,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
         })}\n`,
         'utf8'
       );
-      const { client, calls } = buildClientFromScript({
+      const { client, calls } = buildEdgeClaimClientFromScript({
         'organization.edge.startClaim': [{ ok: true, data: null }],
         'organization.edge.getClaimStatus': [{ ok: true, data: { result: 'success' } }]
       });
@@ -1211,7 +1367,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       })}\n`,
       'utf8'
     );
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: true, data: null }],
       'organization.edge.getClaimStatus': [{ ok: true, data: { result: 'success' } }]
     });
@@ -1250,7 +1406,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       })}\n`,
       'utf8'
     );
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: true, data: null }],
       'organization.edge.getClaimStatus': [{ ok: true, data: { result: 'success' } }]
     });
@@ -1270,8 +1426,9 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
 
     expect(result.rows[0]?.disposition).toBe('succeeded');
     expect(result.rows[1]?.disposition).toBe('skipped');
-    expect(calls.filter((call) => call.endpointKey === 'organization.edge.startClaim')).toHaveLength(1);
-    expect(calls[0]?.args?.body && (calls[0].args.body as Record<string, unknown>).device_ip).toBe('10.0.0.50');
+    const startCalls = endpointCalls(calls, 'organization.edge.startClaim');
+    expect(startCalls).toHaveLength(1);
+    expect((startCalls[0]?.args?.body as Record<string, unknown>).device_ip).toBe('10.0.0.50');
   });
 
   it('fails closed when the resume artifact contains a malformed line', async () => {
@@ -1288,7 +1445,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       })}\n{"rowIndex":2`,
       'utf8'
     );
-    const { client } = buildClientFromScript({
+    const { client } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': []
     });
 
@@ -1322,7 +1479,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       })}\n`,
       'utf8'
     );
-    const { client } = buildClientFromScript({
+    const { client } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': []
     });
 
@@ -1348,7 +1505,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       tmp,
       [CSV_HEADER, 'proxy-1,192.168.1.10,model-1,99', 'proxy-1,192.168.1.10,model-1,99'].join('\n')
     );
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: true, data: null }],
       'organization.edge.getClaimStatus': [{ ok: true, data: { result: 'success' } }]
     });
@@ -1376,7 +1533,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       tmp,
       [CSV_HEADER, 'proxy-1,192.168.1.10,model-1,99', 'proxy-1,192.168.1.10,model-1,99'].join('\n')
     );
-    const { client, calls } = buildClientFromScript({
+    const { client, calls } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: false, status: 409, detail: 'Device already claimed on this edge.' }]
     });
 
@@ -1408,7 +1565,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
         'proxy-1,192.168.1.12,model-1,99'
       ].join('\n')
     );
-    const { client } = buildClientFromScript({
+    const { client } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [
         { ok: true, data: null },
         { ok: true, data: null },
@@ -1443,7 +1600,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
     const inputPath = writeCsv(tmp, [CSV_HEADER, 'proxy-1,192.168.1.10,model-1,99'].join('\n'));
     const reportPath = join(tmp, 'report.ndjson');
     const resumePath = join(tmp, 'resume.ndjson');
-    const firstRun = buildClientFromScript({
+    const firstRun = buildEdgeClaimClientFromScript({
       'organization.edge.startPing': [{ ok: true, data: null }],
       'organization.edge.getPingStatus': [{ ok: true, data: { status: 'failed' } }]
     });
@@ -1465,7 +1622,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
     expect(readNdjson(reportPath)[0]?.disposition).toBe('ping-failed');
     expect(readNdjson(resumePath)[0]?.disposition).toBe('ping-failed');
 
-    const secondRun = buildClientFromScript({
+    const secondRun = buildEdgeClaimClientFromScript({
       'organization.edge.startPing': [{ ok: true, data: null }],
       'organization.edge.getPingStatus': [{ ok: true, data: { status: 'success' } }],
       'organization.edge.startClaim': [{ ok: true, data: null }],
@@ -1496,7 +1653,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
     const inputPath = writeCsv(tmp, [CSV_HEADER, 'proxy-1,192.168.1.10,model-1,99'].join('\n'));
     const reportPath = join(tmp, 'report.ndjson');
     writeFileSync(reportPath, 'stale report line\n', 'utf8');
-    const { client } = buildClientFromScript({
+    const { client } = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: true, data: null }],
       'organization.edge.getClaimStatus': [{ ok: true, data: { result: 'success' } }]
     });
@@ -1541,7 +1698,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
       })}\n`,
       'utf8'
     );
-    const firstRun = buildClientFromScript({
+    const firstRun = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': [{ ok: true, data: null }],
       'organization.edge.getClaimStatus': [{ ok: true, data: { result: 'success' } }]
     });
@@ -1565,7 +1722,7 @@ describe('runEdgeClaimBatch edge-case matrix', () => {
     const afterResume = readFileSync(artifactPath, 'utf8');
     expect(afterResume).toContain('"detail":"preserved"');
 
-    const secondRun = buildClientFromScript({
+    const secondRun = buildEdgeClaimClientFromScript({
       'organization.edge.startClaim': []
     });
     const repeated = await runEdgeClaimBatch({

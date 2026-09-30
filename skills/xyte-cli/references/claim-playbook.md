@@ -37,7 +37,7 @@ xyte-cli util prepare --action organization.devices.claimDevice \
   --input ./raw.xlsx --tenant <tenant-id> --output-dir ./prepared
 ```
 
-Then call `organization.devices.claimDevice` once per row from `prepared/claim-primary.csv`. Review `prepared/claim-rejected.csv` first.
+Then call `organization.devices.claimDevice` once per row from `prepared/organization-devices-claimdevice.csv`. Review `prepared/organization-devices-claimdevice.rejected.csv` first.
 
 Failure handling:
 - 422 with field detail → row is malformed; fix and re-run.
@@ -46,9 +46,9 @@ Failure handling:
 
 ## 2. Edge claim — `organization.edge.startClaim` (async)
 
-Required body fields: `proxy_id`, `device_ip`, `device_model_id`, `space_id` (integer). Optional: `display_name`, `custom_parameters`, `custom_partner_name`, `custom_model_name`, `skip_connectivity_check`.
+Required body fields: `proxy_id`, `device_ip`, `device_model_id`, `space_id` (integer). Optional: `display_name`, `mac`, `sn`, `custom_parameters`, `custom_partner_name`, `custom_model_name`, `skip_connectivity_check`.
 
-Heartbeat model id: `5dc4ba6c-c323-4118-a4e4-504f074426f2`. `proxy_id` lives in the End Customer Portal.
+Use `xyte-cli edge models list --tenant <tenant-id> --page 1 --per-page 100` and `xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>` to discover model ids and supported `custom_parameters` labels. Fill required `parameters[]` before claim, and never pass masked password placeholders (`"*****"`) as claim values. Heartbeat model id: `5dc4ba6c-c323-4118-a4e4-504f074426f2`. `proxy_id` lives in the End Customer Portal.
 
 Lifecycle: `startClaim` returns 204, then poll `getClaimStatus` until `result` is `success` or `failed`.
 
@@ -61,6 +61,9 @@ Connectivity check rule:
 ### 2a. Single edge device
 
 ```bash
+xyte-cli edge models list --tenant <tenant-id> --search <model-or-alias> --page 1 --per-page 100
+xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>
+
 xyte-cli edge claim \
   --tenant <tenant-id> \
   --proxy-id <proxy-id> \
@@ -68,6 +71,9 @@ xyte-cli edge claim \
   --device-model-id <device-model-id> \
   --space-id <space-id> \
   [--display-name <name>] \
+  [--mac <mac>] \
+  [--sn <serial>] \
+  [--custom-parameters <json>] \
   [--skip-connectivity-check] \
   [--poll-interval-ms 5000] \
   [--poll-timeout-ms 600000] \
@@ -85,9 +91,15 @@ xyte-cli edge claim-status --tenant <tenant-id> --proxy-id <proxy-id> --device-i
 ### 2b. Bulk edge claim (north star)
 
 ```bash
+xyte-cli edge models list --tenant <tenant-id> --search <model-or-alias> --page 1 --per-page 100
+xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>
+
 xyte-cli util prepare --action organization.edge.startClaim \
   --input ./edge-devices.xlsx --tenant <tenant-id> --output-dir ./prepared
 # outputs: prepared/organization-edge-startclaim.csv, organization-edge-startclaim.rejected.csv, organization-edge-startclaim.notes.md
+# use model describe parameters[].name when populating custom_parameters.
+# required parameters must be present; password fields need real values, not "*****".
+# optional columns include mac and sn; fill them only from explicit source data.
 
 xyte-cli edge claim-batch \
   --tenant <tenant-id> \
@@ -117,9 +129,31 @@ xyte-cli edge claim-batch \
   --apply
 ```
 
-Replaying after all rows are terminal-success is a no-op (exit 0, zero API calls).
+Replaying after all rows are terminal-success is a no-op (exit 0, no claim API calls).
 
-### 2c. Edge ping (connectivity probe)
+### 2c. Already-claimed Edge custom parameters
+
+Use model discovery to validate parameter labels before writing:
+
+```bash
+xyte-cli edge models describe --tenant <tenant-id> --model-id <model-id>
+xyte-cli edge update-params --tenant <tenant-id> --device-id <device-id> --set-json '{"Port":"161"}' --plan
+# after user approves:
+xyte-cli edge update-params --tenant <tenant-id> --device-id <device-id> --set-json '{"Port":"161"}' --apply
+```
+
+Batch path:
+
+```bash
+xyte-cli util prepare --action edge.params.update \
+  --input ./edge-params.xlsx --tenant <tenant-id> --output-dir ./prepared
+xyte-cli edge update-params-batch --tenant <tenant-id> --input ./prepared/edge-params-update.csv --plan --report ./artifacts/edge-params.plan.ndjson
+xyte-cli edge update-params-batch --tenant <tenant-id> --input ./prepared/edge-params-update.csv --apply --report ./artifacts/edge-params.apply.ndjson --resume-artifact ./artifacts/edge-params.resume.ndjson
+```
+
+Safety: the update command reads current device values, reads the model schema, validates keys against `parameters[].name`, merges requested changes into current `custom_parameters`, sends the complete replacement object to `organization.devices.updateDevice`, and verifies read-back. It blocks unknown requested labels, unsupported existing labels, missing required model parameters, duplicate `device_id` batch rows, model mismatch, read-back mismatch, and masked password placeholders (`"*****"`) unless a real replacement is supplied.
+
+### 2d. Edge ping (connectivity probe)
 
 ```bash
 xyte-cli edge ping --tenant <tenant-id> --proxy-id <proxy-id> --device-ip <device-ip> --plan
@@ -163,14 +197,14 @@ The public Xyte API does not expose C2C claiming today. Do not invent an endpoin
 
 ## 5. Safety defaults
 
-- `edge claim`, `edge claim-batch`, `edge ping` → mutating; `--plan` first, `--apply` only after explicit user approval.
-- `edge claim-status`, `edge ping-status` → read-only.
+- `edge claim`, `edge claim-batch`, `edge update-params`, `edge update-params-batch`, `edge ping` → mutating; `--plan` first, `--apply` only after explicit user approval.
+- `edge models list`, `edge models describe`, `edge claim-status`, `edge ping-status` → read-only.
 - Never run `edge claim-batch` again without `--resume-artifact` on a half-finished run. Resume prevents re-sending rows already recorded as `succeeded` or `already-claimed`, but it does not protect a row whose `startClaim` was sent and then the process died before the result was written.
 - Poll defaults: 5 s interval, 10 min timeout.
 
 ## 6. Summary contracts
 
-- `xyte.edge.claim-batch.v1` — batch summary returned on stdout JSON and flow artifacts. Fields: `schemaVersion`, `generatedAtUtc`, `tenantId`, `mode`, `runId`, `reportPath?`, `resumePath?`, `totals` (per disposition, including `pingFailed`), `stoppedEarly`, `abortDetail?`, `rows[]`. Rows may include `planned` in plan mode and `preClaimPing` when batch performed a pre-claim ping.
+- `xyte.edge.claim-batch.v1` (`schemas/edge-claim-batch.v1.schema.json`) — batch summary returned on stdout JSON and flow artifacts. Fields: `schemaVersion`, `generatedAtUtc`, `tenantId`, `mode`, `runId`, `reportPath?`, `resumePath?`, `totals` (per disposition, including `pingFailed`), `stoppedEarly`, `abortDetail?`, `rows[]`. Rows may include `planned` in plan mode and `preClaimPing` when batch performed a pre-claim ping.
 - `--report` — per-row audit NDJSON. Use it for review/debugging.
 - `--resume-artifact` — completed row resume state NDJSON. Reuse this path when resuming a partial batch; it does not checkpoint in-flight claim IDs.
 - `xyte.edge.ping.v1` — single-probe result.

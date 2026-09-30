@@ -33,6 +33,16 @@ describe('public endpoint catalog', () => {
     expect(partnerTicket?.pathParams).toEqual(['ticket_id']);
   });
 
+  it('documents the sendCommand request field separately from response params', () => {
+    const sendCommand = endpoints.find((endpoint) => endpoint.key === 'organization.commands.sendCommand');
+
+    expect(sendCommand?.bodyExample).toContain('"command"');
+    expect(sendCommand?.bodyExample).not.toContain('"name"');
+    expect(sendCommand?.bodyExample).toContain('"extra_params"');
+    expect(sendCommand?.bodyExample).not.toContain('"params"');
+    expect(sendCommand?.notes?.join(' ')).toContain('params is returned in command responses');
+  });
+
   it('contains no device namespace or device auth scope endpoints', () => {
     const deviceNamespace = endpoints.filter((endpoint) => (endpoint as { namespace: string }).namespace === 'device');
     const deviceScope = endpoints.filter((endpoint) => (endpoint as { authScope: string }).authScope === 'device');
@@ -60,6 +70,7 @@ describe('public endpoint catalog', () => {
     expect(endpoint?.bodyType).toBe('json');
     expect(endpoint?.hasBody).toBe(true);
     expect(endpoint?.pathParams).toEqual(['device_id']);
+    expect(endpoint?.notes?.join(' ')).toContain('custom_parameters is a complete replacement write');
   });
 
   it('includes organization move device endpoint metadata', () => {
@@ -132,10 +143,23 @@ describe('public endpoint catalog', () => {
 
   it('includes documented filter params for key read endpoints', () => {
     const getDevices = endpoints.find((item) => item.key === 'organization.devices.getDevices');
-    expect(getDevices?.queryParams).toEqual(['space_id']);
+    expect(getDevices?.queryParams).toEqual(['page', 'per_page', 'space_id']);
+    expect(getDevices?.notes?.join(' ')).toContain('has_next_page');
+    expect(getDevices?.notes?.join(' ')).toContain('next_page');
 
     const getHistories = endpoints.find((item) => item.key === 'organization.devices.getHistories');
-    expect(getHistories?.queryParams).toEqual(['status', 'from', 'to', 'device_id', 'space_id', 'name']);
+    expect(getHistories?.queryParams).toEqual([
+      'status',
+      'from',
+      'to',
+      'device_id',
+      'space_id',
+      'name',
+      'page',
+      'per_page'
+    ]);
+    expect(getHistories?.notes?.join(' ')).toContain('31 days');
+    expect(getHistories?.notes?.join(' ')).toContain('has_next_page');
 
     const getIncidents = endpoints.find((item) => item.key === 'organization.incidents.getIncidents');
     expect(getIncidents?.queryParams).toEqual([
@@ -173,6 +197,29 @@ describe('public endpoint catalog', () => {
 
     const getUsers = endpoints.find((item) => item.key === 'organization.users.getUsers');
     expect(getUsers?.queryParams).toEqual(['page', 'per_page']);
+  });
+
+  it('includes organization model discovery endpoint metadata', () => {
+    const getModels = endpoints.find((item) => item.key === 'organization.models.getModels');
+    expect(getModels).toBeDefined();
+    expect(getModels?.method).toBe('GET');
+    expect(getModels?.pathTemplate).toBe('/core/v1/organization/models');
+    expect(getModels?.pathParams).toEqual([]);
+    expect(getModels?.queryParams).toEqual(['page', 'per_page', 'search', 'edge_only']);
+    expect(getModels?.authScope).toBe('organization');
+    expect(getModels?.bodyType).toBe('none');
+    expect(getModels?.hasBody).toBe(false);
+    expect(getModels?.sourceFile).toBe('https://docs.xyte.io/reference/get-models');
+    expect(getModels?.notes.join('\n')).toContain('next_page');
+
+    const getModel = endpoints.find((item) => item.key === 'organization.models.getModel');
+    expect(getModel).toBeDefined();
+    expect(getModel?.method).toBe('GET');
+    expect(getModel?.pathTemplate).toBe('/core/v1/organization/models/:id');
+    expect(getModel?.pathParams).toEqual(['id']);
+    expect(getModel?.queryParams).toEqual([]);
+    expect(getModel?.sourceFile).toBe('https://docs.xyte.io/reference/get-model');
+    expect(getModel?.notes?.join(' ')).toContain('parameters[].name');
   });
 
   it('includes organization note endpoint metadata', () => {
@@ -255,6 +302,8 @@ describe('public endpoint catalog', () => {
     expect(endpoint?.bodyExample).toContain('device_ip');
     expect(endpoint?.bodyExample).toContain('device_model_id');
     expect(endpoint?.bodyExample).toContain('space_id');
+    expect(endpoint?.bodyExample).toContain('mac');
+    expect(endpoint?.bodyExample).toContain('sn');
     expect(endpoint?.sourceFile).toBe('https://docs.xyte.io/reference/edgeclaim-device');
   });
 

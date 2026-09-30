@@ -5,7 +5,7 @@ This runbook defines utility preprocessing with `xyte-cli util prepare`.
 ## Scope
 
 1. Preprocess supported utility actions into canonical files.
-2. Execute only the CLI-supported utility workflows from their dedicated commands: `util import-tree`, `util move-devices`, and `edge claim-batch`.
+2. Execute only the CLI-supported utility workflows from their dedicated commands: `util import-tree`, `util move-devices`, `edge claim-batch`, and `edge update-params-batch`.
 3. Keep CLI AI-free: no OCR/model calls inside `xyte-cli`.
 
 ## Core model
@@ -18,7 +18,8 @@ This runbook defines utility preprocessing with `xyte-cli util prepare`.
 6. Ask user what to do next. Never auto-apply.
 7. For `space.import-tree` and `device.move`, run dry-run then apply with explicit user approval. Dry-run summaries count validated rows under `totals.planned`, not `totals.succeeded`.
 8. For `organization.edge.startClaim`, run `edge claim-batch --plan`, then `--apply` after explicit approval and use `--resume-artifact` for partial runs.
-9. For generic endpoint actions, use controlled `xyte-cli api call` loops outside utility execution.
+9. For `edge.params.update`, run `edge update-params-batch --plan`, then `--apply` after explicit approval and use `--resume-artifact` for partial runs.
+10. For generic endpoint actions, use controlled `xyte-cli api call` loops outside utility execution.
 
 ## Canonical outputs
 
@@ -33,28 +34,37 @@ Friendly profiles:
 2. `organization.devices.claimDevice`:
 - `name,space_id,sn,mac,cloud_id`
 3. `organization.edge.startClaim`:
-- `proxy_id,device_ip,device_model_id,space_id,display_name,custom_parameters,custom_partner_name,custom_model_name,skip_connectivity_check`
+- `proxy_id,device_ip,device_model_id,space_id,display_name,mac,sn,custom_parameters,custom_partner_name,custom_model_name,skip_connectivity_check`
 - outputs: `./prepared/organization-edge-startclaim.csv`, `./prepared/organization-edge-startclaim.rejected.csv`, `./prepared/organization-edge-startclaim.notes.md`
 - reject taxonomy: `missing_proxy_id`, `missing_device_ip`, `invalid_device_ip`, `missing_device_model_id`, `missing_space_id`, `invalid_space_id` (non-integer), `invalid_skip_connectivity_check` (non-boolean), `invalid_custom_parameters` (not a JSON object string)
+- batch validation can additionally reject `unknown_custom_parameter`, `missing_required_custom_parameter`, and `masked_password_requires_value` after reading the model schema.
 - `skip_connectivity_check` accepts `true` or `false`; blank means `edge claim-batch` will run a pre-claim ping before `startClaim`
+- use `edge models list` / `edge models describe` before filling rows so `device_model_id` and `custom_parameters` keys come from the model docs; `mac` and `sn` are optional explicit source fields.
 - downstream execution command: [`xyte-cli edge claim-batch`](commands.md#edge-devices)
-4. `device.move`:
+4. `edge.params.update`:
+- `device_id,set_json,expected_model_id`
+- outputs: `./prepared/edge-params-update.csv`, `./prepared/edge-params-update.rejected.csv`, `./prepared/edge-params-update.notes.md`
+- reject taxonomy: `missing_device_id`, `missing_set_json`, `invalid_set_json`, `unknown_parameter`, `unsupported_current_parameter`, `missing_required_parameter`, `masked_password_requires_value`, `model_mismatch`, `duplicate_device_id`
+- `set_json` is a JSON object string of labels to change, for example `{"Port":"161"}`.
+- downstream execution command: [`xyte-cli edge update-params-batch`](commands.md#edge-devices)
+- safety: the batch runner reads the current device, reads the model schema, validates labels against `parameters[].name`, merges `set_json` into current values, sends the complete replacement `custom_parameters`, and verifies with `getDevice`.
+5. `device.move`:
 - `device_id,target_space_id,device_name,current_space_id,target_space_name`
 - outputs: `./prepared/device-move.csv`, `./prepared/device-move.rejected.csv`, `./prepared/device-move.notes.md`
 - downstream execution command: [`xyte-cli util move-devices`](commands.md#utility-preprocessing-and-batch-helpers)
-5. `organization.connectors.prepareSetup`:
+6. `organization.connectors.prepareSetup`:
 - `label,platform,connectorName,targetSpace,targetSpaceId,authorizationOwner,deviceNameSource,sourceRow,notes`
 - outputs: `./prepared/organization-connectors-preparesetup.csv`, `./prepared/organization-connectors-preparesetup.rejected.csv`, `./prepared/organization-connectors-preparesetup.notes.md`
 - prepare-only: no CLI execution command or public API endpoint is attached.
-6. `organization.teamAccess.groups`:
+7. `organization.teamAccess.groups`:
 - `label,groupName,iconName,sourceRow,notes`
 - outputs: `./prepared/organization-teamaccess-groups.csv`, `./prepared/organization-teamaccess-groups.rejected.csv`, `./prepared/organization-teamaccess-groups.notes.md`
 - prepare-only: no CLI execution command or public API endpoint is attached.
-7. `organization.teamAccess.users`:
+8. `organization.teamAccess.users`:
 - `label,email,name,groupName,assignSupportSeat,sourceRow,notes`
 - outputs: `./prepared/organization-teamaccess-users.csv`, `./prepared/organization-teamaccess-users.rejected.csv`, `./prepared/organization-teamaccess-users.notes.md`
 - prepare-only: no CLI execution command or public API endpoint is attached.
-8. `organization.teamAccess.memberships`:
+9. `organization.teamAccess.memberships`:
 - `label,email,groupName,sourceRow,notes`
 - outputs: `./prepared/organization-teamaccess-memberships.csv`, `./prepared/organization-teamaccess-memberships.rejected.csv`, `./prepared/organization-teamaccess-memberships.notes.md`
 - prepare-only: no CLI execution command or public API endpoint is attached.
@@ -78,6 +88,7 @@ Discover actions:
 ```bash
 xyte-cli util list-actions --output text
 xyte-cli util list-actions --output text --mode friendly --execution-support edge.claim-batch
+xyte-cli util list-actions --output text --mode friendly --execution-support edge.params-update-batch
 ```
 
 Prepare claim action:
@@ -101,6 +112,18 @@ xyte-cli util prepare \
 ```
 
 Then drive the bulk-claim workflow via [`xyte-cli edge claim-batch`](commands.md#edge-devices) (plan → gate → apply → resume). Batch runs pre-claim ping for blank or `false` `skip_connectivity_check` rows; use row `true` only when you intend to skip that check. Disambiguation against native / C2C paths lives in [`docs/claim-devices.md`](claim-devices.md).
+
+Prepare already-claimed Edge custom parameter updates:
+
+```bash
+xyte-cli util prepare \
+  --action edge.params.update \
+  --input ./input/edge-params.xlsx \
+  --tenant <tenant-id> \
+  --output-dir ./prepared
+```
+
+Then drive the update workflow via [`xyte-cli edge update-params-batch`](commands.md#edge-devices) (plan → gate → apply → resume). Each row must carry `device_id` and `set_json`; include `expected_model_id` when the source has the intended model id.
 
 Execute prepared device moves (dry-run then apply):
 
@@ -193,6 +216,21 @@ npm run smoke:local:utilities -- --base-url http://127.0.0.1:3001 --tenant local
 1. Prepare contract:
 - schema ID: `xyte.utility.prepare.v1`
 - schema file: `docs/schemas/utility-prepare.v1.schema.json`
-2. Import-tree batch summary:
+2. Utility batch summary:
 - schema ID: `xyte.utility.batch.v1`
 - schema file: `docs/schemas/utility-batch.v1.schema.json`
+3. Edge claim batch summary:
+- schema ID: `xyte.edge.claim-batch.v1`
+- schema file: `docs/schemas/edge-claim-batch.v1.schema.json`
+4. Edge model list:
+- schema ID: `xyte.edge.models.list.v1`
+- schema file: `docs/schemas/edge-models-list.v1.schema.json`
+5. Edge model describe:
+- schema ID: `xyte.edge.models.describe.v1`
+- schema file: `docs/schemas/edge-models-describe.v1.schema.json`
+6. Edge custom-params single update:
+- schema ID: `xyte.edge.params-update.v1`
+- schema file: `docs/schemas/edge-params-update.v1.schema.json`
+7. Edge custom-params batch update:
+- schema ID: `xyte.edge.params-update-batch.v1`
+- schema file: `docs/schemas/edge-params-update-batch.v1.schema.json`

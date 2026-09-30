@@ -97,7 +97,8 @@ xyte-cli ops watch incidents \
             <li><code>xyte.inspect.fleet.v1</code> and <code>xyte.inspect.deep-dive.v1</code>: store operational source data for reports.</li>
             <li><code>xyte.report.v1</code>: track generated report paths and report metadata.</li>
             <li><code>xyte.flow.run.v1</code>: read flow outcome, next action, run bundle path, and pause state.</li>
-            <li><code>xyte.utility.prepare.v1</code> and <code>xyte.utility.batch.v1</code>: process prepared rows, rejected rows, and batch dispositions.</li>
+            <li><code>xyte.utility.prepare.v1</code> and <code>xyte.utility.batch.v1</code>: process prepared rows and generic utility batch summaries.</li>
+            <li><code>xyte.edge.claim-batch.v1</code>, <code>xyte.edge.params-update.v1</code>, and <code>xyte.edge.params-update-batch.v1</code>: validate Edge claim and custom-parameter workflows.</li>
           </ul>
 
           <h2 id="mapping">Command-to-schema mapping</h2>
@@ -112,7 +113,11 @@ xyte-cli ops watch incidents \
               <tr><td><code>xyte-cli ops report generate --input &lt;source.json&gt; --out &lt;report.md&gt; --render markdown</code></td><td><code>xyte.report.v1</code></td><td>Track report path, input source, and render metadata.</td></tr>
               <tr><td><code>xyte-cli flow run &lt;flow-id&gt; --plan --strict-json</code></td><td><code>xyte.flow.run.v1</code></td><td>Read outcome, pause state, next action, and run bundle path.</td></tr>
               <tr><td><code>xyte-cli util prepare --action &lt;action-key&gt; --input &lt;file.xlsx&gt;</code></td><td><code>xyte.utility.prepare.v1</code></td><td>Count primary rows, rejected rows, generated files, and next command.</td></tr>
-              <tr><td><code>xyte-cli edge claim-batch --input &lt;prepared.csv&gt; --plan</code></td><td><code>xyte.utility.batch.v1</code></td><td>Track batch row dispositions, partial runs, and resume behavior.</td></tr>
+              <tr><td><code>xyte-cli edge claim-batch --input &lt;prepared.csv&gt; --plan</code></td><td><code>xyte.edge.claim-batch.v1</code></td><td>Track batch row dispositions, partial runs, and resume behavior.</td></tr>
+              <tr><td><code>xyte-cli edge models list --page 1 --per-page 100</code></td><td><code>xyte.edge.models.list.v1</code></td><td>Discover Edge model ids and parameter labels before claim or update work.</td></tr>
+              <tr><td><code>xyte-cli edge models describe --model-id &lt;model-id&gt;</code></td><td><code>xyte.edge.models.describe.v1</code></td><td>Read model parameters and commands for a selected Edge model.</td></tr>
+              <tr><td><code>xyte-cli edge update-params --device-id &lt;id&gt; --set-json '{...}' --plan</code></td><td><code>xyte.edge.params-update.v1</code></td><td>Review the complete replacement body before applying custom parameter updates.</td></tr>
+              <tr><td><code>xyte-cli edge update-params-batch --input &lt;prepared.csv&gt; --plan</code></td><td><code>xyte.edge.params-update-batch.v1</code></td><td>Track row-level plans, rejections, reports, and resume behavior.</td></tr>
             </tbody>
           </table></div>
 
@@ -226,6 +231,11 @@ done &lt; ./artifacts/incidents.ndjson</code></pre></div>
           <ul class="checklist">
             <li><a href="../schemas/call-envelope.v1.schema.json">call-envelope.v1.schema.json</a></li>
             <li><a href="../schemas/doctor-environment.v1.schema.json">doctor-environment.v1.schema.json</a></li>
+            <li><a href="../schemas/edge-claim-batch.v1.schema.json">edge-claim-batch.v1.schema.json</a></li>
+            <li><a href="../schemas/edge-models-describe.v1.schema.json">edge-models-describe.v1.schema.json</a></li>
+            <li><a href="../schemas/edge-models-list.v1.schema.json">edge-models-list.v1.schema.json</a></li>
+            <li><a href="../schemas/edge-params-update-batch.v1.schema.json">edge-params-update-batch.v1.schema.json</a></li>
+            <li><a href="../schemas/edge-params-update.v1.schema.json">edge-params-update.v1.schema.json</a></li>
             <li><a href="../schemas/flow-run.v1.schema.json">flow-run.v1.schema.json</a></li>
             <li><a href="../schemas/headless-frame.v1.schema.json">headless-frame.v1.schema.json</a></li>
             <li><a href="../schemas/inspect-deep-dive.v1.schema.json">inspect-deep-dive.v1.schema.json</a></li>

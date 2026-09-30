@@ -8,6 +8,7 @@ import { toProblemDetails } from '../../client/errors';
 import { CliUserError } from '../../contracts/user-error';
 import { isMutatingMethod } from '../../client/catalog';
 import { parseJsonObject } from '../../utils/json';
+import { inspectSendCommandRequestBody } from '../../workflows/send-command-request';
 import { parseQueryJson, parseQueryString } from '../parse-options';
 import {
   type CliContext,
@@ -86,6 +87,29 @@ function collectQueryEntries(value: string, previous: string[] = []): string[] {
   return [...previous, value];
 }
 
+function validateSendCommandRequestBody(key: string, body: unknown): void {
+  if (key !== 'organization.commands.sendCommand') return;
+  const inspection = inspectSendCommandRequestBody(body);
+  if (!inspection) return;
+  if (inspection.hasName) {
+    throw new CliUserError({
+      summary: 'Invalid sendCommand body: use "command" instead of "name".',
+      detail: 'The model exposes commands[].name, but the send request field is "command".'
+    });
+  }
+  if (inspection.hasParams) {
+    throw new CliUserError({
+      summary: 'Invalid sendCommand body: use "extra_params" instead of "params".',
+      detail: '"params" is returned in command responses; command request values belong under "extra_params".'
+    });
+  }
+  if (inspection.hasInvalidExtraParams) {
+    throw new CliUserError({
+      summary: 'Invalid sendCommand body: "extra_params" must be a JSON object.'
+    });
+  }
+}
+
 async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptions): Promise<void> {
   const tenantOverride = options.tenant;
   const settings = await ctx.resolveSettings(tenantOverride ? { 'defaults.tenant': tenantOverride } : {});
@@ -121,6 +145,7 @@ async function handleApiCall(ctx: CliContext, key: string, options: ApiCallOptio
       throw new CliUserError({ summary: `Invalid --body-json${detail}` });
     }
   }
+  validateSendCommandRequestBody(key, body);
   const strictJson = resolveStrictJson({ strictJson: options.strictJson, settings });
   const mutating = isMutatingMethod(method);
   const note = options.note?.trim() || undefined;

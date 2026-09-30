@@ -5,6 +5,7 @@ import {
   buildFriendlyClaimDeviceProfile,
   buildFriendlyConnectorSetupProfile,
   buildFriendlyEdgeClaimProfile,
+  buildFriendlyEdgeParamsUpdateProfile,
   buildFriendlyMoveDeviceProfile,
   buildFriendlyTeamAccessGroupsProfile,
   buildFriendlyTeamAccessMembershipsProfile,
@@ -70,7 +71,7 @@ describe('utility-action-profiles', () => {
         group: 'edge',
         action: 'startClaim',
         title: 'Start Edge Claim',
-        pathTemplate: '/core/v1/organization/edge/devices/start_claim'
+        pathTemplate: '/core/v1/organization/edges/devices/start_claim'
       });
       const profile = buildFriendlyEdgeClaimProfile(endpoint);
       expect(profile.actionKey).toBe('organization.edge.startClaim');
@@ -89,6 +90,8 @@ describe('utility-action-profiles', () => {
         'device_model_id',
         'space_id',
         'display_name',
+        'mac',
+        'sn',
         'custom_parameters',
         'custom_partner_name',
         'custom_model_name',
@@ -109,6 +112,27 @@ describe('utility-action-profiles', () => {
       expect(joined).toContain('false');
       expect(joined).toContain('blank');
       expect(joined).toMatch(/reject/i);
+    });
+  });
+
+  describe('buildFriendlyEdgeParamsUpdateProfile', () => {
+    it('targets the edge params batch execution support', () => {
+      const endpoint = makeEndpoint({
+        key: 'organization.devices.updateDevice',
+        group: 'devices',
+        action: 'updateDevice',
+        title: 'Update Device',
+        method: 'PATCH',
+        pathTemplate: '/core/v1/organization/devices/:device_id',
+        pathParams: ['device_id']
+      });
+      const profile = buildFriendlyEdgeParamsUpdateProfile(endpoint);
+      expect(profile.actionKey).toBe('edge.params.update');
+      expect(profile.endpointKey).toBe('organization.devices.updateDevice');
+      expect(profile.executionSupport).toBe('edge.params-update-batch');
+      expect(profile.headers).toEqual(['device_id', 'set_json', 'expected_model_id']);
+      expect(profile.decodeRules.join(' ')).toContain('parameters[].name');
+      expect(profile.decodeRules.join(' ')).toContain('masked password');
     });
   });
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -58,6 +58,7 @@ describe('cli integration', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    process.exitCode = undefined;
   });
 
   it('rejects invalid global output before command-local defaults shadow it', async () => {
@@ -84,6 +85,105 @@ describe('cli integration', () => {
     await expect(program.parseAsync(['node', 'xyte-cli', '--error-format', 'xml', 'logs', 'list'])).rejects.toThrow(
       'Invalid error format'
     );
+  });
+
+  it('runs the update notifier after successful interactive commands', async () => {
+    const updateNotifier = vi.fn().mockResolvedValue({ notified: false, checked: false, reason: 'test' });
+    const program = createCli({
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout: { write: vi.fn() },
+      stderr: { write: vi.fn() },
+      isTTY: true,
+      stdoutIsTTY: true,
+      env: {
+        XYTE_CLI_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'xyte-cli-notifier-')),
+        NODE_ENV: 'development'
+      },
+      updateNotifier
+    });
+
+    await program.parseAsync(['node', 'xyte-cli', 'doctor', 'install', '--format', 'text']);
+
+    expect(updateNotifier).toHaveBeenCalledWith(
+      expect.objectContaining({
+        commandPath: 'xyte-cli doctor install',
+        isInteractive: true,
+        stdoutIsTTY: true
+      })
+    );
+  });
+
+  it('suppresses update checks for commands that always print JSON', async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ version: '0.12.3' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+    );
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout,
+      stderr,
+      isTTY: true,
+      stdoutIsTTY: true,
+      env: {
+        XYTE_CLI_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'xyte-cli-always-json-')),
+        NODE_ENV: 'development'
+      },
+      upgradeDependencies: {
+        fetchImpl,
+        getCurrentVersion: () => '0.12.0'
+      }
+    });
+
+    await program.parseAsync(['node', 'xyte-cli', 'config', 'tenant', 'list']);
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(stderr.write.mock.calls.map((call) => String(call[0])).join('')).not.toContain(
+      'A new version of xyte-cli is available'
+    );
+    expect(() => JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''))).not.toThrow();
+  });
+
+  it('suppresses update checks for command-local default JSON output', async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ version: '0.12.3' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+    );
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout,
+      stderr,
+      isTTY: true,
+      stdoutIsTTY: true,
+      env: {
+        XYTE_CLI_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'xyte-cli-json-notifier-')),
+        NODE_ENV: 'development'
+      },
+      upgradeDependencies: {
+        fetchImpl,
+        getCurrentVersion: () => '0.12.0'
+      }
+    });
+
+    await program.parseAsync(['node', 'xyte-cli', 'doctor', 'install']);
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(stderr.write.mock.calls.map((call) => String(call[0])).join('')).not.toContain(
+      'A new version of xyte-cli is available'
+    );
+    expect(() => JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''))).not.toThrow();
   });
 
   it('allows read-only calls without --allow-write', async () => {
@@ -292,10 +392,62 @@ describe('cli integration', () => {
       '--path-json',
       '{"device_id":"dev-1"}',
       '--body-json',
-      '{"command":"reboot"}'
+      '{"command":"set_input","extra_params":{"input":"33"}}'
     ]);
 
-    expect(fetchMock).toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect((fetchMock.mock.calls[0][1] as RequestInit | undefined)?.body).toBe(
+      JSON.stringify({ command: 'set_input', extra_params: { input: '33' } })
+    );
+  });
+
+  it.each([
+    {
+      label: 'model metadata name used as the request key',
+      bodyJson: '{"name":"set_input"}',
+      expectedError: 'use "command" instead of "name"'
+    },
+    {
+      label: 'response-only params',
+      bodyJson: '{"command":"set_input","params":{"input":"33"}}',
+      expectedError: 'use "extra_params" instead of "params"'
+    },
+    {
+      label: 'non-object extra_params',
+      bodyJson: '{"command":"set_input","extra_params":["33"]}',
+      expectedError: '"extra_params" must be a JSON object'
+    }
+  ])('rejects $label in a raw sendCommand body before calling the API', async ({ bodyJson, expectedError }) => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const program = createCli({
+      profileStore,
+      secretStore,
+      stdout: { write: vi.fn() },
+      stderr: { write: vi.fn() }
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      program.parseAsync([
+        'node',
+        'xyte-cli',
+        'api',
+        'call',
+        'organization.commands.sendCommand',
+        '--tenant',
+        'acme',
+        '--path-json',
+        '{"device_id":"dev-1"}',
+        '--body-json',
+        bodyJson
+      ])
+    ).rejects.toThrow(expectedError);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('allows organization update device call without the legacy write flag', async () => {
@@ -578,6 +730,7 @@ describe('cli integration', () => {
     expect(parsed.some((item: any) => item.actionKey === 'organization.teamAccess.users')).toBe(true);
     expect(parsed.some((item: any) => item.actionKey === 'organization.teamAccess.memberships')).toBe(true);
     expect(parsed.some((item: any) => item.actionKey === 'organization.devices.claimDevice')).toBe(true);
+    expect(parsed.some((item: any) => item.actionKey === 'edge.params.update')).toBe(true);
     expect(parsed.some((item: any) => item.actionKey === 'organization.notes.createDeviceNote')).toBe(true);
     expect(parsed.some((item: any) => item.actionKey === 'organization.notes.deleteDeviceNote')).toBe(true);
     expect(parsed.some((item: any) => item.actionKey === 'space.import-tree')).toBe(true);
@@ -604,6 +757,22 @@ describe('cli integration', () => {
     ]);
     const filtered = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
     expect(filtered.map((item: any) => item.actionKey)).toEqual(['organization.edge.startClaim']);
+
+    stdout.write.mockClear();
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'util',
+      'list-actions',
+      '--format',
+      'json',
+      '--mode',
+      'friendly',
+      '--execution-support',
+      'edge.params-update-batch'
+    ]);
+    const paramsFiltered = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(paramsFiltered.map((item: any) => item.actionKey)).toEqual(['edge.params.update']);
 
     stdout.write.mockClear();
     await program.parseAsync(['node', 'xyte-cli', 'util', 'list-actions', '--format', 'text', '--mode', 'friendly']);
@@ -1260,7 +1429,7 @@ describe('cli integration', () => {
     parsed = JSON.parse(output);
     expect(parsed.values.console.screen).toBe('dashboard');
     expect(parsed.sources['console.screen']).toBe('default');
-  });
+  }, 20_000);
 
   it('lets env defaults win over config until explicit flags override them', async () => {
     const profileStore = new MemoryProfileStore();
@@ -4067,6 +4236,35 @@ describe('cli integration', () => {
   it('force-installs all skill bundles with skills refresh', async () => {
     const ws = mkdtempSync(join(tmpdir(), 'xyte-skills-ws-'));
     const home = mkdtempSync(join(tmpdir(), 'xyte-skills-home-'));
+    const canonical = join(__dirname, '..', 'skills', 'xyte-cli');
+    const installedBundles = [
+      join(ws, '.claude', 'skills', 'xyte-cli'),
+      join(ws, '.github', 'skills', 'xyte-cli'),
+      join(ws, '.agents', 'skills', 'xyte-cli'),
+      join(home, '.claude', 'skills', 'xyte-cli'),
+      join(home, '.copilot', 'skills', 'xyte-cli'),
+      join(home, '.agents', 'skills', 'xyte-cli')
+    ];
+    const snapshot = (root: string): Array<{ path: string; bytes: Buffer }> => {
+      const files: Array<{ path: string; bytes: Buffer }> = [];
+      const visit = (directory: string, relativeDirectory = '') => {
+        const entries = readdirSync(directory, { withFileTypes: true }).sort((left, right) =>
+          left.name.localeCompare(right.name)
+        );
+        for (const entry of entries) {
+          const relativePath = join(relativeDirectory, entry.name);
+          const absolutePath = join(directory, entry.name);
+          if (entry.isDirectory()) {
+            visit(absolutePath, relativePath);
+          } else {
+            files.push({ path: relativePath, bytes: readFileSync(absolutePath) });
+          }
+        }
+      };
+      visit(root);
+      return files;
+    };
+    const canonicalSnapshot = snapshot(canonical);
     const stdout = { write: vi.fn() };
     const program = createCli({
       profileStore: new MemoryProfileStore(),
@@ -4082,8 +4280,17 @@ describe('cli integration', () => {
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     expect(output).toContain('project/claude: installed');
     expect(output).toContain('user/codex: installed');
-    expect(existsSync(join(ws, '.claude/skills/xyte-cli/SKILL.md'))).toBe(true);
-    expect(existsSync(join(home, '.copilot/skills/xyte-cli/SKILL.md'))).toBe(true);
+    for (const installed of installedBundles) {
+      expect(snapshot(installed)).toEqual(canonicalSnapshot);
+    }
+
+    const corruptedSkill = join(installedBundles[0], 'SKILL.md');
+    writeFileSync(
+      corruptedSkill,
+      '# Stale command guidance\n\n```bash\nxyte-cli api call organization.commands.sendCommand --body-json \'{"name":"reboot"}\'\n```\n',
+      'utf8'
+    );
+    expect(readFileSync(corruptedSkill, 'utf8')).toContain('"name":"reboot"');
 
     const stdout2 = { write: vi.fn() };
     const program2 = createCli({
@@ -4098,7 +4305,10 @@ describe('cli integration', () => {
     const output2 = stdout2.write.mock.calls.map((call) => String(call[0])).join('');
     expect(output2).toContain('project/claude: overwritten');
     expect(output2).toContain('user/codex: overwritten');
-  });
+    for (const installed of installedBundles) {
+      expect(snapshot(installed)).toEqual(canonicalSnapshot);
+    }
+  }, 20_000);
 
   it('suggests skills refresh after a successful upgrade in text mode', async () => {
     const stdout = { write: vi.fn() };
@@ -4744,8 +4954,18 @@ describe('cli integration', () => {
             }
           );
         }
-        if (url.includes('/organization/devices/dev-1/commands') && (init?.method ?? 'GET') === 'GET') {
-          return new Response(JSON.stringify({ items: [{ command: 'restart' }] }), {
+        if (
+          url.includes('/organization/devices/dev-1') &&
+          !url.includes('/commands') &&
+          (init?.method ?? 'GET') === 'GET'
+        ) {
+          return new Response(JSON.stringify({ id: 'dev-1', model: { id: 'model-1', name: 'Model 1' } }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/organization/models/model-1') && (init?.method ?? 'GET') === 'GET') {
+          return new Response(JSON.stringify({ id: 'model-1', commands: [{ name: 'restart' }] }), {
             status: 200,
             headers: { 'content-type': 'application/json' }
           });
@@ -4835,7 +5055,8 @@ describe('cli integration', () => {
     expect(third.nextResumeStepId).toBe('gate_ticket_message');
     const thirdStepStatus = new Map<string, string>(third.steps.map((item: any) => [item.stepId, item.status]));
     expect(thirdStepStatus.get('watch_before')).toBe('completed');
-    expect(thirdStepStatus.get('commands_get')).toBe('completed');
+    expect(thirdStepStatus.get('command_device_get')).toBe('completed');
+    expect(thirdStepStatus.get('command_model_describe')).toBe('completed');
     expect(thirdStepStatus.get('gate_send_command')).toBe('gate_approved');
     expect(thirdStepStatus.get('commands_send')).toBe('completed');
     expect(thirdStepStatus.get('gate_update_device')).toBe('gate_approved');
@@ -4866,8 +5087,14 @@ describe('cli integration', () => {
             headers: { 'content-type': 'application/json' }
           });
         }
-        if (url.includes('/organization/devices/dev-from-var/commands')) {
-          return new Response(JSON.stringify({ items: [] }), {
+        if (url.includes('/organization/devices/dev-from-var') && !url.includes('/commands')) {
+          return new Response(JSON.stringify({ id: 'dev-from-var', model: { id: 'model-1' } }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        if (url.includes('/organization/models/model-1')) {
+          return new Response(JSON.stringify({ id: 'model-1', commands: [{ name: 'restart' }] }), {
             status: 200,
             headers: { 'content-type': 'application/json' }
           });

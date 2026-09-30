@@ -13,6 +13,7 @@ interface TransportOptions {
 
 interface TransportRequest {
   requestId?: string;
+  signal?: AbortSignal;
   endpointKey?: string;
   method: string;
   url: string;
@@ -116,7 +117,9 @@ export class HttpTransport {
   private readonly timeoutMs: number;
   private readonly retryAttempts: number;
   private readonly retryBackoffMs: number;
-  private get logger() { return getLogger(); }
+  private get logger() {
+    return getLogger();
+  }
 
   constructor(options: TransportOptions = {}) {
     this.timeoutMs = options.timeoutMs ?? 15_000;
@@ -147,11 +150,12 @@ export class HttpTransport {
           const timeout = setTimeout(() => controller.abort(), request.timeoutMs ?? this.timeoutMs);
 
           try {
+            const signal = request.signal ? AbortSignal.any([controller.signal, request.signal]) : controller.signal;
             const response = await fetch(request.url, {
               method: request.method,
               headers: request.headers,
               body: request.body,
-              signal: controller.signal
+              signal
             });
             clearTimeout(timeout);
 
@@ -198,7 +202,7 @@ export class HttpTransport {
           } catch (error) {
             clearTimeout(timeout);
             lastError = error;
-            const retryable = attempt < maxAttempts && shouldRetry(error);
+            const retryable = !request.signal?.aborted && attempt < maxAttempts && shouldRetry(error);
 
             this.logger.debug(
               {
@@ -217,7 +221,11 @@ export class HttpTransport {
               throw error;
             }
 
-            await delay(this.retryBackoffMs * attempt);
+            await delay(
+              this.retryBackoffMs * attempt,
+              undefined,
+              request.signal ? { signal: request.signal } : undefined
+            );
           }
         }
 

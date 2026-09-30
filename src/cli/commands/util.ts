@@ -57,7 +57,14 @@ function parseUtilityExecutionSupport(value: string | undefined): UtilityExecuti
     return undefined;
   }
   const normalized = value.trim().toLowerCase();
-  const allowed: UtilityExecutionSupport[] = ['space.import-tree', 'device.move', 'edge.claim-batch', 'prepare-only', 'call-loop-only'];
+  const allowed: UtilityExecutionSupport[] = [
+    'space.import-tree',
+    'device.move',
+    'edge.claim-batch',
+    'edge.params-update-batch',
+    'prepare-only',
+    'call-loop-only'
+  ];
   if (!allowed.includes(normalized as UtilityExecutionSupport)) {
     throw new CliUserError({ summary: `Invalid execution support: ${value}. Use ${allowed.join('|')}.` });
   }
@@ -262,7 +269,10 @@ export function registerUtilCommands(parent: Command, ctx: CliContext): void {
     .description('List utility prepare action keys')
     .option('--entity <entity>', 'Filter by entity')
     .option('--mode <mode>', 'friendly|generic')
-    .option('--execution-support <support>', 'space.import-tree|device.move|edge.claim-batch|prepare-only|call-loop-only')
+    .option(
+      '--execution-support <support>',
+      'space.import-tree|device.move|edge.claim-batch|edge.params-update-batch|prepare-only|call-loop-only'
+    )
     .option('--include-generic', 'Include generic profiles', true)
     .option('--no-include-generic', 'Exclude generic profiles')
     .option('--format <format>', 'json|text')

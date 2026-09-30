@@ -30,6 +30,8 @@ export function createOrganizationNamespace(
     removeUsers: (args) => call('organization.groups.removeUsers', args),
     updateGroup: (args) => call('organization.groups.updateGroup', args),
     getIncidents: (args) => call('organization.incidents.getIncidents', args),
+    getModel: (args) => call('organization.models.getModel', args),
+    getModels: (args) => call('organization.models.getModels', args),
     createDeviceNote: (args) => call('organization.notes.createDeviceNote', args),
     createSpaceNote: (args) => call('organization.notes.createSpaceNote', args),
     deleteDeviceNote: (args) => call('organization.notes.deleteDeviceNote', args),

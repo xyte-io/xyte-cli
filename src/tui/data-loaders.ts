@@ -15,9 +15,10 @@ import type { ProfileStore } from '../types/stores';
 import type { XyteClient } from '../types/client';
 import type { SecretProvider } from '../types/profile';
 import type { EndpointNamespace } from '../types/endpoints';
-import { extractArray, extractHasNextPage } from '../utils/json';
+import { extractArray, extractHasNextPage, isRecord } from '../utils/json';
 import { extractIncidentsArray } from '../utils/incidents';
 import { PROVIDER_ORG } from '../types/profile';
+import type { DeviceCommandModelEvidence } from '../workflows/device-command';
 
 interface LoadOutcome<T> {
   data: T;
@@ -395,15 +396,27 @@ export interface CommandTemplate {
   mode: 'command' | 'friendly_name';
   value: string;
   label: string;
+  withFile: boolean;
+  modelEvidence: DeviceCommandModelEvidence;
 }
 
-function normalizeCommandTemplates(items: unknown[]): CommandTemplate[] {
+function extractModelCommands(modelResponse: unknown): unknown[] {
+  if (!isRecord(modelResponse)) {
+    return [];
+  }
+  if (Array.isArray(modelResponse.commands)) {
+    return modelResponse.commands;
+  }
+  return isRecord(modelResponse.data) && Array.isArray(modelResponse.data.commands) ? modelResponse.data.commands : [];
+}
+
+function normalizeCommandTemplates(items: unknown[], modelEvidence: DeviceCommandModelEvidence): CommandTemplate[] {
   const dedupe = new Set<string>();
   const templates: CommandTemplate[] = [];
 
   for (const item of items) {
     const rec = item && typeof item === 'object' ? (item as Record<string, unknown>) : undefined;
-    const command = String(rec?.command ?? '').trim();
+    const command = String(rec?.name ?? '').trim();
     const friendlyName = String(rec?.friendly_name ?? '').trim();
 
     if (command) {
@@ -413,7 +426,9 @@ function normalizeCommandTemplates(items: unknown[]): CommandTemplate[] {
         templates.push({
           mode: 'command',
           value: command,
-          label: `command: ${command}`
+          label: `name: ${command}`,
+          withFile: rec?.with_file === true,
+          modelEvidence
         });
       }
     }
@@ -425,7 +440,9 @@ function normalizeCommandTemplates(items: unknown[]): CommandTemplate[] {
         templates.push({
           mode: 'friendly_name',
           value: friendlyName,
-          label: `friendly_name: ${friendlyName}`
+          label: `friendly_name: ${friendlyName}`,
+          withFile: rec?.with_file === true,
+          modelEvidence
         });
       }
     }
@@ -440,12 +457,28 @@ export async function loadCommandTemplates(
   options: { deviceId: string }
 ): Promise<LoadOutcome<CommandTemplate[]>> {
   return withOutcome(async () => {
-    const raw = await client.organization.getCommands({
+    const device = await client.organization.getDevice({
       tenantId,
       path: { device_id: options.deviceId }
     });
-    const commands = extractArray(raw, ['commands', 'data', 'items']);
-    return normalizeCommandTemplates(commands);
+    const deviceRec = device && typeof device === 'object' ? (device as Record<string, unknown>) : undefined;
+    const model =
+      deviceRec?.model && typeof deviceRec.model === 'object'
+        ? (deviceRec.model as Record<string, unknown>)
+        : undefined;
+    const modelId = String(model?.id ?? deviceRec?.device_model_id ?? deviceRec?.model_id ?? '').trim();
+    if (!modelId) {
+      return [];
+    }
+    const rawModel = await client.organization.getModel({
+      tenantId,
+      path: { id: modelId }
+    });
+    const commands = extractModelCommands(rawModel);
+    return normalizeCommandTemplates(commands, {
+      modelId,
+      modelData: { commands }
+    });
   }, []);
 }
 

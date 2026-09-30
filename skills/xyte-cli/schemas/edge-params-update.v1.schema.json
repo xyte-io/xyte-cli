@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xyte-io.github.io/xyte-cli/schemas/edge-params-update.v1.schema.json",
+  "title": "Xyte CLI Edge Params Update Result",
+  "type": "object",
+  "required": ["schemaVersion", "generatedAtUtc", "tenantId", "mode", "outcome"],
+  "properties": {
+    "schemaVersion": {
+      "const": "xyte.edge.params-update.v1"
+    },
+    "generatedAtUtc": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mode": {
+      "enum": ["plan", "apply"]
+    },
+    "outcome": {
+      "$ref": "#/$defs/outcome"
+    }
+  },
+  "$defs": {
+    "outcome": {
+      "type": "object",
+      "required": ["device_id", "disposition"],
+      "properties": {
+        "rowIndex": {
+          "type": "number"
+        },
+        "device_id": {
+          "type": "string"
+        },
+        "disposition": {
+          "enum": ["planned", "succeeded", "failed", "rejected", "skipped"]
+        },
+        "detail": {
+          "type": "string"
+        },
+        "rejectReason": {
+          "type": "string"
+        },
+        "plan": {
+          "type": "object",
+          "required": ["device_id", "model_id", "set", "current_custom_parameters", "merged_custom_parameters", "requestBody", "supportedParameters"],
+          "properties": {
+            "device_id": {
+              "type": "string"
+            },
+            "model_id": {
+              "type": "string"
+            },
+            "model_name": {
+              "type": "string"
+            },
+            "set": {
+              "type": "object"
+            },
+            "current_custom_parameters": {
+              "type": "object"
+            },
+            "merged_custom_parameters": {
+              "type": "object"
+            },
+            "requestBody": {
+              "type": "object",
+              "required": ["custom_parameters"],
+              "properties": {
+                "custom_parameters": {
+                  "type": "object"
+                }
+              },
+              "additionalProperties": true
+            },
+            "supportedParameters": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "required": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": true
+              }
+            }
+          },
+          "additionalProperties": true
+        },
+        "response": true,
+        "verification": {
+          "type": "object",
+          "required": ["ok", "mismatches"],
+          "properties": {
+            "ok": {
+              "type": "boolean"
+            },
+            "mismatches": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["key"],
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "expected": true,
+                  "actual": true
+                },
+                "additionalProperties": true
+              }
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}
