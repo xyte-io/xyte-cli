@@ -16,7 +16,8 @@ function parseArgs(argv) {
     skipBuild: false,
     skipMsi: false,
     skipNode: false,
-    skipNpmInstall: false
+    skipNpmInstall: false,
+    manifestsOnly: false
   };
   const readValue = (index, flag) => {
     const value = argv[index];
@@ -37,6 +38,7 @@ function parseArgs(argv) {
     else if (arg === '--skip-msi') args.skipMsi = true;
     else if (arg === '--skip-node') args.skipNode = true;
     else if (arg === '--skip-npm-install') args.skipNpmInstall = true;
+    else if (arg === '--manifests-only') args.manifestsOnly = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
   return args;
@@ -382,30 +384,25 @@ function generateWingetManifests(args, msiPath) {
   return wingetDir;
 }
 
-async function signMsiIfConfigured(msiPath) {
-  if (!process.env.WINDOWS_CODESIGN_PFX_BASE64?.trim()) {
-    return false;
-  }
-  if (process.platform !== 'win32') {
-    throw new Error('WINDOWS_CODESIGN_PFX_BASE64 is set, but MSI signing is only supported on Windows runners.');
-  }
-  await runOrThrow(
-    'powershell.exe',
-    ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(repoRoot, 'scripts', 'sign_windows_msi.ps1'), '-MsiPath', msiPath],
-    'Sign Windows MSI'
-  );
-  return true;
-}
-
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   validateArgs(args);
-  if (!args.skipMsi) {
+  if (!args.skipMsi && !args.manifestsOnly) {
     ensureMsiBuildSupported();
   }
   const payloadDir = join(args.outDir, 'payload');
   const wxsPath = join(args.outDir, 'Product.generated.wxs');
   const msiPath = join(args.outDir, `XyteCLI-${packageJson.version}-win-x64.msi`);
+
+  // Release signing changes the MSI bytes after the build, so the workflow re-runs
+  // only this step to point the WinGet manifests at the signed file's SHA-256.
+  if (args.manifestsOnly) {
+    if (!existsSync(msiPath)) {
+      throw new Error(`--manifests-only needs an existing MSI: ${msiPath}`);
+    }
+    generateWingetManifests(args, msiPath);
+    return;
+  }
 
   rmSync(payloadDir, { recursive: true, force: true });
   mkdirSync(payloadDir, { recursive: true });
@@ -421,7 +418,6 @@ async function main() {
 
   if (!args.skipMsi) {
     await runOrThrow('wix', ['build', wxsPath, '-arch', 'x64', '-out', msiPath, '-acceptEula', wixEulaId], 'Build Windows MSI');
-    await signMsiIfConfigured(msiPath);
   }
   const wingetDir = generateWingetManifests(args, msiPath);
 

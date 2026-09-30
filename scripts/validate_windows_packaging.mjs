@@ -8,8 +8,7 @@ const repoRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const requiredFiles = [
   'packaging/windows/Product.wxs.template',
   'packaging/windows/scripts/configure-xyte-cli.ps1',
-  'scripts/package_windows_msi.mjs',
-  'scripts/sign_windows_msi.ps1'
+  'scripts/package_windows_msi.mjs'
 ];
 
 for (const file of requiredFiles) {

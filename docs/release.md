@@ -67,9 +67,10 @@ Prerequisites:
 
 - npm package publish rights for `@xyteai/cli`.
 - `NPM_TOKEN` configured in repository/environment secrets.
-- Optional Windows code-signing secrets for MSI release assets:
-  - `WINDOWS_CODESIGN_PFX_BASE64`
-  - `WINDOWS_CODESIGN_PFX_PASSWORD`
+- Optional Windows MSI signing through Azure Artifact Signing, configured as variables on the `release` GitHub environment (no secrets; the job logs in with GitHub OIDC through a federated credential that trusts only this environment):
+  - `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`: the Entra app that holds the Artifact Signing Certificate Profile Signer role
+  - `AZURE_SIGNING_ENDPOINT`, `AZURE_SIGNING_ACCOUNT`: the Artifact Signing account
+  - `AZURE_SIGNING_CERT_PROFILE`: the public-trust certificate profile; signing is skipped while it is unset
 
 ## Release Assets Workflow
 
@@ -86,7 +87,7 @@ The MSI embeds a bundled Windows Node.js runtime, adds `C:\Program Files\Xyte CL
 
 The Windows MSI release asset job publishes MSI-specific assets independently from the npm package release job. A Windows runner, WiX, signing, or Node runtime download failure should not block the npm tarball, SBOM, and npm checksums from being attached to the release.
 
-If Windows code-signing secrets are configured, the Windows packaging script signs the MSI before generating WinGet manifests, checksums, and upload. If they are not configured, the workflow still builds and uploads the MSI, but the asset is unsigned and should not be submitted to WinGet.
+When `AZURE_SIGNING_CERT_PROFILE` is set, the workflow signs the MSI with `azure/artifact-signing-action`, fails the job unless `Get-AuthenticodeSignature` reports `Valid`, and regenerates the WinGet manifests (`--manifests-only`) so their SHA-256 matches the signed file before checksums and upload. When it is unset, the workflow still builds and uploads the MSI, but the asset is unsigned and should not be submitted to WinGet.
 
 CI currently pins the WiX .NET tool to `7.0.0` and the MSI build command passes WiX's `-acceptEula wix7` flag.
 

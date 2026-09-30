@@ -136,6 +136,12 @@ jobs:
   windows-msi:
     needs: [meta, release]
     runs-on: windows-latest
+    # The `release` environment holds the Azure Artifact Signing settings; its
+    # federated credential only trusts this environment.
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - name: Checkout tag
         uses: actions/checkout@v4
@@ -178,10 +184,39 @@ jobs:
         run: npm run validate:windows-packaging
 
       - name: Build Windows MSI
-        env:
-          WINDOWS_CODESIGN_PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX_BASE64 }}
-          WINDOWS_CODESIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PFX_PASSWORD }}
         run: npm run package:windows-msi -- --out-dir artifacts/windows-installer
+
+      # Signing stays off until AZURE_SIGNING_CERT_PROFILE is set on the release
+      # environment, which needs Microsoft's identity validation to complete first.
+      - name: Azure login
+        if: vars.AZURE_SIGNING_CERT_PROFILE != ''
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign Windows MSI
+        if: vars.AZURE_SIGNING_CERT_PROFILE != ''
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_SIGNING_CERT_PROFILE }}
+          files: ${{ github.workspace }}\artifacts\windows-installer\XyteCLI-${{ needs.meta.outputs.version }}-win-x64.msi
+          description: Xyte CLI
+
+      - name: Verify MSI signature
+        if: vars.AZURE_SIGNING_CERT_PROFILE != ''
+        shell: pwsh
+        run: |
+          $sig = Get-AuthenticodeSignature "artifacts/windows-installer/XyteCLI-${{ needs.meta.outputs.version }}-win-x64.msi"
+          "Status: $($sig.Status); signer: $($sig.SignerCertificate.Subject)"
+          if ($sig.Status -ne 'Valid') { throw "MSI signature is $($sig.Status)" }
+
+      - name: Point WinGet manifests at the signed MSI
+        if: vars.AZURE_SIGNING_CERT_PROFILE != ''
+        run: npm run package:windows-msi -- --out-dir artifacts/windows-installer --manifests-only
 
       - name: Generate Windows checksums
         shell: bash
