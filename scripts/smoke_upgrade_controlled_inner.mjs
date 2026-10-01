@@ -316,7 +316,7 @@ async function main() {
     );
     assertSuccess(upgrade, 'xyte-cli upgrade', XYTE_COMMAND, ['upgrade', '--yes', '--output', 'json']);
     const upgradePayload = parseJsonOutput(upgrade.stdout);
-    if (upgradePayload.schemaVersion !== 'xyte.upgrade.result.v1') {
+    if (upgradePayload.schemaVersion !== 'xyte.upgrade.result.v2') {
       throw new Error(`Unexpected upgrade payload schema: ${upgradePayload.schemaVersion}`);
     }
 

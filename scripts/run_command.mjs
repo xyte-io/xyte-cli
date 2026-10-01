@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import crossSpawn from 'cross-spawn';
 
 export function runCommand(command, args, options = {}) {

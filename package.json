@@ -60,6 +60,8 @@
     "smoke:windows:native-secret-store": "tsx tests/smoke/windows-native-secret-store.ts",
     "smoke:external-live": "tsx tests/smoke/external-user-live.ts",
     "smoke:upgrade:controlled": "node scripts/smoke_upgrade_controlled.mjs",
+    "package:windows-msi": "node scripts/package_windows_msi.mjs",
+    "validate:windows-packaging": "node scripts/validate_windows_packaging.mjs",
     "test:commit": "npm run typecheck && npm test && npm run smoke:pack-install",
     "release:check": "node scripts/release_check.mjs",
     "tui": "tsx src/bin/xyte-cli.ts tui",

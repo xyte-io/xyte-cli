@@ -4227,7 +4227,7 @@ describe('cli integration', () => {
 
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     const parsed = JSON.parse(output);
-    expect(parsed.schemaVersion).toBe('xyte.upgrade.check.v1');
+    expect(parsed.schemaVersion).toBe('xyte.upgrade.check.v2');
     expect(parsed.currentVersion).toBe('0.4.0');
     expect(parsed.latestVersion).toBe('0.5.0');
     expect(commandRunner).not.toHaveBeenCalled();
@@ -4358,6 +4358,114 @@ describe('cli integration', () => {
     expect(output).toContain('xyte-cli skills refresh');
   });
 
+  it('reports a winget hand-off in text mode on the windows-msi channel', async () => {
+    const stdout = { write: vi.fn() };
+    const detachedLauncher = vi.fn().mockResolvedValue(undefined);
+    const program = createCli({
+      stdoutIsTTY: true,
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout,
+      stderr: { write: vi.fn() },
+      upgradeDependencies: {
+        fetchImpl: vi.fn().mockImplementation(
+          async () =>
+            new Response(JSON.stringify({ version: '0.5.0' }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' }
+            })
+        ),
+        commandRunner: vi.fn(),
+        detachedLauncher,
+        installSkillsImpl: vi.fn(),
+        getCurrentVersion: () => '0.4.0',
+        getInstallChannel: () => ({ kind: 'windows-msi' })
+      }
+    });
+
+    await program.parseAsync(['node', 'xyte-cli', 'upgrade', '--yes', '--format', 'text']);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(detachedLauncher).toHaveBeenCalledTimes(1);
+    expect(output).toContain('Upgrade started in a new winget console window');
+    expect(output).toContain('can lag the npm release');
+    expect(output).toContain('xyte-cli skills refresh');
+    expect(output).not.toContain('Verified version');
+  });
+
+  it.each([
+    { args: [] as string[], launched: true },
+    { args: ['--format', 'json'], launched: false },
+    { args: ['--output', 'json'], launched: false }
+  ])('launches winget at a terminal unless JSON is explicitly requested ($args)', async ({ args, launched }) => {
+    const stdout = { write: vi.fn() };
+    const detachedLauncher = vi.fn().mockResolvedValue(undefined);
+    const program = createCli({
+      stdoutIsTTY: true,
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout,
+      stderr: { write: vi.fn() },
+      upgradeDependencies: {
+        fetchImpl: vi.fn().mockImplementation(
+          async () =>
+            new Response(JSON.stringify({ version: '0.5.0' }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' }
+            })
+        ),
+        commandRunner: vi.fn(),
+        detachedLauncher,
+        installSkillsImpl: vi.fn(),
+        getCurrentVersion: () => '0.4.0',
+        getInstallChannel: () => ({ kind: 'windows-msi' })
+      }
+    });
+
+    const globalArgs = args[0] === '--output' ? args : [];
+    const commandArgs = args[0] === '--format' ? args : [];
+    await program.parseAsync(['node', 'xyte-cli', ...globalArgs, 'upgrade', '--yes', ...commandArgs]);
+
+    const payload = JSON.parse(stdout.write.mock.calls.map((call) => String(call[0])).join(''));
+    expect(detachedLauncher).toHaveBeenCalledTimes(launched ? 1 : 0);
+    expect(payload.handoff).toEqual({ tool: 'winget', status: launched ? 'started' : 'manual' });
+  });
+
+  it('prints the winget command instead of launching it without a terminal on the windows-msi channel', async () => {
+    const stdout = { write: vi.fn() };
+    const detachedLauncher = vi.fn().mockResolvedValue(undefined);
+    const program = createCli({
+      stdoutIsTTY: false,
+      profileStore: new MemoryProfileStore(),
+      secretStore: new MemorySecretStore(),
+      stdout,
+      stderr: { write: vi.fn() },
+      upgradeDependencies: {
+        fetchImpl: vi.fn().mockImplementation(
+          async () =>
+            new Response(JSON.stringify({ version: '0.5.0' }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' }
+            })
+        ),
+        commandRunner: vi.fn(),
+        detachedLauncher,
+        installSkillsImpl: vi.fn(),
+        getCurrentVersion: () => '0.4.0',
+        getInstallChannel: () => ({ kind: 'windows-msi' })
+      }
+    });
+
+    await program.parseAsync(['node', 'xyte-cli', 'upgrade', '--yes', '--format', 'text']);
+
+    const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
+    expect(detachedLauncher).not.toHaveBeenCalled();
+    expect(output).toContain('To upgrade, run: winget upgrade --id Xyte.XyteCLI');
+    expect(output).toContain('can lag the npm release');
+    expect(output).toContain('xyte-cli skills refresh');
+    expect(output).not.toContain('Verified version');
+  });
+
   it('warns and succeeds when upgrade skill refresh partially fails', async () => {
     const profileStore = new MemoryProfileStore();
     const secretStore = new MemorySecretStore();
@@ -4424,7 +4532,7 @@ describe('cli integration', () => {
 
     const output = stdout.write.mock.calls.map((call) => String(call[0])).join('');
     const parsed = JSON.parse(output);
-    expect(parsed.schemaVersion).toBe('xyte.upgrade.result.v1');
+    expect(parsed.schemaVersion).toBe('xyte.upgrade.result.v2');
     expect(parsed.updated).toBe(true);
     expect(parsed.skills.scope).toBe('user');
     expect(parsed.skills.failedCount).toBe(1);

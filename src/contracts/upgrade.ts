@@ -7,6 +7,7 @@ export const UpgradeCheckSchema = z.object({
   schemaVersion: z.literal(UPGRADE_CHECK_SCHEMA_VERSION),
   generatedAtUtc: z.string(),
   packageName: z.string(),
+  installChannel: z.enum(['npm', 'windows-msi']),
   currentVersion: z.string(),
   latestVersion: z.string(),
   upToDate: z.boolean(),
@@ -47,32 +48,41 @@ export const UpgradeResultSchema = z.object({
   schemaVersion: z.literal(UPGRADE_RESULT_SCHEMA_VERSION),
   generatedAtUtc: z.string(),
   packageName: z.string(),
+  installChannel: z.enum(['npm', 'windows-msi']),
   currentVersion: z.string(),
   latestVersion: z.string(),
   upToDateBefore: z.boolean(),
   updated: z.boolean(),
   updateCommand: UpgradeCommandSchema.optional(),
-  verify: UpgradeVerifySchema,
-  skills: UpgradeSkillsSchema,
+  // Present when the upgrade is handed to an external installer (windows-msi → winget):
+  // `started` = launched in its own console window; `manual` = not launched (no TTY or
+  // JSON output), run updateCommand yourself. verify and skills are then absent.
+  handoff: z.object({ tool: z.literal('winget'), status: z.enum(['started', 'manual']) }).optional(),
+  verify: UpgradeVerifySchema.optional(),
+  skills: UpgradeSkillsSchema.optional(),
   warnings: z.array(z.string())
 });
 
-export type UpgradeCheckV1 = z.infer<typeof UpgradeCheckSchema>;
-export type UpgradeResultV1 = z.infer<typeof UpgradeResultSchema>;
+export type UpgradeCheckV2 = z.infer<typeof UpgradeCheckSchema>;
+export type UpgradeResultV2 = z.infer<typeof UpgradeResultSchema>;
 
 export function buildUpgradeCheck(args: {
   packageName: string;
+  installChannel?: 'npm' | 'windows-msi';
+  recommendedCommand: string;
   currentVersion: string;
   latestVersion: string;
-}): UpgradeCheckV1 {
+}): UpgradeCheckV2 {
   const upToDate = compareSemver(args.currentVersion, args.latestVersion) >= 0;
+  const installChannel = args.installChannel ?? 'npm';
   return {
     schemaVersion: UPGRADE_CHECK_SCHEMA_VERSION,
     generatedAtUtc: new Date().toISOString(),
     packageName: args.packageName,
+    installChannel,
     currentVersion: args.currentVersion,
     latestVersion: args.latestVersion,
     upToDate,
-    recommendedCommand: upToDate ? null : `npm install --global ${args.packageName}@latest`
+    recommendedCommand: upToDate ? null : args.recommendedCommand
   };
 }

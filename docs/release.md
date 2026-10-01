@@ -9,6 +9,7 @@ This project targets **Node.js 22** as its primary runtime environment.
 - Earlier Node.js releases, including **Node 18**, are no longer supported.
 
 This repository ships one npm package: `@xyteai/cli`.
+Release assets also include a Windows x64 MSI for users who should not install Node.js/npm manually. The npm package remains a first-class install path.
 
 ## Governance
 
@@ -26,6 +27,7 @@ This repository ships one npm package: `@xyteai/cli`.
 - `npm test`
 - `npm run build`
 - packaged-install smoke from the built tarball (`npm run smoke:pack-install`)
+- Windows MSI package build (`npm run package:windows-msi`)
 - Windows native secret-store certification (`windows-native-secret-store-cert`)
 - Linux native secret-store certification (`linux-native-secret-store-cert`)
 - separate security job: `npm audit --audit-level=high`
@@ -65,6 +67,10 @@ Prerequisites:
 
 - npm package publish rights for `@xyteai/cli`.
 - `NPM_TOKEN` configured in repository/environment secrets.
+- Optional Windows MSI signing through Azure Artifact Signing, configured as variables on the `release` GitHub environment (no secrets; the job logs in with GitHub OIDC through a federated credential that trusts only this environment):
+  - `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`: the Entra app that holds the Artifact Signing Certificate Profile Signer role
+  - `AZURE_SIGNING_ENDPOINT`, `AZURE_SIGNING_ACCOUNT`: the Artifact Signing account
+  - `AZURE_SIGNING_CERT_PROFILE`: the public-trust certificate profile; while it is unset the MSI is neither signed nor published
 
 ## Release Assets Workflow
 
@@ -72,8 +78,24 @@ Prerequisites:
 
 - the same packaged-install smoke validates the tarball before attach/upload steps
 - built npm tarball (`*.tgz`)
+- signed Windows installer (`XyteCLI-<version>-win-x64.msi`), only when MSI signing is configured
+- generated WinGet manifests for `Xyte.XyteCLI`, likewise only with signing
 - CycloneDX SBOM (`sbom.cdx.json`)
 - SHA-256 checksums (`checksums.txt`)
+
+The MSI embeds a bundled Windows Node.js runtime, adds `C:\Program Files\Xyte CLI` to machine `PATH`, ships the post-install setup assistant, and marks the install channel as `windows-msi`. Users update MSI installs with `winget upgrade --id Xyte.XyteCLI --exact` or a newer MSI, not `npm install -g`.
+
+The Windows MSI jobs publish MSI-specific assets independently from the npm package release job. A Windows runner, WiX, signing, or Node runtime download failure should not block the npm tarball, SBOM, and npm checksums from being attached to the release.
+
+The Windows path is two jobs. `windows-msi` runs `npm ci`, builds and packages the unsigned MSI with read-only permissions and no environment, and uploads it as a workflow artifact. `windows-msi-sign` runs in the `release` environment with `id-token: write`, but never checks out the repo or installs npm dependencies: it downloads that artifact, signs it, and publishes. Dependency install scripts therefore never run next to the signing credential.
+
+When `AZURE_SIGNING_CERT_PROFILE` is set, `windows-msi-sign` signs the MSI with `azure/artifact-signing-action`, fails unless `Get-AuthenticodeSignature` reports `Valid`, and rewrites `InstallerSha256` in the WinGet installer manifest to the signed file's SHA-256 before checksums and upload. When it is unset, the job publishes nothing and emits a `::warning::` that the Windows MSI was not published because signing is not configured. An unsigned MSI never reaches the release; the unsigned build stays downloadable as the `windows-msi-unsigned` workflow artifact.
+
+Prerelease tags (for example `1.2.3-rc.1`) get no MSI: WiX only accepts numeric versions, so both Windows jobs are skipped for any version containing `-`.
+
+If the release already has `XyteCLI-<version>-win-x64.msi` attached (a re-run for a published tag), both Windows jobs skip (`windows-msi-sign` re-checks before logging in to Azure, so re-running only that job cannot replace it either), because re-signing changes the MSI's SHA-256 and breaks any WinGet manifest already submitted for it. To replace it deliberately, run the workflow manually with `force_windows_msi` checked.
+
+CI currently pins the WiX .NET tool to `7.0.0` and the MSI build command passes WiX's `-acceptEula wix7` flag.
 
 ## Manual Emergency Publish
 
