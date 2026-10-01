@@ -386,7 +386,7 @@ Before the first scheduled run, do a dry run: show me exactly which devices you 
       <div class="box"><button class="copy">Copy</button><span class="pad"></span>Every weekday at <span class="fill">[7:30 AM]</span>, use xyte-cli to create a fleet report for <span class="fill">[customer name, or "all spaces"]</span>: devices online vs. offline, active incidents, open tickets, the 10 rooms that need attention first, and what changed since the last report. Make it a one-page PDF and email it to <span class="fill">[you@company.com]</span>. Only use real data from xyte-cli. Don't change anything on any device.</div>
     </div>
 
-    <div class="note"><b>You stay in control.</b><span>Scheduled prompts use the same API key and permissions as you, and every command shows up in Xyte's audit trail. Start with a small group of rooms, read the first few reports, then widen the scope.</span></div>
+    <div class="note"><b>You stay in control.</b><span>Scheduled prompts use the same API key and permissions as you, and every command shows up in Xyte's audit trail. Start with a small group of rooms, read the first few reports, then widen the scope. xyte-cli can't send email itself, so the email step works only if your assistant can send mail. If it can't, ask it to save the PDF to a folder instead.</span></div>
   </div>
 </section>
 
