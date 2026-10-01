@@ -7,7 +7,7 @@ import { installSkills } from './install-skills';
 import { CliUserError } from '../contracts/user-error';
 import { runProcess } from '../utils/run-command';
 import { getCliVersion } from '../utils/version';
-import { buildUpgradeCheck, type UpgradeCheckV1, type UpgradeResultV1 } from '../contracts/upgrade';
+import { buildUpgradeCheck, type UpgradeCheckV2, type UpgradeResultV2 } from '../contracts/upgrade';
 import { UPGRADE_RESULT_SCHEMA_VERSION } from '../contracts/versions';
 import { detectInstallChannel, WINDOWS_MSI_PACKAGE_ID, type InstallChannel } from '../utils/install-channel';
 
@@ -193,7 +193,7 @@ async function fetchLatestVersion(packageName: string, fetchImpl: typeof fetch):
 export async function checkForUpgrade(
   settings: Pick<UpgradeSettings, 'packageName' | 'latestVersionOverride'> = {},
   deps: UpgradeDependencies = {}
-): Promise<UpgradeCheckV1> {
+): Promise<UpgradeCheckV2> {
   const packageName = settings.packageName ?? DEFAULT_CLI_PACKAGE;
   const fetchImpl = deps.fetchImpl ?? fetch;
   const currentVersion = (deps.getCurrentVersion ?? getCliVersion)();
@@ -214,7 +214,7 @@ export async function checkForUpgrade(
 export async function applyUpgrade(
   settings: UpgradeSettings,
   deps: UpgradeDependencies = {}
-): Promise<UpgradeResultV1> {
+): Promise<UpgradeResultV2> {
   const packageName = settings.packageName ?? DEFAULT_CLI_PACKAGE;
   const runner = deps.commandRunner ?? defaultRunner;
   const installSkillsImpl = deps.installSkillsImpl ?? installSkills;

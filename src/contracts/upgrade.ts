@@ -63,8 +63,8 @@ export const UpgradeResultSchema = z.object({
   warnings: z.array(z.string())
 });
 
-export type UpgradeCheckV1 = z.infer<typeof UpgradeCheckSchema>;
-export type UpgradeResultV1 = z.infer<typeof UpgradeResultSchema>;
+export type UpgradeCheckV2 = z.infer<typeof UpgradeCheckSchema>;
+export type UpgradeResultV2 = z.infer<typeof UpgradeResultSchema>;
 
 export function buildUpgradeCheck(args: {
   packageName: string;
@@ -72,7 +72,7 @@ export function buildUpgradeCheck(args: {
   recommendedCommand: string;
   currentVersion: string;
   latestVersion: string;
-}): UpgradeCheckV1 {
+}): UpgradeCheckV2 {
   const upToDate = compareSemver(args.currentVersion, args.latestVersion) >= 0;
   const installChannel = args.installChannel ?? 'npm';
   return {
