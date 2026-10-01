@@ -144,7 +144,9 @@ xyte-cli api endpoints describe organization.groups.addUsers
 xyte-cli api endpoints describe partner.organizations.createOrganization
 xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query-json '{"page":1,"per_page":100}'
 xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query-json '{"page":1,"per_page":100}' --output-mode envelope --strict-json [--note <text>]
-# For complete device inventories, increment page until the envelope response reports no continuation (`next_page` is null/absent, or `has_next_page=false` on tenants that return that field).
+xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query-json '{"name":"lobby","status":"offline,error","connection_method":"c2c"}'
+# Filters: space_id, name, status, effective_status, model_id, connection_method, connector_id. Multi-value status/effective_status is a comma-separated string. Any other query param returns 422.
+# For complete device inventories, increment page until the envelope response reports no continuation (`next_page` is null/absent).
 xyte-cli api call organization.devices.mergeDevice --tenant <tenant-id> --path-json '{"device_id":"<primary-device-id>"}' --body-json '{"with_device_ids":["<shadow-device-id>"]}' --note "approved merge"
 xyte-cli api call organization.devices.splitDevice --tenant <tenant-id> --path-json '{"device_id":"<primary-device-id>"}' --body-json '{"shadow_device_id":"<shadow-device-id>"}' --note "approved split"
 xyte-cli api call organization.notes.getDeviceNotes --tenant <tenant-id> --path-json '{"device_id":"<device-id>"}' --query-json '{"page":1,"per_page":100}'

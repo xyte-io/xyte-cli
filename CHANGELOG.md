@@ -6,10 +6,20 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-09-24
+
+### Added
+- `organization.devices.getDevices` now lists the hub's device filters: `name` (case-insensitive substring), `status`, `effective_status`, `model_id`, `connection_method` (`native`/`c2c`/`edge`) and `connector_id`. Pass several `status` / `effective_status` values as a comma-separated string, e.g. `--query-json '{"status":"online,error"}'`.
+- Device responses from `getDevices`, `getDevice` and `claimDevice` document the new `connector: { type, id, name }` block.
+
 ### Changed
+- The hub now rejects any other `getDevices` query parameter, and invalid filter values, with `422`.
+- Device pagination guidance now names `next_page` only; the API docs were corrected from `has_next_page`.
 - `organization.devices.getHistories` catalog notes and skill docs now document `page`/`per_page` pagination (422 outside 1..1000, not clamped), the 31-day inclusive `from`/`to` window (422 when exceeded or reversed), the stable newest-first ordering, and guidance to prefer narrow windows and filters over deep page walks.
+- Bumped package metadata and lockfile to `0.15.0`.
 
 ### Upgrade notes
+- Run `xyte-cli skills refresh` after upgrading so installed skill bundles pick up the new filters.
 - Existing workspaces that already installed the shipped skill bundle should run `xyte-cli skills refresh` after upgrading — the previous `getHistories` example used a wide `from=0` window that now returns 422 against production.
 
 ## [0.14.0] - 2026-08-03
