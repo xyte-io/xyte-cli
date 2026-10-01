@@ -110,25 +110,46 @@ export function resolveWingetPath(
   if (!found) {
     throw new CliUserError({ summary: 'winget.exe was not found in %LOCALAPPDATA%\\Microsoft\\WindowsApps or on PATH.' });
   }
-  // The path is quoted for cmd.exe below; these characters would break out of that quoting.
-  if (/["%&<>()@^|!]/.test(found)) {
-    throw new CliUserError({ summary: `winget path "${found}" contains characters that cannot be passed safely through cmd.exe.` });
+  return assertCmdSafePath(found, 'winget');
+}
+
+// Paths are quoted for cmd.exe below; these characters would break out of that quoting.
+function assertCmdSafePath(filePath: string, label: string): string {
+  if (/["%&<>()@^|!]/.test(filePath)) {
+    throw new CliUserError({ summary: `${label} path "${filePath}" contains characters that cannot be passed safely through cmd.exe.` });
   }
-  return found;
+  return filePath;
+}
+
+/**
+ * Absolute path to cmd.exe, for the same reason as resolveWingetPath: a bare
+ * `cmd.exe` is looked up in the current directory first.
+ */
+export function resolveCmdPath(env: NodeJS.ProcessEnv = process.env): string {
+  const win = path.win32;
+  const comSpec = env.ComSpec;
+  const cmdPath =
+    comSpec && win.isAbsolute(comSpec) ? comSpec : win.join(env.SystemRoot ?? 'C:\\Windows', 'System32', 'cmd.exe');
+  if (!win.isAbsolute(cmdPath)) {
+    throw new CliUserError({ summary: `cmd.exe path "${cmdPath}" is not absolute.` });
+  }
+  return assertCmdSafePath(cmdPath, 'cmd.exe');
 }
 
 /**
  * cmd.exe argv that opens a new console window running winget and keeps it open
  * (`cmd /k`) after winget exits, so its output and errors stay readable.
  */
-export function buildWingetConsoleArgs(wingetPath: string, args: string[]): string[] {
-  return ['/d', '/c', 'start', '"Xyte CLI upgrade"', 'cmd.exe', '/d', '/k', `"${wingetPath}"`, ...args];
+export function buildWingetConsoleArgs(cmdPath: string, wingetPath: string, args: string[]): string[] {
+  return ['/d', '/c', 'start', '"Xyte CLI upgrade"', `"${cmdPath}"`, '/d', '/k', `"${wingetPath}"`, ...args];
 }
 
 function defaultDetachedLauncher(command: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
+    let cmdPath: string;
     let wingetPath: string;
     try {
+      cmdPath = resolveCmdPath();
       wingetPath = command === 'winget' ? resolveWingetPath() : command;
     } catch (error) {
       reject(error);
@@ -136,7 +157,7 @@ function defaultDetachedLauncher(command: string, args: string[]): Promise<void>
     }
     // `start` gives winget its own console window; detached + stdio ignore lets the
     // short-lived outer cmd.exe (and this process) exit without waiting for it.
-    const child = spawn('cmd.exe', buildWingetConsoleArgs(wingetPath, args), {
+    const child = spawn(cmdPath, buildWingetConsoleArgs(cmdPath, wingetPath, args), {
       detached: true,
       stdio: 'ignore',
       windowsVerbatimArguments: true

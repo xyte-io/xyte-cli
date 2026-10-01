@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-import { applyUpgrade, buildWingetConsoleArgs, checkForUpgrade, resolveWingetPath } from '../src/cli/upgrade';
+import { applyUpgrade, buildWingetConsoleArgs, checkForUpgrade, resolveCmdPath, resolveWingetPath } from '../src/cli/upgrade';
 import { maybeNotifyUpdateAvailable } from '../src/cli/update-notifier';
 import { compareSemver } from '../src/contracts/semver';
 
@@ -370,12 +370,12 @@ describe('upgrade utilities', () => {
   });
 
   it('builds a cmd.exe launch that opens a console window and keeps it open', () => {
-    expect(buildWingetConsoleArgs('C:\\W\\winget.exe', ['upgrade', '--id', 'Xyte.XyteCLI'])).toEqual([
+    expect(buildWingetConsoleArgs('C:\\Windows\\System32\\cmd.exe', 'C:\\W\\winget.exe', ['upgrade', '--id', 'Xyte.XyteCLI'])).toEqual([
       '/d',
       '/c',
       'start',
       '"Xyte CLI upgrade"',
-      'cmd.exe',
+      '"C:\\Windows\\System32\\cmd.exe"',
       '/d',
       '/k',
       '"C:\\W\\winget.exe"',
@@ -383,6 +383,14 @@ describe('upgrade utilities', () => {
       '--id',
       'Xyte.XyteCLI'
     ]);
+  });
+
+  it('resolves cmd.exe to an absolute path, never by bare name', () => {
+    expect(resolveCmdPath({ ComSpec: 'C:\\Windows\\system32\\cmd.exe' })).toBe('C:\\Windows\\system32\\cmd.exe');
+    expect(resolveCmdPath({ ComSpec: 'cmd.exe', SystemRoot: 'D:\\Win' })).toBe('D:\\Win\\System32\\cmd.exe');
+    expect(resolveCmdPath({})).toBe('C:\\Windows\\System32\\cmd.exe');
+    expect(() => resolveCmdPath({ SystemRoot: 'Win' })).toThrow(/not absolute/);
+    expect(() => resolveCmdPath({ ComSpec: 'C:\\a&b\\cmd.exe' })).toThrow(/cannot be passed safely/);
   });
 
   it('prints a passive update notice at most once per check interval', async () => {
