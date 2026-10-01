@@ -47,6 +47,7 @@
         Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe"
         Arguments="-NoExit -Command &quot;xyte-cli --version; xyte-cli doctor environment --format text&quot;"
         WorkingDirectory="INSTALLFOLDER" />
+      <RemoveFolder Id="RemoveApplicationProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
       <RegistryValue Root="HKLM" Key="Software\Xyte\Xyte CLI" Name="Shortcuts" Type="integer" Value="1" KeyPath="yes" />
     </Component>
 
