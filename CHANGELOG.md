@@ -9,7 +9,7 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 ## [0.15.0] - 2026-09-24
 
 ### Added
-- `organization.devices.getDevices` now lists the hub's device filters: `name` (case-insensitive substring), `status`, `effective_status`, `model_id`, `connection_method` (`native`/`c2c`/`edge`) and `connector_id`. Pass several statuses as a comma-separated string, e.g. `--query-json '{"status":"online,error"}'`.
+- `organization.devices.getDevices` now lists the hub's device filters: `name` (case-insensitive substring), `status`, `effective_status`, `model_id`, `connection_method` (`native`/`c2c`/`edge`) and `connector_id`. Pass several `status` / `effective_status` values as a comma-separated string, e.g. `--query-json '{"status":"online,error"}'`.
 - Device responses from `getDevices`, `getDevice` and `claimDevice` document the new `connector: { type, id, name }` block.
 
 ### Changed
