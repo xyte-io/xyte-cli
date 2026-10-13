@@ -2158,6 +2158,52 @@ describe('cli integration', () => {
     expect(parsed.response.status).toBe(200);
   });
 
+  it('serializes getDevices filters as scalar query params with comma lists', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ items: [], next_page: null }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'api',
+      'call',
+      'organization.devices.getDevices',
+      '--tenant',
+      'acme',
+      '--query-json',
+      '{"name":"lobby","status":"online,error","effective_status":"warning","connection_method":"c2c","connector_id":"5b1f0c2e-7a4d-4c1e-9f3a-2d6b8e1c0a11","page":1,"per_page":100}'
+    ]);
+
+    const [requestUrl, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const url = new URL(String(requestUrl));
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+    expect(url.pathname).toBe('/core/v1/organization/devices');
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      name: 'lobby',
+      status: 'online,error',
+      effective_status: 'warning',
+      connection_method: 'c2c',
+      connector_id: '5b1f0c2e-7a4d-4c1e-9f3a-2d6b8e1c0a11',
+      page: '1',
+      per_page: '100'
+    });
+  });
+
   it('rejects invalid output-mode values for api call', async () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });

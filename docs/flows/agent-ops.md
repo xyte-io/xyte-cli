@@ -254,7 +254,7 @@ xyte-cli api call organization.commands.getCommands \
 ```bash
 mkdir -p ./artifacts ./reports
 xyte-cli api call organization.devices.getDevices --tenant <tenant-id> --query-json '{"space_id":"<source-space-id>","page":1,"per_page":100}' --output-mode envelope --output json > ./artifacts/source-devices.page-1.json
-# Repeat page 2, 3, ... until the response reports no continuation (`next_page` is null/absent, or `has_next_page=false` on tenants that return that field), then combine items into ./artifacts/source-devices.json.
+# Repeat page 2, 3, ... until the response reports no continuation (`next_page` is null/absent), then combine items into ./artifacts/source-devices.json.
 xyte-cli api call organization.spaces.getSpaces --tenant <tenant-id> --query path_includes=<target-path> --output json > ./artifacts/target-spaces.json
 xyte-cli util match --tenant <tenant-id> --source ./artifacts/source-devices.json --target ./artifacts/target-spaces.json --source-field name --target-field name --out ./artifacts/device-moves.csv
 xyte-cli ops report generate --tenant <tenant-id> --input ./artifacts/device-moves.csv.summary.json --out ./reports/device-migration-pre.md --render markdown
@@ -264,7 +264,7 @@ xyte-cli ops inspect fleet --tenant <tenant-id> --output json --out ./artifacts/
 ```
 
 - Expected artifacts:
-  - complete source device inventory JSON, collected across all `getDevices` pages until no `next_page` / `has_next_page` continuation remains, and target space inventory JSON.
+  - complete source device inventory JSON, collected across all `getDevices` pages until no `next_page` continuation remains, and target space inventory JSON.
   - deterministic move CSV at `./artifacts/device-moves.csv` plus summary JSON sidecar.
   - pre-migration markdown report at `./reports/device-migration-pre.md`.
   - dry-run and apply NDJSON row reports for move execution.
