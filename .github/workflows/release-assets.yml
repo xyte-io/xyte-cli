@@ -11,6 +11,11 @@ on:
         description: "Tag to package (e.g. 0.1.0 or v0.1.0)"
         required: true
         type: string
+      force_windows_msi:
+        description: "Rebuild and replace the Windows MSI even if the release already has one (changes its SHA-256; breaks any submitted WinGet manifest)"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -29,11 +34,13 @@ jobs:
       - name: Resolve tag
         id: meta
         shell: bash
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
           set -euo pipefail
 
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            TAG="${{ github.event.inputs.tag }}"
+            TAG="${INPUT_TAG}"
           else
             TAG="${GITHUB_REF_NAME}"
           fi
@@ -76,6 +83,8 @@ jobs:
         run: npm run smoke:pack-install
 
   release:
+    # windows-msi must stay out of this needs list: a Windows toolchain failure
+    # must not block the npm tarball/SBOM release (see docs/release.md).
     needs: [meta, packaged-install-smoke]
     runs-on: ubuntu-latest
     steps:
@@ -130,3 +139,275 @@ jobs:
             *.tgz
             sbom.cdx.json
             checksums.txt
+
+  # Build and sign are split so npm ci (dependency lifecycle scripts), the build and
+  # packaging never run in a job that can mint the signing OIDC token.
+  windows-msi:
+    needs: [meta, release]
+    # WiX only accepts numeric versions, so prerelease tags (1.2.3-rc.1) ship no MSI.
+    if: ${{ !contains(needs.meta.outputs.version, '-') }}
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    outputs:
+      skip: ${{ steps.existing.outputs.skip }}
+    steps:
+      # Re-signing changes the MSI's SHA-256, which breaks a WinGet manifest already
+      # submitted for it, so an attached MSI is only replaced on an explicit request.
+      - name: Check for an existing Windows MSI asset
+        id: existing
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ github.event.inputs.force_windows_msi || 'false' }}
+          TAG: ${{ needs.meta.outputs.tag }}
+          MSI_NAME: XyteCLI-${{ needs.meta.outputs.version }}-win-x64.msi
+        run: |
+          set -euo pipefail
+          skip=false
+          err="$(mktemp)"
+          if [[ "${FORCE}" != "true" ]]; then
+            # Only "release not found" counts as absent; any other gh failure must not
+            # read as "no MSI yet" and trigger a rebuild/re-sign.
+            if ! assets="$(gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" --json assets --jq '.assets[].name' 2>"${err}")"; then
+              if grep -qi 'release not found' "${err}"; then
+                assets=""
+              else
+                cat "${err}" >&2
+                echo "::error::Could not list the assets of release ${TAG}."
+                exit 1
+              fi
+            fi
+            if grep -Fxq "${MSI_NAME}" <<<"${assets}"; then
+              echo "::notice::${MSI_NAME} is already attached to ${TAG}; skipping. Re-run with force_windows_msi to replace it."
+              skip=true
+            fi
+          fi
+          echo "skip=${skip}" >> "${GITHUB_OUTPUT}"
+
+      - name: Checkout tag
+        if: steps.existing.outputs.skip != 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: refs/tags/${{ needs.meta.outputs.tag }}
+
+      - name: Setup Node.js
+        if: steps.existing.outputs.skip != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Setup .NET SDK
+        if: steps.existing.outputs.skip != 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.x"
+
+      - name: Install dependencies
+        if: steps.existing.outputs.skip != 'true'
+        run: npm ci
+
+      - name: Validate package version matches tag
+        if: steps.existing.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          TAG_VERSION="${{ needs.meta.outputs.version }}"
+          if [[ "${PACKAGE_VERSION}" != "${TAG_VERSION}" ]]; then
+            echo "::error::package.json version (${PACKAGE_VERSION}) does not match tag (${TAG_VERSION})."
+            exit 1
+          fi
+
+      - name: Install WiX Toolset
+        if: steps.existing.outputs.skip != 'true'
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 7.0.0
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Validate Windows packaging metadata
+        if: steps.existing.outputs.skip != 'true'
+        run: npm run validate:windows-packaging
+
+      - name: Build Windows MSI
+        if: steps.existing.outputs.skip != 'true'
+        env:
+          XYTE_WINDOWS_INSTALLER_URL: https://github.com/${{ github.repository }}/releases/download/${{ needs.meta.outputs.tag }}/XyteCLI-${{ needs.meta.outputs.version }}-win-x64.msi
+        run: npm run package:windows-msi -- --out-dir artifacts/windows-installer
+
+      - name: Upload unsigned Windows MSI
+        if: steps.existing.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-msi-unsigned
+          if-no-files-found: error
+          path: |
+            artifacts/windows-installer/*.msi
+            artifacts/windows-installer/windows-installer-manifest.json
+            artifacts/windows-installer/winget/*.yaml
+
+  # Signs and publishes the MSI built above. No checkout, no npm install: only the
+  # signing action and first-party shell steps run next to the OIDC token.
+  windows-msi-sign:
+    needs: [meta, windows-msi]
+    if: ${{ needs.windows-msi.outputs.skip != 'true' }}
+    runs-on: windows-latest
+    # The `release` environment holds the Azure Artifact Signing settings; its
+    # federated credential only trusts this environment.
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      MSI_PATH: artifacts/windows-installer/XyteCLI-${{ needs.meta.outputs.version }}-win-x64.msi
+    steps:
+      # Same guard as windows-msi, repeated before azure/login so re-running only this
+      # job cannot re-sign and replace an MSI that is already published.
+      - name: Check for an existing Windows MSI asset
+        id: existing
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ github.event.inputs.force_windows_msi || 'false' }}
+          TAG: ${{ needs.meta.outputs.tag }}
+          MSI_NAME: XyteCLI-${{ needs.meta.outputs.version }}-win-x64.msi
+        run: |
+          set -euo pipefail
+          skip=false
+          err="$(mktemp)"
+          if [[ "${FORCE}" != "true" ]]; then
+            # Only "release not found" counts as absent; any other gh failure must not
+            # read as "no MSI yet" and trigger a rebuild/re-sign.
+            if ! assets="$(gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" --json assets --jq '.assets[].name' 2>"${err}")"; then
+              if grep -qi 'release not found' "${err}"; then
+                assets=""
+              else
+                cat "${err}" >&2
+                echo "::error::Could not list the assets of release ${TAG}."
+                exit 1
+              fi
+            fi
+            if grep -Fxq "${MSI_NAME}" <<<"${assets}"; then
+              echo "::notice::${MSI_NAME} is already attached to ${TAG}; skipping. Re-run with force_windows_msi to replace it."
+              skip=true
+            fi
+          fi
+          echo "skip=${skip}" >> "${GITHUB_OUTPUT}"
+
+      # Signing stays off until AZURE_SIGNING_CERT_PROFILE is set on the release
+      # environment, which needs Microsoft's identity validation to complete first.
+      # An unsigned MSI is never published: until then the release gets no Windows
+      # assets and the unsigned build stays in the windows-msi-unsigned artifact.
+      - name: Decide whether to sign and publish
+        id: gate
+        if: steps.existing.outputs.skip != 'true'
+        shell: bash
+        env:
+          SIGNING_CERT_PROFILE: ${{ vars.AZURE_SIGNING_CERT_PROFILE }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SIGNING_CERT_PROFILE}" ]]; then
+            echo "::warning::Windows MSI was not published: signing is not configured (AZURE_SIGNING_CERT_PROFILE is unset on the release environment). The unsigned build is available as the windows-msi-unsigned workflow artifact."
+            echo "publish=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "publish=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Download unsigned Windows MSI
+        if: steps.gate.outputs.publish == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-msi-unsigned
+          path: artifacts/windows-installer
+
+      - name: Azure login
+        if: steps.gate.outputs.publish == 'true'
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign Windows MSI
+        if: steps.gate.outputs.publish == 'true'
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_SIGNING_CERT_PROFILE }}
+          files: ${{ github.workspace }}\artifacts\windows-installer\XyteCLI-${{ needs.meta.outputs.version }}-win-x64.msi
+          description: Xyte CLI
+
+      - name: Verify MSI signature
+        if: steps.gate.outputs.publish == 'true'
+        shell: pwsh
+        run: |
+          $sig = Get-AuthenticodeSignature $env:MSI_PATH
+          "Status: $($sig.Status); signer: $($sig.SignerCertificate.Subject)"
+          if ($sig.Status -ne 'Valid') { throw "MSI signature is $($sig.Status)" }
+
+      - name: Point the WinGet manifest at the signed MSI
+        if: steps.gate.outputs.publish == 'true'
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $env:MSI_PATH).Hash
+          $yaml = 'artifacts/windows-installer/winget/Xyte.XyteCLI.installer.yaml'
+          $content = Get-Content -Raw -LiteralPath $yaml
+          if ($content -notmatch '(?m)^\s*InstallerSha256:') { throw "InstallerSha256 missing from $yaml" }
+          $content = $content -replace '(?m)^(\s*InstallerSha256:).*$', "`${1} $hash"
+          Set-Content -LiteralPath $yaml -Value $content -NoNewline -Encoding utf8NoBOM
+          "InstallerSha256: $hash"
+
+      - name: Generate Windows checksums
+        if: steps.gate.outputs.publish == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd artifacts/windows-installer
+          sha256sum *.msi windows-installer-manifest.json winget/*.yaml > windows-checksums.txt
+
+      - name: Upload Windows MSI artifact
+        if: steps.gate.outputs.publish == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-msi
+          path: |
+            artifacts/windows-installer/*.msi
+            artifacts/windows-installer/windows-installer-manifest.json
+            artifacts/windows-installer/winget/*.yaml
+            artifacts/windows-installer/windows-checksums.txt
+
+      - name: Publish Windows release assets
+        if: steps.gate.outputs.publish == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.meta.outputs.tag }}
+          files: |
+            artifacts/windows-installer/*.msi
+            artifacts/windows-installer/windows-installer-manifest.json
+            artifacts/windows-installer/winget/*.yaml
+            artifacts/windows-installer/windows-checksums.txt
+
+      - name: Verify Windows release assets attached
+        if: steps.gate.outputs.publish == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          assets="$(gh release view "${{ needs.meta.outputs.tag }}" --repo "${{ github.repository }}" --json assets --jq '.assets[].name')"
+          for expected in \
+            "XyteCLI-${{ needs.meta.outputs.version }}-win-x64.msi" \
+            "windows-installer-manifest.json" \
+            "windows-checksums.txt" \
+            "Xyte.XyteCLI.yaml" \
+            "Xyte.XyteCLI.installer.yaml" \
+            "Xyte.XyteCLI.locale.en-US.yaml"; do
+            if ! grep -Fxq "$expected" <<<"$assets"; then
+              echo "::error::Windows release asset missing: $expected"
+              exit 1
+            fi
+          done

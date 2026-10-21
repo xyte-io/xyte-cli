@@ -266,6 +266,7 @@ describe('golden contracts', () => {
   it('matches upgrade check contract', () => {
     const check = buildUpgradeCheck({
       packageName: '@xyteai/cli',
+      recommendedCommand: 'npm install --global @xyteai/cli@latest',
       currentVersion: '0.4.0',
       latestVersion: '0.4.1'
     });

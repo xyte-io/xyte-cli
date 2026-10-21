@@ -25,6 +25,7 @@ import {
   type SkillInstallScope
 } from './install-skills';
 import { applyUpgrade, checkForUpgrade, type UpgradeDependencies } from './upgrade';
+import { detectInstallChannel } from '../utils/install-channel';
 import { maybeNotifyUpdateAvailable, type UpdateNotifier } from './update-notifier';
 import { promptValue } from './prompt-value';
 import { runTuiApp } from '../tui/app';
@@ -912,20 +913,27 @@ export function createCli(runtime: CliRuntime = {}): Command {
         stdoutIsTTY,
         settings
       });
+      const formatSource = command.getOptionValueSource('format');
+      const explicitJson =
+        output === 'json' &&
+        ((formatSource !== undefined && formatSource !== 'default') || getExplicitGlobalOutput(command) === 'json');
       const latestVersionOverride = process.env.XYTE_CLI_UPGRADE_TARGET_VERSION?.trim() || undefined;
       const installSpec = process.env.XYTE_CLI_UPGRADE_SPEC?.trim() || undefined;
-      const check = await checkForUpgrade(
-        { packageName: '@xyteai/cli', latestVersionOverride },
-        runtime.upgradeDependencies
-      );
+      const loadCheck = () =>
+        checkForUpgrade({ packageName: '@xyteai/cli', latestVersionOverride }, runtime.upgradeDependencies);
       if (options.check) {
+        const check = await loadCheck();
         if (output === 'text') {
           stdout.write(`Package: ${check.packageName}\n`);
+          stdout.write(`Install channel: ${check.installChannel}\n`);
           stdout.write(`Current: ${check.currentVersion}\n`);
           stdout.write(`Latest: ${check.latestVersion}\n`);
           stdout.write(`Up to date: ${check.upToDate}\n`);
           if (check.recommendedCommand) {
             stdout.write(`Recommended: ${check.recommendedCommand}\n`);
+            if (check.installChannel === 'windows-msi') {
+              stdout.write('Note: the winget package can lag the npm release; winget reports if the version is not available yet.\n');
+            }
           }
           return;
         }
@@ -939,7 +947,10 @@ export function createCli(runtime: CliRuntime = {}): Command {
         }
         const answer = (
           await prompt({
-            question: 'Proceed with global CLI update and user-scope skills refresh? (y/N)',
+            question:
+              (runtime.upgradeDependencies?.getInstallChannel ?? detectInstallChannel)().kind === 'windows-msi'
+                ? 'Proceed to hand off the upgrade to winget? (y/N)'
+                : 'Proceed with global CLI update and user-scope skills refresh? (y/N)',
             initial: 'N',
             stdout
           })
@@ -950,7 +961,7 @@ export function createCli(runtime: CliRuntime = {}): Command {
           if (output === 'text') {
             stdout.write('Upgrade canceled.\n');
           } else {
-            printJson(stdout, check, { strictJson: resolveStrictJson({ settings }) });
+            printJson(stdout, await loadCheck(), { strictJson: resolveStrictJson({ settings }) });
           }
           return;
         }
@@ -958,22 +969,44 @@ export function createCli(runtime: CliRuntime = {}): Command {
 
       const result = await applyUpgrade(
         {
-          packageName: check.packageName,
+          packageName: '@xyteai/cli',
           skillSourceDir: resolveSkillSourceDir(),
           installSpec,
-          latestVersionOverride
+          latestVersionOverride,
+          // windows-msi: open a winget window for a human at a terminal, even under the
+          // default JSON format; non-TTY callers and an explicit JSON request
+          // (--format json / --output json) get the command back instead.
+          launchInteractive: stdoutIsTTY && !explicitJson
         },
         runtime.upgradeDependencies
       );
 
       if (output === 'text') {
         stdout.write(`Package: ${result.packageName}\n`);
+        stdout.write(`Install channel: ${result.installChannel}\n`);
         stdout.write(`Current: ${result.currentVersion}\n`);
         stdout.write(`Latest: ${result.latestVersion}\n`);
+        if (result.handoff && result.updateCommand) {
+          const wingetCommand = `winget ${result.updateCommand.args.join(' ')}`;
+          if (result.handoff.status === 'started') {
+            stdout.write(`Upgrade started in a new winget console window (it stays open when winget finishes): ${wingetCommand}\n`);
+          } else {
+            stdout.write(`To upgrade, run: ${wingetCommand}\n`);
+          }
+          stdout.write('Note: the winget package can lag the npm release; winget reports if the version is not available yet.\n');
+          stdout.write('After winget finishes, open a new terminal and run: xyte-cli skills refresh\n');
+          return;
+        }
+        if (result.installChannel === 'windows-msi') {
+          stdout.write('Already up to date.\n');
+          return;
+        }
         stdout.write(`Updated: ${result.updated}\n`);
-        stdout.write(`Verified version: ${result.verify.detectedVersion}\n`);
+        if (result.verify) {
+          stdout.write(`Verified version: ${result.verify.detectedVersion}\n`);
+        }
         stdout.write('Skill refresh summary:\n');
-        result.skills.outcomes.forEach((outcome) => stdout.write(`${formatInstallOutcome(outcome)}\n`));
+        result.skills?.outcomes.forEach((outcome) => stdout.write(`${formatInstallOutcome(outcome)}\n`));
         if (result.warnings.length > 0) {
           stdout.write('Warnings:\n');
           result.warnings.forEach((warning) => stdout.write(`- ${warning}\n`));
