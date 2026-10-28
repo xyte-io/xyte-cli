@@ -88,6 +88,38 @@ describe('namespace endpoint mappings', () => {
     });
   });
 
+  it('maps organization maintenance schedule endpoints', async () => {
+    const call = vi.fn().mockResolvedValue({ ok: true });
+    const organization = createOrganizationNamespace(call);
+
+    await organization.getMaintenanceSchedules({ query: { space_id: 17517, active_now: true } });
+    await organization.getSpaceMaintenanceSchedules({ path: { space_id: 17517 } });
+    await organization.createMaintenanceSchedule({
+      path: { space_id: 17517 },
+      body: { days: ['mon'], start: '02:00', end: '06:00' }
+    });
+    await organization.updateMaintenanceSchedule({ path: { id: 'sched-1' }, body: { enabled: false } });
+    await organization.deleteMaintenanceSchedule({ path: { id: 'sched-1' } });
+
+    expect(call).toHaveBeenNthCalledWith(1, 'organization.maintenanceSchedules.getMaintenanceSchedules', {
+      query: { space_id: 17517, active_now: true }
+    });
+    expect(call).toHaveBeenNthCalledWith(2, 'organization.maintenanceSchedules.getSpaceMaintenanceSchedules', {
+      path: { space_id: 17517 }
+    });
+    expect(call).toHaveBeenNthCalledWith(3, 'organization.maintenanceSchedules.createMaintenanceSchedule', {
+      path: { space_id: 17517 },
+      body: { days: ['mon'], start: '02:00', end: '06:00' }
+    });
+    expect(call).toHaveBeenNthCalledWith(4, 'organization.maintenanceSchedules.updateMaintenanceSchedule', {
+      path: { id: 'sched-1' },
+      body: { enabled: false }
+    });
+    expect(call).toHaveBeenNthCalledWith(5, 'organization.maintenanceSchedules.deleteMaintenanceSchedule', {
+      path: { id: 'sched-1' }
+    });
+  });
+
   it('maps organization.startEdgeClaim to organization.edge.startClaim', async () => {
     const call = vi.fn().mockResolvedValue({ ok: true });
     const organization = createOrganizationNamespace(call);

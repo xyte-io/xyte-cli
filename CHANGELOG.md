@@ -9,8 +9,12 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 ### Added
 - Windows MSI installer pipeline: WiX-based packaging with a bundled Node.js runtime (checksum-verified against nodejs.org SHASUMS256), machine `PATH` entry, Start Menu shortcuts, the Configure Xyte CLI post-install assistant, generated WinGet manifests for `Xyte.XyteCLI`, and optional Authenticode signing through Azure Artifact Signing. Release assets include the signed MSI, WinGet manifests, and Windows checksums, published independently of the npm release; without signing configured the MSI is not published. See `docs/windows-installer.md`.
 - Install-channel detection: `xyte-cli upgrade` reports `installChannel` (`npm` | `windows-msi`) and hands MSI upgrades off to a detached `winget upgrade --id Xyte.XyteCLI --exact --source winget ...` (launched in its own console window from an interactive terminal; non-TTY callers and an explicit `--format json`/`--output json` get the command back as `handoff.status: "manual"`; result v2 carries `handoff`; `verify`/`skills` are omitted then) while npm installs keep using `npm install --global`.
+- `organization.maintenanceSchedules.*` for the hub's recurring maintenance windows: `getMaintenanceSchedules` (filters `space_id`, `enabled`, `active_now`), `getSpaceMaintenanceSchedules` (a space's own, inherited and effective windows), `createMaintenanceSchedule`, `updateMaintenanceSchedule` and `deleteMaintenanceSchedule`, in the endpoint catalog and the typed client.
+- `organization.spaces.getSpaces` lists the `maintenance_scheduled_active` and `has_maintenance_schedules` filters and documents each space's `maintenance: { manual, scheduled }` block.
+- `organization.incidents.getIncidents` lists `include_suppressed` and documents each incident's `scheduled_maintenance: { suppressed, suppressed_until, announced_at }` block.
 
 ### Changed
+- `organization.incidents.getIncidents` no longer returns incidents suppressed by a scheduled maintenance window unless `include_suppressed=true` is passed (hub behavior change, matching the Xyte portal).
 - **Breaking (JSON contracts):** upgrade payloads moved to `xyte.upgrade.check.v2` and `xyte.upgrade.result.v2`, which add the required `installChannel` field. The v1 schemas remain published unchanged for legacy payloads; consumers validating upgrade JSON should adopt the v2 schemas in `docs/schemas/`.
 
 ## [0.15.0] - 2026-09-24

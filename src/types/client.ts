@@ -66,6 +66,11 @@ export interface OrganizationNamespace {
   removeUsers: NamespaceCall;
   updateGroup: NamespaceCall;
   getIncidents: NamespaceCall;
+  getMaintenanceSchedules: NamespaceCall;
+  getSpaceMaintenanceSchedules: NamespaceCall;
+  createMaintenanceSchedule: NamespaceCall;
+  updateMaintenanceSchedule: NamespaceCall;
+  deleteMaintenanceSchedule: NamespaceCall;
   getModel: NamespaceCall;
   getModels: NamespaceCall;
   createDeviceNote: NamespaceCall;
