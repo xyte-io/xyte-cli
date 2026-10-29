@@ -1,9 +1,26 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { listEndpoints } from '../src/client/catalog';
 import { createOrganizationNamespace } from '../src/client/namespaces/organization';
 import { createPartnerNamespace } from '../src/client/namespaces/partner';
 
 describe('namespace endpoint mappings', () => {
+  it.each([
+    ['organization', createOrganizationNamespace],
+    ['partner', createPartnerNamespace]
+  ] as const)('maps every %s catalog key to exactly one client method', async (namespace, create) => {
+    const call = vi.fn().mockResolvedValue({ ok: true });
+    const methods = Object.values(create(call)) as Array<(args?: unknown) => Promise<unknown>>;
+
+    for (const method of methods) {
+      await method();
+    }
+
+    const calledKeys = call.mock.calls.map(([key]) => key as string);
+    expect(new Set(calledKeys).size).toBe(calledKeys.length);
+    expect([...calledKeys].sort()).toEqual(listEndpoints(namespace).map((endpoint) => endpoint.key).sort());
+  });
+
   it('maps partner.getDevices to partner.devices.getDevices', async () => {
     const call = vi.fn().mockResolvedValue({ ok: true });
     const partner = createPartnerNamespace(call);

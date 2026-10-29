@@ -145,6 +145,9 @@ describe('public endpoint catalog', () => {
     for (const [action, method, pathTemplate, pathParams, queryParams, bodyType, slug] of expected) {
       const endpoint = endpoints.find((item) => item.key === `organization.maintenanceSchedules.${action}`);
       expect(endpoint).toBeDefined();
+      expect(endpoint?.namespace).toBe('organization');
+      expect(endpoint?.group).toBe('maintenanceSchedules');
+      expect(endpoint?.action).toBe(action);
       expect(endpoint?.method).toBe(method);
       expect(endpoint?.base).toBe('hub');
       expect(endpoint?.pathTemplate).toBe(pathTemplate);

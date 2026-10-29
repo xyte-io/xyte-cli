@@ -3,6 +3,8 @@ import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import endpoints from '../src/api-catalog/public-endpoints.json';
+
 const NOTE_KEYS = [
   'organization.notes.createDeviceNote',
   'organization.notes.createSpaceNote',
@@ -59,5 +61,42 @@ describe('notes endpoint docs and skill guidance', () => {
     expect(readme).toContain('organization.notes.createDeviceNote');
     expect(commands).toContain('organization.notes.getDeviceNotes');
     expect(commands).toContain('organization.notes.deleteDeviceNote');
+  });
+});
+
+describe('maintenance schedule docs and skill guidance', () => {
+  it('lists every catalog query field in the endpoint reference filter matrix', () => {
+    const content = read('skills/xyte-cli/references/endpoints.md');
+
+    for (const key of [
+      'organization.maintenanceSchedules.getMaintenanceSchedules',
+      'organization.incidents.getIncidents',
+      'organization.spaces.getSpaces'
+    ]) {
+      const row = content.split('\n').find((line) => line.startsWith(`| \`${key}\` |`));
+      expect(row, key).toBeDefined();
+      for (const field of endpoints.find((item) => item.key === key)?.queryParams ?? []) {
+        expect(row).toContain(`\`${field}\``);
+      }
+    }
+  });
+
+  it('documents all maintenance schedule keys and gates their writes behind approval', () => {
+    const content = read('skills/xyte-cli/references/endpoints.md');
+    const keys = endpoints.filter((item) => item.group === 'maintenanceSchedules').map((item) => item.key);
+
+    expect(keys).toHaveLength(5);
+    for (const key of keys) {
+      expect(content).toContain(`- \`${key}\``);
+    }
+    const section = content.slice(content.indexOf('### `organization.maintenanceSchedules.*`'));
+    expect(section).toContain('explicit user approval');
+  });
+
+  it('tells agents suppressed incidents are hidden unless include_suppressed is set', () => {
+    for (const content of [read('skills/xyte-cli/SKILL.md'), read('skills/xyte-cli/references/endpoints.md')]) {
+      expect(content).toContain('include_suppressed');
+      expect(content).toContain('scheduled maintenance window are left out');
+    }
   });
 });
