@@ -14,7 +14,7 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 - `organization.incidents.getIncidents` lists `include_suppressed` and documents each incident's `scheduled_maintenance: { suppressed, suppressed_until, announced_at }` block.
 
 ### Changed
-- `organization.incidents.getIncidents` no longer returns incidents suppressed by a scheduled maintenance window unless `include_suppressed=true` is passed (hub behavior change, matching the Xyte portal).
+- `organization.incidents.getIncidents` no longer returns incidents suppressed by a scheduled maintenance window unless `include_suppressed=true` is passed (hub behavior change, matching the Xyte portal). `ops watch incidents`, `ops inspect fleet|deep-dive` (and reports built from them) and the TUI incident views follow this default; `ops watch incidents --query-json '{"include_suppressed":true}'` opts back in.
 - **Breaking (JSON contracts):** upgrade payloads moved to `xyte.upgrade.check.v2` and `xyte.upgrade.result.v2`, which add the required `installChannel` field. The v1 schemas remain published unchanged for legacy payloads; consumers validating upgrade JSON should adopt the v2 schemas in `docs/schemas/`.
 
 ## [0.15.0] - 2026-09-24

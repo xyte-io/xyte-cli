@@ -97,7 +97,7 @@ xyte-cli api call organization.incidents.getIncidents \
   --query-json '{"status":"active","from":0,"to":1710000000,"page":1,"per_page":100}'
 ```
 
-Replace `1710000000` with the current Unix timestamp in your shell or runtime. Use explicit integer Unix timestamps for `from` and `to`. In some environments, omitted or `null` bounds can return empty results.
+Replace `1710000000` with the current Unix timestamp in your shell or runtime. Use explicit integer Unix timestamps for `from` and `to`. In some environments, omitted or `null` bounds can return empty results. Incidents suppressed by a scheduled maintenance window are left out by default; add `"include_suppressed":true` to include them.
 
 ## Concrete Write/Delete Examples
 
@@ -195,6 +195,30 @@ xyte-cli api call organization.notes.getSpaceNotes \
   --query-json '{"page":1,"per_page":100}'
 ```
 
+### `organization.maintenanceSchedules.*`
+
+Read schedules freely. Create, update and delete schedules only after explicit user approval: disabling, shortening or deleting a window announces the still-open incidents it was hiding as new incidents. Create takes the space from path `space_id`; update and delete take the schedule's path `id`. `start`/`end` are `HH:MM` in the space's timezone.
+
+```bash
+xyte-cli api call organization.maintenanceSchedules.getSpaceMaintenanceSchedules \
+  --tenant <tenant-id> \
+  --path-json '{"space_id":"<space-id>"}'
+
+xyte-cli api call organization.maintenanceSchedules.createMaintenanceSchedule \
+  --tenant <tenant-id> \
+  --path-json '{"space_id":"<space-id>"}' \
+  --body-json '{"name":"Nightly","days":["mon","tue","wed","thu","fri"],"start":"02:00","end":"06:00"}'
+
+xyte-cli api call organization.maintenanceSchedules.updateMaintenanceSchedule \
+  --tenant <tenant-id> \
+  --path-json '{"id":"<schedule-id>"}' \
+  --body-json '{"enabled":false}'
+
+xyte-cli api call organization.maintenanceSchedules.deleteMaintenanceSchedule \
+  --tenant <tenant-id> \
+  --path-json '{"id":"<schedule-id>"}'
+```
+
 ### `organization.groups.addUsers`
 
 ```bash
@@ -224,6 +248,11 @@ Organization:
 - `organization.devices.resumeIncidents`
 - `organization.incidents.closeIncident`
 - `organization.incidents.getIncidents`
+- `organization.maintenanceSchedules.getMaintenanceSchedules`
+- `organization.maintenanceSchedules.getSpaceMaintenanceSchedules`
+- `organization.maintenanceSchedules.createMaintenanceSchedule`
+- `organization.maintenanceSchedules.updateMaintenanceSchedule`
+- `organization.maintenanceSchedules.deleteMaintenanceSchedule`
 - `organization.notes.getAllDeviceNotes`
 - `organization.notes.getAllSpaceNotes`
 - `organization.notes.getDeviceNotes`

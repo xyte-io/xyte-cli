@@ -298,7 +298,8 @@
       "Docs parent: /branches/2.0/reference/devices-2",
       "Docs raw path params: device_id",
       "Response includes effective_status (nullable string): one of ok, warning, error, offline, disconnected, never_seen. Computed device status reflecting incident priority, connectivity, telemetry-seen state, and raw device status.",
-      "Response includes connector: { type: native|c2c|edge, id: uuid|null, name: string|null }."
+      "Response includes connector: { type: native|c2c|edge, id: uuid|null, name: string|null }.",
+      "Response includes maintenance: { manual: { active, source: device_snooze|space|null }, scheduled: { active, until } }. manual is a device snooze or its space in maintenance; scheduled is a scheduled maintenance window covering the device's space now, until = when it ends."
     ]
   },
   {
@@ -334,7 +335,8 @@
       "Filters combine with AND: name is a case-insensitive substring match; status is one or more of online, offline, unavailable, error; effective_status is one or more of ok, warning, error, offline, disconnected, never_seen; model_id is a device model UUID; connection_method is one of native, c2c, edge; connector_id is the UUID of a C2C integration or edge (a device's connector.id). Pass multi-value status/effective_status as a comma-separated string, e.g. {\"status\":\"online,error\"}. Status filters can trail the live status by up to a minute, so a returned device's status may not match the filter yet.",
       "Any other query parameter returns 422 Unsupported query parameter(s). Invalid enum values or non-UUID model_id/connector_id return 422.",
       "Response includes effective_status (nullable string): one of ok, warning, error, offline, disconnected, never_seen. Computed device status reflecting incident priority, connectivity, telemetry-seen state, and raw device status.",
-      "Each device includes connector: { type: native|c2c|edge, id: uuid|null, name: string|null }."
+      "Each device includes connector: { type: native|c2c|edge, id: uuid|null, name: string|null }.",
+      "Each device includes maintenance: { manual: { active, source: device_snooze|space|null }, scheduled: { active, until } }. manual is a device snooze or its space in maintenance; scheduled is a scheduled maintenance window covering the device's space now, until = when it ends."
     ]
   },
   {
@@ -539,7 +541,8 @@
     "notes": [
       "Docs page: https://docs.xyte.io/reference/get-organizations-info",
       "Docs category: /branches/2.0/categories/reference/API Access",
-      "Docs parent: /branches/2.0/reference/organisation-api"
+      "Docs parent: /branches/2.0/reference/organisation-api",
+      "statistics.open_incidents leaves out incidents suppressed by a scheduled maintenance window, matching the getIncidents default (not include_suppressed=true)."
     ]
   },
   {
@@ -868,7 +871,7 @@
       "Docs raw path params: space_id",
       "Server route evidence: xyte-io/server#9705 (Bruno docs Organization API/Maintenance Schedules).",
       "Body: days (required, one or more of mon, tue, wed, thu, fri, sat, sun), start (required, HH:MM 00:00-23:59), end (required, HH:MM 00:00-24:00, must differ from start), name (optional, up to 255 chars), enabled (optional, default true). The space comes from the path only and cannot be changed later.",
-      "Returns 200 with the schedule. 422 { error } on a missing field, unknown day, malformed time, start equal to end, or more than 10 schedules on the space; 404 when the space is not in the organization."
+      "Returns 200 with the schedule. 422 { error } on a missing field, an empty days list, unknown day, malformed time, start equal to end, a name over 255 chars, enabled: null, or more than 10 schedules on the space; 404 when the space is not in the organization."
     ]
   },
   {
@@ -897,7 +900,7 @@
       "Server route evidence: xyte-io/server#9705 (Bruno docs Organization API/Maintenance Schedules).",
       "Partial update: send only the fields to change (name, days, start, end, enabled), same rules as createMaintenanceSchedule.",
       "Disabling or shortening a window releases the incidents it was hiding right away: each one still open is announced as a new incident unless another window still covers its space.",
-      "Returns 200 with the updated schedule. 422 on an unknown day, malformed time, or start equal to end; 404 when the schedule is not in the organization."
+      "Returns 200 with the updated schedule. 422 on an empty or null days list, unknown day, malformed time, start equal to end, a name over 255 chars, or enabled: null; 404 when the schedule is not in the organization."
     ]
   },
   {
