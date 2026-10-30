@@ -2,9 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
-The format is inspired by Keep a Changelog and this project follows SemVer for `@xyteai/cli`.
+The format is inspired by Keep a Changelog and this project follows SemVer for `@xyteai/cli`. Before 1.0, breaking changes bump the minor version.
 
 ## [Unreleased]
+
+## [0.16.0] - 2026-10-29
 
 ### Added
 - Windows MSI installer pipeline: WiX-based packaging with a bundled Node.js runtime (checksum-verified against nodejs.org SHASUMS256), machine `PATH` entry, Start Menu shortcuts, the Configure Xyte CLI post-install assistant, generated WinGet manifests for `Xyte.XyteCLI`, and optional Authenticode signing through Azure Artifact Signing. Release assets include the signed MSI, WinGet manifests, and Windows checksums, published independently of the npm release; without signing configured the MSI is not published. See `docs/windows-installer.md`.
@@ -12,8 +14,14 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ### Changed
 - **Breaking (JSON contracts):** upgrade payloads moved to `xyte.upgrade.check.v2` and `xyte.upgrade.result.v2`, which add the required `installChannel` field. The v1 schemas remain published unchanged for legacy payloads; consumers validating upgrade JSON should adopt the v2 schemas in `docs/schemas/`.
+- Bumped package metadata and lockfile to `0.16.0`.
 
-## [0.15.0] - 2026-09-24
+### Upgrade notes
+- Run `xyte-cli skills refresh` after upgrading so installed skill bundles get the v2 upgrade schemas and guidance.
+- Consumers that validate `xyte-cli upgrade` JSON should switch to `xyte.upgrade.check.v2` / `xyte.upgrade.result.v2`.
+- 0.15.0 was never published to npm; upgrading from 0.14.0 also brings everything listed under 0.15.0, including its upgrade notes.
+
+## [0.15.0] - 2026-10-07 (not published; ships in 0.16.0)
 
 ### Added
 - `organization.devices.getDevices` now lists the hub's device filters: `name` (case-insensitive substring), `status`, `effective_status`, `model_id`, `connection_method` (`native`/`c2c`/`edge`) and `connector_id`. Pass several `status` / `effective_status` values as a comma-separated string, e.g. `--query-json '{"status":"online,error"}'`.
