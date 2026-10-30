@@ -133,6 +133,44 @@ describe('public endpoint catalog', () => {
     expect(resume?.sourceFile).toBe('https://docs.xyte.io/reference/resume-incidents');
   });
 
+  it('includes organization maintenance schedule endpoints', () => {
+    const expected = [
+      ['getMaintenanceSchedules', 'GET', '/core/v1/organization/maintenance_schedules', [], ['page', 'per_page', 'space_id', 'enabled', 'active_now'], 'none', 'get-maintenance-schedules'],
+      ['getSpaceMaintenanceSchedules', 'GET', '/core/v1/organization/spaces/:space_id/maintenance_schedules', ['space_id'], [], 'none', 'get-space-maintenance-schedules'],
+      ['createMaintenanceSchedule', 'POST', '/core/v1/organization/spaces/:space_id/maintenance_schedules', ['space_id'], [], 'json', 'create-maintenance-schedule'],
+      ['updateMaintenanceSchedule', 'PATCH', '/core/v1/organization/maintenance_schedules/:id', ['id'], [], 'json', 'update-maintenance-schedule'],
+      ['deleteMaintenanceSchedule', 'DELETE', '/core/v1/organization/maintenance_schedules/:id', ['id'], [], 'none', 'delete-maintenance-schedule']
+    ] as const;
+
+    for (const [action, method, pathTemplate, pathParams, queryParams, bodyType, slug] of expected) {
+      const endpoint = endpoints.find((item) => item.key === `organization.maintenanceSchedules.${action}`);
+      expect(endpoint).toBeDefined();
+      expect(endpoint?.namespace).toBe('organization');
+      expect(endpoint?.group).toBe('maintenanceSchedules');
+      expect(endpoint?.action).toBe(action);
+      expect(endpoint?.method).toBe(method);
+      expect(endpoint?.base).toBe('hub');
+      expect(endpoint?.pathTemplate).toBe(pathTemplate);
+      expect(endpoint?.pathParams).toEqual(pathParams);
+      expect(endpoint?.queryParams).toEqual(queryParams);
+      expect(endpoint?.authScope).toBe('organization');
+      expect(endpoint?.bodyType).toBe(bodyType);
+      expect(endpoint?.hasBody).toBe(bodyType === 'json');
+      expect(endpoint?.sourceFile).toBe(`https://docs.xyte.io/reference/${slug}`);
+    }
+
+    const create = endpoints.find((item) => item.key === 'organization.maintenanceSchedules.createMaintenanceSchedule');
+    expect(JSON.parse(create?.bodyExample ?? '{}')).toEqual({
+      name: 'Nightly',
+      days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+      start: '02:00',
+      end: '06:00',
+      enabled: true
+    });
+    const update = endpoints.find((item) => item.key === 'organization.maintenanceSchedules.updateMaintenanceSchedule');
+    expect(JSON.parse(update?.bodyExample ?? '{}')).toEqual({ end: '07:00', enabled: false });
+  });
+
   it('does not include stale PR aliases for endpoints already represented on main', () => {
     expect(endpoints.some((item) => item.key === 'organization.incidents.deleteIncident')).toBe(false);
     expect(endpoints.some((item) => item.key === 'organization.edges.startClaim')).toBe(false);
@@ -188,8 +226,10 @@ describe('public endpoint catalog', () => {
       'sub_model',
       'space_id',
       'page',
-      'per_page'
+      'per_page',
+      'include_suppressed'
     ]);
+    expect(getIncidents?.notes?.join(' ')).toContain('scheduled_maintenance: { suppressed, suppressed_until, announced_at }');
 
     const getSpaces = endpoints.find((item) => item.key === 'organization.spaces.getSpaces');
     expect(getSpaces?.queryParams).toEqual([
@@ -199,8 +239,11 @@ describe('public endpoint catalog', () => {
       'space_type',
       'created_before',
       'created_after',
-      'path_includes'
+      'path_includes',
+      'maintenance_scheduled_active',
+      'has_maintenance_schedules'
     ]);
+    expect(getSpaces?.notes?.join(' ')).toContain('maintenance: { manual: { active, inherited }, scheduled:');
 
     const getEdges = endpoints.find((item) => item.key === 'organization.edges.getEdges');
     expect(getEdges?.queryParams).toEqual(['page', 'per_page']);

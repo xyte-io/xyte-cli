@@ -1,9 +1,26 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { listEndpoints } from '../src/client/catalog';
 import { createOrganizationNamespace } from '../src/client/namespaces/organization';
 import { createPartnerNamespace } from '../src/client/namespaces/partner';
 
 describe('namespace endpoint mappings', () => {
+  it.each([
+    ['organization', createOrganizationNamespace],
+    ['partner', createPartnerNamespace]
+  ] as const)('maps every %s catalog key to exactly one client method', async (namespace, create) => {
+    const call = vi.fn().mockResolvedValue({ ok: true });
+    const methods = Object.values(create(call)) as Array<(args?: unknown) => Promise<unknown>>;
+
+    for (const method of methods) {
+      await method();
+    }
+
+    const calledKeys = call.mock.calls.map(([key]) => key as string);
+    expect(new Set(calledKeys).size).toBe(calledKeys.length);
+    expect([...calledKeys].sort()).toEqual(listEndpoints(namespace).map((endpoint) => endpoint.key).sort());
+  });
+
   it('maps partner.getDevices to partner.devices.getDevices', async () => {
     const call = vi.fn().mockResolvedValue({ ok: true });
     const partner = createPartnerNamespace(call);
@@ -85,6 +102,38 @@ describe('namespace endpoint mappings', () => {
     });
     expect(call).toHaveBeenNthCalledWith(2, 'organization.devices.resumeIncidents', {
       path: { device_id: 'dev-1' }
+    });
+  });
+
+  it('maps organization maintenance schedule endpoints', async () => {
+    const call = vi.fn().mockResolvedValue({ ok: true });
+    const organization = createOrganizationNamespace(call);
+
+    await organization.getMaintenanceSchedules({ query: { space_id: 17517, active_now: true } });
+    await organization.getSpaceMaintenanceSchedules({ path: { space_id: 17517 } });
+    await organization.createMaintenanceSchedule({
+      path: { space_id: 17517 },
+      body: { days: ['mon'], start: '02:00', end: '06:00' }
+    });
+    await organization.updateMaintenanceSchedule({ path: { id: 'sched-1' }, body: { enabled: false } });
+    await organization.deleteMaintenanceSchedule({ path: { id: 'sched-1' } });
+
+    expect(call).toHaveBeenNthCalledWith(1, 'organization.maintenanceSchedules.getMaintenanceSchedules', {
+      query: { space_id: 17517, active_now: true }
+    });
+    expect(call).toHaveBeenNthCalledWith(2, 'organization.maintenanceSchedules.getSpaceMaintenanceSchedules', {
+      path: { space_id: 17517 }
+    });
+    expect(call).toHaveBeenNthCalledWith(3, 'organization.maintenanceSchedules.createMaintenanceSchedule', {
+      path: { space_id: 17517 },
+      body: { days: ['mon'], start: '02:00', end: '06:00' }
+    });
+    expect(call).toHaveBeenNthCalledWith(4, 'organization.maintenanceSchedules.updateMaintenanceSchedule', {
+      path: { id: 'sched-1' },
+      body: { enabled: false }
+    });
+    expect(call).toHaveBeenNthCalledWith(5, 'organization.maintenanceSchedules.deleteMaintenanceSchedule', {
+      path: { id: 'sched-1' }
     });
   });
 

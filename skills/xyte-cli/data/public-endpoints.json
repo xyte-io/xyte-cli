@@ -298,7 +298,8 @@
       "Docs parent: /branches/2.0/reference/devices-2",
       "Docs raw path params: device_id",
       "Response includes effective_status (nullable string): one of ok, warning, error, offline, disconnected, never_seen. Computed device status reflecting incident priority, connectivity, telemetry-seen state, and raw device status.",
-      "Response includes connector: { type: native|c2c|edge, id: uuid|null, name: string|null }."
+      "Response includes connector: { type: native|c2c|edge, id: uuid|null, name: string|null }.",
+      "Response includes maintenance: { manual: { active, source: device_snooze|space|null }, scheduled: { active, until } }. manual is a device snooze or its space in maintenance; scheduled is a scheduled maintenance window covering the device's space now, until = when it ends."
     ]
   },
   {
@@ -334,7 +335,8 @@
       "Filters combine with AND: name is a case-insensitive substring match; status is one or more of online, offline, unavailable, error; effective_status is one or more of ok, warning, error, offline, disconnected, never_seen; model_id is a device model UUID; connection_method is one of native, c2c, edge; connector_id is the UUID of a C2C integration or edge (a device's connector.id). Pass multi-value status/effective_status as a comma-separated string, e.g. {\"status\":\"online,error\"}. Status filters can trail the live status by up to a minute, so a returned device's status may not match the filter yet.",
       "Any other query parameter returns 422 Unsupported query parameter(s). Invalid enum values or non-UUID model_id/connector_id return 422.",
       "Response includes effective_status (nullable string): one of ok, warning, error, offline, disconnected, never_seen. Computed device status reflecting incident priority, connectivity, telemetry-seen state, and raw device status.",
-      "Each device includes connector: { type: native|c2c|edge, id: uuid|null, name: string|null }."
+      "Each device includes connector: { type: native|c2c|edge, id: uuid|null, name: string|null }.",
+      "Each device includes maintenance: { manual: { active, source: device_snooze|space|null }, scheduled: { active, until } }. manual is a device snooze or its space in maintenance; scheduled is a scheduled maintenance window covering the device's space now, until = when it ends."
     ]
   },
   {
@@ -539,7 +541,8 @@
     "notes": [
       "Docs page: https://docs.xyte.io/reference/get-organizations-info",
       "Docs category: /branches/2.0/categories/reference/API Access",
-      "Docs parent: /branches/2.0/reference/organisation-api"
+      "Docs parent: /branches/2.0/reference/organisation-api",
+      "statistics.open_incidents leaves out incidents suppressed by a scheduled maintenance window, matching the getIncidents default (not include_suppressed=true)."
     ]
   },
   {
@@ -770,7 +773,8 @@
       "sub_model",
       "space_id",
       "page",
-      "per_page"
+      "per_page",
+      "include_suppressed"
     ],
     "authScope": "organization",
     "bodyType": "none",
@@ -779,7 +783,150 @@
     "notes": [
       "Docs page: https://docs.xyte.io/reference/get-incidents",
       "Docs category: /branches/2.0/categories/reference/API Access",
-      "Docs parent: /branches/2.0/reference/incidents-1"
+      "Docs parent: /branches/2.0/reference/incidents-1",
+      "include_suppressed=true also returns incidents suppressed by a scheduled maintenance window; by default (false) they are left out, matching the Xyte portal. Each incident carries scheduled_maintenance: { suppressed, suppressed_until, announced_at }."
+    ]
+  },
+  {
+    "key": "organization.maintenanceSchedules.getMaintenanceSchedules",
+    "namespace": "organization",
+    "group": "maintenanceSchedules",
+    "action": "getMaintenanceSchedules",
+    "title": "Get Maintenance Schedules",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/maintenance_schedules",
+    "pathParams": [],
+    "queryParams": [
+      "page",
+      "per_page",
+      "space_id",
+      "enabled",
+      "active_now"
+    ],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/get-maintenance-schedules",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-maintenance-schedules",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/maintenance-schedules",
+      "Server route evidence: xyte-io/server#9705 (Bruno docs Organization API/Maintenance Schedules).",
+      "An incident opened while a window covers its device's space is suppressed: left out of incident lists, counts and integrations, and announced as a new incident if still open when the window ends. Windows apply to the space and every space below it.",
+      "Paginated response { items, next_page, total_count }, oldest first; continue while next_page is set. page starts at 1; per_page defaults to 100, max 100.",
+      "space_id returns only the schedules set on that space, not the ones it inherits (use getSpaceMaintenanceSchedules for those). enabled and active_now take true/false; a disabled schedule is never active_now.",
+      "Schedule shape: { id, name, days: [mon..sun], start: HH:MM, end: HH:MM, enabled, space: { id, name, path }, active_now, until, next_start_at, next_end_at, created_by: { id, name }|null, created_at, updated_at }. start/end are local wall-clock time in the schedule space's timezone; an end at or before start runs into the next day; 00:00-24:00 is the whole day."
+    ]
+  },
+  {
+    "key": "organization.maintenanceSchedules.getSpaceMaintenanceSchedules",
+    "namespace": "organization",
+    "group": "maintenanceSchedules",
+    "action": "getSpaceMaintenanceSchedules",
+    "title": "Get Space Maintenance Schedules",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/spaces/:space_id/maintenance_schedules",
+    "pathParams": [
+      "space_id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/get-space-maintenance-schedules",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/get-space-maintenance-schedules",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/maintenance-schedules",
+      "Docs raw path params: space_id",
+      "Server route evidence: xyte-io/server#9705 (Bruno docs Organization API/Maintenance Schedules).",
+      "Response { own: [schedule], inherited: [{ schedule, from_space: { id, name } }], effective: { active, until, next_start_at } }. own lists every schedule set on the space, enabled or not; inherited lists the enabled schedules on its ancestors; effective is the union of all enabled windows covering the space (overlapping or touching windows chain), next_start_at null beyond 7 days.",
+      "404 when the space is not in the organization."
+    ]
+  },
+  {
+    "key": "organization.maintenanceSchedules.createMaintenanceSchedule",
+    "namespace": "organization",
+    "group": "maintenanceSchedules",
+    "action": "createMaintenanceSchedule",
+    "title": "Create Maintenance Schedule",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/spaces/:space_id/maintenance_schedules",
+    "pathParams": [
+      "space_id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/create-maintenance-schedule",
+    "bodyExample": "{\n  \"name\": \"Nightly\",\n  \"days\": [\"mon\", \"tue\", \"wed\", \"thu\", \"fri\"],\n  \"start\": \"02:00\",\n  \"end\": \"06:00\",\n  \"enabled\": true\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/create-maintenance-schedule",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/maintenance-schedules",
+      "Docs raw path params: space_id",
+      "Server route evidence: xyte-io/server#9705 (Bruno docs Organization API/Maintenance Schedules).",
+      "Body: days (required, one or more of mon, tue, wed, thu, fri, sat, sun), start (required, HH:MM 00:00-23:59), end (required, HH:MM 00:00-24:00, must differ from start), name (optional, up to 255 chars), enabled (optional, default true). The space comes from the path only and cannot be changed later.",
+      "Returns 200 with the schedule. 422 { error } on a missing field, an empty days list, unknown day, malformed time, start equal to end, a name over 255 chars, enabled: null, or more than 10 schedules on the space; 404 when the space is not in the organization."
+    ]
+  },
+  {
+    "key": "organization.maintenanceSchedules.updateMaintenanceSchedule",
+    "namespace": "organization",
+    "group": "maintenanceSchedules",
+    "action": "updateMaintenanceSchedule",
+    "title": "Update Maintenance Schedule",
+    "method": "PATCH",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/maintenance_schedules/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "https://docs.xyte.io/reference/update-maintenance-schedule",
+    "bodyExample": "{\n  \"end\": \"07:00\",\n  \"enabled\": false\n}",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/update-maintenance-schedule",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/maintenance-schedules",
+      "Docs raw path params: id",
+      "Server route evidence: xyte-io/server#9705 (Bruno docs Organization API/Maintenance Schedules).",
+      "Partial update: send only the fields to change (name, days, start, end, enabled), same rules as createMaintenanceSchedule.",
+      "Disabling or shortening a window releases the incidents it was hiding right away: each one still open is announced as a new incident unless another window still covers its space.",
+      "Returns 200 with the updated schedule. 422 on an empty or null days list, unknown day, malformed time, start equal to end, a name over 255 chars, or enabled: null; 404 when the schedule is not in the organization."
+    ]
+  },
+  {
+    "key": "organization.maintenanceSchedules.deleteMaintenanceSchedule",
+    "namespace": "organization",
+    "group": "maintenanceSchedules",
+    "action": "deleteMaintenanceSchedule",
+    "title": "Delete Maintenance Schedule",
+    "method": "DELETE",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/maintenance_schedules/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "https://docs.xyte.io/reference/delete-maintenance-schedule",
+    "notes": [
+      "Docs page: https://docs.xyte.io/reference/delete-maintenance-schedule",
+      "Docs category: /branches/2.0/categories/reference/API Access",
+      "Docs parent: /branches/2.0/reference/maintenance-schedules",
+      "Docs raw path params: id",
+      "Server route evidence: xyte-io/server#9705 (Bruno docs Organization API/Maintenance Schedules).",
+      "Returns { \"success\": true }. Open incidents the schedule was hiding are announced as new incidents unless another window still covers their space. 404 when the schedule is not in the organization."
     ]
   },
   {
@@ -1158,7 +1305,9 @@
       "space_type",
       "created_before",
       "created_after",
-      "path_includes"
+      "path_includes",
+      "maintenance_scheduled_active",
+      "has_maintenance_schedules"
     ],
     "authScope": "organization",
     "bodyType": "none",
@@ -1167,7 +1316,9 @@
     "notes": [
       "Docs page: https://docs.xyte.io/reference/get-spaces",
       "Docs category: /branches/2.0/categories/reference/API Access",
-      "Docs parent: /branches/2.0/reference/spaces-1"
+      "Docs parent: /branches/2.0/reference/spaces-1",
+      "maintenance_scheduled_active=true returns only spaces a scheduled maintenance window covers now (false: the others); has_maintenance_schedules=true returns only spaces with an enabled schedule set on them or on an ancestor (false: the others).",
+      "Each space carries maintenance: { manual: { active, inherited }, scheduled: { active, until, next_start_at, has_schedules, inherits_schedules } }. scheduled is an indication only and does not change the room status."
     ]
   },
   {

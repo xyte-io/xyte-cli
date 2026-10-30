@@ -41,11 +41,12 @@ Derived from the bundled public endpoint spec.
 
 | Endpoint Key | Query Fields | Pagination Fields | Notes |
 | --- | --- | --- | --- |
-| `organization.spaces.getSpaces` | `id`, `name`, `parent_id`, `space_type`, `created_before`, `created_after`, `path_includes` | none | Main listing endpoint with server-side filtering |
+| `organization.spaces.getSpaces` | `id`, `name`, `parent_id`, `space_type`, `created_before`, `created_after`, `path_includes`, `maintenance_scheduled_active`, `has_maintenance_schedules` | none | Main listing endpoint with server-side filtering. `maintenance_scheduled_active=true` = spaces a scheduled maintenance window covers now; `has_maintenance_schedules=true` = spaces with an enabled schedule on them or an ancestor. Each space carries `maintenance: {manual, scheduled}` |
 | `organization.devices.getDevices` | `page`, `per_page`, `space_id`, `name`, `status`, `effective_status`, `model_id`, `connection_method`, `connector_id` | `page`, `per_page` | Filters combine with AND; `name` is a case-insensitive substring; `status` (online/offline/unavailable/error) and `effective_status` (ok/warning/error/offline/disconnected/never_seen) take a comma-separated list and can trail the live `status` by up to a minute; `connection_method` is native/c2c/edge; `model_id`/`connector_id` are UUIDs (`connector_id` = a device's `connector.id`). Unknown params and invalid values return 422. Continue while `next_page` is set. Each device carries `connector: {type, id, name}` |
 | `organization.devices.getHistories` | `status`, `from`, `to`, `device_id`, `space_id`, `name`, `page`, `per_page` | `page`, `per_page` | Filtered history lookup. `from`/`to` window must not exceed 31 days (422 otherwise); defaults: `from` = 1 week ago, `to` = now, applied independently — send both. `status` filters the device's *current* status. |
 | `organization.commands.getCommands` | `status`, `page`, `per_page` | `page`, `per_page` | Command history pagination and status filter |
-| `organization.incidents.getIncidents` | `from`, `to`, `status`, `priority`, `title`, `description`, `issue`, `device_model`, `partner_name`, `sub_model`, `space_id`, `page`, `per_page` | `page`, `per_page` | Incident filtering matrix. Use integer `from` and `to`; for reliable active-incident fetches use both (`from=0`, `to=<now>`). |
+| `organization.incidents.getIncidents` | `from`, `to`, `status`, `priority`, `title`, `description`, `issue`, `device_model`, `partner_name`, `sub_model`, `space_id`, `page`, `per_page`, `include_suppressed` | `page`, `per_page` | Incident filtering matrix. Use integer `from` and `to`; for reliable active-incident fetches use both (`from=0`, `to=<now>`). Incidents suppressed by a scheduled maintenance window are left out unless `include_suppressed=true`. |
+| `organization.maintenanceSchedules.getMaintenanceSchedules` | `page`, `per_page`, `space_id`, `enabled`, `active_now` | `page`, `per_page` | Recurring maintenance windows, oldest first; `per_page` max 100; continue while `next_page` is set. `space_id` = schedules set on that space only; use `getSpaceMaintenanceSchedules` (path `space_id`) for own + inherited + effective coverage |
 | `organization.notes.getAllDeviceNotes` | `page`, `per_page` | `page`, `per_page` | Paginated notes across all devices |
 | `organization.notes.getAllSpaceNotes` | `page`, `per_page` | `page`, `per_page` | Paginated notes across all spaces |
 | `organization.notes.getDeviceNotes` | `page`, `per_page` | `page`, `per_page` | Paginated notes for one device; path `device_id` |
@@ -96,7 +97,7 @@ xyte-cli api call organization.incidents.getIncidents \
   --query-json '{"status":"active","from":0,"to":1710000000,"page":1,"per_page":100}'
 ```
 
-Replace `1710000000` with the current Unix timestamp in your shell or runtime. Use explicit integer Unix timestamps for `from` and `to`. In some environments, omitted or `null` bounds can return empty results.
+Replace `1710000000` with the current Unix timestamp in your shell or runtime. Use explicit integer Unix timestamps for `from` and `to`. In some environments, omitted or `null` bounds can return empty results. Incidents suppressed by a scheduled maintenance window are left out by default; add `"include_suppressed":true` to include them.
 
 ## Concrete Write/Delete Examples
 
@@ -194,6 +195,30 @@ xyte-cli api call organization.notes.getSpaceNotes \
   --query-json '{"page":1,"per_page":100}'
 ```
 
+### `organization.maintenanceSchedules.*`
+
+Read schedules freely. Create, update and delete schedules only after explicit user approval: disabling, shortening or deleting a window announces the still-open incidents it was hiding as new incidents. Create takes the space from path `space_id`; update and delete take the schedule's path `id`. `start`/`end` are `HH:MM` in the space's timezone.
+
+```bash
+xyte-cli api call organization.maintenanceSchedules.getSpaceMaintenanceSchedules \
+  --tenant <tenant-id> \
+  --path-json '{"space_id":"<space-id>"}'
+
+xyte-cli api call organization.maintenanceSchedules.createMaintenanceSchedule \
+  --tenant <tenant-id> \
+  --path-json '{"space_id":"<space-id>"}' \
+  --body-json '{"name":"Nightly","days":["mon","tue","wed","thu","fri"],"start":"02:00","end":"06:00"}'
+
+xyte-cli api call organization.maintenanceSchedules.updateMaintenanceSchedule \
+  --tenant <tenant-id> \
+  --path-json '{"id":"<schedule-id>"}' \
+  --body-json '{"enabled":false}'
+
+xyte-cli api call organization.maintenanceSchedules.deleteMaintenanceSchedule \
+  --tenant <tenant-id> \
+  --path-json '{"id":"<schedule-id>"}'
+```
+
 ### `organization.groups.addUsers`
 
 ```bash
@@ -223,6 +248,11 @@ Organization:
 - `organization.devices.resumeIncidents`
 - `organization.incidents.closeIncident`
 - `organization.incidents.getIncidents`
+- `organization.maintenanceSchedules.getMaintenanceSchedules`
+- `organization.maintenanceSchedules.getSpaceMaintenanceSchedules`
+- `organization.maintenanceSchedules.createMaintenanceSchedule`
+- `organization.maintenanceSchedules.updateMaintenanceSchedule`
+- `organization.maintenanceSchedules.deleteMaintenanceSchedule`
 - `organization.notes.getAllDeviceNotes`
 - `organization.notes.getAllSpaceNotes`
 - `organization.notes.getDeviceNotes`
