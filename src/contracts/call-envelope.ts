@@ -12,7 +12,7 @@ const CallEnvelopeResponseSchema = z.object({
   status: z.number().int().nonnegative(),
   durationMs: z.number().int().nonnegative(),
   retryCount: z.number().int().nonnegative(),
-  data: z.unknown()
+  data: z.unknown().optional()
 });
 
 const CallEnvelopeRequestSchema = z.object({
