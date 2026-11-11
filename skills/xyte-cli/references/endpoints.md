@@ -46,7 +46,7 @@ Derived from the bundled public endpoint spec.
 | `organization.devices.getHistories` | `status`, `from`, `to`, `device_id`, `space_id`, `name`, `page`, `per_page` | `page`, `per_page` | Filtered history lookup. `from`/`to` window must not exceed 31 days (422 otherwise); defaults: `from` = 1 week ago, `to` = now, applied independently — send both. `status` filters the device's *current* status. |
 | `organization.commands.getCommands` | `status`, `page`, `per_page` | `page`, `per_page` | Command history pagination and status filter |
 | `organization.incidents.getIncidents` | `from`, `to`, `status`, `priority`, `title`, `description`, `issue`, `device_model`, `partner_name`, `sub_model`, `space_id`, `page`, `per_page`, `include_suppressed` | `page`, `per_page` | Incident filtering matrix. Use integer `from` and `to`; for reliable active-incident fetches use both (`from=0`, `to=<now>`). Incidents suppressed by a scheduled maintenance window are left out unless `include_suppressed=true`. |
-| `organization.maintenanceSchedules.getMaintenanceSchedules` | `page`, `per_page`, `space_id`, `enabled`, `active_now` | `page`, `per_page` | Recurring maintenance windows, oldest first; `per_page` max 100; continue while `next_page` is set. `space_id` = schedules set on that space only; use `getSpaceMaintenanceSchedules` (path `space_id`) for own + inherited + effective coverage |
+| `organization.maintenanceSchedules.getMaintenanceSchedules` | `page`, `per_page`, `space_id`, `enabled`, `active` | `page`, `per_page` | Recurring maintenance windows, oldest first; `per_page` max 100; continue while `next_page` is set. `space_id` = schedules set on that space only; use `getSpaceMaintenanceSchedules` (path `space_id`) for own + inherited + effective coverage |
 | `organization.notes.getAllDeviceNotes` | `page`, `per_page` | `page`, `per_page` | Paginated notes across all devices |
 | `organization.notes.getAllSpaceNotes` | `page`, `per_page` | `page`, `per_page` | Paginated notes across all spaces |
 | `organization.notes.getDeviceNotes` | `page`, `per_page` | `page`, `per_page` | Paginated notes for one device; path `device_id` |
@@ -197,7 +197,7 @@ xyte-cli api call organization.notes.getSpaceNotes \
 
 ### `organization.maintenanceSchedules.*`
 
-Read schedules freely. Create, update and delete schedules only after explicit user approval: disabling, shortening or deleting a window announces the still-open incidents it was hiding as new incidents. Create takes the space from path `space_id`; update and delete take the schedule's path `id`. `start`/`end` are `HH:MM` in the space's timezone.
+Read schedules freely. Create, update and delete schedules only after explicit user approval: disabling, shortening or deleting a window announces the still-open incidents it was hiding as new incidents. Create takes the space from path `space_id`; update and delete take the schedule's path `id`. `start`/`end` are `HH:MM` in the schedule's `timezone` (IANA, from its space). Every schedule endpoint answers `403` until Xyte enables scheduled maintenance for the organization.
 
 ```bash
 xyte-cli api call organization.maintenanceSchedules.getSpaceMaintenanceSchedules \

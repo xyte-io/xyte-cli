@@ -135,7 +135,7 @@ describe('public endpoint catalog', () => {
 
   it('includes organization maintenance schedule endpoints', () => {
     const expected = [
-      ['getMaintenanceSchedules', 'GET', '/core/v1/organization/maintenance_schedules', [], ['page', 'per_page', 'space_id', 'enabled', 'active_now'], 'none', 'get-maintenance-schedules'],
+      ['getMaintenanceSchedules', 'GET', '/core/v1/organization/maintenance_schedules', [], ['page', 'per_page', 'space_id', 'enabled', 'active'], 'none', 'get-maintenance-schedules'],
       ['getSpaceMaintenanceSchedules', 'GET', '/core/v1/organization/spaces/:space_id/maintenance_schedules', ['space_id'], [], 'none', 'get-space-maintenance-schedules'],
       ['createMaintenanceSchedule', 'POST', '/core/v1/organization/spaces/:space_id/maintenance_schedules', ['space_id'], [], 'json', 'create-maintenance-schedule'],
       ['updateMaintenanceSchedule', 'PATCH', '/core/v1/organization/maintenance_schedules/:id', ['id'], [], 'json', 'update-maintenance-schedule'],
@@ -229,7 +229,7 @@ describe('public endpoint catalog', () => {
       'per_page',
       'include_suppressed'
     ]);
-    expect(getIncidents?.notes?.join(' ')).toContain('scheduled_maintenance: { suppressed, suppressed_until, announced_at }');
+    expect(getIncidents?.notes?.join(' ')).toContain('maintenance: { scheduled: { suppressed, suppressed_until, announced_at } }');
 
     const getSpaces = endpoints.find((item) => item.key === 'organization.spaces.getSpaces');
     expect(getSpaces?.queryParams).toEqual([

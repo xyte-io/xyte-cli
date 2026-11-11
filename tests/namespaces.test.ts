@@ -109,7 +109,7 @@ describe('namespace endpoint mappings', () => {
     const call = vi.fn().mockResolvedValue({ ok: true });
     const organization = createOrganizationNamespace(call);
 
-    await organization.getMaintenanceSchedules({ query: { space_id: 17517, active_now: true } });
+    await organization.getMaintenanceSchedules({ query: { space_id: 17517, active: true } });
     await organization.getSpaceMaintenanceSchedules({ path: { space_id: 17517 } });
     await organization.createMaintenanceSchedule({
       path: { space_id: 17517 },
@@ -119,7 +119,7 @@ describe('namespace endpoint mappings', () => {
     await organization.deleteMaintenanceSchedule({ path: { id: 'sched-1' } });
 
     expect(call).toHaveBeenNthCalledWith(1, 'organization.maintenanceSchedules.getMaintenanceSchedules', {
-      query: { space_id: 17517, active_now: true }
+      query: { space_id: 17517, active: true }
     });
     expect(call).toHaveBeenNthCalledWith(2, 'organization.maintenanceSchedules.getSpaceMaintenanceSchedules', {
       path: { space_id: 17517 }
