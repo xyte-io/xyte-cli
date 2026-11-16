@@ -770,7 +770,12 @@
       "sub_model",
       "space_id",
       "page",
-      "per_page"
+      "per_page",
+      "notified",
+      "with_notifications",
+      "in_maintenance",
+      "snoozed",
+      "include_suppressed"
     ],
     "authScope": "organization",
     "bodyType": "none",
@@ -779,7 +784,10 @@
     "notes": [
       "Docs page: https://docs.xyte.io/reference/get-incidents",
       "Docs category: /branches/2.0/categories/reference/API Access",
-      "Docs parent: /branches/2.0/reference/incidents-1"
+      "Docs parent: /branches/2.0/reference/incidents-1",
+      "notified, in_maintenance and snoozed are optional true/false filters; include_suppressed=true also returns incidents suppressed by a scheduled maintenance window (hidden by default).",
+      "with_notifications=true adds notified and notifications[] to every item (default false leaves the payload unchanged). One notifications entry per organization integration the incident was dispatched to: integration_id, integration_type, status (sent/failed/skipped), action (create/update/close), notified_at, external_id, external_reference, external_url, reason, error.",
+      "notifications[].error is a string or null: the last failed ticket delivery for that integration, e.g. \"ConnectWise: Error (HTTP 400): {...}\", \"Couldn't reach <integration>\", \"Couldn't send to <integration>: internal error\", \"<integration> refused the <action> (HTTP 403): <answer>\" or \"Device data was temporarily unavailable\"; at most 1000 characters. Always null for non-ticketing integrations (chat drivers, email, webhook) and when no delivery failed; a later successful update or close clears it. error is independent of status (it can be set while status is sent)."
     ]
   },
   {

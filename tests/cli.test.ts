@@ -2204,6 +2204,69 @@ describe('cli integration', () => {
     });
   });
 
+  it('serializes getIncidents with_notifications and passes notifications[].error through', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    const failedDeliveryError = "Couldn't reach ConnectWise";
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          items: [
+            {
+              uuid: 'inc-1',
+              notified: true,
+              notifications: [
+                { integration_type: 'connect_wise', status: 'sent', action: 'update', error: failedDeliveryError },
+                { integration_type: 'slack', status: 'sent', action: 'create', error: null }
+              ]
+            }
+          ],
+          next_page: null
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'api',
+      'call',
+      'organization.incidents.getIncidents',
+      '--tenant',
+      'acme',
+      '--query-json',
+      '{"status":"active","from":0,"to":1710000000,"with_notifications":true,"notified":false}'
+    ]);
+
+    const [requestUrl, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const url = new URL(String(requestUrl));
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+    expect(url.pathname).toBe('/core/v1/organization/incidents');
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      status: 'active',
+      from: '0',
+      to: '1710000000',
+      with_notifications: 'true',
+      notified: 'false'
+    });
+
+    const parsed = JSON.parse(String(stdout.write.mock.calls[0]?.[0] ?? '{}'));
+    expect(parsed.items[0].notifications.map((entry: { error: string | null }) => entry.error)).toEqual([
+      failedDeliveryError,
+      null
+    ]);
+  });
+
   it('rejects invalid output-mode values for api call', async () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });

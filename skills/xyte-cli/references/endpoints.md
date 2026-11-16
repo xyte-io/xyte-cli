@@ -45,7 +45,7 @@ Derived from the bundled public endpoint spec.
 | `organization.devices.getDevices` | `page`, `per_page`, `space_id`, `name`, `status`, `effective_status`, `model_id`, `connection_method`, `connector_id` | `page`, `per_page` | Filters combine with AND; `name` is a case-insensitive substring; `status` (online/offline/unavailable/error) and `effective_status` (ok/warning/error/offline/disconnected/never_seen) take a comma-separated list and can trail the live `status` by up to a minute; `connection_method` is native/c2c/edge; `model_id`/`connector_id` are UUIDs (`connector_id` = a device's `connector.id`). Unknown params and invalid values return 422. Continue while `next_page` is set. Each device carries `connector: {type, id, name}` |
 | `organization.devices.getHistories` | `status`, `from`, `to`, `device_id`, `space_id`, `name`, `page`, `per_page` | `page`, `per_page` | Filtered history lookup. `from`/`to` window must not exceed 31 days (422 otherwise); defaults: `from` = 1 week ago, `to` = now, applied independently — send both. `status` filters the device's *current* status. |
 | `organization.commands.getCommands` | `status`, `page`, `per_page` | `page`, `per_page` | Command history pagination and status filter |
-| `organization.incidents.getIncidents` | `from`, `to`, `status`, `priority`, `title`, `description`, `issue`, `device_model`, `partner_name`, `sub_model`, `space_id`, `page`, `per_page` | `page`, `per_page` | Incident filtering matrix. Use integer `from` and `to`; for reliable active-incident fetches use both (`from=0`, `to=<now>`). |
+| `organization.incidents.getIncidents` | `from`, `to`, `status`, `priority`, `title`, `description`, `issue`, `device_model`, `partner_name`, `sub_model`, `space_id`, `page`, `per_page`, `notified`, `with_notifications`, `in_maintenance`, `snoozed`, `include_suppressed` | `page`, `per_page` | Incident filtering matrix. Use integer `from` and `to`; for reliable active-incident fetches use both (`from=0`, `to=<now>`). |
 | `organization.notes.getAllDeviceNotes` | `page`, `per_page` | `page`, `per_page` | Paginated notes across all devices |
 | `organization.notes.getAllSpaceNotes` | `page`, `per_page` | `page`, `per_page` | Paginated notes across all spaces |
 | `organization.notes.getDeviceNotes` | `page`, `per_page` | `page`, `per_page` | Paginated notes for one device; path `device_id` |
@@ -97,6 +97,8 @@ xyte-cli api call organization.incidents.getIncidents \
 ```
 
 Replace `1710000000` with the current Unix timestamp in your shell or runtime. Use explicit integer Unix timestamps for `from` and `to`. In some environments, omitted or `null` bounds can return empty results.
+
+Add `"with_notifications":true` to see how each incident reached the organization's integrations: every item gets `notified` and a `notifications` list, one entry per integration. `notifications[].error` is the last failed ticket delivery for that integration (for example `Couldn't reach ConnectWise`), at most 1000 characters. It is `null` for chat, email and webhook integrations and when no delivery failed, and a later successful update or close clears it.
 
 ## Concrete Write/Delete Examples
 

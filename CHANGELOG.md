@@ -6,6 +6,12 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+### Changed
+- `organization.incidents.getIncidents` now lists the hub's `notified`, `with_notifications`, `in_maintenance`, `snoozed` and `include_suppressed` query params, and its notes document the `with_notifications=true` payload, including `notifications[].error`: the last failed ticket delivery for that integration (`null` for non-ticketing integrations and when nothing failed; a later successful update or close clears it).
+
+### Upgrade notes
+- Run `xyte-cli skills refresh` after upgrading so installed skill bundles pick up the new incident params and `notifications[].error` guidance.
+
 ## [0.16.0] - 2026-10-29
 
 ### Added

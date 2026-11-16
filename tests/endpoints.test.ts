@@ -188,8 +188,17 @@ describe('public endpoint catalog', () => {
       'sub_model',
       'space_id',
       'page',
-      'per_page'
+      'per_page',
+      'notified',
+      'with_notifications',
+      'in_maintenance',
+      'snoozed',
+      'include_suppressed'
     ]);
+    const getIncidentsNotes = getIncidents?.notes?.join(' ');
+    expect(getIncidentsNotes).toContain('with_notifications=true adds notified and notifications[]');
+    expect(getIncidentsNotes).toContain('notifications[].error');
+    expect(getIncidentsNotes).toContain('a later successful update or close clears it');
 
     const getSpaces = endpoints.find((item) => item.key === 'organization.spaces.getSpaces');
     expect(getSpaces?.queryParams).toEqual([
