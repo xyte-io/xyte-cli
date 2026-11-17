@@ -438,15 +438,15 @@ describe('public endpoint catalog', () => {
   });
 
   it.each([
-    ['partner.organizations.getOrganizations', 'GET', '/core/v1/partner/organizations', [], ['name', 'tag', 'page'], 'none'],
+    ['partner.organizations.getOrganizations', 'GET', '/core/v1/partner/organizations', [], ['name', 'tag', 'page', 'per_page'], 'none'],
     ['partner.organizationTags.addOrganizationTag', 'POST', '/core/v1/partner/organizations/:organization_id/tags', ['organization_id'], [], 'json'],
     ['partner.organizationTags.removeOrganizationTag', 'DELETE', '/core/v1/partner/organizations/:organization_id/tags/:tag_id', ['organization_id', 'tag_id'], [], 'none'],
-    ['partner.organizationTags.getOrganizationTags', 'GET', '/core/v1/partner/organization_tags', [], ['page'], 'none'],
+    ['partner.organizationTags.getOrganizationTags', 'GET', '/core/v1/partner/organization_tags', [], ['page', 'per_page'], 'none'],
     ['partner.coupons.createCoupon', 'POST', '/core/v1/partner/coupons', [], [], 'json'],
-    ['partner.coupons.getCoupons', 'GET', '/core/v1/partner/coupons', [], ['page'], 'none'],
+    ['partner.coupons.getCoupons', 'GET', '/core/v1/partner/coupons', [], ['page', 'per_page'], 'none'],
     ['partner.coupons.updateCoupon', 'PATCH', '/core/v1/partner/coupons/:id', ['id'], [], 'json'],
     ['partner.coupons.deleteCoupon', 'DELETE', '/core/v1/partner/coupons/:id', ['id'], [], 'none'],
-    ['partner.storeListings.getStoreListings', 'GET', '/core/v1/partner/store_listings', [], ['page'], 'none']
+    ['partner.storeListings.getStoreListings', 'GET', '/core/v1/partner/store_listings', [], ['page', 'per_page'], 'none']
   ])('includes partner coupon and tag endpoint %s', (key, method, pathTemplate, pathParams, queryParams, bodyType) => {
     const endpoint = endpoints.find((item) => item.key === key);
     expect(endpoint).toBeDefined();
