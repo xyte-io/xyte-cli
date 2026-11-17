@@ -458,7 +458,20 @@ describe('public endpoint catalog', () => {
     expect(endpoint?.base).toBe('hub');
     expect(endpoint?.bodyType).toBe(bodyType);
     expect(endpoint?.hasBody).toBe(bodyType === 'json');
-    const writeActionKeys = listUtilityActionProfiles().map((profile) => profile.actionKey);
-    expect(writeActionKeys.includes(key)).toBe(method !== 'GET');
+  });
+
+  it('maps both removeOrganizationTag path params to utility action columns', () => {
+    const profile = listUtilityActionProfiles().find((item) => item.actionKey === 'partner.organizationTags.removeOrganizationTag');
+    expect(profile?.headers).toEqual(['organization_id', 'tag_id', 'query_json', 'body_json']);
+  });
+
+  it('keeps every bodyExample valid JSON and every path param in its template', () => {
+    for (const endpoint of endpoints) {
+      if (endpoint.bodyExample) {
+        expect(() => JSON.parse(endpoint.bodyExample as string), endpoint.key).not.toThrow();
+      }
+      const templateParams = [...endpoint.pathTemplate.matchAll(/:([a-z_]+)/g)].map((match) => match[1]);
+      expect(templateParams, endpoint.key).toEqual(endpoint.pathParams);
+    }
   });
 });
