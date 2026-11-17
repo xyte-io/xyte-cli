@@ -1427,6 +1427,97 @@
     ]
   },
   {
+    "key": "partner.coupons.createCoupon",
+    "namespace": "partner",
+    "group": "coupons",
+    "action": "createCoupon",
+    "title": "Create Coupon",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/coupons",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Coupons/Create Coupon.bru",
+    "bodyExample": "{\n  \"name\": \"Gold 10\",\n  \"discount_type\": \"fixed_amount\",\n  \"amount_off\": 12.34,\n  \"currency\": \"USD\",\n  \"organization_tag_id\": \"....-d75e0abec7d2\",\n  \"store_listing_id\": \"....-c3\",\n  \"starts_at\": \"2026-03-01T00:00:00Z\",\n  \"ends_at\": \"2026-04-01T00:00:00Z\",\n  \"active\": true\n}",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
+      "Requires the Store plan feature and store coupons enabled for the partner (403 otherwise)."
+    ]
+  },
+  {
+    "key": "partner.coupons.deleteCoupon",
+    "namespace": "partner",
+    "group": "coupons",
+    "action": "deleteCoupon",
+    "title": "Delete Coupon",
+    "method": "DELETE",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/coupons/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Coupons/Delete Coupon.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
+      "Requires the Store plan feature and store coupons enabled for the partner (403 otherwise).",
+      "A coupon used in orders cannot be deleted (403); set active false with updateCoupon instead."
+    ]
+  },
+  {
+    "key": "partner.coupons.getCoupons",
+    "namespace": "partner",
+    "group": "coupons",
+    "action": "getCoupons",
+    "title": "Get Coupons",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/coupons",
+    "pathParams": [],
+    "queryParams": [
+      "page"
+    ],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Coupons/Get Coupons.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
+      "Requires the Store plan feature and store coupons enabled for the partner (403 otherwise).",
+      "500 per page."
+    ]
+  },
+  {
+    "key": "partner.coupons.updateCoupon",
+    "namespace": "partner",
+    "group": "coupons",
+    "action": "updateCoupon",
+    "title": "Update Coupon",
+    "method": "PATCH",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/coupons/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Coupons/Update Coupon.bru",
+    "bodyExample": "{\n  \"name\": \"Gold 15\",\n  \"percent_off\": 15,\n  \"ends_at\": null,\n  \"active\": false\n}",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
+      "Requires the Store plan feature and store coupons enabled for the partner (403 otherwise).",
+      "Only sent fields change; null clears a field."
+    ]
+  },
+  {
     "key": "partner.devices.deleteDevice",
     "namespace": "partner",
     "group": "devices",
@@ -1630,6 +1721,73 @@
     ]
   },
   {
+    "key": "partner.organizationTags.addOrganizationTag",
+    "namespace": "partner",
+    "group": "organizationTags",
+    "action": "addOrganizationTag",
+    "title": "Add Organization Tag",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/organizations/:organization_id/tags",
+    "pathParams": [
+      "organization_id"
+    ],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Organization Tags/Add Organization Tag.bru",
+    "bodyExample": "{\n  \"name\": \"Gold\",\n  \"note\": \"Renewed in May\"\n}",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
+      "Creates the tag on first use; up to 50 tags per organization. Response id is the organization_tag_id for createCoupon."
+    ]
+  },
+  {
+    "key": "partner.organizationTags.getOrganizationTags",
+    "namespace": "partner",
+    "group": "organizationTags",
+    "action": "getOrganizationTags",
+    "title": "Get Organization Tags",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/organization_tags",
+    "pathParams": [],
+    "queryParams": [
+      "page"
+    ],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Organization Tags/Get Organization Tags.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
+      "500 per page."
+    ]
+  },
+  {
+    "key": "partner.organizationTags.removeOrganizationTag",
+    "namespace": "partner",
+    "group": "organizationTags",
+    "action": "removeOrganizationTag",
+    "title": "Remove Organization Tag",
+    "method": "DELETE",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/organizations/:organization_id/tags/:tag_id",
+    "pathParams": [
+      "organization_id",
+      "tag_id"
+    ],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Organization Tags/Remove Organization Tag.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870."
+    ]
+  },
+  {
     "key": "partner.organizations.createOrganization",
     "namespace": "partner",
     "group": "organizations",
@@ -1649,6 +1807,52 @@
       "Docs page: https://dev.xyte.io/reference/partner-create-organization",
       "Partner docs PR xyte-io/partner-docs-portal#1 documents this endpoint; server PR xyte-io/server#8666 is merged.",
       "Response includes an organization API key for subsequent Organization API calls."
+    ]
+  },
+  {
+    "key": "partner.organizations.getOrganizations",
+    "namespace": "partner",
+    "group": "organizations",
+    "action": "getOrganizations",
+    "title": "Get Organizations",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/organizations",
+    "pathParams": [],
+    "queryParams": [
+      "name",
+      "tag",
+      "page"
+    ],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Organizations/Get Organizations.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
+      "name is a case-insensitive substring; tag is an exact partner tag name. 500 per page, ordered by name."
+    ]
+  },
+  {
+    "key": "partner.storeListings.getStoreListings",
+    "namespace": "partner",
+    "group": "storeListings",
+    "action": "getStoreListings",
+    "title": "Get Store Listings",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/store_listings",
+    "pathParams": [],
+    "queryParams": [
+      "page"
+    ],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Store Listings/Get Store Listings.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
+      "Requires the Store plan feature (403 otherwise). 500 per page."
     ]
   },
   {

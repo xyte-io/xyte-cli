@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import endpoints from '../src/api-catalog/public-endpoints.json';
+import { listUtilityActionProfiles } from '../src/workflows/utility-action-catalog';
 
 describe('public endpoint catalog', () => {
   it('maps every key uniquely', () => {
@@ -434,5 +435,30 @@ describe('public endpoint catalog', () => {
     expect(endpoint?.hasBody).toBe(true);
     expect(endpoint?.pathParams).toEqual([]);
     expect(endpoint?.queryParams).toEqual([]);
+  });
+
+  it.each([
+    ['partner.organizations.getOrganizations', 'GET', '/core/v1/partner/organizations', [], ['name', 'tag', 'page'], 'none'],
+    ['partner.organizationTags.addOrganizationTag', 'POST', '/core/v1/partner/organizations/:organization_id/tags', ['organization_id'], [], 'json'],
+    ['partner.organizationTags.removeOrganizationTag', 'DELETE', '/core/v1/partner/organizations/:organization_id/tags/:tag_id', ['organization_id', 'tag_id'], [], 'none'],
+    ['partner.organizationTags.getOrganizationTags', 'GET', '/core/v1/partner/organization_tags', [], ['page'], 'none'],
+    ['partner.coupons.createCoupon', 'POST', '/core/v1/partner/coupons', [], [], 'json'],
+    ['partner.coupons.getCoupons', 'GET', '/core/v1/partner/coupons', [], ['page'], 'none'],
+    ['partner.coupons.updateCoupon', 'PATCH', '/core/v1/partner/coupons/:id', ['id'], [], 'json'],
+    ['partner.coupons.deleteCoupon', 'DELETE', '/core/v1/partner/coupons/:id', ['id'], [], 'none'],
+    ['partner.storeListings.getStoreListings', 'GET', '/core/v1/partner/store_listings', [], ['page'], 'none']
+  ])('includes partner coupon and tag endpoint %s', (key, method, pathTemplate, pathParams, queryParams, bodyType) => {
+    const endpoint = endpoints.find((item) => item.key === key);
+    expect(endpoint).toBeDefined();
+    expect(endpoint?.method).toBe(method);
+    expect(endpoint?.pathTemplate).toBe(pathTemplate);
+    expect(endpoint?.pathParams).toEqual(pathParams);
+    expect(endpoint?.queryParams).toEqual(queryParams);
+    expect(endpoint?.authScope).toBe('partner');
+    expect(endpoint?.base).toBe('hub');
+    expect(endpoint?.bodyType).toBe(bodyType);
+    expect(endpoint?.hasBody).toBe(bodyType === 'json');
+    const writeActionKeys = listUtilityActionProfiles().map((profile) => profile.actionKey);
+    expect(writeActionKeys.includes(key)).toBe(method !== 'GET');
   });
 });
