@@ -1445,9 +1445,10 @@
     "notes": [
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
       "Requires the Store plan feature and store coupons enabled for the partner (403 otherwise).",
+      "Body: name required; code and/or organization_tag_id (at least one); discount_type percent needs percent_off (1-100), fixed_amount needs amount_off (major units) and currency; store_listing_id optional (omitted = whole store); active defaults to true.",
       "\"Valid through Dec 31\" is ends_at = the last millisecond of that day in the user's time zone (e.g. 2026-12-31T23:59:59.999-05:00), which is what the portal stores; ends_at is exclusive. Ask for the time zone if unknown.",
       "Per product, interval and currency only the single largest coupon applies; coupons never add up. 422 if a monthly or yearly price would become free, or any price would end between 0 and the minimum charge; one-time prices may reach 0.",
-      "Create the coupon before adding its tag to organizations. An identical existing coupon is returned, not duplicated."
+      "organization_tag_id comes from getOrganizationTags; a brand-new tag gets its id by adding it to one organization first (addOrganizationTag). Then create the coupon, and only then add the tag to the other organizations. An identical existing coupon is returned, not duplicated."
     ]
   },
   {
@@ -1518,7 +1519,7 @@
     "notes": [
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
       "Requires the Store plan feature and store coupons enabled for the partner (403 otherwise).",
-      "Only sent fields change; null clears a field.",
+      "Only sent fields change; null clears an optional field (e.g. code, store_listing_id = whole store, starts_at, ends_at). active cannot be null (422).",
       "\"Valid through Dec 31\" is ends_at = the last millisecond of that day in the user's time zone (e.g. 2026-12-31T23:59:59.999-05:00), which is what the portal stores; ends_at is exclusive. Ask for the time zone if unknown.",
       "Per product, interval and currency only the single largest coupon applies; coupons never add up. 422 if a monthly or yearly price would become free, or any price would end between 0 and the minimum charge; one-time prices may reach 0."
     ]
@@ -1746,9 +1747,9 @@
     "bodyExample": "{\n  \"name\": \"Gold\",\n  \"note\": \"Renewed in May\"\n}",
     "notes": [
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
-      "Creates the tag on first use; up to 50 tags per organization. Response id is the organization_tag_id for createCoupon.",
+      "Creates the tag on first use; tag names are case-insensitive; up to 50 tags per organization. Response id is the organization_tag_id for createCoupon.",
       "Tags cannot be deleted, only removed from organizations. A tag added with an API key shows no \"added by\" person in the Partner portal.",
-      "To give a tag a coupon, create the coupon first."
+      "Adding a tag that is already attached returns 200 with that tag and its existing note unchanged; the sent note is not saved. To give a tag a coupon, create the coupon before adding the tag to the other organizations (a new tag needs one organization first to get its id)."
     ]
   },
   {
@@ -1841,7 +1842,7 @@
     "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Organizations/Get Organizations.bru",
     "notes": [
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
-      "name is a case-insensitive substring; tag is an exact partner tag name. Ordered by name. per_page is optional, 1-500, default 500 (422 otherwise). To find a customer, filter by name instead of paging."
+      "name is a case-insensitive substring; tag is an exact partner tag name, case-insensitive. Ordered by name. per_page is optional, 1-500, default 500 (422 otherwise). To find a customer, filter by name instead of paging."
     ]
   },
   {
