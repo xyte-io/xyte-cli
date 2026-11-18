@@ -770,7 +770,12 @@
       "sub_model",
       "space_id",
       "page",
-      "per_page"
+      "per_page",
+      "notified",
+      "with_notifications",
+      "in_maintenance",
+      "snoozed",
+      "include_suppressed"
     ],
     "authScope": "organization",
     "bodyType": "none",
@@ -779,7 +784,10 @@
     "notes": [
       "Docs page: https://docs.xyte.io/reference/get-incidents",
       "Docs category: /branches/2.0/categories/reference/API Access",
-      "Docs parent: /branches/2.0/reference/incidents-1"
+      "Docs parent: /branches/2.0/reference/incidents-1",
+      "notified, in_maintenance and snoozed are optional true/false filters; include_suppressed=true also returns incidents suppressed by a scheduled maintenance window (hidden by default).",
+      "with_notifications=true adds notified and notifications[] to every item (default false leaves the payload unchanged). One notifications entry per organization integration the incident was dispatched to: integration_id, integration_type, status, action, notified_at, external_id, external_reference, external_url, reason, error. status (sent/failed/skipped), reason, notified_at and external_* describe the opening (create) notification only; later updates and closes do not change them. action is the last event dispatched (create/update/close).",
+      "notifications[].error is the last failed delivery, or null; set only for ticketing integrations (ServiceNow, Jira, Freshdesk, FreshService, ConnectWise, Autotask, Salesforce), always null for others. It is independent of status (can be set while status is sent); action names the failed event only while it is still the latest. Text is the system's own answer (e.g. \"ConnectWise: Error (HTTP 400): {...}\") or one of: \"Couldn't reach <name>\", \"Couldn't send to <name>: internal error\", \"<name> refused the <action> (HTTP 403)\" (plus the reason when given), \"Device data was temporarily unavailable\", \"remote side returned no id\" (create went through without a record id; reason no_remote_reference). At most 1000 characters. A later successful update or close clears it; an update that arrives after a close neither clears nor replaces it."
     ]
   },
   {

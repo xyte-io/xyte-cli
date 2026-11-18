@@ -188,8 +188,16 @@ describe('public endpoint catalog', () => {
       'sub_model',
       'space_id',
       'page',
-      'per_page'
+      'per_page',
+      'notified',
+      'with_notifications',
+      'in_maintenance',
+      'snoozed',
+      'include_suppressed'
     ]);
+    const getIncidentsNotes = getIncidents?.notes?.join(' ');
+    expect(getIncidentsNotes).toContain('notifications[].error');
+    expect(getIncidentsNotes).toContain('remote side returned no id');
 
     const getSpaces = endpoints.find((item) => item.key === 'organization.spaces.getSpaces');
     expect(getSpaces?.queryParams).toEqual([
