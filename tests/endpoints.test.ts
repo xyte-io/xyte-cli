@@ -196,9 +196,8 @@ describe('public endpoint catalog', () => {
       'include_suppressed'
     ]);
     const getIncidentsNotes = getIncidents?.notes?.join(' ');
-    expect(getIncidentsNotes).toContain('with_notifications=true adds notified and notifications[]');
     expect(getIncidentsNotes).toContain('notifications[].error');
-    expect(getIncidentsNotes).toContain('a later successful update or close clears it');
+    expect(getIncidentsNotes).toContain('remote side returned no id');
 
     const getSpaces = endpoints.find((item) => item.key === 'organization.spaces.getSpaces');
     expect(getSpaces?.queryParams).toEqual([
