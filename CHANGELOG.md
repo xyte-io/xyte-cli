@@ -6,6 +6,14 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+### Added
+- `organization.maintenanceSchedules.*` for the hub's recurring maintenance windows: `getMaintenanceSchedules` (filters `space_id`, `enabled`, `active`), `getSpaceMaintenanceSchedules` (a space's own, inherited and effective windows), `createMaintenanceSchedule`, `updateMaintenanceSchedule` and `deleteMaintenanceSchedule`, in the endpoint catalog and the typed client.
+- `organization.spaces.getSpaces` lists the `maintenance_scheduled_active` and `has_maintenance_schedules` filters and documents each space's `maintenance: { manual, scheduled }` block.
+- `organization.incidents.getIncidents` lists `include_suppressed` and documents each incident's `maintenance: { scheduled: { suppressed, suppressed_until, announced_at } }` block.
+
+### Changed
+- `organization.incidents.getIncidents` no longer returns incidents suppressed by a scheduled maintenance window unless `include_suppressed=true` is passed (hub behavior change, matching the Xyte portal). `ops watch incidents`, `ops inspect fleet|deep-dive` (and reports built from them) and the TUI incident views follow this default; `ops watch incidents --query-json '{"include_suppressed":true}'` opts back in.
+
 ## [0.16.0] - 2026-10-29
 
 ### Added
