@@ -321,9 +321,9 @@
     "notes": [
       "Docs page: https://docs.xyte.io/reference/get-device-details-history",
       "Server route evidence: xyte-io/server#9871 adds devices_controller#details (GET, member route) and the Bruno doc Organization API/Devices/Get Device Details History; no query params, no request body.",
-      "Response: { current: { details, since }, history: [ { details, valid_from, valid_until, slot } ] }, history newest first. current.since is when the current details replaced the previous value (null when they never changed).",
-      "history holds the last 5 changes (slot: latest) plus at most one older value from about a week ago (slot: week) and one from about a month ago (slot: month); empty when details never changed. valid_from is null when unknown.",
-      "Returns 401 when the Authorization header is missing or invalid, or the device does not belong to the organization."
+      "Response: { current: { details, since }, history: [ { details, valid_from, valid_until, slot } ] }, history newest first. current.since is when the current details replaced the previous value (null when no change has been recorded). Changes are recorded from the hub release of this endpoint (no earlier history), and changes to only the per-model untracked fields add no entry.",
+      "history holds the last 5 changes (slot: latest) plus at most one older value that was at least a week old (slot: week) and one at least 30 days old (slot: month) when the details last changed; entries can have gaps, so read valid_from/valid_until. Empty when no change has been recorded. valid_from is null when unknown.",
+      "Returns 401 when the Authorization header is missing or invalid, or the device does not exist or does not belong to the organization."
     ]
   },
   {
