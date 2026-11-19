@@ -1441,7 +1441,7 @@
     "bodyType": "json",
     "hasBody": true,
     "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Coupons/Create Coupon.bru",
-    "bodyExample": "{\n  \"name\": \"Gold 10\",\n  \"discount_type\": \"fixed_amount\",\n  \"amount_off\": 12.34,\n  \"currency\": \"USD\",\n  \"organization_tag_id\": \"....-d75e0abec7d2\",\n  \"store_listing_id\": \"....-c3\",\n  \"starts_at\": \"2026-03-01T00:00:00Z\",\n  \"ends_at\": \"2026-04-01T00:00:00Z\",\n  \"active\": true\n}",
+    "bodyExample": "{\n  \"name\": \"Gold 10\",\n  \"discount_type\": \"fixed_amount\",\n  \"amount_off\": 12.34,\n  \"currency\": \"USD\",\n  \"organization_tag_id\": \"....-d75e0abec7d2\",\n  \"store_listing_id\": \"....-c3\",\n  \"starts_at\": \"2026-03-01T00:00:00Z\",\n  \"ends_at\": \"2026-03-31T23:59:59.999Z\",\n  \"active\": true\n}",
     "notes": [
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
       "Requires the Store plan feature and store coupons enabled for the partner (403 otherwise).",
@@ -1520,6 +1520,8 @@
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
       "Requires the Store plan feature and store coupons enabled for the partner (403 otherwise).",
       "Only sent fields change; null clears an optional field (e.g. code, store_listing_id = whole store, starts_at, ends_at). active cannot be null (422).",
+      "amount_off without currency is in the coupon's currency; currency without amount_off keeps the number and changes the currency (5 USD becomes 5 JPY), so send amount_off too when it should change or does not fit the new currency's decimals.",
+      "Changing discount_type clears the other type's fields: percent_off on a switch to fixed_amount, amount_off and currency on a switch to percent.",
       "\"Valid through Dec 31\" is ends_at = the last millisecond of that day in the user's time zone (e.g. 2026-12-31T23:59:59.999-05:00), which is what the portal stores; ends_at is exclusive. Ask for the time zone if unknown.",
       "Per product, interval and currency only the single largest coupon applies; coupons never add up. 422 if a monthly or yearly price would become free, or any price would end between 0 and the minimum charge; one-time prices may reach 0."
     ]
@@ -1772,7 +1774,8 @@
     "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Organization Tags/Get Organization Tags.bru",
     "notes": [
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
-      "per_page is optional, 1-500, default 500 (422 otherwise). Tags cannot be deleted; remove them from each organization instead."
+      "per_page is optional, 1-500, default 500 (422 otherwise). Tags cannot be deleted; remove them from each organization instead.",
+      "organizations_count counts only organizations visible to the partner. coupons lists the partner's coupons handed out by the tag (empty without the Store plan feature or store coupons)."
     ]
   },
   {
@@ -1795,7 +1798,8 @@
     "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Organization Tags/Remove Organization Tag.bru",
     "notes": [
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
-      "The tag itself stays; tags cannot be deleted."
+      "The tag itself stays; tags cannot be deleted.",
+      "Response coupons_removed lists the coupons the organization lost through this tag (not ones still reached through another tag or redeemed by code); empty without the Store plan feature or store coupons, or when the organization is not store_visible. 404 if the tag is not attached (including a second remove)."
     ]
   },
   {
