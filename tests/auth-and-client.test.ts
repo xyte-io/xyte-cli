@@ -344,6 +344,31 @@ describe('client auth behavior', () => {
     expect(request.mock.calls[7][0].headers['Content-Type']).toBeUndefined();
   });
 
+  it('renders the organization device details history read without a body', async () => {
+    const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { current: {}, history: [] } });
+    const transport = { request } as unknown as HttpTransport;
+
+    const client = createXyteClient({
+      auth: { organization: 'org-key-123' },
+      hubBaseUrl: 'https://hub.example.test',
+      transport
+    });
+
+    await client.organization.getDeviceDetailsHistory({
+      path: { device_id: 'device/one' },
+      body: { ignored: true }
+    });
+
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request.mock.calls[0][0]).toMatchObject({
+      method: 'GET',
+      url: 'https://hub.example.test/core/v1/organization/devices/device%2Fone/details'
+    });
+    expect(request.mock.calls[0][0].headers.Authorization).toBe('org-key-123');
+    expect(request.mock.calls[0][0].body).toBeUndefined();
+    expect(request.mock.calls[0][0].headers['Content-Type']).toBeUndefined();
+  });
+
   it('uses active slot secret when multiple slots exist', async () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });

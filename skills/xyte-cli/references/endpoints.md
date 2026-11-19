@@ -98,6 +98,16 @@ xyte-cli api call organization.incidents.getIncidents \
 
 Replace `1710000000` with the current Unix timestamp in your shell or runtime. Use explicit integer Unix timestamps for `from` and `to`. In some environments, omitted or `null` bounds can return empty results.
 
+### `organization.devices.getDeviceDetailsHistory`
+
+Read-only. History of the device `details` object, not status history (for that, see `organization.devices.getHistories`). Returns the device's current `details` (`current.details`, `current.since`) and earlier values in `history`, newest first: the last 5 changes (`slot: "latest"`) plus at most one older value that was at least a week old (`week`) and one at least 30 days old (`month`) when the details last changed; entries can have gaps, so read `valid_from`/`valid_until`. `history` is empty and `current.since` is `null` when no change has been recorded: history starts at the later of the hub release of this endpoint and the device's claim by the organization (a newly claimed device starts with empty history; earlier changes are not available), and changes to only the per-model untracked fields add no entry.
+
+```bash
+xyte-cli api call organization.devices.getDeviceDetailsHistory \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}'
+```
+
 ## Concrete Write/Delete Examples
 
 ### `organization.incidents.closeIncident`
@@ -216,6 +226,7 @@ xyte-cli api call partner.organizations.createOrganization \
 Organization:
 - `organization.devices.getDevices`
 - `organization.devices.getDevice`
+- `organization.devices.getDeviceDetailsHistory`
 - `organization.devices.claimDevice` (native claim)
 - `organization.devices.mergeDevice`
 - `organization.devices.splitDevice`
