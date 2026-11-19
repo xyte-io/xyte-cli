@@ -354,7 +354,10 @@ describe('client auth behavior', () => {
       transport
     });
 
-    await client.organization.getDeviceDetailsHistory({ path: { device_id: 'device/one' } });
+    await client.organization.getDeviceDetailsHistory({
+      path: { device_id: 'device/one' },
+      body: { ignored: true }
+    });
 
     expect(request).toHaveBeenCalledTimes(1);
     expect(request.mock.calls[0][0]).toMatchObject({

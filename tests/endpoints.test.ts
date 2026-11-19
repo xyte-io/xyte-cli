@@ -146,6 +146,7 @@ describe('public endpoint catalog', () => {
     expect(history?.bodyType).toBe('none');
     expect(history?.hasBody).toBe(false);
     expect(history?.notes?.join(' ')).toContain('slot: latest');
+    expect(history?.sourceFile).toBe('https://docs.xyte.io/reference/get-device-details-history');
   });
 
   it('does not include stale PR aliases for endpoints already represented on main', () => {
