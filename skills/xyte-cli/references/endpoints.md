@@ -100,7 +100,7 @@ Replace `1710000000` with the current Unix timestamp in your shell or runtime. U
 
 ### `organization.devices.getDeviceDetailsHistory`
 
-Read-only. History of the device `details` object, not status history (for that, see `organization.devices.getHistories`). Returns the device's current `details` (`current.details`, `current.since`) and earlier values in `history`, newest first: the last 5 changes (`slot: "latest"`) plus at most one older value that was at least a week old (`week`) and one at least 30 days old (`month`) when the details last changed; entries can have gaps, so read `valid_from`/`valid_until`. `history` is empty and `current.since` is `null` when no change has been recorded: recording starts with the hub release of this endpoint, and changes to only the per-model untracked fields add no entry.
+Read-only. History of the device `details` object, not status history (for that, see `organization.devices.getHistories`). Returns the device's current `details` (`current.details`, `current.since`) and earlier values in `history`, newest first: the last 5 changes (`slot: "latest"`) plus at most one older value that was at least a week old (`week`) and one at least 30 days old (`month`) when the details last changed; entries can have gaps, so read `valid_from`/`valid_until`. `history` is empty and `current.since` is `null` when no change has been recorded: history starts at the later of the hub release of this endpoint and the device's claim by the organization (a newly claimed device starts with empty history; earlier changes are not available), and changes to only the per-model untracked fields add no entry.
 
 ```bash
 xyte-cli api call organization.devices.getDeviceDetailsHistory \
