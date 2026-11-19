@@ -157,6 +157,16 @@ xyte-cli api call organization.devices.splitDevice \
   --note "approved split"
 ```
 
+### `organization.devices.getDeviceDetailsHistory`
+
+Read-only. Returns the device's current `details` (`current.details`, `current.since`) and earlier values in `history`, newest first: the last 5 changes (`slot: "latest"`) plus at most one from about a week ago (`week`) and one from about a month ago (`month`). `history` is empty and `current.since` is `null` when the details never changed.
+
+```bash
+xyte-cli api call organization.devices.getDeviceDetailsHistory \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}'
+```
+
 ### `organization.devices.suspendIncidents` / `organization.devices.resumeIncidents`
 
 ```bash
@@ -216,6 +226,7 @@ xyte-cli api call partner.organizations.createOrganization \
 Organization:
 - `organization.devices.getDevices`
 - `organization.devices.getDevice`
+- `organization.devices.getDeviceDetailsHistory`
 - `organization.devices.claimDevice` (native claim)
 - `organization.devices.mergeDevice`
 - `organization.devices.splitDevice`
