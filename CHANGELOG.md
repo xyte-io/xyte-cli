@@ -9,6 +9,9 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 ### Added
 - `organization.devices.getDeviceDetailsHistory` (`GET /core/v1/organization/devices/:device_id/details`) in the endpoint catalog and the typed client: a device's current `details` plus earlier values, newest first (last 5 changes, plus one about a week and one about a month old). Call it with `xyte-cli api call organization.devices.getDeviceDetailsHistory --tenant <tenant-id> --path-json '{"device_id":"<device-id>"}'`.
 
+### Upgrade notes
+- Run `xyte-cli skills refresh` after upgrading so installed skill bundles pick up the new endpoint.
+
 ## [0.16.0] - 2026-10-29
 
 ### Added

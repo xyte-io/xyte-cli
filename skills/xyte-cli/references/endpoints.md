@@ -98,6 +98,16 @@ xyte-cli api call organization.incidents.getIncidents \
 
 Replace `1710000000` with the current Unix timestamp in your shell or runtime. Use explicit integer Unix timestamps for `from` and `to`. In some environments, omitted or `null` bounds can return empty results.
 
+### `organization.devices.getDeviceDetailsHistory`
+
+Read-only. History of the device `details` object, not status history (for that, see `organization.devices.getHistories`). Returns the device's current `details` (`current.details`, `current.since`) and earlier values in `history`, newest first: the last 5 changes (`slot: "latest"`) plus at most one from about a week ago (`week`) and one from about a month ago (`month`). `history` is empty and `current.since` is `null` when the details never changed.
+
+```bash
+xyte-cli api call organization.devices.getDeviceDetailsHistory \
+  --tenant <tenant-id> \
+  --path-json '{"device_id":"<device-id>"}'
+```
+
 ## Concrete Write/Delete Examples
 
 ### `organization.incidents.closeIncident`
@@ -155,16 +165,6 @@ xyte-cli api call organization.devices.splitDevice \
   --path-json '{"device_id":"<primary-device-id>"}' \
   --body-json '{"shadow_device_id":"<shadow-device-id>"}' \
   --note "approved split"
-```
-
-### `organization.devices.getDeviceDetailsHistory`
-
-Read-only. Returns the device's current `details` (`current.details`, `current.since`) and earlier values in `history`, newest first: the last 5 changes (`slot: "latest"`) plus at most one from about a week ago (`week`) and one from about a month ago (`month`). `history` is empty and `current.since` is `null` when the details never changed.
-
-```bash
-xyte-cli api call organization.devices.getDeviceDetailsHistory \
-  --tenant <tenant-id> \
-  --path-json '{"device_id":"<device-id>"}'
 ```
 
 ### `organization.devices.suspendIncidents` / `organization.devices.resumeIncidents`
