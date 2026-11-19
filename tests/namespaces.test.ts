@@ -300,4 +300,25 @@ describe('namespace endpoint mappings', () => {
       body: { name: 'Acme HQ' }
     });
   });
+
+  it('maps partner coupon, tag and store listing methods to catalog keys', async () => {
+    const call = vi.fn().mockResolvedValue({ ok: true });
+    const partner = createPartnerNamespace(call);
+    const cases: Array<[keyof typeof partner, string]> = [
+      ['getOrganizations', 'partner.organizations.getOrganizations'],
+      ['addOrganizationTag', 'partner.organizationTags.addOrganizationTag'],
+      ['removeOrganizationTag', 'partner.organizationTags.removeOrganizationTag'],
+      ['getOrganizationTags', 'partner.organizationTags.getOrganizationTags'],
+      ['createCoupon', 'partner.coupons.createCoupon'],
+      ['getCoupons', 'partner.coupons.getCoupons'],
+      ['updateCoupon', 'partner.coupons.updateCoupon'],
+      ['deleteCoupon', 'partner.coupons.deleteCoupon'],
+      ['getStoreListings', 'partner.storeListings.getStoreListings']
+    ];
+
+    for (const [method, key] of cases) {
+      await partner[method]({ query: { page: 1 } });
+      expect(call).toHaveBeenLastCalledWith(key, { query: { page: 1 } });
+    }
+  });
 });

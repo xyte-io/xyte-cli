@@ -123,6 +123,24 @@ describe('client auth behavior', () => {
     expect(sent.body).toBeUndefined();
   });
 
+  it('renders partner organization tag removal with both path params', async () => {
+    const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { coupons_removed: [] } });
+    const transport = { request } as unknown as HttpTransport;
+
+    const client = createXyteClient({
+      auth: { partner: 'partner-key-456' },
+      hubBaseUrl: 'https://hub.example.test',
+      transport
+    });
+    await client.partner.removeOrganizationTag({ path: { organization_id: 'o 1', tag_id: 't1' } });
+
+    expect(request).toHaveBeenCalledTimes(1);
+    const sent = request.mock.calls[0][0];
+    expect(sent.method).toBe('DELETE');
+    expect(sent.url).toBe('https://hub.example.test/core/v1/partner/organizations/o%201/tags/t1');
+    expect(sent.body).toBeUndefined();
+  });
+
   it('renders organization merge and split device requests', async () => {
     const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } });
     const transport = { request } as unknown as HttpTransport;

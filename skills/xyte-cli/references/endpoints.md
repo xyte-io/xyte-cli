@@ -54,6 +54,10 @@ Derived from the bundled public endpoint spec.
 | `organization.groups.getGroups` | `page`, `per_page` | `page`, `per_page` | Paginated team access groups |
 | `organization.users.getUsers` | `page`, `per_page` | `page`, `per_page` | Paginated active users |
 | `organization.models.getModels` | `page`, `per_page`, `search`, `edge_only` | `page`, `per_page` | Use `edge_only=true` for Edge model discovery and custom parameter labels |
+| `partner.organizations.getOrganizations` | `name`, `tag`, `page`, `per_page` | `page`, `per_page` | `name` is a case-insensitive substring; `tag` is an exact partner tag name, case-insensitive. `per_page` 1-500, default 500 (422 otherwise) |
+| `partner.organizationTags.getOrganizationTags` | `page`, `per_page` | `page`, `per_page` | `per_page` 1-500, default 500 (422 otherwise) |
+| `partner.coupons.getCoupons` | `page`, `per_page` | `page`, `per_page` | `per_page` 1-500, default 500 (422 otherwise). Newest first |
+| `partner.storeListings.getStoreListings` | `page`, `per_page` | `page`, `per_page` | `per_page` 1-500, default 500 (422 otherwise) |
 
 For the complete current query-param set, run `xyte-cli api endpoints describe <endpoint-key>` before calling.
 
@@ -211,6 +215,18 @@ xyte-cli api call partner.organizations.createOrganization \
   --body-json '{"name":"Acme HQ","admin_contact_email":"admin@example.com","admin_contact_name":"Jane Doe","finance_contact_email":"finance@example.com","finance_contact_name":"Finance Team"}'
 ```
 
+### `partner.coupons.*`
+
+Coupons need the partner's Store plan feature and store coupons enabled (403 otherwise). A tag coupon takes `organization_tag_id` from `partner.organizationTags.*`; `store_listing_id` comes from `partner.storeListings.getStoreListings`.
+
+Body: `name` is required; send `code` and/or `organization_tag_id` (at least one); `percent` needs `percent_off` (1-100), `fixed_amount` needs `amount_off` and `currency`.
+
+```bash
+xyte-cli api call partner.coupons.createCoupon \
+  --tenant <tenant-id> \
+  --body-json '{"name":"Spring","code":"SPRING10","discount_type":"percent","percent_off":10}'
+```
+
 ## Common Endpoint Keys
 
 Organization:
@@ -247,6 +263,15 @@ Partner:
 - `partner.devices.getDevices`
 - `partner.devices.getDeviceInfo`
 - `partner.organizations.createOrganization`
+- `partner.organizations.getOrganizations`
+- `partner.organizationTags.getOrganizationTags`
+- `partner.organizationTags.addOrganizationTag`
+- `partner.organizationTags.removeOrganizationTag`
+- `partner.coupons.getCoupons`
+- `partner.coupons.createCoupon`
+- `partner.coupons.updateCoupon`
+- `partner.coupons.deleteCoupon`
+- `partner.storeListings.getStoreListings`
 - `partner.tickets.getTickets`
 
 ## Edge Devices (Async)
