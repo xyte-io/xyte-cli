@@ -433,6 +433,22 @@ describe('public endpoint catalog', () => {
     expect(writesWithoutNote).toEqual([]);
   });
 
+  it.each(['partner.orders.getOrders', 'partner.orders.getOrder', 'partner.orders.approveOrder'])(
+    'notes the approved_by field on %s',
+    (key) => {
+      const notes = endpoints.find((item) => item.key === key)?.notes ?? [];
+      expect(notes.some((note) => note.includes('approved_by'))).toBe(true);
+    }
+  );
+
+  it.each(['partner.payments.getPayments', 'partner.payments.getPayment'])(
+    'notes that %s totals are the partner share, not the buyer charge',
+    (key) => {
+      const notes = endpoints.find((item) => item.key === key)?.notes ?? [];
+      expect(notes.some((note) => note.includes("not the buyer's full charge"))).toBe(true);
+    }
+  );
+
   it('includes partner organization creation endpoint metadata', () => {
     const endpoint = endpoints.find((item) => item.key === 'partner.organizations.createOrganization');
     expect(endpoint).toBeDefined();
