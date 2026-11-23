@@ -2231,7 +2231,7 @@ describe('cli integration', () => {
       '--tenant',
       'acme',
       '--query-json',
-      '{"room_status":"error","space_type":"room"}'
+      '{"room_status":"error","space_type":"room","maintenance_scheduled_active":true,"has_maintenance_schedules":false}'
     ]);
 
     const [requestUrl, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -2239,7 +2239,50 @@ describe('cli integration', () => {
     expect(init.method).toBe('GET');
     expect(init.body).toBeUndefined();
     expect(url.pathname).toBe('/core/v1/organization/spaces');
-    expect(Object.fromEntries(url.searchParams)).toEqual({ room_status: 'error', space_type: 'room' });
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      room_status: 'error',
+      space_type: 'room',
+      maintenance_scheduled_active: 'true',
+      has_maintenance_schedules: 'false'
+    });
+  });
+
+  it('calls getSpace on the single-space route with an encoded space_id', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ id: 42 }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'api',
+      'call',
+      'organization.spaces.getSpace',
+      '--tenant',
+      'acme',
+      '--path-json',
+      '{"space_id":"a/b"}'
+    ]);
+
+    const [requestUrl, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const url = new URL(String(requestUrl));
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+    expect(url.pathname).toBe('/core/v1/organization/spaces/a%2Fb');
+    expect(url.search).toBe('');
   });
 
   it('rejects invalid output-mode values for api call', async () => {

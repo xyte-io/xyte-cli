@@ -212,9 +212,17 @@ describe('public endpoint catalog', () => {
       'created_before',
       'created_after',
       'path_includes',
-      'room_status'
+      'room_status',
+      'maintenance_scheduled_active',
+      'has_maintenance_schedules'
     ]);
     expect(getSpaces?.notes?.join(' ')).toContain('Any other value returns 400');
+
+    const getSpace = endpoints.find((item) => item.key === 'organization.spaces.getSpace');
+    expect(getSpace?.title).toBe('Get Space');
+    expect(getSpace?.pathTemplate).toBe('/core/v1/organization/spaces/:space_id');
+    expect(getSpace?.pathParams).toEqual(['space_id']);
+    expect(getSpace?.queryParams).toEqual([]);
 
     const getEdges = endpoints.find((item) => item.key === 'organization.edges.getEdges');
     expect(getEdges?.queryParams).toEqual(['page', 'per_page']);

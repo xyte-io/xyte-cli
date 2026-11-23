@@ -11,6 +11,10 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 ### Added
 - `organization.spaces.getSpaces` lists the hub's `room_status` filter: one of `no_devices`, `maintenance_mode`, `error`, `warning`, `unknown`, `healthy` (case-insensitive; blank means no filter), e.g. `--query-json '{"room_status":"error"}'`. Any other value returns 400.
 - Space responses from `getSpaces`, `getSpace`, `createSpace`, `findOrCreateSpace` and `updateSpace` document the new `room_status` (nullable), `room_status_updated_at` (nullable ISO 8601) and `is_vip` (boolean) fields. A space with child spaces carries `null`/`null`/`false`.
+- `organization.spaces.getSpaces` lists the hub's boolean maintenance filters `maintenance_scheduled_active` and `has_maintenance_schedules`.
+
+### Fixed
+- `organization.spaces.getSpace` now calls `GET /core/v1/organization/spaces/:space_id` with a required `space_id` path param, matching the hub. It previously pointed at the list route with the list filters. The TUI space detail view, which already passed `space_id`, now gets the single space.
 
 ### Changed
 - Bumped package metadata and lockfile to `0.17.0`.
