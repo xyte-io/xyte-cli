@@ -6,6 +6,19 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-23
+
+### Added
+- `organization.spaces.getSpaces` lists the hub's `room_status` filter: one of `no_devices`, `maintenance_mode`, `error`, `warning`, `unknown`, `healthy` (case-insensitive; blank means no filter), e.g. `--query-json '{"room_status":"error"}'`. Any other value returns 400.
+- Space responses from `getSpaces`, `getSpace`, `createSpace`, `findOrCreateSpace` and `updateSpace` document the new `room_status` (nullable), `room_status_updated_at` (nullable ISO 8601) and `is_vip` (boolean) fields. A space with child spaces carries `null`/`null`/`false`.
+
+### Changed
+- Bumped package metadata and lockfile to `0.17.0`.
+
+### Upgrade notes
+- The filter and fields need a hub release that serves them.
+- Run `xyte-cli skills refresh` after upgrading so installed skill bundles pick up the new filter.
+
 ## [0.16.0] - 2026-10-29
 
 ### Added

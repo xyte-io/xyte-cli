@@ -2204,6 +2204,44 @@ describe('cli integration', () => {
     });
   });
 
+  it('sends the getSpaces room_status filter as a query param', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-org', 'org-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'api',
+      'call',
+      'organization.spaces.getSpaces',
+      '--tenant',
+      'acme',
+      '--query-json',
+      '{"room_status":"error","space_type":"room"}'
+    ]);
+
+    const [requestUrl, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const url = new URL(String(requestUrl));
+    expect(init.method).toBe('GET');
+    expect(init.body).toBeUndefined();
+    expect(url.pathname).toBe('/core/v1/organization/spaces');
+    expect(Object.fromEntries(url.searchParams)).toEqual({ room_status: 'error', space_type: 'room' });
+  });
+
   it('rejects invalid output-mode values for api call', async () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });

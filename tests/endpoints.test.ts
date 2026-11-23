@@ -160,6 +160,18 @@ describe('public endpoint catalog', () => {
       expect(endpoints.find((item) => item.key === key)?.notes?.join(' ')).toContain('connector: { type: native|c2c|edge');
     }
 
+    for (const key of [
+      'organization.spaces.getSpaces',
+      'organization.spaces.getSpace',
+      'organization.spaces.createSpace',
+      'organization.spaces.findOrCreateSpace',
+      'organization.spaces.updateSpace'
+    ]) {
+      const notes = endpoints.find((item) => item.key === key)?.notes?.join(' ');
+      expect(notes).toContain('room_status_updated_at');
+      expect(notes).toContain('is_vip');
+    }
+
     const getHistories = endpoints.find((item) => item.key === 'organization.devices.getHistories');
     expect(getHistories?.queryParams).toEqual([
       'status',
@@ -199,8 +211,10 @@ describe('public endpoint catalog', () => {
       'space_type',
       'created_before',
       'created_after',
-      'path_includes'
+      'path_includes',
+      'room_status'
     ]);
+    expect(getSpaces?.notes?.join(' ')).toContain('Any other value returns 400');
 
     const getEdges = endpoints.find((item) => item.key === 'organization.edges.getEdges');
     expect(getEdges?.queryParams).toEqual(['page', 'per_page']);

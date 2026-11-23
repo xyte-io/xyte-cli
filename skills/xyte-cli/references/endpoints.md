@@ -41,7 +41,7 @@ Derived from the bundled public endpoint spec.
 
 | Endpoint Key | Query Fields | Pagination Fields | Notes |
 | --- | --- | --- | --- |
-| `organization.spaces.getSpaces` | `id`, `name`, `parent_id`, `space_type`, `created_before`, `created_after`, `path_includes` | none | Main listing endpoint with server-side filtering |
+| `organization.spaces.getSpaces` | `id`, `name`, `parent_id`, `space_type`, `created_before`, `created_after`, `path_includes`, `room_status` | none | Main listing endpoint with server-side filtering. `room_status` is one of `no_devices`, `maintenance_mode`, `error`, `warning`, `unknown`, `healthy` (case-insensitive; other values return 400). Each space carries `room_status`, `room_status_updated_at` and `is_vip` (`null`/`null`/`false` for a space with child spaces) |
 | `organization.devices.getDevices` | `page`, `per_page`, `space_id`, `name`, `status`, `effective_status`, `model_id`, `connection_method`, `connector_id` | `page`, `per_page` | Filters combine with AND; `name` is a case-insensitive substring; `status` (online/offline/unavailable/error) and `effective_status` (ok/warning/error/offline/disconnected/never_seen) take a comma-separated list and can trail the live `status` by up to a minute; `connection_method` is native/c2c/edge; `model_id`/`connector_id` are UUIDs (`connector_id` = a device's `connector.id`). Unknown params and invalid values return 422. Continue while `next_page` is set. Each device carries `connector: {type, id, name}` |
 | `organization.devices.getHistories` | `status`, `from`, `to`, `device_id`, `space_id`, `name`, `page`, `per_page` | `page`, `per_page` | Filtered history lookup. `from`/`to` window must not exceed 31 days (422 otherwise); defaults: `from` = 1 week ago, `to` = now, applied independently — send both. `status` filters the device's *current* status. |
 | `organization.commands.getCommands` | `status`, `page`, `per_page` | `page`, `per_page` | Command history pagination and status filter |
@@ -69,6 +69,14 @@ xyte-cli api call organization.spaces.getSpaces \
     "name": "room",
     "space_type": "room"
   }'
+```
+
+Rooms currently in error (any value from the table above works):
+
+```bash
+xyte-cli api call organization.spaces.getSpaces \
+  --tenant <tenant-id> \
+  --query-json '{"room_status": "error"}'
 ```
 
 ### `organization.devices.getHistories`
