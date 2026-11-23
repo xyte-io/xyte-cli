@@ -1779,7 +1779,8 @@
     "notes": [
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
       "Requires the Store plan feature (403 otherwise).",
-      "Includes the order items; warranty items (warranty true) need a start date in approveOrder."
+      "Includes the order items; warranty items (warranty true) need a start date in approveOrder.",
+      "Also returns renewal orders, which getOrders lists only with include_renewals=true."
     ]
   },
   {
@@ -1841,7 +1842,8 @@
       "Brand partner API keys are read-only (403).",
       "Creates the tag on first use; tag names are case-insensitive; up to 50 tags per organization. Response id is the organization_tag_id for createCoupon.",
       "Tags cannot be deleted, only removed from organizations. A tag added with an API key shows no \"added by\" person in the Partner portal.",
-      "Adding a tag that is already attached returns 200 with that tag and its existing note unchanged; the sent note is not saved. To give a tag a coupon, create the coupon before adding the tag to the other organizations (a new tag needs one organization first to get its id)."
+      "Adding a tag that is already attached returns 200 with that tag and its existing note unchanged; the sent note is not saved. To give a tag a coupon, create the coupon before adding the tag to the other organizations (a new tag needs one organization first to get its id).",
+      "Body: note is optional, up to 1000 characters (422 if longer or not a string). To change the note of an attached tag, use updateOrganizationTag."
     ]
   },
   {
@@ -2115,7 +2117,8 @@
     "notes": [
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
       "Requires the Store plan feature (403 otherwise).",
-      "per_page is optional, 1-500, default 100 (422 otherwise). Newest first."
+      "per_page is optional, 1-500, default 100 (422 otherwise). Newest first.",
+      "order_id, subscription_id and product.id can belong to another partner (a reseller's order, another owner's subscription or product); getOrder, getSubscription or getProduct then returns 404."
     ]
   },
   {
@@ -2137,7 +2140,8 @@
     "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Store Listings/Get Store Listing.bru",
     "notes": [
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
-      "Requires the Store plan feature (403 otherwise)."
+      "Requires the Store plan feature (403 otherwise).",
+      "product.id can belong to another partner that shares the product with you; getProduct then returns 404."
     ]
   },
   {
@@ -2160,7 +2164,8 @@
     "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Store Listings/Get Store Listings.bru",
     "notes": [
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
-      "Requires the Store plan feature (403 otherwise). per_page is optional, 1-500, default 100 (422 otherwise)."
+      "Requires the Store plan feature (403 otherwise). per_page is optional, 1-500, default 100 (422 otherwise).",
+      "For a brand partner the list includes its brands' listings, in store order (set per partner, so brands' listings are mixed). A brand partner's coupons cannot use its brands' listings."
     ]
   },
   {
@@ -2203,7 +2208,8 @@
     "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Subscriptions/Get Subscription.bru",
     "notes": [
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
-      "Requires the Store plan feature (403 otherwise)."
+      "Requires the Store plan feature (403 otherwise).",
+      "order_id can belong to a reseller that sold the order; getOrder then returns 404."
     ]
   },
   {
@@ -2259,7 +2265,7 @@
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
       "Requires the Store plan feature (403 otherwise).",
       "per_page is optional, 1-500, default 100 (422 otherwise). Newest first.",
-      "next_charge_from is inclusive, next_charge_to exclusive; both need a time-zone offset (Z or +hh:mm), else 422. next_charge_to must be after next_charge_from, else 422. next_charge_at is a date, read as 00:00 UTC."
+      "next_charge_from is inclusive, next_charge_to exclusive; both need a time-zone offset (Z or +hh:mm), else 422. next_charge_to must be after next_charge_from, else 422. next_charge_at is a date, read as 00:00 UTC. A subscription with no next charge (next_charge_at null) matches neither filter."
     ]
   },
   {
