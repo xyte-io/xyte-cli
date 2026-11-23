@@ -1446,7 +1446,7 @@
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
       "Requires the Store plan feature and store coupons enabled for the partner (403 otherwise).",
       "Body: name required; code and/or organization_tag_id (at least one); discount_type percent needs percent_off (1-100), fixed_amount needs amount_off (major units) and currency; store_listing_id optional (omitted = whole store); active defaults to true.",
-      "\"Valid through Dec 31\" is ends_at = the last millisecond of that day in the user's time zone (e.g. 2026-12-31T23:59:59.999-05:00), which is what the portal stores; ends_at is exclusive. Ask for the time zone if unknown.",
+      "\"Valid through Dec 31\" is ends_at = the last millisecond of that day in the user's time zone (e.g. 2026-12-31T23:59:59.999-05:00), which is what the portal stores; ends_at is exclusive. Ask for the time zone if unknown. starts_at and ends_at need a time-zone offset (Z or +hh:mm), else 422.",
       "Per product, interval and currency only the single largest coupon applies; coupons never add up. 422 if a monthly or yearly price would become free, or any price would end between 0 and the minimum charge; one-time prices may reach 0.",
       "organization_tag_id comes from getOrganizationTags; a brand-new tag gets its id by adding it to one organization first (addOrganizationTag). Then create the coupon, and only then add the tag to the other organizations. An identical existing coupon is returned, not duplicated."
     ]
@@ -1495,7 +1495,7 @@
     "notes": [
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
       "Requires the Store plan feature and store coupons enabled for the partner (403 otherwise).",
-      "per_page is optional, 1-500, default 500 (422 otherwise). Newest first."
+      "per_page is optional, 1-500, default 100 (422 otherwise). Newest first."
     ]
   },
   {
@@ -1522,7 +1522,7 @@
       "Only sent fields change; null clears an optional field (e.g. code, store_listing_id = whole store, starts_at, ends_at). active cannot be null (422).",
       "amount_off without currency is in the coupon's currency; currency without amount_off keeps the number and changes the currency (5 USD becomes 5 JPY), so send amount_off too when it should change or does not fit the new currency's decimals.",
       "Changing discount_type clears the other type's fields: percent_off on a switch to fixed_amount, amount_off and currency on a switch to percent.",
-      "\"Valid through Dec 31\" is ends_at = the last millisecond of that day in the user's time zone (e.g. 2026-12-31T23:59:59.999-05:00), which is what the portal stores; ends_at is exclusive. Ask for the time zone if unknown.",
+      "\"Valid through Dec 31\" is ends_at = the last millisecond of that day in the user's time zone (e.g. 2026-12-31T23:59:59.999-05:00), which is what the portal stores; ends_at is exclusive. Ask for the time zone if unknown. starts_at and ends_at need a time-zone offset (Z or +hh:mm), else 422.",
       "Per product, interval and currency only the single largest coupon applies; coupons never add up. 422 if a monthly or yearly price would become free, or any price would end between 0 and the minimum charge; one-time prices may reach 0."
     ]
   },
@@ -1730,6 +1730,91 @@
     ]
   },
   {
+    "key": "partner.orders.approveOrder",
+    "namespace": "partner",
+    "group": "orders",
+    "action": "approveOrder",
+    "title": "Approve Order",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/orders/:order_id/approve",
+    "pathParams": [
+      "order_id"
+    ],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Orders/Approve Order.bru",
+    "bodyExample": "{\n  \"warranty_start_dates\": {\n    \"....-e5\": \"2026-01-15\"\n  }\n}",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
+      "Requires the Store plan feature (403 otherwise).",
+      "Brand partner API keys are read-only (403).",
+      "Approval cannot be undone; it creates the purchased products and emails the customer. An already approved order returns 200 and nothing changes. 422 when the order is not awaiting approval.",
+      "Body: warranty_start_dates is optional, { \"<order_item_id>\": \"YYYY-MM-DD\" }; required for each warranty item without a stored warranty_start_at."
+    ]
+  },
+  {
+    "key": "partner.orders.getOrder",
+    "namespace": "partner",
+    "group": "orders",
+    "action": "getOrder",
+    "title": "Get Order",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/orders/:order_id",
+    "pathParams": [
+      "order_id"
+    ],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Orders/Get Order.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
+      "Requires the Store plan feature (403 otherwise).",
+      "Includes the order items; warranty items (warranty true) need a start date in approveOrder."
+    ]
+  },
+  {
+    "key": "partner.orders.getOrders",
+    "namespace": "partner",
+    "group": "orders",
+    "action": "getOrders",
+    "title": "Get Orders",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/orders",
+    "pathParams": [],
+    "queryParams": [
+      "page",
+      "per_page",
+      "created_from",
+      "created_to",
+      "organization_id",
+      "fulfillment_status",
+      "payment_status",
+      "pending_approval",
+      "coupon_id",
+      "short_id",
+      "reference_id",
+      "include_renewals"
+    ],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Orders/Get Orders.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
+      "Requires the Store plan feature (403 otherwise).",
+      "per_page is optional, 1-500, default 100 (422 otherwise). Newest first.",
+      "created_from is inclusive, created_to exclusive; both need a time-zone offset (Z or +hh:mm), else 422.",
+      "pending_approval=true lists orders waiting for approveOrder; include_renewals defaults to false (first purchases only)."
+    ]
+  },
+  {
     "key": "partner.organizationTags.addOrganizationTag",
     "namespace": "partner",
     "group": "organizationTags",
@@ -1774,7 +1859,7 @@
     "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Organization Tags/Get Organization Tags.bru",
     "notes": [
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
-      "per_page is optional, 1-500, default 500 (422 otherwise). Tags cannot be deleted; remove them from each organization instead.",
+      "per_page is optional, 1-500, default 100 (422 otherwise). Tags cannot be deleted; remove them from each organization instead.",
       "organizations_count counts only organizations visible to the partner. coupons lists the partner's coupons handed out by the tag (empty without the Store plan feature or store coupons)."
     ]
   },
@@ -1800,6 +1885,31 @@
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
       "The tag itself stays; tags cannot be deleted.",
       "Response coupons_removed lists the coupons the organization lost through this tag (not ones still reached through another tag or redeemed by code); empty without the Store plan feature or store coupons, or when the organization is not store_visible. 404 if the tag is not attached (including a second remove)."
+    ]
+  },
+  {
+    "key": "partner.organizationTags.updateOrganizationTag",
+    "namespace": "partner",
+    "group": "organizationTags",
+    "action": "updateOrganizationTag",
+    "title": "Update Organization Tag",
+    "method": "PATCH",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/organizations/:organization_id/tags/:tag_id",
+    "pathParams": [
+      "organization_id",
+      "tag_id"
+    ],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Organization Tags/Update Organization Tag.bru",
+    "bodyExample": "{\n  \"note\": \"Renewed in June\"\n}",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
+      "Brand partner API keys are read-only (403).",
+      "Body: note is required, up to 1000 characters; null or \"\" clears it. Changes the note on this organization only. 404 if the tag is not attached."
     ]
   },
   {
@@ -1846,7 +1956,181 @@
     "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Organizations/Get Organizations.bru",
     "notes": [
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
-      "name is a case-insensitive substring; tag is an exact partner tag name, case-insensitive. Ordered by name. per_page is optional, 1-500, default 500 (422 otherwise). To find a customer, filter by name instead of paging."
+      "name is a case-insensitive substring; tag is an exact partner tag name, case-insensitive. Ordered by name. per_page is optional, 1-500, default 100 (422 otherwise). To find a customer, filter by name instead of paging."
+    ]
+  },
+  {
+    "key": "partner.payments.getPayment",
+    "namespace": "partner",
+    "group": "payments",
+    "action": "getPayment",
+    "title": "Get Payment",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/payments/:payment_id",
+    "pathParams": [
+      "payment_id"
+    ],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Payments/Get Payment.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
+      "Requires the Store plan feature (403 otherwise).",
+      "404 for an offline payment."
+    ]
+  },
+  {
+    "key": "partner.payments.getPayments",
+    "namespace": "partner",
+    "group": "payments",
+    "action": "getPayments",
+    "title": "Get Payments",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/payments",
+    "pathParams": [],
+    "queryParams": [
+      "page",
+      "per_page",
+      "created_from",
+      "created_to",
+      "organization_id",
+      "status"
+    ],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Payments/Get Payments.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
+      "Requires the Store plan feature (403 otherwise).",
+      "per_page is optional, 1-500, default 100 (422 otherwise). Newest first.",
+      "created_from is inclusive, created_to exclusive; both need a time-zone offset (Z or +hh:mm), else 422.",
+      "Offline payments are not listed."
+    ]
+  },
+  {
+    "key": "partner.products.getProduct",
+    "namespace": "partner",
+    "group": "products",
+    "action": "getProduct",
+    "title": "Get Product",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/products/:product_id",
+    "pathParams": [
+      "product_id"
+    ],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Products/Get Product.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
+      "Requires the Store plan feature (403 otherwise)."
+    ]
+  },
+  {
+    "key": "partner.products.getProducts",
+    "namespace": "partner",
+    "group": "products",
+    "action": "getProducts",
+    "title": "Get Products",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/products",
+    "pathParams": [],
+    "queryParams": [
+      "page",
+      "per_page",
+      "archived",
+      "type"
+    ],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Products/Get Products.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
+      "Requires the Store plan feature (403 otherwise).",
+      "per_page is optional, 1-500, default 100 (422 otherwise). Newest first.",
+      "Products other partners share with you are not listed."
+    ]
+  },
+  {
+    "key": "partner.soldProducts.getSoldProduct",
+    "namespace": "partner",
+    "group": "soldProducts",
+    "action": "getSoldProduct",
+    "title": "Get Sold Product",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/sold_products/:sold_product_id",
+    "pathParams": [
+      "sold_product_id"
+    ],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Sold Products/Get Sold Product.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
+      "Requires the Store plan feature (403 otherwise)."
+    ]
+  },
+  {
+    "key": "partner.soldProducts.getSoldProducts",
+    "namespace": "partner",
+    "group": "soldProducts",
+    "action": "getSoldProducts",
+    "title": "Get Sold Products",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/sold_products",
+    "pathParams": [],
+    "queryParams": [
+      "page",
+      "per_page",
+      "organization_id",
+      "order_id",
+      "product_id",
+      "redeemed"
+    ],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Sold Products/Get Sold Products.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
+      "Requires the Store plan feature (403 otherwise).",
+      "per_page is optional, 1-500, default 100 (422 otherwise). Newest first."
+    ]
+  },
+  {
+    "key": "partner.storeListings.getStoreListing",
+    "namespace": "partner",
+    "group": "storeListings",
+    "action": "getStoreListing",
+    "title": "Get Store Listing",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/store_listings/:store_listing_id",
+    "pathParams": [
+      "store_listing_id"
+    ],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Store Listings/Get Store Listing.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
+      "Requires the Store plan feature (403 otherwise)."
     ]
   },
   {
@@ -1869,7 +2153,106 @@
     "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Store Listings/Get Store Listings.bru",
     "notes": [
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
-      "Requires the Store plan feature (403 otherwise). per_page is optional, 1-500, default 500 (422 otherwise)."
+      "Requires the Store plan feature (403 otherwise). per_page is optional, 1-500, default 100 (422 otherwise)."
+    ]
+  },
+  {
+    "key": "partner.storeSettings.getStoreSettings",
+    "namespace": "partner",
+    "group": "storeSettings",
+    "action": "getStoreSettings",
+    "title": "Get Store Settings",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/store_settings",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Store Settings/Get Store Settings.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
+      "Requires the Store plan feature (403 otherwise).",
+      "A brand partner's key gets the brand's own settings."
+    ]
+  },
+  {
+    "key": "partner.subscriptions.getSubscription",
+    "namespace": "partner",
+    "group": "subscriptions",
+    "action": "getSubscription",
+    "title": "Get Subscription",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/subscriptions/:subscription_id",
+    "pathParams": [
+      "subscription_id"
+    ],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Subscriptions/Get Subscription.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
+      "Requires the Store plan feature (403 otherwise)."
+    ]
+  },
+  {
+    "key": "partner.subscriptions.getSubscriptionInvoiceItems",
+    "namespace": "partner",
+    "group": "subscriptions",
+    "action": "getSubscriptionInvoiceItems",
+    "title": "Get Subscription Invoice Items",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/subscriptions/:subscription_id/invoice_items",
+    "pathParams": [
+      "subscription_id"
+    ],
+    "queryParams": [
+      "page",
+      "per_page"
+    ],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Subscriptions/Get Subscription Invoice Items.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
+      "Requires the Store plan feature (403 otherwise).",
+      "per_page is optional, 1-500, default 100 (422 otherwise). Newest first.",
+      "One item per charge: the first purchase and every renewal."
+    ]
+  },
+  {
+    "key": "partner.subscriptions.getSubscriptions",
+    "namespace": "partner",
+    "group": "subscriptions",
+    "action": "getSubscriptions",
+    "title": "Get Subscriptions",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/subscriptions",
+    "pathParams": [],
+    "queryParams": [
+      "page",
+      "per_page",
+      "status",
+      "organization_id",
+      "next_charge_from",
+      "next_charge_to"
+    ],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Subscriptions/Get Subscriptions.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
+      "Requires the Store plan feature (403 otherwise).",
+      "per_page is optional, 1-500, default 100 (422 otherwise). Newest first.",
+      "next_charge_from is inclusive, next_charge_to exclusive; both need a time-zone offset (Z or +hh:mm), else 422."
     ]
   },
   {

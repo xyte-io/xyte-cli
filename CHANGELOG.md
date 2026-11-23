@@ -8,6 +8,7 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ### Added
 - Partner API endpoints in the catalog and the `partner` client namespace: `partner.organizations.getOrganizations`, `partner.organizationTags.{getOrganizationTags,addOrganizationTag,removeOrganizationTag}`, `partner.coupons.{getCoupons,createCoupon,updateCoupon,deleteCoupon}` and `partner.storeListings.getStoreListings`. Coupon and store listing calls need the partner's Store plan feature (coupons also need store coupons enabled). They need a hub release that serves these endpoints (xyte-io/server#9869, #9870); older hubs return 404.
+- Partner API store reads in the catalog and the `partner` client namespace: `partner.orders.{getOrders,getOrder,approveOrder}`, `partner.payments.{getPayments,getPayment}`, `partner.subscriptions.{getSubscriptions,getSubscription,getSubscriptionInvoiceItems}`, `partner.products.{getProducts,getProduct}`, `partner.soldProducts.{getSoldProducts,getSoldProduct}`, `partner.storeListings.getStoreListing`, `partner.storeSettings.getStoreSettings` and `partner.organizationTags.updateOrganizationTag`. Partner list calls now default to `per_page` 100 (1-500), and time filters and coupon `starts_at` / `ends_at` need a time-zone offset (422 otherwise). Brand partner API keys are read-only (403 on writes). They need a hub release that serves these endpoints (xyte-io/server#9927); older hubs return 404.
 
 ## [0.16.0] - 2026-10-29
 

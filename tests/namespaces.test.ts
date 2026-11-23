@@ -301,7 +301,7 @@ describe('namespace endpoint mappings', () => {
     });
   });
 
-  it('maps partner coupon, tag and store listing methods to catalog keys', async () => {
+  it('maps partner coupon, tag and store methods to catalog keys', async () => {
     const call = vi.fn().mockResolvedValue({ ok: true });
     const partner = createPartnerNamespace(call);
     const cases: Array<[keyof typeof partner, string]> = [
@@ -313,7 +313,22 @@ describe('namespace endpoint mappings', () => {
       ['getCoupons', 'partner.coupons.getCoupons'],
       ['updateCoupon', 'partner.coupons.updateCoupon'],
       ['deleteCoupon', 'partner.coupons.deleteCoupon'],
-      ['getStoreListings', 'partner.storeListings.getStoreListings']
+      ['getStoreListings', 'partner.storeListings.getStoreListings'],
+      ['getOrders', 'partner.orders.getOrders'],
+      ['getOrder', 'partner.orders.getOrder'],
+      ['approveOrder', 'partner.orders.approveOrder'],
+      ['getPayments', 'partner.payments.getPayments'],
+      ['getPayment', 'partner.payments.getPayment'],
+      ['getSubscriptions', 'partner.subscriptions.getSubscriptions'],
+      ['getSubscription', 'partner.subscriptions.getSubscription'],
+      ['getSubscriptionInvoiceItems', 'partner.subscriptions.getSubscriptionInvoiceItems'],
+      ['getProducts', 'partner.products.getProducts'],
+      ['getProduct', 'partner.products.getProduct'],
+      ['getSoldProducts', 'partner.soldProducts.getSoldProducts'],
+      ['getSoldProduct', 'partner.soldProducts.getSoldProduct'],
+      ['getStoreListing', 'partner.storeListings.getStoreListing'],
+      ['getStoreSettings', 'partner.storeSettings.getStoreSettings'],
+      ['updateOrganizationTag', 'partner.organizationTags.updateOrganizationTag']
     ];
 
     for (const [method, key] of cases) {

@@ -446,8 +446,23 @@ describe('public endpoint catalog', () => {
     ['partner.coupons.getCoupons', 'GET', '/core/v1/partner/coupons', [], ['page', 'per_page'], 'none'],
     ['partner.coupons.updateCoupon', 'PATCH', '/core/v1/partner/coupons/:id', ['id'], [], 'json'],
     ['partner.coupons.deleteCoupon', 'DELETE', '/core/v1/partner/coupons/:id', ['id'], [], 'none'],
-    ['partner.storeListings.getStoreListings', 'GET', '/core/v1/partner/store_listings', [], ['page', 'per_page'], 'none']
-  ])('includes partner coupon and tag endpoint %s', (key, method, pathTemplate, pathParams, queryParams, bodyType) => {
+    ['partner.storeListings.getStoreListings', 'GET', '/core/v1/partner/store_listings', [], ['page', 'per_page'], 'none'],
+    ['partner.orders.getOrders', 'GET', '/core/v1/partner/orders', [], ['page', 'per_page', 'created_from', 'created_to', 'organization_id', 'fulfillment_status', 'payment_status', 'pending_approval', 'coupon_id', 'short_id', 'reference_id', 'include_renewals'], 'none'],
+    ['partner.orders.getOrder', 'GET', '/core/v1/partner/orders/:order_id', ['order_id'], [], 'none'],
+    ['partner.orders.approveOrder', 'POST', '/core/v1/partner/orders/:order_id/approve', ['order_id'], [], 'json'],
+    ['partner.payments.getPayments', 'GET', '/core/v1/partner/payments', [], ['page', 'per_page', 'created_from', 'created_to', 'organization_id', 'status'], 'none'],
+    ['partner.payments.getPayment', 'GET', '/core/v1/partner/payments/:payment_id', ['payment_id'], [], 'none'],
+    ['partner.subscriptions.getSubscriptions', 'GET', '/core/v1/partner/subscriptions', [], ['page', 'per_page', 'status', 'organization_id', 'next_charge_from', 'next_charge_to'], 'none'],
+    ['partner.subscriptions.getSubscription', 'GET', '/core/v1/partner/subscriptions/:subscription_id', ['subscription_id'], [], 'none'],
+    ['partner.subscriptions.getSubscriptionInvoiceItems', 'GET', '/core/v1/partner/subscriptions/:subscription_id/invoice_items', ['subscription_id'], ['page', 'per_page'], 'none'],
+    ['partner.products.getProducts', 'GET', '/core/v1/partner/products', [], ['page', 'per_page', 'archived', 'type'], 'none'],
+    ['partner.products.getProduct', 'GET', '/core/v1/partner/products/:product_id', ['product_id'], [], 'none'],
+    ['partner.soldProducts.getSoldProducts', 'GET', '/core/v1/partner/sold_products', [], ['page', 'per_page', 'organization_id', 'order_id', 'product_id', 'redeemed'], 'none'],
+    ['partner.soldProducts.getSoldProduct', 'GET', '/core/v1/partner/sold_products/:sold_product_id', ['sold_product_id'], [], 'none'],
+    ['partner.storeListings.getStoreListing', 'GET', '/core/v1/partner/store_listings/:store_listing_id', ['store_listing_id'], [], 'none'],
+    ['partner.storeSettings.getStoreSettings', 'GET', '/core/v1/partner/store_settings', [], [], 'none'],
+    ['partner.organizationTags.updateOrganizationTag', 'PATCH', '/core/v1/partner/organizations/:organization_id/tags/:tag_id', ['organization_id', 'tag_id'], [], 'json']
+  ])('includes partner store endpoint %s', (key, method, pathTemplate, pathParams, queryParams, bodyType) => {
     const endpoint = endpoints.find((item) => item.key === key);
     expect(endpoint).toBeDefined();
     expect(endpoint?.method).toBe(method);
