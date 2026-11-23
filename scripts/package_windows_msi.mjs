@@ -173,9 +173,17 @@ async function downloadNode(args, payloadDir) {
   mkdirSync(extractDir, { recursive: true });
 
   if (process.platform === 'win32') {
+    // Call .NET directly: Expand-Archive in powershell.exe launched from a pwsh 7 step loads
+    // pwsh's Archive module via the inherited PSModulePath, fails, and still exits 0.
     await runOrThrow(
       'powershell.exe',
-      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', `Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${extractDir}' -Force`],
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        `$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('${zipPath}', '${extractDir}')`
+      ],
       'Extract Node.js Windows runtime'
     );
   } else {
