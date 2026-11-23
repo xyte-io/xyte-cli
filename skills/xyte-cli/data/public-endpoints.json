@@ -1756,7 +1756,7 @@
       "Requires the Store plan feature (403 otherwise).",
       "Brand partner API keys are read-only (403).",
       "Approval cannot be undone; it creates the purchased products and emails the customer. An already approved order returns 200 and nothing changes. 422 when the order is not awaiting approval.",
-      "Body: warranty_start_dates is optional, { \"<order_item_id>\": \"YYYY-MM-DD\" }; required for each warranty item without a stored warranty_start_at."
+      "Body: warranty_start_dates is optional, { \"<order_item_id>\": \"YYYY-MM-DD\" }; required for each warranty item without a stored warranty_start_at. 422 for a bad date or a key that is not a warranty item of the order; the body shape and dates are checked before the order state, item keys after it."
     ]
   },
   {
@@ -1814,7 +1814,7 @@
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
       "Requires the Store plan feature (403 otherwise).",
       "per_page is optional, 1-500, default 100 (422 otherwise). Newest first.",
-      "created_from is inclusive, created_to exclusive; both need a time-zone offset (Z or +hh:mm), else 422.",
+      "created_from is inclusive, created_to exclusive; both need a time-zone offset (Z or +hh:mm), else 422. created_to must be after created_from, else 422.",
       "pending_approval=true lists orders waiting for approveOrder; include_renewals defaults to false (first purchases only)."
     ]
   },
@@ -2015,7 +2015,7 @@
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
       "Requires the Store plan feature (403 otherwise).",
       "per_page is optional, 1-500, default 100 (422 otherwise). Newest first.",
-      "created_from is inclusive, created_to exclusive; both need a time-zone offset (Z or +hh:mm), else 422.",
+      "created_from is inclusive, created_to exclusive; both need a time-zone offset (Z or +hh:mm), else 422. created_to must be after created_from, else 422.",
       "Offline payments are not listed."
     ]
   },
@@ -2259,7 +2259,7 @@
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
       "Requires the Store plan feature (403 otherwise).",
       "per_page is optional, 1-500, default 100 (422 otherwise). Newest first.",
-      "next_charge_from is inclusive, next_charge_to exclusive; both need a time-zone offset (Z or +hh:mm), else 422."
+      "next_charge_from is inclusive, next_charge_to exclusive; both need a time-zone offset (Z or +hh:mm), else 422. next_charge_to must be after next_charge_from, else 422. next_charge_at is a date, read as 00:00 UTC."
     ]
   },
   {
