@@ -425,6 +425,14 @@ describe('public endpoint catalog', () => {
     expect(addUsers?.hasBody).toBe(true);
   });
 
+  it('notes that brand partner keys are read-only on every partner write', () => {
+    const writesWithoutNote = endpoints
+      .filter((item) => item.authScope === 'partner' && item.method !== 'GET')
+      .filter((item) => !item.notes?.includes('Brand partner API keys are read-only (403).'))
+      .map((item) => item.key);
+    expect(writesWithoutNote).toEqual([]);
+  });
+
   it('includes partner organization creation endpoint metadata', () => {
     const endpoint = endpoints.find((item) => item.key === 'partner.organizations.createOrganization');
     expect(endpoint).toBeDefined();
