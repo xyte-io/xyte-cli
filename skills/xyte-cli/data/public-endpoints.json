@@ -1062,7 +1062,7 @@
       "Docs page: https://docs.xyte.io/reference/create-space",
       "Docs category: /branches/2.0/categories/reference/API Access",
       "Docs parent: /branches/2.0/reference/spaces-1",
-      "Response space includes room_status (nullable string: no_devices, maintenance_mode, error, warning, unknown, healthy; the room status the portal Rooms list shows), room_status_updated_at (nullable ISO 8601 timestamp of the last room status change) and is_vip (boolean). A space with child spaces has room_status null, is_vip false and normally room_status_updated_at null; Unsorted/Unprovisioned spaces may be null or hold a status the portal hides."
+      "Response space includes room_status (nullable: no_devices, maintenance_mode, error, warning, unknown, healthy), room_status_updated_at (nullable ISO 8601) and is_vip (boolean); see organization.spaces.getSpaces for details."
     ]
   },
   {
@@ -1111,7 +1111,7 @@
       "Docs parent: /branches/2.0/reference/spaces-1",
       "Docs page: https://docs.xyte.io/reference/find-or-create-space",
       "Docs SSR API path currently resolves to '/core/v1/organization/spaces-1', which does not map to a callable route; override keeps documented Find-or-Create behavior callable.",
-      "Response space includes room_status (nullable string: no_devices, maintenance_mode, error, warning, unknown, healthy; the room status the portal Rooms list shows), room_status_updated_at (nullable ISO 8601 timestamp of the last room status change) and is_vip (boolean). A space with child spaces has room_status null, is_vip false and normally room_status_updated_at null; Unsorted/Unprovisioned spaces may be null or hold a status the portal hides."
+      "Response space includes room_status (nullable: no_devices, maintenance_mode, error, warning, unknown, healthy), room_status_updated_at (nullable ISO 8601) and is_vip (boolean); see organization.spaces.getSpaces for details."
     ]
   },
   {
@@ -1130,12 +1130,13 @@
     "authScope": "organization",
     "bodyType": "none",
     "hasBody": false,
-    "sourceFile": "https://docs.xyte.io/reference/spaces-1",
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Organization API/Spaces/Get Space.bru",
     "notes": [
       "Docs category: /branches/2.0/categories/reference/API Access",
       "Docs parent: /branches/2.0/reference/spaces-1",
       "No dedicated docs page; route verified from the hub Bruno request Organization API/Spaces/Get Space.bru (GET /core/v1/organization/spaces/:space_id). Earlier catalog versions pointed this key at the list route.",
-      "Response space includes room_status (nullable string: no_devices, maintenance_mode, error, warning, unknown, healthy; the room status the portal Rooms list shows), room_status_updated_at (nullable ISO 8601 timestamp of the last room status change) and is_vip (boolean). A space with child spaces has room_status null, is_vip false and normally room_status_updated_at null; Unsorted/Unprovisioned spaces may be null or hold a status the portal hides."
+      "Response space includes room_status (nullable: no_devices, maintenance_mode, error, warning, unknown, healthy), room_status_updated_at (nullable ISO 8601) and is_vip (boolean); see organization.spaces.getSpaces for details.",
+      "Returns one space object. Unlike a getSpaces item it has no path field; call getSpaces with id for the path."
     ]
   },
   {
@@ -1149,6 +1150,8 @@
     "pathTemplate": "/core/v1/organization/spaces",
     "pathParams": [],
     "queryParams": [
+      "page",
+      "per_page",
       "id",
       "name",
       "parent_id",
@@ -1168,9 +1171,10 @@
       "Docs page: https://docs.xyte.io/reference/get-spaces",
       "Docs category: /branches/2.0/categories/reference/API Access",
       "Docs parent: /branches/2.0/reference/spaces-1",
-      "Response space includes room_status (nullable string: no_devices, maintenance_mode, error, warning, unknown, healthy; the room status the portal Rooms list shows), room_status_updated_at (nullable ISO 8601 timestamp of the last room status change) and is_vip (boolean). A space with child spaces has room_status null, is_vip false and normally room_status_updated_at null; Unsorted/Unprovisioned spaces may be null or hold a status the portal hides.",
+      "Each space includes room_status (nullable string: no_devices, maintenance_mode, error, warning, unknown, healthy; the room status the portal Rooms list shows), room_status_updated_at (nullable ISO 8601 timestamp of the last room status change) and is_vip (boolean). A space with child spaces has room_status null and normally room_status_updated_at null and is_vip false; Unsorted/Unprovisioned spaces may be null or hold a status the portal hides.",
       "Optional room_status filter: one of no_devices, maintenance_mode, error, warning, unknown, healthy (case-insensitive; blank means no filter). Any other value returns 400. Unsorted/Unprovisioned spaces with a matching status are returned too.",
-      "Optional maintenance filters (booleans): maintenance_scheduled_active=true returns only spaces a scheduled maintenance window covers now, false only the others; has_maintenance_schedules=true returns only spaces with an enabled maintenance schedule set on them or on an ancestor, false only the others."
+      "Optional maintenance filters (booleans): maintenance_scheduled_active=true returns only spaces a scheduled maintenance window covers now, false only the others; has_maintenance_schedules=true returns only spaces with an enabled maintenance schedule set on them or on an ancestor, false only the others. Non-boolean values return 422.",
+      "Paginated: page (default 1), per_page (default and max 100); continue while next_page is set."
     ]
   },
   {
@@ -1196,7 +1200,7 @@
       "Docs category: /branches/2.0/categories/reference/API Access",
       "Docs parent: /branches/2.0/reference/spaces-1",
       "Docs raw path params: space_id",
-      "Response space includes room_status (nullable string: no_devices, maintenance_mode, error, warning, unknown, healthy; the room status the portal Rooms list shows), room_status_updated_at (nullable ISO 8601 timestamp of the last room status change) and is_vip (boolean). A space with child spaces has room_status null, is_vip false and normally room_status_updated_at null; Unsorted/Unprovisioned spaces may be null or hold a status the portal hides."
+      "Response space includes room_status (nullable: no_devices, maintenance_mode, error, warning, unknown, healthy), room_status_updated_at (nullable ISO 8601) and is_vip (boolean); see organization.spaces.getSpaces for details."
     ]
   },
   {

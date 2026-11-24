@@ -32,6 +32,10 @@ describe('public endpoint catalog', () => {
     const partnerTicket = endpoints.find((endpoint) => endpoint.key === 'partner.tickets.getTicket');
     expect(partnerTicket?.pathTemplate).toBe('/core/v1/partner/tickets/:ticket_id');
     expect(partnerTicket?.pathParams).toEqual(['ticket_id']);
+
+    const getSpace = endpoints.find((endpoint) => endpoint.key === 'organization.spaces.getSpace');
+    expect(getSpace?.pathTemplate).toBe('/core/v1/organization/spaces/:space_id');
+    expect(getSpace?.pathParams).toEqual(['space_id']);
   });
 
   it('documents the sendCommand request field separately from response params', () => {
@@ -206,6 +210,8 @@ describe('public endpoint catalog', () => {
 
     const getSpaces = endpoints.find((item) => item.key === 'organization.spaces.getSpaces');
     expect(getSpaces?.queryParams).toEqual([
+      'page',
+      'per_page',
       'id',
       'name',
       'parent_id',
@@ -218,6 +224,7 @@ describe('public endpoint catalog', () => {
       'has_maintenance_schedules'
     ]);
     expect(getSpaces?.notes?.join(' ')).toContain('Any other value returns 400');
+    expect(getSpaces?.notes?.join(' ')).toContain('Non-boolean values return 422');
 
     const getSpace = endpoints.find((item) => item.key === 'organization.spaces.getSpace');
     expect(getSpace?.title).toBe('Get Space');
