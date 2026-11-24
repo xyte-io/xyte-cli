@@ -54,10 +54,18 @@ Derived from the bundled public endpoint spec.
 | `organization.groups.getGroups` | `page`, `per_page` | `page`, `per_page` | Paginated team access groups |
 | `organization.users.getUsers` | `page`, `per_page` | `page`, `per_page` | Paginated active users |
 | `organization.models.getModels` | `page`, `per_page`, `search`, `edge_only` | `page`, `per_page` | Use `edge_only=true` for Edge model discovery and custom parameter labels |
-| `partner.organizations.getOrganizations` | `name`, `tag`, `page`, `per_page` | `page`, `per_page` | `name` is a case-insensitive substring; `tag` is an exact partner tag name, case-insensitive. `per_page` 1-500, default 500 (422 otherwise) |
-| `partner.organizationTags.getOrganizationTags` | `page`, `per_page` | `page`, `per_page` | `per_page` 1-500, default 500 (422 otherwise) |
-| `partner.coupons.getCoupons` | `page`, `per_page` | `page`, `per_page` | `per_page` 1-500, default 500 (422 otherwise). Newest first |
-| `partner.storeListings.getStoreListings` | `page`, `per_page` | `page`, `per_page` | `per_page` 1-500, default 500 (422 otherwise) |
+| `partner.organizations.getOrganizations` | `name`, `tag`, `page`, `per_page` | `page`, `per_page` | `name` is a case-insensitive substring; `tag` is an exact partner tag name, case-insensitive. `per_page` 1-500, default 100 (422 otherwise) |
+| `partner.organizationTags.getOrganizationTags` | `page`, `per_page` | `page`, `per_page` | `per_page` 1-500, default 100 (422 otherwise) |
+| `partner.coupons.getCoupons` | `page`, `per_page` | `page`, `per_page` | `per_page` 1-500, default 100 (422 otherwise). Newest first |
+| `partner.storeListings.getStoreListings` | `page`, `per_page` | `page`, `per_page` | `per_page` 1-500, default 100 (422 otherwise) |
+| `partner.orders.getOrders` | `page`, `per_page`, `created_from`, `created_to`, `organization_id`, `fulfillment_status`, `payment_status`, `pending_approval`, `coupon_id`, `short_id`, `reference_id`, `include_renewals` | `page`, `per_page` | `per_page` 1-500, default 100 (422 otherwise). Newest first. `created_from` inclusive, `created_to` exclusive; both need a time-zone offset (`Z` or `+hh:mm`), 422 otherwise. `pending_approval=true` lists orders waiting for `approveOrder`; `include_renewals` defaults to `false` (first purchases only). Each order has `approved_by`: `{type: api_key, name}`, `{type: user, id, name}` or `null` |
+| `partner.payments.getPayments` | `page`, `per_page`, `created_from`, `created_to`, `organization_id`, `status` | `page`, `per_page` | `per_page` 1-500, default 100 (422 otherwise). Newest first. `created_from` inclusive, `created_to` exclusive; both need a time-zone offset (`Z` or `+hh:mm`), 422 otherwise. Offline payments are not listed. Totals are your share of the payment, not the buyer's full charge |
+| `partner.subscriptions.getSubscriptions` | `page`, `per_page`, `status`, `organization_id`, `next_charge_from`, `next_charge_to` | `page`, `per_page` | `per_page` 1-500, default 100 (422 otherwise). Newest first. `next_charge_from` inclusive, `next_charge_to` exclusive; both need a time-zone offset (`Z` or `+hh:mm`), 422 otherwise |
+| `partner.subscriptions.getSubscriptionInvoiceItems` | `page`, `per_page` | `page`, `per_page` | `per_page` 1-500, default 100 (422 otherwise). Newest first |
+| `partner.products.getProducts` | `page`, `per_page`, `archived`, `type` | `page`, `per_page` | `per_page` 1-500, default 100 (422 otherwise). Newest first. Products other partners share with you are not listed |
+| `partner.soldProducts.getSoldProducts` | `page`, `per_page`, `organization_id`, `order_id`, `product_id`, `redeemed` | `page`, `per_page` | `per_page` 1-500, default 100 (422 otherwise). Newest first |
+
+`partner.orders.*`, `partner.payments.*`, `partner.subscriptions.*`, `partner.products.*`, `partner.soldProducts.*`, `partner.storeListings.*`, `partner.storeSettings.*` and `partner.coupons.*` need the partner's Store plan feature (403 otherwise); `partner.coupons.*` also need store coupons enabled.
 
 For the complete current query-param set, run `xyte-cli api endpoints describe <endpoint-key>` before calling.
 
@@ -259,7 +267,7 @@ Organization:
 - `organization.edge.startPing` (edge connectivity probe — async, poll with `getPingStatus`)
 - `organization.edge.getPingStatus`
 
-Partner:
+Partner (brand partner API keys are read-only: any call other than `GET` or `HEAD` returns 403):
 - `partner.devices.getDevices`
 - `partner.devices.getDeviceInfo`
 - `partner.organizations.createOrganization`
@@ -267,11 +275,26 @@ Partner:
 - `partner.organizationTags.getOrganizationTags`
 - `partner.organizationTags.addOrganizationTag`
 - `partner.organizationTags.removeOrganizationTag`
+- `partner.organizationTags.updateOrganizationTag`
 - `partner.coupons.getCoupons`
 - `partner.coupons.createCoupon`
 - `partner.coupons.updateCoupon`
 - `partner.coupons.deleteCoupon`
 - `partner.storeListings.getStoreListings`
+- `partner.storeListings.getStoreListing`
+- `partner.storeSettings.getStoreSettings`
+- `partner.orders.getOrders`
+- `partner.orders.getOrder`
+- `partner.orders.approveOrder`
+- `partner.payments.getPayments`
+- `partner.payments.getPayment`
+- `partner.subscriptions.getSubscriptions`
+- `partner.subscriptions.getSubscription`
+- `partner.subscriptions.getSubscriptionInvoiceItems`
+- `partner.products.getProducts`
+- `partner.products.getProduct`
+- `partner.soldProducts.getSoldProducts`
+- `partner.soldProducts.getSoldProduct`
 - `partner.tickets.getTickets`
 
 ## Edge Devices (Async)

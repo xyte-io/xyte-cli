@@ -60,4 +60,13 @@ describe('notes endpoint docs and skill guidance', () => {
     expect(commands).toContain('organization.notes.getDeviceNotes');
     expect(commands).toContain('organization.notes.deleteDeviceNote');
   });
+
+  it('pins the partner brand read-only and Store plan guidance in the shipped endpoint reference', () => {
+    const content = read('skills/xyte-cli/references/endpoints.md');
+
+    expect(content).toContain('Partner (brand partner API keys are read-only: any call other than `GET` or `HEAD` returns 403):');
+    expect(content).toContain(
+      '`partner.orders.*`, `partner.payments.*`, `partner.subscriptions.*`, `partner.products.*`, `partner.soldProducts.*`, `partner.storeListings.*`, `partner.storeSettings.*` and `partner.coupons.*` need the partner\'s Store plan feature (403 otherwise); `partner.coupons.*` also need store coupons enabled.'
+    );
+  });
 });

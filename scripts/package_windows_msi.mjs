@@ -173,9 +173,19 @@ async function downloadNode(args, payloadDir) {
   mkdirSync(extractDir, { recursive: true });
 
   if (process.platform === 'win32') {
+    // Call .NET directly: Expand-Archive in powershell.exe launched from a pwsh 7 step loads
+    // pwsh's Archive module via the inherited PSModulePath, fails, and still exits 0.
+    // PowerShell reads ' and the typographic single quotes as quote chars; doubling one escapes it.
+    const psq = (s) => s.replace(/['‘’‚‛]/g, '$&$&');
     await runOrThrow(
       'powershell.exe',
-      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', `Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${extractDir}' -Force`],
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-Command',
+        `$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory('${psq(zipPath)}', '${psq(extractDir)}')`
+      ],
       'Extract Node.js Windows runtime'
     );
   } else {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { listEndpoints } from '../src/client/catalog';
 import { createOrganizationNamespace } from '../src/client/namespaces/organization';
 import { createPartnerNamespace } from '../src/client/namespaces/partner';
 
@@ -301,7 +302,7 @@ describe('namespace endpoint mappings', () => {
     });
   });
 
-  it('maps partner coupon, tag and store listing methods to catalog keys', async () => {
+  it('maps partner coupon, tag and store methods to catalog keys', async () => {
     const call = vi.fn().mockResolvedValue({ ok: true });
     const partner = createPartnerNamespace(call);
     const cases: Array<[keyof typeof partner, string]> = [
@@ -313,12 +314,40 @@ describe('namespace endpoint mappings', () => {
       ['getCoupons', 'partner.coupons.getCoupons'],
       ['updateCoupon', 'partner.coupons.updateCoupon'],
       ['deleteCoupon', 'partner.coupons.deleteCoupon'],
-      ['getStoreListings', 'partner.storeListings.getStoreListings']
+      ['getStoreListings', 'partner.storeListings.getStoreListings'],
+      ['getOrders', 'partner.orders.getOrders'],
+      ['getOrder', 'partner.orders.getOrder'],
+      ['approveOrder', 'partner.orders.approveOrder'],
+      ['getPayments', 'partner.payments.getPayments'],
+      ['getPayment', 'partner.payments.getPayment'],
+      ['getSubscriptions', 'partner.subscriptions.getSubscriptions'],
+      ['getSubscription', 'partner.subscriptions.getSubscription'],
+      ['getSubscriptionInvoiceItems', 'partner.subscriptions.getSubscriptionInvoiceItems'],
+      ['getProducts', 'partner.products.getProducts'],
+      ['getProduct', 'partner.products.getProduct'],
+      ['getSoldProducts', 'partner.soldProducts.getSoldProducts'],
+      ['getSoldProduct', 'partner.soldProducts.getSoldProduct'],
+      ['getStoreListing', 'partner.storeListings.getStoreListing'],
+      ['getStoreSettings', 'partner.storeSettings.getStoreSettings'],
+      ['updateOrganizationTag', 'partner.organizationTags.updateOrganizationTag']
     ];
 
     for (const [method, key] of cases) {
       await partner[method]({ query: { page: 1 } });
       expect(call).toHaveBeenLastCalledWith(key, { query: { page: 1 } });
     }
+  });
+
+  it('calls every partner catalog key from some partner namespace method', async () => {
+    const call = vi.fn().mockResolvedValue({ ok: true });
+    const partner = createPartnerNamespace(call);
+    for (const method of Object.values(partner)) {
+      await method({});
+    }
+    const calledKeys = new Set(call.mock.calls.map(([key]) => key));
+
+    const catalogKeys = listEndpoints('partner').map((endpoint) => endpoint.key);
+    expect(catalogKeys.length).toBeGreaterThan(0);
+    expect(catalogKeys.filter((key) => !calledKeys.has(key))).toEqual([]);
   });
 });
