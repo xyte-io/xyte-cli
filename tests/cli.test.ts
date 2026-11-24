@@ -297,6 +297,39 @@ describe('cli integration', () => {
     expect(calledUrl).toContain('name=South+Wing');
   });
 
+  it('URL-encodes a + time-zone offset in --query shorthand', async () => {
+    const profileStore = new MemoryProfileStore();
+    await profileStore.upsertTenant({ id: 'acme' });
+    await profileStore.setActiveTenant('acme');
+    const secretStore = new MemorySecretStore();
+    await secretStore.setSecret('acme', 'xyte-partner', 'partner-key');
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const program = createCli({ profileStore, secretStore, stdout, stderr });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await program.parseAsync([
+      'node',
+      'xyte-cli',
+      'api',
+      'call',
+      'partner.orders.getOrders',
+      '--tenant',
+      'acme',
+      '--query',
+      'created_from=2026-01-01T00:00:00+02:00'
+    ]);
+
+    const calledUrl = String(fetchMock.mock.calls[0][0]);
+    expect(calledUrl).toContain('created_from=2026-01-01T00%3A00%3A00%2B02%3A00');
+  });
+
   it('records api call notes in envelope output and action logs', async () => {
     const profileStore = new MemoryProfileStore();
     await profileStore.upsertTenant({ id: 'acme' });
