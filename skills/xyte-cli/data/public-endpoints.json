@@ -1431,6 +1431,106 @@
     ]
   },
   {
+    "key": "partner.coupons.createCoupon",
+    "namespace": "partner",
+    "group": "coupons",
+    "action": "createCoupon",
+    "title": "Create Coupon",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/coupons",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Coupons/Create Coupon.bru",
+    "bodyExample": "{\n  \"name\": \"Gold 10\",\n  \"discount_type\": \"fixed_amount\",\n  \"amount_off\": 12.34,\n  \"currency\": \"USD\",\n  \"organization_tag_id\": \"....-d75e0abec7d2\",\n  \"store_listing_id\": \"....-c3\",\n  \"starts_at\": \"2026-03-01T00:00:00Z\",\n  \"ends_at\": \"2026-03-31T23:59:59.999Z\",\n  \"active\": true\n}",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
+      "Requires the Store plan feature and store coupons enabled for the partner (403 otherwise).",
+      "Body: name required; code and/or organization_tag_id (at least one); discount_type percent needs percent_off (1-100), fixed_amount needs amount_off (major units) and currency; store_listing_id optional (omitted = whole store); active defaults to true.",
+      "\"Valid through Dec 31\" is ends_at = the last millisecond of that day in the user's time zone (e.g. 2026-12-31T23:59:59.999-05:00), which is what the portal stores; ends_at is exclusive. Ask for the time zone if unknown.",
+      "Per product, interval and currency only the single largest coupon applies; coupons never add up. 422 if a monthly or yearly price would become free, or any price would end between 0 and the minimum charge; one-time prices may reach 0.",
+      "organization_tag_id comes from getOrganizationTags; a brand-new tag gets its id by adding it to one organization first (addOrganizationTag). Then create the coupon, and only then add the tag to the other organizations. An identical existing coupon is returned, not duplicated."
+    ]
+  },
+  {
+    "key": "partner.coupons.deleteCoupon",
+    "namespace": "partner",
+    "group": "coupons",
+    "action": "deleteCoupon",
+    "title": "Delete Coupon",
+    "method": "DELETE",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/coupons/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Coupons/Delete Coupon.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
+      "Requires the Store plan feature and store coupons enabled for the partner (403 otherwise).",
+      "A coupon used in orders cannot be deleted (403); set active false with updateCoupon instead."
+    ]
+  },
+  {
+    "key": "partner.coupons.getCoupons",
+    "namespace": "partner",
+    "group": "coupons",
+    "action": "getCoupons",
+    "title": "Get Coupons",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/coupons",
+    "pathParams": [],
+    "queryParams": [
+      "page",
+      "per_page"
+    ],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Coupons/Get Coupons.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
+      "Requires the Store plan feature and store coupons enabled for the partner (403 otherwise).",
+      "per_page is optional, 1-500, default 500 (422 otherwise). Newest first."
+    ]
+  },
+  {
+    "key": "partner.coupons.updateCoupon",
+    "namespace": "partner",
+    "group": "coupons",
+    "action": "updateCoupon",
+    "title": "Update Coupon",
+    "method": "PATCH",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/coupons/:id",
+    "pathParams": [
+      "id"
+    ],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Coupons/Update Coupon.bru",
+    "bodyExample": "{\n  \"name\": \"Gold 15\",\n  \"percent_off\": 15,\n  \"ends_at\": null,\n  \"active\": false\n}",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
+      "Requires the Store plan feature and store coupons enabled for the partner (403 otherwise).",
+      "Only sent fields change; null clears an optional field (e.g. code, store_listing_id = whole store, starts_at, ends_at). active cannot be null (422).",
+      "amount_off without currency is in the coupon's currency; currency without amount_off keeps the number and changes the currency (5 USD becomes 5 JPY), so send amount_off too when it should change or does not fit the new currency's decimals.",
+      "Changing discount_type clears the other type's fields: percent_off on a switch to fixed_amount, amount_off and currency on a switch to percent.",
+      "\"Valid through Dec 31\" is ends_at = the last millisecond of that day in the user's time zone (e.g. 2026-12-31T23:59:59.999-05:00), which is what the portal stores; ends_at is exclusive. Ask for the time zone if unknown.",
+      "Per product, interval and currency only the single largest coupon applies; coupons never add up. 422 if a monthly or yearly price would become free, or any price would end between 0 and the minimum charge; one-time prices may reach 0."
+    ]
+  },
+  {
     "key": "partner.devices.deleteDevice",
     "namespace": "partner",
     "group": "devices",
@@ -1634,6 +1734,79 @@
     ]
   },
   {
+    "key": "partner.organizationTags.addOrganizationTag",
+    "namespace": "partner",
+    "group": "organizationTags",
+    "action": "addOrganizationTag",
+    "title": "Add Organization Tag",
+    "method": "POST",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/organizations/:organization_id/tags",
+    "pathParams": [
+      "organization_id"
+    ],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "json",
+    "hasBody": true,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Organization Tags/Add Organization Tag.bru",
+    "bodyExample": "{\n  \"name\": \"Gold\",\n  \"note\": \"Renewed in May\"\n}",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
+      "Creates the tag on first use; tag names are case-insensitive; up to 50 tags per organization. Response id is the organization_tag_id for createCoupon.",
+      "Tags cannot be deleted, only removed from organizations. A tag added with an API key shows no \"added by\" person in the Partner portal.",
+      "Adding a tag that is already attached returns 200 with that tag and its existing note unchanged; the sent note is not saved. To give a tag a coupon, create the coupon before adding the tag to the other organizations (a new tag needs one organization first to get its id)."
+    ]
+  },
+  {
+    "key": "partner.organizationTags.getOrganizationTags",
+    "namespace": "partner",
+    "group": "organizationTags",
+    "action": "getOrganizationTags",
+    "title": "Get Organization Tags",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/organization_tags",
+    "pathParams": [],
+    "queryParams": [
+      "page",
+      "per_page"
+    ],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Organization Tags/Get Organization Tags.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
+      "per_page is optional, 1-500, default 500 (422 otherwise). Tags cannot be deleted; remove them from each organization instead.",
+      "organizations_count counts only organizations visible to the partner. coupons lists the partner's coupons handed out by the tag (empty without the Store plan feature or store coupons)."
+    ]
+  },
+  {
+    "key": "partner.organizationTags.removeOrganizationTag",
+    "namespace": "partner",
+    "group": "organizationTags",
+    "action": "removeOrganizationTag",
+    "title": "Remove Organization Tag",
+    "method": "DELETE",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/organizations/:organization_id/tags/:tag_id",
+    "pathParams": [
+      "organization_id",
+      "tag_id"
+    ],
+    "queryParams": [],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Organization Tags/Remove Organization Tag.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
+      "The tag itself stays; tags cannot be deleted.",
+      "Response coupons_removed lists the coupons the organization lost through this tag (not ones still reached through another tag or redeemed by code); empty without the Store plan feature or store coupons, or when the organization is not store_visible. 404 if the tag is not attached (including a second remove)."
+    ]
+  },
+  {
     "key": "partner.organizations.createOrganization",
     "namespace": "partner",
     "group": "organizations",
@@ -1653,6 +1826,54 @@
       "Docs page: https://dev.xyte.io/reference/partner-create-organization",
       "Partner docs PR xyte-io/partner-docs-portal#1 documents this endpoint; server PR xyte-io/server#8666 is merged.",
       "Response includes an organization API key for subsequent Organization API calls."
+    ]
+  },
+  {
+    "key": "partner.organizations.getOrganizations",
+    "namespace": "partner",
+    "group": "organizations",
+    "action": "getOrganizations",
+    "title": "Get Organizations",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/organizations",
+    "pathParams": [],
+    "queryParams": [
+      "name",
+      "tag",
+      "page",
+      "per_page"
+    ],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Organizations/Get Organizations.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
+      "name is a case-insensitive substring; tag is an exact partner tag name, case-insensitive. Ordered by name. per_page is optional, 1-500, default 500 (422 otherwise). To find a customer, filter by name instead of paging."
+    ]
+  },
+  {
+    "key": "partner.storeListings.getStoreListings",
+    "namespace": "partner",
+    "group": "storeListings",
+    "action": "getStoreListings",
+    "title": "Get Store Listings",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/partner/store_listings",
+    "pathParams": [],
+    "queryParams": [
+      "page",
+      "per_page"
+    ],
+    "authScope": "partner",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Store Listings/Get Store Listings.bru",
+    "notes": [
+      "dev.xyte.io page pending; endpoint added by xyte-io/server#9869 and #9870.",
+      "Requires the Store plan feature (403 otherwise). per_page is optional, 1-500, default 500 (422 otherwise)."
     ]
   },
   {

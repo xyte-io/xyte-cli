@@ -109,6 +109,15 @@ export interface PartnerNamespace {
   getStateHistoryMultiDevices: NamespaceCall;
   getTelemetries: NamespaceCall;
   createOrganization: NamespaceCall;
+  getOrganizations: NamespaceCall;
+  addOrganizationTag: NamespaceCall;
+  removeOrganizationTag: NamespaceCall;
+  getOrganizationTags: NamespaceCall;
+  createCoupon: NamespaceCall;
+  getCoupons: NamespaceCall;
+  updateCoupon: NamespaceCall;
+  deleteCoupon: NamespaceCall;
+  getStoreListings: NamespaceCall;
   addComment: NamespaceCall;
   closeTicket: NamespaceCall;
   getTicket: NamespaceCall;

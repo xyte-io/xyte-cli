@@ -6,6 +6,9 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+### Added
+- Partner API endpoints in the catalog and the `partner` client namespace: `partner.organizations.getOrganizations`, `partner.organizationTags.{getOrganizationTags,addOrganizationTag,removeOrganizationTag}`, `partner.coupons.{getCoupons,createCoupon,updateCoupon,deleteCoupon}` and `partner.storeListings.getStoreListings`. Coupon and store listing calls need the partner's Store plan feature (coupons also need store coupons enabled). They need a hub release that serves these endpoints (xyte-io/server#9869, #9870); older hubs return 404.
+
 ## [0.17.0] - 2026-11-23
 
 ### Added
