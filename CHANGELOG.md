@@ -7,6 +7,7 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 ## [Unreleased]
 
 ### Added
+- Partner API endpoints in the catalog and the `partner` client namespace: `partner.organizations.getOrganizations`, `partner.organizationTags.{getOrganizationTags,addOrganizationTag,removeOrganizationTag}`, `partner.coupons.{getCoupons,createCoupon,updateCoupon,deleteCoupon}` and `partner.storeListings.getStoreListings`. Coupon and store listing calls need the partner's Store plan feature (coupons also need store coupons enabled). They need a hub release that serves these endpoints (xyte-io/server#9869, #9870); older hubs return 404.
 - `organization.maintenanceSchedules.*` for the hub's recurring maintenance windows: `getMaintenanceSchedules` (filters `space_id`, `enabled`, `active`), `getSpaceMaintenanceSchedules` (a space's own, inherited and effective windows), `createMaintenanceSchedule`, `updateMaintenanceSchedule` and `deleteMaintenanceSchedule`, in the endpoint catalog and the typed client.
 - `organization.spaces.getSpaces` lists the `maintenance_scheduled_active` and `has_maintenance_schedules` filters and documents each space's `maintenance: { manual, scheduled }` block.
 - `organization.incidents.getIncidents` lists `include_suppressed` and documents each incident's `maintenance: { scheduled: { suppressed, suppressed_until, announced_at } }` block.
