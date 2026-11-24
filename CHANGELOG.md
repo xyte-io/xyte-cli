@@ -4,14 +4,10 @@ All notable changes to this project are documented in this file.
 
 The format is inspired by Keep a Changelog and this project follows SemVer for `@xyteai/cli`. Before 1.0, breaking changes bump the minor version.
 
-## [Unreleased]
-
-### Added
-- Partner API endpoints in the catalog and the `partner` client namespace: `partner.organizations.getOrganizations`, `partner.organizationTags.{getOrganizationTags,addOrganizationTag,removeOrganizationTag}`, `partner.coupons.{getCoupons,createCoupon,updateCoupon,deleteCoupon}` and `partner.storeListings.getStoreListings`. Coupon and store listing calls need the partner's Store plan feature (coupons also need store coupons enabled). They need a hub release that serves these endpoints (xyte-io/server#9869, #9870); older hubs return 404.
-
 ## [0.17.0] - 2026-11-23
 
 ### Added
+- Partner API endpoints in the catalog and the `partner` client namespace: `partner.organizations.getOrganizations`, `partner.organizationTags.{getOrganizationTags,addOrganizationTag,removeOrganizationTag}`, `partner.coupons.{getCoupons,createCoupon,updateCoupon,deleteCoupon}` and `partner.storeListings.getStoreListings`. Coupon and store listing calls need the partner's Store plan feature (coupons also need store coupons enabled). They need a hub release that serves these endpoints (xyte-io/server#9869, #9870); older hubs return 404.
 - `organization.spaces.getSpaces` lists the hub's `room_status` filter: one of `no_devices`, `maintenance_mode`, `error`, `warning`, `unknown`, `healthy` (case-insensitive; blank means no filter), e.g. `--query-json '{"room_status":"error"}'`. Any other value returns 400.
 - Space responses from `getSpaces`, `getSpace`, `createSpace`, `findOrCreateSpace` and `updateSpace` document the new `room_status` (nullable), `room_status_updated_at` (nullable ISO 8601) and `is_vip` (boolean) fields. A space with child spaces carries `null`/`null`/`false`.
 - `organization.spaces.getSpaces` lists the hub's boolean maintenance filters `maintenance_scheduled_active` and `has_maintenance_schedules`.
