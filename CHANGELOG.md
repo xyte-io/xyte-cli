@@ -12,6 +12,12 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 - Partner API endpoints in the catalog and the `partner` client namespace: `partner.organizations.getOrganizations`, `partner.organizationTags.{getOrganizationTags,addOrganizationTag,removeOrganizationTag}`, `partner.coupons.{getCoupons,createCoupon,updateCoupon,deleteCoupon}` and `partner.storeListings.getStoreListings`. Coupon and store listing calls need the partner's Store plan feature (coupons also need store coupons enabled). They need a hub release that serves these endpoints (xyte-io/server#9869, #9870); older hubs return 404.
 - Partner API store reads, plus order approval and organization tag note update, in the catalog and the `partner` client namespace: `partner.orders.{getOrders,getOrder,approveOrder}`, `partner.payments.{getPayments,getPayment}`, `partner.subscriptions.{getSubscriptions,getSubscription,getSubscriptionInvoiceItems}`, `partner.products.{getProducts,getProduct}`, `partner.soldProducts.{getSoldProducts,getSoldProduct}`, `partner.storeListings.getStoreListing`, `partner.storeSettings.getStoreSettings` and `partner.organizationTags.updateOrganizationTag`. Partner list calls now default to `per_page` 100 (1-500), and time filters and coupon `starts_at` / `ends_at` need a time-zone offset (422 otherwise). Brand partner API keys are read-only (403 on writes). Orders carry `approved_by` (API key, portal user or `null`), and payment totals are the partner's share, not the buyer's full charge. They need a hub release that serves these endpoints (xyte-io/server#9927); older hubs return 404.
 
+### Changed
+- Bumped package metadata and lockfile to `0.17.0`.
+
+### Fixed
+- Windows MSI packaging now extracts the bundled Node.js runtime through .NET `ZipFile` instead of `Expand-Archive`, which failed without a non-zero exit when `powershell.exe` was launched from a PowerShell 7 step and left the MSI build without its runtime. Single quotes in the extract paths are escaped.
+
 ## [0.16.0] - 2026-10-29
 
 ### Added
