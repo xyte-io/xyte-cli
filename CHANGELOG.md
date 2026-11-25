@@ -19,7 +19,7 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 - The `room_status` filter and the three space fields need a hub release that serves them (xyte-io/server#9951); older hubs ignore `room_status` (unfiltered list) and omit the fields.
 - `getSpace` now requires `space_id`; callers that used it without one as a list call should switch to `organization.spaces.getSpaces`.
 - `merged_effective_status_updated_at` needs a hub release that serves it; older hubs omit the field.
-- Run `xyte-cli skills refresh` after upgrading so installed skill bundles pick up the new filter.
+- Run `xyte-cli skills refresh` after upgrading so installed skill bundles pick up the new filter and field notes.
 
 ## [0.17.0] - 2026-11-24
 
