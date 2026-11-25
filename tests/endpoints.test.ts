@@ -470,6 +470,17 @@ describe('public endpoint catalog', () => {
     }
   );
 
+  it.each([
+    'partner.orders.getOrders',
+    'partner.orders.getOrder',
+    'partner.orders.approveOrder',
+    'partner.products.getProducts',
+    'partner.products.getProduct'
+  ])('notes the store_department field on %s', (key) => {
+    const notes = endpoints.find((item) => item.key === key)?.notes ?? [];
+    expect(notes.some((note) => note.includes('store_department'))).toBe(true);
+  });
+
   it.each(['partner.payments.getPayments', 'partner.payments.getPayment'])(
     'notes that %s totals are the partner share, not the buyer charge',
     (key) => {
