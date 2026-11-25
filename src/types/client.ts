@@ -53,6 +53,7 @@ export interface OrganizationNamespace {
   updateDevice: NamespaceCall;
   deleteDevice: NamespaceCall;
   getDevice: NamespaceCall;
+  getDeviceDetailsHistory: NamespaceCall;
   getDevices: NamespaceCall;
   getHistories: NamespaceCall;
   getEdges: NamespaceCall;

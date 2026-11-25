@@ -17,6 +17,7 @@ export function createOrganizationNamespace(
     updateDevice: (args) => call('organization.devices.updateDevice', args),
     deleteDevice: (args) => call('organization.devices.deleteDevice', args),
     getDevice: (args) => call('organization.devices.getDevice', args),
+    getDeviceDetailsHistory: (args) => call('organization.devices.getDeviceDetailsHistory', args),
     getDevices: (args) => call('organization.devices.getDevices', args),
     getHistories: (args) => call('organization.devices.getHistories', args),
     getEdges: (args) => call('organization.edges.getEdges', args),
