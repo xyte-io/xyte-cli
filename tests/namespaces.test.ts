@@ -192,6 +192,17 @@ describe('namespace endpoint mappings', () => {
     });
   });
 
+  it('maps organization data export methods to their endpoint keys', async () => {
+    const call = vi.fn().mockResolvedValue({ ok: true });
+    const organization = createOrganizationNamespace(call);
+
+    await organization.getExports({});
+    await organization.getExport({ path: { date: '2026-11-22' } });
+
+    expect(call).toHaveBeenNthCalledWith(1, 'organization.exports.getExports', {});
+    expect(call).toHaveBeenNthCalledWith(2, 'organization.exports.getExport', { path: { date: '2026-11-22' } });
+  });
+
   it('maps organization users and groups to their endpoint keys', async () => {
     const call = vi.fn().mockResolvedValue({ ok: true });
     const organization = createOrganizationNamespace(call);

@@ -56,6 +56,8 @@ export interface OrganizationNamespace {
   getDevices: NamespaceCall;
   getHistories: NamespaceCall;
   getEdges: NamespaceCall;
+  getExports: NamespaceCall;
+  getExport: NamespaceCall;
   getOrganizationInfo: NamespaceCall;
   addExternalUser: NamespaceCall;
   addUsers: NamespaceCall;

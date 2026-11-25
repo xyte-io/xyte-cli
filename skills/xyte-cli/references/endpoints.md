@@ -264,6 +264,8 @@ Organization:
 - `organization.notes.deleteDeviceNote`
 - `organization.notes.deleteSpaceNote`
 - `organization.edges.getEdges`
+- `organization.exports.getExports` (nightly data exports, 7 most recent, newest first)
+- `organization.exports.getExport` (one day's files with 15-minute download URLs)
 - `organization.groups.getGroups`
 - `organization.groups.addUsers`
 - `organization.users.getUsers`
@@ -304,6 +306,20 @@ Partner (brand partner API keys are read-only: any call other than `GET` or `HEA
 - `partner.soldProducts.getSoldProducts`
 - `partner.soldProducts.getSoldProduct`
 - `partner.tickets.getTickets`
+
+## Nightly Data Export
+
+Organizations on a plan with the Data Export feature get a nightly export (01:00 UTC, previous UTC day) of devices, spaces, device models, incidents and device status changes as gzipped NDJSON files. Both calls are read-only.
+
+```bash
+xyte-cli api call organization.exports.getExports --tenant <tenant-id>
+xyte-cli api call organization.exports.getExport --tenant <tenant-id> --path-json '{"date":"2026-11-22"}'
+```
+
+- `getExports` lists the 7 most recent exports, newest first (`{ items: [{ date, generated_at }] }`); days without an export leave gaps. It is empty until an organization admin turns the export on in the portal.
+- `getExport` takes `date` as `YYYY-MM-DD` (422 otherwise) and returns `files[]` with `name`, `rows`, `bytes`, `url`, `expires_at`. `files[].name` is `devices.ndjson.gz`, `spaces.ndjson.gz`, `device_models.ndjson.gz`, `incidents.ndjson.gz`, `state_history.ndjson.gz`. Each `url` is a pre-signed link valid for 15 minutes; call again for fresh URLs. Anyone with the URL can download the file, so do not paste it into shared logs, tickets or chat.
+- `incidents.ndjson.gz` holds incidents created or updated that day plus every still-active incident, so older-dated incidents are expected. `state_history.ndjson.gz` only covers devices on Xyte's current telemetry platform; other devices have no lines, which is not data loss.
+- 403 means the pricing plan lacks Data Export; 404 means no export for that day (or the export is off, or the hub does not serve data export yet: xyte-io/server#9941); 503 means export is temporarily unavailable, so retry later.
 
 ## Edge Devices (Async)
 

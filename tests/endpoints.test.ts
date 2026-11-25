@@ -420,6 +420,35 @@ describe('public endpoint catalog', () => {
     expect(endpoint?.queryParams).toEqual(['page', 'per_page']);
   });
 
+  it.each([
+    ['organization.exports.getExports', '/core/v1/organization/exports', []],
+    ['organization.exports.getExport', '/core/v1/organization/exports/:date', ['date']]
+  ])('includes organization data export endpoint %s', (key, pathTemplate, pathParams) => {
+    const endpoint = endpoints.find((item) => item.key === key);
+    expect(endpoint).toBeDefined();
+    expect(endpoint?.method).toBe('GET');
+    expect(endpoint?.pathTemplate).toBe(pathTemplate);
+    expect(endpoint?.authScope).toBe('organization');
+    expect(endpoint?.bodyType).toBe('none');
+    expect(endpoint?.hasBody).toBe(false);
+    expect(endpoint?.pathParams).toEqual(pathParams);
+    expect(endpoint?.queryParams).toEqual([]);
+  });
+
+  it('documents organization data export caveats in notes', () => {
+    const list = endpoints.find((item) => item.key === 'organization.exports.getExports');
+    const show = endpoints.find((item) => item.key === 'organization.exports.getExport');
+    const listNotes = (list?.notes ?? []).join(' ');
+    const showNotes = (show?.notes ?? []).join(' ');
+    expect(listNotes).toContain('7 most recent');
+    expect(listNotes).toContain('server#9941');
+    for (const text of ['422', 'pre-signed', 'devices.ndjson.gz', 'state_history.ndjson.gz', 'server#9941']) {
+      expect(showNotes).toContain(text);
+    }
+    expect(list?.sourceFile.startsWith('hub Bruno: docs/api/Xyte Public/')).toBe(true);
+    expect(show?.sourceFile.startsWith('hub Bruno: docs/api/Xyte Public/')).toBe(true);
+  });
+
   it('includes organization users and groups endpoint metadata', () => {
     const getUsers = endpoints.find((item) => item.key === 'organization.users.getUsers');
     expect(getUsers).toBeDefined();
