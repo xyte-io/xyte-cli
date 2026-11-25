@@ -138,6 +138,22 @@ describe('public endpoint catalog', () => {
     expect(resume?.sourceFile).toBe('https://docs.xyte.io/reference/resume-incidents');
   });
 
+  it('includes the organization device details history read', () => {
+    const history = endpoints.find((item) => item.key === 'organization.devices.getDeviceDetailsHistory');
+    expect(history).toBeDefined();
+    expect(history?.namespace).toBe('organization');
+    expect(history?.method).toBe('GET');
+    expect(history?.base).toBe('hub');
+    expect(history?.pathTemplate).toBe('/core/v1/organization/devices/:device_id/details');
+    expect(history?.pathParams).toEqual(['device_id']);
+    expect(history?.queryParams).toEqual([]);
+    expect(history?.authScope).toBe('organization');
+    expect(history?.bodyType).toBe('none');
+    expect(history?.hasBody).toBe(false);
+    expect(history?.notes?.join(' ')).toContain('slot: latest');
+    expect(history?.sourceFile).toBe('https://docs.xyte.io/reference/get-device-details-history');
+  });
+
   it('does not include stale PR aliases for endpoints already represented on main', () => {
     expect(endpoints.some((item) => item.key === 'organization.incidents.deleteIncident')).toBe(false);
     expect(endpoints.some((item) => item.key === 'organization.edges.startClaim')).toBe(false);

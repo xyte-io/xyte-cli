@@ -7,6 +7,7 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 ## [Unreleased]
 
 ### Added
+- `organization.devices.getDeviceDetailsHistory` (`GET /core/v1/organization/devices/:device_id/details`) in the endpoint catalog and the typed client: a device's current `details` plus earlier values, newest first (last 5 changes, plus one at least a week and one at least 30 days old; history starts at the later of the hub release of the endpoint and the device's claim by the organization). Call it with `xyte-cli api call organization.devices.getDeviceDetailsHistory --tenant <tenant-id> --path-json '{"device_id":"<device-id>"}'`.
 - `organization.spaces.getSpaces` lists the hub's `room_status` filter: one of `no_devices`, `maintenance_mode`, `error`, `warning`, `unknown`, `healthy` (case-insensitive; blank means no filter), e.g. `--query-json '{"room_status":"error"}'`. Any other value returns 400.
 - Space responses from `getSpaces`, `getSpace`, `createSpace`, `findOrCreateSpace` and `updateSpace` document the new `room_status` (nullable), `room_status_updated_at` (nullable ISO 8601) and `is_vip` (boolean) fields. A space with child spaces has `room_status` `null` and normally `room_status_updated_at` `null` and `is_vip` `false`; Unsorted/Unprovisioned spaces may be `null` or hold a status the portal hides.
 - `organization.spaces.getSpaces` lists the hub's boolean maintenance filters `maintenance_scheduled_active` and `has_maintenance_schedules` (non-boolean values return 422), and its `page` / `per_page` params (`per_page` default and max 100; continue while `next_page` is set).
@@ -19,7 +20,7 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 - The `room_status` filter and the three space fields need a hub release that serves them (xyte-io/server#9951); older hubs ignore `room_status` (unfiltered list) and omit the fields.
 - `getSpace` now requires `space_id`; callers that used it without one as a list call should switch to `organization.spaces.getSpaces`.
 - `merged_effective_status_updated_at` needs a hub release that serves it; older hubs omit the field.
-- Run `xyte-cli skills refresh` after upgrading so installed skill bundles pick up the new filter and field notes.
+- Run `xyte-cli skills refresh` after upgrading so installed skill bundles pick up the new endpoint, filter and field notes.
 
 ## [0.17.0] - 2026-11-24
 

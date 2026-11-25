@@ -89,6 +89,17 @@ describe('namespace endpoint mappings', () => {
     });
   });
 
+  it('maps organization.getDeviceDetailsHistory to its catalog key', async () => {
+    const call = vi.fn().mockResolvedValue({ ok: true });
+    const organization = createOrganizationNamespace(call);
+
+    await organization.getDeviceDetailsHistory({ path: { device_id: 'dev-1' } });
+
+    expect(call).toHaveBeenCalledWith('organization.devices.getDeviceDetailsHistory', {
+      path: { device_id: 'dev-1' }
+    });
+  });
+
   it('maps organization.startEdgeClaim to organization.edge.startClaim', async () => {
     const call = vi.fn().mockResolvedValue({ ok: true });
     const organization = createOrganizationNamespace(call);
