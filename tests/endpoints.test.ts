@@ -163,6 +163,9 @@ describe('public endpoint catalog', () => {
     expect(getDevices?.notes?.join(' ')).toContain('Unsupported query parameter');
     for (const key of ['organization.devices.getDevices', 'organization.devices.getDevice', 'organization.devices.claimDevice']) {
       expect(endpoints.find((item) => item.key === key)?.notes?.join(' ')).toContain('connector: { type: native|c2c|edge');
+      expect(endpoints.find((item) => item.key === key)?.notes?.join(' ')).toContain(
+        'merged_effective_status_updated_at (nullable string)'
+      );
     }
 
     for (const key of [
