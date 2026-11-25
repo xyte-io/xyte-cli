@@ -1765,7 +1765,8 @@
       "Brand partner API keys are read-only (403).",
       "Approval cannot be undone; it creates the purchased products and emails the customer. An already approved order returns 200 and nothing changes. 422 when the order is not awaiting approval.",
       "The order records the calling API key as approver: approved_by is { \"type\": \"api_key\", \"name\": \"<key name>\" }; a repeat approve keeps the first approver.",
-      "Body: warranty_start_dates is optional, { \"<order_item_id>\": \"YYYY-MM-DD\" }; required for each warranty item without a stored warranty_start_at. 422 for a bad date or a key that is not a warranty item of the order; the body shape and dates are checked before the order state, item keys after it."
+      "Body: warranty_start_dates is optional, { \"<order_item_id>\": \"YYYY-MM-DD\" }; required for each warranty item without a stored warranty_start_at. 422 for a bad date or a key that is not a warranty item of the order; the body shape and dates are checked before the order state, item keys after it.",
+      "Returns the order in the getOrder shape, including store_department (see getOrder)."
     ]
   },
   {
@@ -1790,7 +1791,8 @@
       "Requires the Store plan feature (403 otherwise).",
       "Includes the order items; warranty items (warranty true) need a start date in approveOrder.",
       "Also returns renewal orders, which getOrders lists only with include_renewals=true.",
-      "approved_by is who approved the order: { \"type\": \"api_key\", \"name\" } (name at approval time, kept after a rename or delete), { \"type\": \"user\", \"id\", \"name\" } (partner portal; for a PO the user who approved it), or null (not approved, user since removed, or approved before the field existed)."
+      "approved_by is who approved the order: { \"type\": \"api_key\", \"name\" } (name at approval time, kept after a rename or delete), { \"type\": \"user\", \"id\", \"name\" } (partner portal; for a PO the user who approved it), or null (not approved, user since removed, or approved before the field existed).",
+      "store_department is { \"id\", \"name\" } of the store department the order was placed in, or null for an order placed under the store's own settings. The department overrides only the settings it sets (currencies, payment methods, approval, order parameters, purchase order custom fields, legal documents, seller name and email, and the address when it overrides it); every setting it leaves blank comes from getStoreSettings. Tax and branding always come from the store."
     ]
   },
   {
@@ -1827,7 +1829,8 @@
       "per_page is optional, 1-500, default 100 (422 otherwise). Newest first.",
       "created_from is inclusive, created_to exclusive; both need a time-zone offset (Z or +hh:mm), else 422. created_to must be after created_from, else 422.",
       "pending_approval=true lists orders waiting for approveOrder; include_renewals defaults to false (first purchases only).",
-      "approved_by is who approved the order: { \"type\": \"api_key\", \"name\" } (name at approval time, kept after a rename or delete), { \"type\": \"user\", \"id\", \"name\" } (partner portal; for a PO the user who approved it), or null (not approved, user since removed, or approved before the field existed)."
+      "approved_by is who approved the order: { \"type\": \"api_key\", \"name\" } (name at approval time, kept after a rename or delete), { \"type\": \"user\", \"id\", \"name\" } (partner portal; for a PO the user who approved it), or null (not approved, user since removed, or approved before the field existed).",
+      "store_department is { \"id\", \"name\" } of the store department the order was placed in, or null for an order placed under the store's own settings. The department overrides only the settings it sets (currencies, payment methods, approval, order parameters, purchase order custom fields, legal documents, seller name and email, and the address when it overrides it); every setting it leaves blank comes from getStoreSettings. Tax and branding always come from the store."
     ]
   },
   {
@@ -2053,7 +2056,8 @@
     "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Partner API/Products/Get Product.bru",
     "notes": [
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
-      "Requires the Store plan feature (403 otherwise)."
+      "Requires the Store plan feature (403 otherwise).",
+      "store_department is { \"id\", \"name\" } of the store department the product is assigned to, or null when it has none. The department applies only to orders placed through your own listings of the product: it overrides the settings it sets, and the rest come from getStoreSettings. A connected partner's listing sells under that partner's store settings, and the order's store_department is null. An archived department stays assigned, and the product cannot be published again until it is moved to another department or the store default."
     ]
   },
   {
@@ -2080,7 +2084,8 @@
       "dev.xyte.io page pending; endpoint added by xyte-io/server#9927.",
       "Requires the Store plan feature (403 otherwise).",
       "per_page is optional, 1-500, default 100 (422 otherwise). Newest first.",
-      "Products other partners share with you are not listed."
+      "Products other partners share with you are not listed.",
+      "store_department is { \"id\", \"name\" } of the store department the product is assigned to, or null when it has none. The department applies only to orders placed through your own listings of the product: it overrides the settings it sets, and the rest come from getStoreSettings. A connected partner's listing sells under that partner's store settings, and the order's store_department is null. An archived department stays assigned, and the product cannot be published again until it is moved to another department or the store default."
     ]
   },
   {

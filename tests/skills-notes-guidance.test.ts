@@ -68,5 +68,6 @@ describe('notes endpoint docs and skill guidance', () => {
     expect(content).toContain(
       '`partner.orders.*`, `partner.payments.*`, `partner.subscriptions.*`, `partner.products.*`, `partner.soldProducts.*`, `partner.storeListings.*`, `partner.storeSettings.*` and `partner.coupons.*` need the partner\'s Store plan feature (403 otherwise); `partner.coupons.*` also need store coupons enabled.'
     );
+    expect(content).toContain('`store_department`');
   });
 });
