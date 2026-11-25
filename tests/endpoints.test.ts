@@ -435,6 +435,20 @@ describe('public endpoint catalog', () => {
     expect(endpoint?.queryParams).toEqual([]);
   });
 
+  it('documents organization data export caveats in notes', () => {
+    const list = endpoints.find((item) => item.key === 'organization.exports.getExports');
+    const show = endpoints.find((item) => item.key === 'organization.exports.getExport');
+    const listNotes = (list?.notes ?? []).join(' ');
+    const showNotes = (show?.notes ?? []).join(' ');
+    expect(listNotes).toContain('7 most recent');
+    expect(listNotes).toContain('server#9941');
+    for (const text of ['422', 'pre-signed', 'devices.ndjson.gz', 'state_history.ndjson.gz', 'server#9941']) {
+      expect(showNotes).toContain(text);
+    }
+    expect(list?.sourceFile.startsWith('hub Bruno: docs/api/Xyte Public/')).toBe(true);
+    expect(show?.sourceFile.startsWith('hub Bruno: docs/api/Xyte Public/')).toBe(true);
+  });
+
   it('includes organization users and groups endpoint metadata', () => {
     const getUsers = endpoints.find((item) => item.key === 'organization.users.getUsers');
     expect(getUsers).toBeDefined();
