@@ -420,6 +420,21 @@ describe('public endpoint catalog', () => {
     expect(endpoint?.queryParams).toEqual(['page', 'per_page']);
   });
 
+  it.each([
+    ['organization.exports.getExports', '/core/v1/organization/exports', []],
+    ['organization.exports.getExport', '/core/v1/organization/exports/:date', ['date']]
+  ])('includes organization data export endpoint %s', (key, pathTemplate, pathParams) => {
+    const endpoint = endpoints.find((item) => item.key === key);
+    expect(endpoint).toBeDefined();
+    expect(endpoint?.method).toBe('GET');
+    expect(endpoint?.pathTemplate).toBe(pathTemplate);
+    expect(endpoint?.authScope).toBe('organization');
+    expect(endpoint?.bodyType).toBe('none');
+    expect(endpoint?.hasBody).toBe(false);
+    expect(endpoint?.pathParams).toEqual(pathParams);
+    expect(endpoint?.queryParams).toEqual([]);
+  });
+
   it('includes organization users and groups endpoint metadata', () => {
     const getUsers = endpoints.find((item) => item.key === 'organization.users.getUsers');
     expect(getUsers).toBeDefined();

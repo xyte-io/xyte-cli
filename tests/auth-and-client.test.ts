@@ -158,6 +158,27 @@ describe('client auth behavior', () => {
     expect(sent.url).toBe('https://hub.example.test/core/v1/partner/orders?created_from=2026-01-01T00%3A00%3A00%2B02%3A00');
   });
 
+  it('renders organization data export requests with the org key and no body', async () => {
+    const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { items: [] } });
+    const transport = { request } as unknown as HttpTransport;
+
+    const client = createXyteClient({
+      auth: { organization: 'org-key-123' },
+      hubBaseUrl: 'https://hub.example.test',
+      transport
+    });
+    await client.organization.getExports({});
+    await client.organization.getExport({ path: { date: '2026-11-22' } });
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(request.mock.calls[0][0]).toMatchObject({ method: 'GET', url: 'https://hub.example.test/core/v1/organization/exports' });
+    expect(request.mock.calls[1][0]).toMatchObject({ method: 'GET', url: 'https://hub.example.test/core/v1/organization/exports/2026-11-22' });
+    for (const [sent] of request.mock.calls) {
+      expect(sent.headers.Authorization).toBe('org-key-123');
+      expect(sent.body).toBeUndefined();
+    }
+  });
+
   it('renders organization merge and split device requests', async () => {
     const request = vi.fn().mockResolvedValue({ status: 200, headers: {}, data: { ok: true } });
     const transport = { request } as unknown as HttpTransport;

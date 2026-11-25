@@ -522,6 +522,55 @@
     ]
   },
   {
+    "key": "organization.exports.getExports",
+    "namespace": "organization",
+    "group": "exports",
+    "action": "getExports",
+    "title": "Get Exports",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/exports",
+    "pathParams": [],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Organization API/Exports/Get Exports.bru",
+    "notes": [
+      "docs.xyte.io page pending; endpoint added by xyte-io/server#9941.",
+      "Lists the organization's 7 most recent nightly data exports, newest first: { items: [{ date, generated_at }] }. Not paginated.",
+      "Exports run nightly at 01:00 UTC for the previous UTC day.",
+      "Requires the Data Export pricing plan feature (403 otherwise). The list is empty until an organization admin turns the export on in the portal.",
+      "503 when data export is temporarily unavailable; retry later."
+    ]
+  },
+  {
+    "key": "organization.exports.getExport",
+    "namespace": "organization",
+    "group": "exports",
+    "action": "getExport",
+    "title": "Get Export",
+    "method": "GET",
+    "base": "hub",
+    "pathTemplate": "/core/v1/organization/exports/:date",
+    "pathParams": [
+      "date"
+    ],
+    "queryParams": [],
+    "authScope": "organization",
+    "bodyType": "none",
+    "hasBody": false,
+    "sourceFile": "hub Bruno: docs/api/Xyte Public/Xyte Platform API - Documentation/Organization API/Exports/Get Export.bru",
+    "notes": [
+      "docs.xyte.io page pending; endpoint added by xyte-io/server#9941.",
+      "date is the UTC day as YYYY-MM-DD (a date from organization.exports.getExports); any other format returns 422.",
+      "Returns { organization_id, date, schema_version, generated_at, files: [{ name, rows, bytes, url, expires_at }] }. Files are gzipped NDJSON: devices, spaces, device_models, incidents, state_history.",
+      "Each url is a pre-signed download link valid for 15 minutes (expires_at); call again for fresh URLs. Anyone holding the URL can download the file, so do not paste it into shared logs or tickets.",
+      "Requires the Data Export pricing plan feature (403 otherwise). 404 when no export exists for that date or the export is turned off.",
+      "503 when data export is temporarily unavailable; retry later."
+    ]
+  },
+  {
     "key": "organization.getOrganizationInfo",
     "namespace": "organization",
     "group": "general",

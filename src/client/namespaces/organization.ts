@@ -20,6 +20,8 @@ export function createOrganizationNamespace(
     getDevices: (args) => call('organization.devices.getDevices', args),
     getHistories: (args) => call('organization.devices.getHistories', args),
     getEdges: (args) => call('organization.edges.getEdges', args),
+    getExports: (args) => call('organization.exports.getExports', args),
+    getExport: (args) => call('organization.exports.getExport', args),
     getOrganizationInfo: (args) => call('organization.getOrganizationInfo', args),
     addExternalUser: (args) => call('organization.groups.addExternalUser', args),
     addUsers: (args) => call('organization.groups.addUsers', args),

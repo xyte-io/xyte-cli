@@ -264,6 +264,8 @@ Organization:
 - `organization.notes.deleteDeviceNote`
 - `organization.notes.deleteSpaceNote`
 - `organization.edges.getEdges`
+- `organization.exports.getExports` (nightly data exports, last 7 days)
+- `organization.exports.getExport` (one day's files with 15-minute download URLs)
 - `organization.groups.getGroups`
 - `organization.groups.addUsers`
 - `organization.users.getUsers`
@@ -304,6 +306,19 @@ Partner (brand partner API keys are read-only: any call other than `GET` or `HEA
 - `partner.soldProducts.getSoldProducts`
 - `partner.soldProducts.getSoldProduct`
 - `partner.tickets.getTickets`
+
+## Nightly Data Export
+
+Organizations on a plan with the Data Export feature get a nightly export (01:00 UTC, previous UTC day) of devices, spaces, device models, incidents and device status changes as gzipped NDJSON files. Both calls are read-only.
+
+```bash
+xyte-cli api call organization.exports.getExports --tenant <tenant-id>
+xyte-cli api call organization.exports.getExport --tenant <tenant-id> --path-json '{"date":"2026-11-22"}'
+```
+
+- `getExports` lists up to 7 recent days (`{ items: [{ date, generated_at }] }`); it is empty until an organization admin turns the export on in the portal.
+- `getExport` takes `date` as `YYYY-MM-DD` (422 otherwise) and returns `files[]` with `name`, `rows`, `bytes`, `url`, `expires_at`. Each `url` is a pre-signed link valid for 15 minutes; call again for fresh URLs. Anyone with the URL can download the file, so do not paste it into shared logs, tickets or chat.
+- 403 means the pricing plan lacks Data Export; 404 means no export for that day (or the export is off); 503 means export is temporarily unavailable, so retry later.
 
 ## Edge Devices (Async)
 
