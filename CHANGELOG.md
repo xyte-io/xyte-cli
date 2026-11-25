@@ -6,6 +6,19 @@ The format is inspired by Keep a Changelog and this project follows SemVer for `
 
 ## [Unreleased]
 
+### Added
+- `organization.spaces.getSpaces` lists the hub's `room_status` filter: one of `no_devices`, `maintenance_mode`, `error`, `warning`, `unknown`, `healthy` (case-insensitive; blank means no filter), e.g. `--query-json '{"room_status":"error"}'`. Any other value returns 400.
+- Space responses from `getSpaces`, `getSpace`, `createSpace`, `findOrCreateSpace` and `updateSpace` document the new `room_status` (nullable), `room_status_updated_at` (nullable ISO 8601) and `is_vip` (boolean) fields. A space with child spaces has `room_status` `null` and normally `room_status_updated_at` `null` and `is_vip` `false`; Unsorted/Unprovisioned spaces may be `null` or hold a status the portal hides.
+- `organization.spaces.getSpaces` lists the hub's boolean maintenance filters `maintenance_scheduled_active` and `has_maintenance_schedules` (non-boolean values return 422), and its `page` / `per_page` params (`per_page` default and max 100; continue while `next_page` is set).
+
+### Fixed
+- `organization.spaces.getSpace` now calls `GET /core/v1/organization/spaces/:space_id` with a required `space_id` path param, matching the hub. It previously pointed at the list route with the list filters. The TUI space detail view, which already passed `space_id`, now gets the single space.
+
+### Upgrade notes
+- The `room_status` filter and the three space fields need a hub release that serves them (xyte-io/server#9951); older hubs ignore `room_status` (unfiltered list) and omit the fields.
+- `getSpace` now requires `space_id`; callers that used it without one as a list call should switch to `organization.spaces.getSpaces`.
+- Run `xyte-cli skills refresh` after upgrading so installed skill bundles pick up the new filter.
+
 ## [0.17.0] - 2026-11-24
 
 ### Added

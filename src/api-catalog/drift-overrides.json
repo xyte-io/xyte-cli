@@ -46,5 +46,21 @@
     "appendNotes": [
       "Docs OpenAPI path currently includes a ReadMe '(COPY)' suffix; the callable ticket route is /core/v1/partner/tickets/:ticket_id."
     ]
+  },
+  "organization.spaces.getSpace": {
+    "pathTemplate": "/core/v1/organization/spaces/:space_id",
+    "pathParams": [
+      "space_id"
+    ],
+    "queryParams": [],
+    "appendNotes": [
+      "Docs map getSpace to the list page; hub Bruno Organization API/Spaces/Get Space.bru and spaces_controller#show use GET /core/v1/organization/spaces/:space_id (DEV-8124)."
+    ]
+  },
+  "organization.spaces.getSpaces": {
+    "queryParams": ["page", "per_page", "id", "name", "parent_id", "space_type", "created_before", "created_after", "path_includes", "room_status", "maintenance_scheduled_active", "has_maintenance_schedules"],
+    "appendNotes": [
+      "Public docs omit page/per_page, room_status and the maintenance filters; all verified against hub spaces_controller.rb#index and Get Spaces.bru (xyte-io/server#9951). Keep the getSpaces room status, maintenance and pagination notes in public-endpoints.json when regenerating."
+    ]
   }
 }

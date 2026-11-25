@@ -32,6 +32,10 @@ describe('public endpoint catalog', () => {
     const partnerTicket = endpoints.find((endpoint) => endpoint.key === 'partner.tickets.getTicket');
     expect(partnerTicket?.pathTemplate).toBe('/core/v1/partner/tickets/:ticket_id');
     expect(partnerTicket?.pathParams).toEqual(['ticket_id']);
+
+    const getSpace = endpoints.find((endpoint) => endpoint.key === 'organization.spaces.getSpace');
+    expect(getSpace?.pathTemplate).toBe('/core/v1/organization/spaces/:space_id');
+    expect(getSpace?.pathParams).toEqual(['space_id']);
   });
 
   it('documents the sendCommand request field separately from response params', () => {
@@ -161,6 +165,18 @@ describe('public endpoint catalog', () => {
       expect(endpoints.find((item) => item.key === key)?.notes?.join(' ')).toContain('connector: { type: native|c2c|edge');
     }
 
+    for (const key of [
+      'organization.spaces.getSpaces',
+      'organization.spaces.getSpace',
+      'organization.spaces.createSpace',
+      'organization.spaces.findOrCreateSpace',
+      'organization.spaces.updateSpace'
+    ]) {
+      const notes = endpoints.find((item) => item.key === key)?.notes?.join(' ');
+      expect(notes).toContain('room_status_updated_at');
+      expect(notes).toContain('is_vip');
+    }
+
     const getHistories = endpoints.find((item) => item.key === 'organization.devices.getHistories');
     expect(getHistories?.queryParams).toEqual([
       'status',
@@ -194,14 +210,27 @@ describe('public endpoint catalog', () => {
 
     const getSpaces = endpoints.find((item) => item.key === 'organization.spaces.getSpaces');
     expect(getSpaces?.queryParams).toEqual([
+      'page',
+      'per_page',
       'id',
       'name',
       'parent_id',
       'space_type',
       'created_before',
       'created_after',
-      'path_includes'
+      'path_includes',
+      'room_status',
+      'maintenance_scheduled_active',
+      'has_maintenance_schedules'
     ]);
+    expect(getSpaces?.notes?.join(' ')).toContain('Any other value returns 400');
+    expect(getSpaces?.notes?.join(' ')).toContain('Non-boolean values return 422');
+
+    const getSpace = endpoints.find((item) => item.key === 'organization.spaces.getSpace');
+    expect(getSpace?.title).toBe('Get Space');
+    expect(getSpace?.pathTemplate).toBe('/core/v1/organization/spaces/:space_id');
+    expect(getSpace?.pathParams).toEqual(['space_id']);
+    expect(getSpace?.queryParams).toEqual([]);
 
     const getEdges = endpoints.find((item) => item.key === 'organization.edges.getEdges');
     expect(getEdges?.queryParams).toEqual(['page', 'per_page']);
