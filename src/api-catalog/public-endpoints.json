@@ -106,6 +106,8 @@
       "Docs category: /branches/2.0/categories/reference/API Access",
       "Docs parent: /branches/2.0/reference/devices-2",
       "Response includes effective_status (nullable string): one of ok, warning, error, offline, disconnected, never_seen. Computed device status reflecting incident priority, connectivity, telemetry-seen state, and raw device status.",
+      "Response includes merged_effective_status (nullable string): same values as effective_status. In a merged device group the primary holds the rollup of the whole group; every other device mirrors its own effective_status.",
+      "Response includes merged_effective_status_updated_at (nullable string): ISO 8601 time merged_effective_status (the merge-aware status, also in the response) last changed. Null for a device whose merged status has not changed since the field was introduced; it is when the hub recorded the change, usually within a minute, but a device that stops reporting is marked offline only after its model's offline timeout (15 minutes by default).",
       "Response includes connector: { type: native|c2c|edge, id: uuid|null, name: string|null }."
     ]
   },
@@ -298,6 +300,8 @@
       "Docs parent: /branches/2.0/reference/devices-2",
       "Docs raw path params: device_id",
       "Response includes effective_status (nullable string): one of ok, warning, error, offline, disconnected, never_seen. Computed device status reflecting incident priority, connectivity, telemetry-seen state, and raw device status.",
+      "Response includes merged_effective_status (nullable string): same values as effective_status. In a merged device group the primary holds the rollup of the whole group; every other device mirrors its own effective_status.",
+      "Response includes merged_effective_status_updated_at (nullable string): ISO 8601 time merged_effective_status (the merge-aware status, also in the response) last changed. Null for a device whose merged status has not changed since the field was introduced; it is when the hub recorded the change, usually within a minute, but a device that stops reporting is marked offline only after its model's offline timeout (15 minutes by default).",
       "Response includes connector: { type: native|c2c|edge, id: uuid|null, name: string|null }."
     ]
   },
@@ -359,6 +363,8 @@
       "Filters combine with AND: name is a case-insensitive substring match; status is one or more of online, offline, unavailable, error; effective_status is one or more of ok, warning, error, offline, disconnected, never_seen; model_id is a device model UUID; connection_method is one of native, c2c, edge; connector_id is the UUID of a C2C integration or edge (a device's connector.id). Pass multi-value status/effective_status as a comma-separated string, e.g. {\"status\":\"online,error\"}. Status filters can trail the live status by up to a minute, so a returned device's status may not match the filter yet.",
       "Any other query parameter returns 422 Unsupported query parameter(s). Invalid enum values or non-UUID model_id/connector_id return 422.",
       "Response includes effective_status (nullable string): one of ok, warning, error, offline, disconnected, never_seen. Computed device status reflecting incident priority, connectivity, telemetry-seen state, and raw device status.",
+      "Response includes merged_effective_status (nullable string): same values as effective_status. In a merged device group the primary holds the rollup of the whole group; every other device mirrors its own effective_status.",
+      "Response includes merged_effective_status_updated_at (nullable string): ISO 8601 time merged_effective_status (the merge-aware status, also in the response) last changed. Null for a device whose merged status has not changed since the field was introduced; it is when the hub recorded the change, usually within a minute, but a device that stops reporting is marked offline only after its model's offline timeout (15 minutes by default).",
       "Each device includes connector: { type: native|c2c|edge, id: uuid|null, name: string|null }."
     ]
   },
